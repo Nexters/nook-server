@@ -1,0 +1,3 @@
+logging:
+  level:
+    org.every.nook.api: info

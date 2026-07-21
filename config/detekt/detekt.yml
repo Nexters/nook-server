@@ -1,0 +1,69 @@
+config:
+  validation: true
+  warningsAsErrors: true
+
+complexity:
+  CyclomaticComplexMethod:
+    active: true
+    allowedComplexity: 15
+  LongMethod:
+    active: true
+    allowedLines: 60
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 6
+    allowedConstructorParameters: 8
+    ignoreDefaultParameters: true
+  NestedBlockDepth:
+    active: true
+    allowedDepth: 4
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: true
+  TooGenericExceptionThrown:
+    active: true
+
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*|`[^`]+`'
+  MatchingDeclarationName:
+    active: true
+
+potential-bugs:
+  DontDowncastCollectionTypes:
+    active: true
+  ImplicitDefaultLocale:
+    active: true
+  NullableToStringCall:
+    active: true
+
+style:
+  ForbiddenComment:
+    active: true
+    comments:
+      - reason: 'Resolve TODOs before merging or link them to a tracked issue.'
+        value: 'TODO:'
+      - reason: 'Resolve FIXMEs before merging or link them to a tracked issue.'
+        value: 'FIXME:'
+  MagicNumber:
+    active: true
+    ignoreNumbers: ['-1', '0', '1', '2']
+    ignoreEnums: true
+    ignoreHashCodeFunction: true
+    ignorePropertyDeclaration: true
+  MaxLineLength:
+    active: true
+    maxLineLength: 120
+    excludeCommentStatements: false
+  ReturnCount:
+    active: true
+    max: 3
+  WildcardImport:
+    active: true
+
+ktlint:
+  active: true
+  Filename:
+    excludes: ['**/package-info.kt']
