@@ -18,6 +18,8 @@ dependencies {
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
     testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation(kotlin("reflect"))
+    testImplementation(kotlin("test"))
 }
 
 tasks.bootJar {
