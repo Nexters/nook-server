@@ -53,3 +53,19 @@ external:
     reels-dataset-id: ${BRIGHT_DATA_REELS_DATASET_ID:gd_lyclm20il4r5helnj}
     connect-timeout: ${BRIGHT_DATA_CONNECT_TIMEOUT:3s}
     read-timeout: ${BRIGHT_DATA_READ_TIMEOUT:60s}
+
+auth:
+  kakao:
+    app-id: ${KAKAO_APP_ID:}
+  jwt:
+    issuer: nook-api
+    access-secret: ${JWT_ACCESS_SECRET}
+    refresh-secret: ${JWT_REFRESH_SECRET}
+    access-ttl: 30m
+    refresh-ttl: 30d
+    signup-ttl: 10m
+  apple:
+    client-id: ${APPLE_CLIENT_ID:}
+    team-id: ${APPLE_TEAM_ID:}
+    key-id: ${APPLE_KEY_ID:}
+    private-key: ${APPLE_PRIVATE_KEY:}
