@@ -12,12 +12,21 @@ import java.time.Instant
 @EntityListeners(AuditingEntityListener::class)
 abstract class BaseEntity {
     @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(
+        name = "created_at",
+        nullable = false,
+        updatable = false,
+        columnDefinition = "TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6)",
+    )
     lateinit var createdAt: Instant
         protected set
 
     @LastModifiedDate
-    @Column(name = "updated_at", nullable = false)
+    @Column(
+        name = "updated_at",
+        nullable = false,
+        columnDefinition = "TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
+    )
     lateinit var updatedAt: Instant
         protected set
 }
