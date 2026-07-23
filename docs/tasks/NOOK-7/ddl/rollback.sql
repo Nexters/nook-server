@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS group_posts;
+DROP TABLE IF EXISTS user_groups;
+DROP TABLE IF EXISTS user_saved_posts;
+DROP TABLE IF EXISTS post_places;
+DROP TABLE IF EXISTS places;
+DROP TABLE IF EXISTS post_media;
+DROP TABLE IF EXISTS posts;

@@ -31,6 +31,7 @@ class BaseEntityTest {
         assertEquals("created_at", column.name)
         assertEquals(false, column.nullable)
         assertEquals(false, column.updatable)
+        assertEquals("TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6)", column.columnDefinition)
     }
 
     @Test
@@ -42,5 +43,9 @@ class BaseEntityTest {
         assertNotNull(column)
         assertEquals("updated_at", column.name)
         assertEquals(false, column.nullable)
+        assertEquals(
+            "TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
+            column.columnDefinition,
+        )
     }
 }
