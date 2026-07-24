@@ -6,5 +6,7 @@ enum class ErrorType {
     FORBIDDEN,
     NOT_FOUND,
     CONFLICT,
+    BAD_GATEWAY,
+    GATEWAY_TIMEOUT,
     INTERNAL_ERROR,
 }

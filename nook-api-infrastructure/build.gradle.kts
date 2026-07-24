@@ -11,6 +11,8 @@ dependencies {
     implementation(project(":nook-api-domain"))
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework:spring-web")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-boot4-support:3.8.0")
     runtimeOnly("com.mysql:mysql-connector-j")
 

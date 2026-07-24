@@ -33,3 +33,12 @@ management:
     health:
       probes:
         enabled: true
+
+external:
+  bright-data:
+    base-url: ${BRIGHT_DATA_BASE_URL:https://api.brightdata.com}
+    api-token: ${BRIGHT_DATA_API_TOKEN:}
+    posts-dataset-id: ${BRIGHT_DATA_POSTS_DATASET_ID:gd_lk5ns7kz21pck8jpis}
+    reels-dataset-id: ${BRIGHT_DATA_REELS_DATASET_ID:gd_lyclm20il4r5helnj}
+    connect-timeout: ${BRIGHT_DATA_CONNECT_TIMEOUT:3s}
+    read-timeout: ${BRIGHT_DATA_READ_TIMEOUT:60s}
