@@ -5,6 +5,7 @@ COPY gradlew gradlew
 COPY gradle gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY nook-api-application nook-api-application
+COPY nook-api-batch nook-api-batch
 COPY nook-api-domain nook-api-domain
 COPY nook-api-infrastructure nook-api-infrastructure
 COPY nook-api-presentation nook-api-presentation
