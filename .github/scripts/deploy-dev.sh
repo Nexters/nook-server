@@ -14,9 +14,9 @@ printf '%s' "${GABIA_REGISTRY_PASSWORD}" \
 cd /opt/nook/api
 
 if grep -q '^IMAGE=' .env; then
-  sed -i "s|^IMAGE=.*|IMAGE=${IMAGE}|" .env
+  sed -i "s|^IMAGE=.*|IMAGE=${DEV_IMAGE}|" .env
 else
-  printf '\nIMAGE=%s\n' "${IMAGE}" >> .env
+  printf '\nIMAGE=%s\n' "${DEV_IMAGE}" >> .env
 fi
 
 docker compose pull
