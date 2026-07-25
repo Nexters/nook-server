@@ -11,7 +11,7 @@ dependencies {
     implementation(project(":nook-api-domain"))
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-boot4-support:3.8.0")
+    implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-boot4-support:3.9.0")
     runtimeOnly("com.mysql:mysql-connector-j")
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
