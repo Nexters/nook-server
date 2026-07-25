@@ -13,7 +13,7 @@
 - Instagram URL 공유부터 장소 정보 완성까지의 처리 흐름 다이어그램
 - 동기 처리와 비동기 처리 경계
 - Bright Data, S3/CloudFront, OCR/LLM, Kakao Map API의 역할
-- 구조화된 장소 태그, 텍스트 LLM 분석, OCR 보강의 단계적 실행 기준
+- 게시글 텍스트와 장소 태그의 교차검증, OCR 보강의 단계적 실행 기준
 - OCR와 2차 LLM 호출의 비용·지연 판단 기준과 관측 지표
 - 게시물 저장, 미디어 저장, 장소 파싱, 장소 확정, polling status 제공 책임
 - 후속 구현에서 확정해야 할 API 계약과 상태 값
@@ -55,33 +55,24 @@ sequenceDiagram
 
     API--)Parser: 장소 파싱 작업 enqueue
     Parser->>PostStore: 게시글 본문, 인스타 장소 태그, 해시태그, 미디어 조회
-    alt 인스타 장소 태그로 검색 가능
-        Parser->>Kakao: 구조화된 장소 태그로 후보 검색
-        Kakao-->>Parser: 카카오 장소 후보
-    end
+    Parser->>LLM: 본문, 장소 태그, 해시태그를 함께 분석
+    LLM-->>Parser: 장소명, 지역명, 검색 질의, 신뢰도
+    Parser->>Kakao: 1차 LLM 질의로 후보 검색 및 검증
+    Kakao-->>Parser: 카카오 장소 후보
 
-    alt 단일 후보를 충분한 근거로 확정
-        Note over Parser,LLM: LLM 0회, OCR 0회
-    else 구조화된 정보만으로 확정 불가
-        Parser->>LLM: 본문, 장소 태그, 해시태그 분석
-        LLM-->>Parser: 장소명, 지역명, 검색 질의, 신뢰도
-        Parser->>Kakao: 1차 LLM 질의로 후보 검색 및 검증
-        Kakao-->>Parser: 카카오 장소 후보
-
-        alt 텍스트 근거와 카카오 후보가 일치
-            Note over Parser,OCR: LLM 1회, OCR 0회
-        else 후보 없음 또는 복수 후보로 불충분
-            alt OCR 가능한 이미지가 있음
-                Parser->>OCR: 대표 이미지부터 제한적으로 OCR
-                OCR-->>Parser: 이미지 내 텍스트
-                Parser->>LLM: 기존 단서, OCR 결과, 이전 후보를 재분석
-                LLM-->>Parser: 보강된 검색 질의와 신뢰도
-                Parser->>Kakao: 보강 질의로 후보 재검색 및 검증
-                Kakao-->>Parser: 카카오 장소 후보
-                Note over Parser,OCR: LLM 2회, OCR 1회 이상
-            else OCR로 보강할 수 없음
-                Parser->>PostStore: parsing status 실패 처리
-            end
+    alt 게시글 근거와 카카오 후보가 일치
+        Note over Parser,OCR: LLM 1회, OCR 0회
+    else 후보 없음 또는 복수 후보로 불충분
+        alt OCR 가능한 이미지가 있음
+            Parser->>OCR: 대표 이미지부터 제한적으로 OCR
+            OCR-->>Parser: 이미지 내 텍스트
+            Parser->>LLM: 기존 단서, OCR 결과, 이전 후보를 재분석
+            LLM-->>Parser: 보강된 검색 질의와 신뢰도
+            Parser->>Kakao: 보강 질의로 후보 재검색 및 검증
+            Kakao-->>Parser: 카카오 장소 후보
+            Note over Parser,OCR: LLM 2회, OCR 1회 이상
+        else OCR로 보강할 수 없음
+            Parser->>PostStore: parsing status 실패 처리
         end
     end
 
@@ -119,9 +110,8 @@ provider 응답과 스토리지 저장 결과를 확보한 뒤, 게시물 저장
 장소 정보는 공유 요청 응답 이후 별도 작업으로 완성합니다.
 
 - 저장된 게시글 본문, Instagram 장소 태그, 해시태그, 미디어 URL을 읽습니다.
-- Instagram 장소 태그가 검색 가능한 형태라면 LLM 호출 전에 카카오 맵 API로 후보를 조회합니다.
-- 구조화된 장소 태그와 카카오 단일 후보가 충분히 일치하면 LLM과 OCR 없이 장소를 확정합니다.
-- 구조화된 정보만으로 확정할 수 없으면 본문, 장소 태그, 해시태그를 1차 LLM 입력으로 사용합니다.
+- 본문, 장소 태그, 해시태그를 항상 1차 LLM 입력으로 함께 사용합니다.
+- 장소 태그는 작성자가 선택한 보조 단서일 뿐 단독 확정 근거로 사용하지 않습니다.
 - 1차 LLM이 생성한 장소명, 지역명, 검색 질의로 카카오 후보를 조회하고 텍스트 근거와 일치하는지 검증합니다.
 - 1차 결과로 확정할 수 없고 OCR 가능한 이미지가 있을 때만 대표 이미지부터 OCR을 실행합니다.
 - 기존 텍스트, OCR 결과, 1차 카카오 검색 결과를 2차 LLM 입력으로 함께 전달해 질의를 보강합니다.
@@ -134,18 +124,19 @@ LLM과 카카오 맵 API 호출도 DB 트랜잭션 바깥에서 실행합니다.
 
 ## 단계별 실행 정책
 
-장소 파싱은 비용이 낮고 근거가 강한 입력부터 사용합니다.
+장소 태그가 있더라도 게시글의 실제 내용과 일치하는지 반드시 함께 확인합니다. 장소 파싱은 모든
+게시물에 대해 텍스트 분석을 먼저 실행하고, 이미지 정보는 앞선 근거가 불충분할 때만 사용합니다.
 
 | 단계 | 진입 조건 | 외부 호출 | 성공 조건 |
 | --- | --- | --- | --- |
-| 구조화 정보 우선 | Instagram 장소 태그가 있음 | Kakao 1회 | 장소명과 지역이 일치하는 단일 후보 |
-| 텍스트 분석 | 구조화 정보만으로 확정 불가 | LLM 1회, Kakao 1회 | 본문·태그 근거와 일치하는 단일 후보 |
+| 텍스트 분석 | 모든 게시물 | LLM 1회, Kakao 1회 | 본문·장소 태그·해시태그 근거와 일치하는 단일 후보 |
 | 이미지 보강 | 후보가 없거나 복수이고 OCR 가능한 이미지가 있음 | OCR, LLM 1회 추가, Kakao 1회 추가 | OCR 근거까지 반영해 검증된 단일 후보 |
 | 종료 | 이미지 보강 후에도 확정 불가 | 없음 | `FAILED` 또는 후속 사용자 확인 대상으로 전환 |
 
-신뢰도 숫자 하나만으로 장소를 확정하지 않습니다. 최소한 LLM이 제시한 장소명·지역과 카카오 후보의
-장소명·주소가 일치해야 하며, 여러 후보의 점수가 비슷하면 OCR 보강 또는 실패로 처리합니다. 임계값은
-초기 운영 데이터로 조정할 수 있도록 설정값으로 관리합니다.
+장소 태그나 신뢰도 숫자 하나만으로 장소를 확정하지 않습니다. 최소한 본문·장소 태그·해시태그를 종합한
+LLM 결과의 장소명·지역과 카카오 후보의 장소명·주소가 일치해야 합니다. 장소 태그와 게시글 내용이
+충돌하거나 여러 후보의 점수가 비슷하면 OCR 보강 또는 실패로 처리합니다. 임계값은 초기 운영 데이터로
+조정할 수 있도록 설정값으로 관리합니다.
 
 OCR은 모든 이미지를 한 번에 처리하지 않습니다. 대표 이미지 1장부터 시작하고, 이미지당 호출 비용과
 지연을 고려해 최대 처리 장수를 설정합니다. 영상만 있는 릴스는 초기 범위에서 OCR 대상에서 제외하고,
@@ -161,8 +152,7 @@ OCR은 모든 이미지를 한 번에 처리하지 않습니다. 대표 이미�
 
 ```text
 평균 비용
-= 구조화 검색 비용
-+ P(텍스트 분석 진입) * (1차 LLM + 카카오 검색)
+= 1차 LLM + 카카오 검색
 + P(OCR 보강 진입) * (OCR 처리 이미지 수 * OCR 단가 + 2차 LLM + 카카오 재검색)
 ```
 
@@ -172,7 +162,7 @@ OCR 보강은 추가 호출 비용과 지연보다 장소 확정률 개선으로
 
 다음 지표를 파싱 작업 단위로 기록합니다.
 
-- `resolutionPath`: `STRUCTURED`, `TEXT_LLM`, `OCR_ENRICHED`
+- `resolutionPath`: `TEXT_LLM`, `OCR_ENRICHED`
 - `llmCallCount`, `ocrCallCount`, `ocrImageCount`, `kakaoSearchCount`
 - 단계별 `processingDurationMs`와 전체 `processingDurationMs`
 - `candidateCount`, `confidence`, `finalStatus`, `failureReason`
@@ -194,17 +184,16 @@ OCR 보강은 추가 호출 비용과 지연보다 장소 확정률 개선으로
 나눕니다.
 
 - `PENDING`: 게시물 저장은 끝났고 장소 파싱 작업이 등록되었습니다.
-- `PROCESSING`: 구조화 검색, LLM 분석, OCR 보강, 카카오 검색 중 하나를 실행하고 있습니다.
+- `PROCESSING`: LLM 분석, OCR 보강, 카카오 검색 중 하나를 실행하고 있습니다.
 - `COMPLETED`: 정확한 장소 정보 저장과 게시물-장소 연결이 끝났습니다.
 - `FAILED`: 재시도 가능한 오류 또는 최종 실패로 장소를 확정하지 못했습니다.
 
 polling API는 `COMPLETED`일 때 장소 정보를 함께 반환합니다. `PENDING`과 `PROCESSING`에서는 현재 상태와
 게시물 식별자만 반환하고, `FAILED`에서는 공개 가능한 실패 사유를 반환할 수 있습니다.
 
-내부 처리 단계는 `STRUCTURED_SEARCH`, `TEXT_ANALYZING`, `PLACE_SEARCHING`, `OCR_PROCESSING`,
-`PLACE_RETRYING`처럼 세분화해 관측할 수 있습니다. 클라이언트 공개 enum은 내부 단계와 분리해
-`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` 네 가지로 유지하면 처리 전략 변경이 API 호환성에
-영향을 주지 않습니다.
+내부 처리 단계는 `TEXT_ANALYZING`, `PLACE_SEARCHING`, `OCR_PROCESSING`, `PLACE_RETRYING`처럼
+세분화해 관측할 수 있습니다. 클라이언트 공개 enum은 내부 단계와 분리해 `PENDING`, `PROCESSING`,
+`COMPLETED`, `FAILED` 네 가지로 유지하면 처리 전략 변경이 API 호환성에 영향을 주지 않습니다.
 
 ## 미결정 사항
 
@@ -220,7 +209,8 @@ polling API는 `COMPLETED`일 때 장소 정보를 함께 반환합니다. `PEND
 
 - 게시물 생성과 장소 생성 흐름을 하나의 다이어그램으로 이해할 수 있습니다.
 - 동기 처리와 비동기 처리 경계가 명확합니다.
-- 구조화 정보만으로 장소를 확정하면 LLM과 OCR을 호출하지 않습니다.
+- 장소 태그가 있어도 본문과 해시태그를 포함한 1차 LLM 분석을 항상 실행합니다.
+- 장소 태그를 단독 확정 근거로 사용하지 않습니다.
 - 텍스트 분석으로 장소를 확정하면 OCR을 호출하지 않습니다.
 - OCR과 2차 LLM은 앞선 단계로 장소를 확정할 수 없을 때만 호출합니다.
 - 게시글 저장, 미디어 저장, 장소 파싱, 카카오 장소 확정, polling 응답의 책임이 분리되어 있습니다.
