@@ -1,0 +1,2 @@
+-- NOOK-10 does not change the database schema.
+-- No database rollback is required.
