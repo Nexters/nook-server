@@ -33,3 +33,10 @@ management:
     health:
       probes:
         enabled: true
+
+external:
+  kakao-local:
+    base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${KAKAO_REST_API_KEY:}
+    connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:3s}
+    read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:5s}

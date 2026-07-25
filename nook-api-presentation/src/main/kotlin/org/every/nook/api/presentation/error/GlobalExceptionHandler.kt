@@ -110,6 +110,8 @@ class GlobalExceptionHandler {
         ErrorType.FORBIDDEN -> HttpStatus.FORBIDDEN
         ErrorType.NOT_FOUND -> HttpStatus.NOT_FOUND
         ErrorType.CONFLICT -> HttpStatus.CONFLICT
+        ErrorType.BAD_GATEWAY -> HttpStatus.BAD_GATEWAY
+        ErrorType.GATEWAY_TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT
         ErrorType.INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR
     }
 

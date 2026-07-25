@@ -30,7 +30,10 @@
 export DB_URL='jdbc:mysql://localhost:3306/nook?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC'
 export DB_USERNAME='nook'
 export DB_PASSWORD='nook'
+export KAKAO_REST_API_KEY='your-kakao-rest-api-key'
 ```
+
+장소 후보 검색에는 카카오 디벨로퍼스 애플리케이션의 REST API 키를 사용합니다.
 
 API 애플리케이션을 실행합니다.
 

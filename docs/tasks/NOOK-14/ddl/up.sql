@@ -1,0 +1,2 @@
+-- NOOK-14 does not change the database schema.
+-- Place candidates are fetched from Kakao Local API and are not persisted.
