@@ -4,7 +4,7 @@ set -euo pipefail
 : "${DEV_SSH_HOST:?DEV_SSH_HOST is required}"
 : "${DEV_SSH_KEY_PATH:?DEV_SSH_KEY_PATH is required}"
 : "${DEV_IMAGE:?DEV_IMAGE is required}"
-: "${GABIA_PRIVATE_REGISTRY:?GABIA_PRIVATE_REGISTRY is required}"
+: "${GABIA_PUBLIC_REGISTRY:?GABIA_PUBLIC_REGISTRY is required}"
 : "${GABIA_REGISTRY_USERNAME:?GABIA_REGISTRY_USERNAME is required}"
 : "${GABIA_REGISTRY_PASSWORD:?GABIA_REGISTRY_PASSWORD is required}"
 
@@ -22,7 +22,7 @@ fi
 
 printf '%s' "${GABIA_REGISTRY_PASSWORD}" \
   | ssh "${ssh_options[@]}" "${remote}" \
-      "docker login ${GABIA_PRIVATE_REGISTRY} -u '${GABIA_REGISTRY_USERNAME}' --password-stdin"
+      "docker login ${GABIA_PUBLIC_REGISTRY} -u '${GABIA_REGISTRY_USERNAME}' --password-stdin"
 
 ssh "${ssh_options[@]}" "${remote}" "IMAGE='${DEV_IMAGE}' bash -s" <<'REMOTE'
 set -euo pipefail
