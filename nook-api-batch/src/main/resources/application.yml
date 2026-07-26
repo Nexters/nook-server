@@ -23,3 +23,20 @@ spring:
       initialize-schema: never
     job:
       enabled: true
+
+external:
+  kakao-local:
+    base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${KAKAO_REST_API_KEY:}
+    connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:3s}
+    read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:5s}
+  openai:
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-5-nano}
+    connect-timeout: ${OPENAI_CONNECT_TIMEOUT:3s}
+    read-timeout: ${OPENAI_READ_TIMEOUT:30s}
+
+place-parsing:
+  worker:
+    fixed-delay: ${PLACE_PARSING_WORKER_FIXED_DELAY:5s}

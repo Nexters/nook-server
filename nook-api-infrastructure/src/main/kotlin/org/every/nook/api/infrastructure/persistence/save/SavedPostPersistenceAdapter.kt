@@ -4,6 +4,7 @@ import org.every.nook.api.application.save.port.FindSavedPostPlaceParsingPort
 import org.every.nook.api.application.save.port.SaveInstagramPostPort
 import org.every.nook.api.application.save.port.SavedInstagramPost
 import org.every.nook.api.application.save.port.SavedPostPlaceParsingSnapshot
+import org.every.nook.api.application.save.port.UpdateSavedPostPlaceBookmarkPort
 import org.every.nook.api.domain.place.GeoPoint
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -33,14 +34,11 @@ class SavedPostPersistenceAdapter(
     private val postPlaceJpaRepository: PostPlaceJpaRepository,
     private val placeJpaRepository: PlaceJpaRepository,
 ) : SaveInstagramPostPort,
-    FindSavedPostPlaceParsingPort {
+    FindSavedPostPlaceParsingPort,
+    UpdateSavedPostPlaceBookmarkPort {
     @Transactional
     override fun save(userId: Long, post: Post): SavedInstagramPost {
-        val existingPost = postJpaRepository.findBySourceTypeAndExternalPostId(
-            sourceType = post.source.type,
-            externalPostId = post.source.externalPostId,
-        )
-        val postEntity = existingPost ?: saveNewPost(post)
+        val postEntity = saveNewPost(post)
         val postId = requireNotNull(postEntity.id)
         val parsingJob = placeParsingJobJpaRepository.findByPostId(postId)
             ?: placeParsingJobJpaRepository.save(
@@ -76,8 +74,23 @@ class SavedPostPersistenceAdapter(
             postId = savedPost.postId,
             placeParsingStatus = parsingJob.status,
             failureReason = parsingJob.failureReason,
-            places = postPlaces.mapNotNull { placesById[it.placeId]?.toDomain() },
+            places = postPlaces.mapNotNull { postPlace ->
+                placesById[postPlace.placeId]?.toDomain()?.let { place ->
+                    SavedPostPlaceParsingSnapshot.SavedPlace(
+                        place = place,
+                        bookmarked = postPlace.bookmarked,
+                    )
+                }
+            },
         )
+    }
+
+    @Transactional
+    override fun update(userId: Long, savedPostId: Long, placeId: Long, bookmarked: Boolean): Boolean {
+        val savedPost = userSavedPostJpaRepository.findByIdAndUserId(savedPostId, userId) ?: return false
+        val postPlace = postPlaceJpaRepository.findByPostIdAndPlaceId(savedPost.postId, placeId) ?: return false
+        postPlace.bookmarked = bookmarked
+        return true
     }
 
     private fun saveNewPost(post: Post): PostEntity {
@@ -88,6 +101,7 @@ class SavedPostPersistenceAdapter(
                 canonicalUrl = post.canonicalUrl,
                 authorIdentifier = post.authorIdentifier,
                 title = post.title,
+                memo = post.memo,
                 body = post.body,
                 publishedAt = post.publishedAt,
                 sourceLocationTag = post.sourceLocationTag,

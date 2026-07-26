@@ -35,6 +35,12 @@ management:
         enabled: true
 
 external:
+  openai:
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-5-nano}
+    connect-timeout: ${OPENAI_CONNECT_TIMEOUT:3s}
+    read-timeout: ${OPENAI_READ_TIMEOUT:30s}
   kakao-local:
     base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
     rest-api-key: ${KAKAO_REST_API_KEY:}
