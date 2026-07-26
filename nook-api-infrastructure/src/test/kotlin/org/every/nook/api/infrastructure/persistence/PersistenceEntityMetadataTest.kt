@@ -4,7 +4,9 @@ import jakarta.persistence.Table
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
+import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
+import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
@@ -59,12 +61,24 @@ class PersistenceEntityMetadataTest {
         assertEquals(listOf("user_id", "name"), uniqueConstraint.columnNames.toList())
     }
 
+    @Test
+    fun `place parsing job is unique per post`() {
+        val table = requireNotNull(PlaceParsingJobEntity::class.findAnnotation<Table>())
+        val uniqueConstraint = table.uniqueConstraints.single()
+
+        assertEquals("place_parsing_jobs", table.name)
+        assertEquals("idx_u_post_id", uniqueConstraint.name)
+        assertEquals(listOf("post_id"), uniqueConstraint.columnNames.toList())
+    }
+
     private companion object {
         val persistenceEntities: List<KClass<*>> = listOf(
             PostEntity::class,
             PostMediaEntity::class,
+            PostHashtagEntity::class,
             PlaceEntity::class,
             PostPlaceEntity::class,
+            PlaceParsingJobEntity::class,
             UserSavedPostEntity::class,
             GroupEntity::class,
             GroupPostEntity::class,
