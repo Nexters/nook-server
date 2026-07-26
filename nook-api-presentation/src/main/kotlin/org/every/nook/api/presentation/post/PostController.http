@@ -1,0 +1,24 @@
+# TODO: 로그인 API 구현 후 이 위치에 로그인 요청을 추가합니다.
+
+@postId = 1
+@placeId = 1
+
+### URL로 게시물 생성
+POST {{baseUrl}}/api/v1/posts
+Content-Type: application/json
+
+{
+  "url": "https://www.instagram.com/p/ABC123/",
+  "memo": "주말에 방문"
+}
+
+### 게시물 연관 장소 북마크 변경
+PATCH {{baseUrl}}/api/v1/posts/{{postId}}/places/{{placeId}}/bookmark
+Content-Type: application/json
+
+{
+  "bookmarked": true
+}
+
+### 게시물 장소 파싱 결과 조회
+GET {{baseUrl}}/api/v1/posts/{{postId}}/place-parsing

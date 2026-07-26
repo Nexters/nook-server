@@ -1,0 +1,15 @@
+# TODO: 로그인 API 구현 후 이 위치에 로그인 요청을 추가합니다.
+
+### 장소 후보 조회
+POST {{baseUrl}}/api/v1/places/candidates/search
+Content-Type: application/json
+
+{
+  "queries": [
+    "성수 카페",
+    "서울숲 맛집"
+  ],
+  "longitude": 127.0436,
+  "latitude": 37.5445,
+  "radius": 5000
+}

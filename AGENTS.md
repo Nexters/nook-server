@@ -53,6 +53,13 @@ nook-api-infrastructure -> nook-api-application, nook-api-domain
 - 호환성을 깨야 한다면 구현 전에 영향 범위와 migration/versioning 방안을 드러내고 사용자 결정을 받는다.
 - 상세 기준은 `docs/policies/api.md`를 따른다.
 
+### HTTP Client requests
+
+- 모든 controller는 같은 패키지에 controller 파일명과 동일한 `.http` 파일을 둔다.
+- `.http` 파일 최상단에는 로그인 요청을 두고, 로그인 미구현 상태라면 로그인 요청을 추가할 위치에 TODO 주석을 둔다.
+- 요청 URL은 `http-client.env.json`의 `baseUrl`을 사용하고 controller 계약 변경 시 대응하는 `.http` 파일도 함께 갱신한다.
+- 상세 기준은 `docs/policies/api.md`를 따른다.
+
 ## Working Agreement
 
 1. 작업 전에 관련 코드, 테스트, 문서를 읽고 현재 동작을 근거로 삼는다.
