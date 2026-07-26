@@ -13,9 +13,10 @@ data class PlaceView(
     val longitude: BigDecimal,
     val category: String?,
     val phoneNumber: String?,
+    val bookmarked: Boolean,
 ) {
     companion object {
-        fun from(place: Place): PlaceView = PlaceView(
+        fun from(place: Place, bookmarked: Boolean): PlaceView = PlaceView(
             id = requireNotNull(place.id),
             provider = place.providerReference.provider,
             externalPlaceId = place.providerReference.externalPlaceId,
@@ -25,6 +26,7 @@ data class PlaceView(
             longitude = place.location.longitude,
             category = place.category,
             phoneNumber = place.phoneNumber,
+            bookmarked = bookmarked,
         )
     }
 }

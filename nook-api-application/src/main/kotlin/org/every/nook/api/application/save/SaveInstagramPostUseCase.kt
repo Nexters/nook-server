@@ -3,6 +3,7 @@ package org.every.nook.api.application.save
 import org.every.nook.api.application.instagram.ExtractInstagramContentUseCase
 import org.every.nook.api.application.instagram.ExtractedInstagramContent
 import org.every.nook.api.application.instagram.InvalidInstagramUrlException
+import org.every.nook.api.application.post.PostTitleGenerator
 import org.every.nook.api.application.save.error.InvalidInstagramPostUrlException
 import org.every.nook.api.application.save.model.PlaceParsingStatusView
 import org.every.nook.api.application.save.port.PostMediaStoragePort
@@ -11,6 +12,7 @@ import org.every.nook.api.domain.post.Post
 
 class SaveInstagramPostUseCase(
     private val extractInstagramContentUseCase: ExtractInstagramContentUseCase,
+    private val postTitleGenerator: PostTitleGenerator,
     private val postMediaStoragePort: PostMediaStoragePort,
     private val saveInstagramPostPort: SaveInstagramPostPort,
 ) {
@@ -25,6 +27,15 @@ class SaveInstagramPostUseCase(
             hashtags = extractedContent.hashtags.toPersistentHashtags(),
         )
         val storedPost = providedPost.copy(
+            canonicalUrl = command.instagramUrl,
+            memo = command.memo,
+            title = postTitleGenerator.generate(
+                PostTitleGenerator.Request(
+                    body = providedPost.body,
+                    hashtags = providedPost.hashtags,
+                    sourceLocationTag = providedPost.sourceLocationTag,
+                ),
+            ),
             media = providedPost.media.map(postMediaStoragePort::store),
         )
         val saved = saveInstagramPostPort.save(command.userId, storedPost)
@@ -56,7 +67,7 @@ class SaveInstagramPostUseCase(
         .distinct()
         .toList()
 
-    data class Command(val userId: Long, val instagramUrl: String)
+    data class Command(val userId: Long, val instagramUrl: String, val memo: String? = null)
 
     data class Result(val savedPostId: Long, val postId: Long, val placeParsingStatus: PlaceParsingStatusView)
 }

@@ -2,6 +2,7 @@ package org.every.nook.api.presentation.save
 
 import org.every.nook.api.application.save.FindSavedPostPlaceParsingUseCase
 import org.every.nook.api.application.save.SaveInstagramPostUseCase
+import org.every.nook.api.application.save.UpdateSavedPostPlaceBookmarkUseCase
 import org.every.nook.api.application.save.model.PlaceParsingStatusView
 import org.every.nook.api.application.save.model.PlaceView
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -10,6 +11,7 @@ import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
@@ -18,6 +20,7 @@ import kotlin.test.Test
 
 class SavedPostControllerTest {
     private lateinit var mockMvc: MockMvc
+    private lateinit var updateBookmarkUseCase: UpdateSavedPostPlaceBookmarkUseCase
 
     @BeforeTest
     fun setUp() {
@@ -27,6 +30,7 @@ class SavedPostControllerTest {
                 SaveInstagramPostUseCase.Command(
                     userId = 7,
                     instagramUrl = "https://www.instagram.com/p/ABC123/",
+                    memo = "주말에 방문",
                 ),
             ),
         ).thenReturn(
@@ -37,6 +41,7 @@ class SavedPostControllerTest {
             ),
         )
         val findUseCase = mock(FindSavedPostPlaceParsingUseCase::class.java)
+        updateBookmarkUseCase = mock(UpdateSavedPostPlaceBookmarkUseCase::class.java)
         `when`(
             findUseCase(FindSavedPostPlaceParsingUseCase.Query(userId = 7, savedPostId = 11)),
         ).thenReturn(
@@ -56,12 +61,13 @@ class SavedPostControllerTest {
                         longitude = BigDecimal("127.1"),
                         category = null,
                         phoneNumber = null,
+                        bookmarked = true,
                     ),
                 ),
             ),
         )
         mockMvc = MockMvcBuilders
-            .standaloneSetup(SavedPostController(saveUseCase, findUseCase))
+            .standaloneSetup(SavedPostController(saveUseCase, findUseCase, updateBookmarkUseCase))
             .setControllerAdvice(GlobalExceptionHandler())
             .build()
     }
@@ -71,7 +77,12 @@ class SavedPostControllerTest {
         mockMvc.post("/api/v1/saved-posts") {
             header(SavedPostController.USER_ID_HEADER, 7)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"instagramUrl":"https://www.instagram.com/p/ABC123/"}"""
+            content = """
+                {
+                  "instagramUrl": "https://www.instagram.com/p/ABC123/",
+                  "memo": "주말에 방문"
+                }
+            """.trimIndent()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.resultType") { value("SUCCESS") }
@@ -90,6 +101,19 @@ class SavedPostControllerTest {
             jsonPath("$.success.placeParsingStatus") { value("COMPLETED") }
             jsonPath("$.success.places[0].id") { value(17) }
             jsonPath("$.success.places[0].name") { value("Nook Cafe") }
+            jsonPath("$.success.places[0].bookmarked") { value(true) }
+        }
+    }
+
+    @Test
+    fun `updates an associated place bookmark`() {
+        mockMvc.patch("/api/v1/saved-posts/11/places/17/bookmark") {
+            header(SavedPostController.USER_ID_HEADER, 7)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"bookmarked":false}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.resultType") { value("SUCCESS") }
         }
     }
 

@@ -31,7 +31,7 @@ class FindSavedPostPlaceParsingUseCaseTest {
                 postId = 13,
                 placeParsingStatus = PlaceParsingStatus.COMPLETED,
                 failureReason = null,
-                places = listOf(place),
+                places = listOf(SavedPostPlaceParsingSnapshot.SavedPlace(place, bookmarked = true)),
             )
         }
         val useCase = FindSavedPostPlaceParsingUseCase(port)
@@ -40,6 +40,7 @@ class FindSavedPostPlaceParsingUseCaseTest {
 
         assertEquals(PlaceParsingStatusView.COMPLETED, result.placeParsingStatus)
         assertEquals("Nook Cafe", result.places.single().name)
+        assertEquals(true, result.places.single().bookmarked)
     }
 
     @Test

@@ -25,13 +25,11 @@ class PersistenceEntityMetadataTest {
     }
 
     @Test
-    fun `post identity is unique by source and external post id`() {
+    fun `Instagram requests can create independent posts from the same source`() {
         val table = requireNotNull(PostEntity::class.findAnnotation<Table>())
-        val uniqueConstraint = table.uniqueConstraints.single()
 
         assertEquals("posts", table.name)
-        assertEquals("idx_u_source_type_external_post_id", uniqueConstraint.name)
-        assertEquals(listOf("source_type", "external_post_id"), uniqueConstraint.columnNames.toList())
+        assertTrue(table.uniqueConstraints.isEmpty())
     }
 
     @Test

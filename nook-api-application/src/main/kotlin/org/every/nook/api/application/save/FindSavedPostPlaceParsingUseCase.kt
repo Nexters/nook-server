@@ -17,7 +17,9 @@ class FindSavedPostPlaceParsingUseCase(private val findSavedPostPlaceParsingPort
             postId = snapshot.postId,
             placeParsingStatus = PlaceParsingStatusView.from(snapshot.placeParsingStatus),
             failureReason = snapshot.failureReason,
-            places = snapshot.places.map(PlaceView::from),
+            places = snapshot.places.map { savedPlace ->
+                PlaceView.from(savedPlace.place, savedPlace.bookmarked)
+            },
         )
     }
 

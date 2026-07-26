@@ -38,6 +38,7 @@ data class PlaceResponse(
     val longitude: BigDecimal,
     val category: String?,
     val phoneNumber: String?,
+    val bookmarked: Boolean,
 ) {
     companion object {
         fun from(place: PlaceView): PlaceResponse = PlaceResponse(
@@ -50,6 +51,7 @@ data class PlaceResponse(
             longitude = place.longitude,
             category = place.category,
             phoneNumber = place.phoneNumber,
+            bookmarked = place.bookmarked,
         )
     }
 }

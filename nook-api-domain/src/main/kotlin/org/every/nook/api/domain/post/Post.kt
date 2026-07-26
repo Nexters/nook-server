@@ -7,6 +7,7 @@ data class Post(
     val canonicalUrl: String,
     val authorIdentifier: String? = null,
     val title: String? = null,
+    val memo: String? = null,
     val body: String? = null,
     val publishedAt: Instant? = null,
     val sourceLocationTag: String? = null,
@@ -26,6 +27,9 @@ data class Post(
         require(title == null || title.length <= MAX_TITLE_LENGTH) {
             "Post title must not exceed $MAX_TITLE_LENGTH characters"
         }
+        require(memo == null || memo.length <= MAX_MEMO_LENGTH) {
+            "Post memo must not exceed $MAX_MEMO_LENGTH characters"
+        }
         require(sourceLocationTag == null || sourceLocationTag.length <= MAX_SOURCE_LOCATION_TAG_LENGTH) {
             "Post source location tag must not exceed $MAX_SOURCE_LOCATION_TAG_LENGTH characters"
         }
@@ -44,6 +48,7 @@ data class Post(
         const val MAX_CANONICAL_URL_LENGTH = 2048
         const val MAX_AUTHOR_IDENTIFIER_LENGTH = 255
         const val MAX_TITLE_LENGTH = 500
+        const val MAX_MEMO_LENGTH = 2000
         const val MAX_SOURCE_LOCATION_TAG_LENGTH = 500
         const val MAX_HASHTAG_LENGTH = 100
     }

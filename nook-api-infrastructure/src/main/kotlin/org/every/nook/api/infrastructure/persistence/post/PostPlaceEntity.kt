@@ -26,6 +26,8 @@ class PostPlaceEntity(
     val placeId: Long,
     @Column(name = "display_order", nullable = false)
     val sequence: Int,
+    @Column(name = "bookmarked", nullable = false)
+    var bookmarked: Boolean = true,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
