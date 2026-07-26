@@ -12,6 +12,13 @@
 - `success`와 `error`는 동시에 노출하지 않습니다.
 - 204 응답에는 본문과 envelope를 사용하지 않습니다.
 
+## OpenAPI 문서화
+
+- 모든 controller에는 Swagger UI 그룹명이 명확히 보이도록 `@Tag(name = "...")`를 명시합니다.
+- 모든 공개 API handler에는 endpoint 목적을 한국어로 설명하는 `@Operation(summary = "...")`를 명시합니다.
+- `@Tag` 이름은 도메인 또는 리소스 단위의 명사형 영문 이름을 사용합니다.
+- `@Operation` 요약은 구현 방식이 아니라 클라이언트가 호출하는 사용자 의도를 설명합니다.
+
 ## 오류 처리
 
 - 예상 가능한 오류는 `NookException`으로 표현합니다.
