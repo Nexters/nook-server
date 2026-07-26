@@ -4,7 +4,6 @@ import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostPlaceParsingSnapshot
-import org.every.nook.api.application.post.port.UpdatePostPlaceBookmarkPort
 import org.every.nook.api.domain.place.GeoPoint
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -14,6 +13,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
@@ -33,9 +33,9 @@ class PostPersistenceAdapter(
     private val placeParsingJobJpaRepository: PlaceParsingJobJpaRepository,
     private val postPlaceJpaRepository: PostPlaceJpaRepository,
     private val placeJpaRepository: PlaceJpaRepository,
+    private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
 ) : CreatePostPort,
-    FindPostPlaceParsingPort,
-    UpdatePostPlaceBookmarkPort {
+    FindPostPlaceParsingPort {
     @Transactional
     override fun create(userId: Long, post: Post): CreatedPost {
         val postEntity = saveNewPost(post)
@@ -65,6 +65,13 @@ class PostPersistenceAdapter(
         val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return null
         val parsingJob = placeParsingJobJpaRepository.findByPostId(userPost.postId) ?: return null
         val postPlaces = postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(userPost.postId)
+        val bookmarkedPlaceIds = if (postPlaces.isEmpty()) {
+            emptySet()
+        } else {
+            userPlaceBookmarkJpaRepository
+                .findAllByUserIdAndPlaceIdIn(userId, postPlaces.map { it.placeId })
+                .mapTo(mutableSetOf()) { it.placeId }
+        }
         val placesById = placeJpaRepository.findAllById(postPlaces.map { it.placeId })
             .associateBy { requireNotNull(it.id) }
 
@@ -76,19 +83,11 @@ class PostPersistenceAdapter(
                 placesById[postPlace.placeId]?.toDomain()?.let { place ->
                     PostPlaceParsingSnapshot.RelatedPlace(
                         place = place,
-                        bookmarked = postPlace.bookmarked,
+                        bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                     )
                 }
             },
         )
-    }
-
-    @Transactional
-    override fun update(userId: Long, postId: Long, placeId: Long, bookmarked: Boolean): Boolean {
-        val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return false
-        val postPlace = postPlaceJpaRepository.findByPostIdAndPlaceId(userPost.postId, placeId) ?: return false
-        postPlace.bookmarked = bookmarked
-        return true
     }
 
     private fun saveNewPost(post: Post): PostEntity {

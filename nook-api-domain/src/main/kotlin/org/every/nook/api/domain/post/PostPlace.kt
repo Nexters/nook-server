@@ -1,12 +1,6 @@
 package org.every.nook.api.domain.post
 
-data class PostPlace(
-    val postId: Long,
-    val placeId: Long,
-    val sequence: Int,
-    val bookmarked: Boolean = true,
-    val id: Long? = null,
-) {
+data class PostPlace(val postId: Long, val placeId: Long, val sequence: Int, val id: Long? = null) {
     init {
         require(id == null || id > 0) { "Post place id must be positive" }
         require(postId > 0) { "Post id must be positive" }

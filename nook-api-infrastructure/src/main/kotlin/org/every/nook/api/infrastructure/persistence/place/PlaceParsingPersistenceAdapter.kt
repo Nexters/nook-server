@@ -8,6 +8,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaReposito
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,6 +19,8 @@ class PlaceParsingPersistenceAdapter(
     private val hashtagRepository: PostHashtagJpaRepository,
     private val placeRepository: PlaceJpaRepository,
     private val postPlaceRepository: PostPlaceJpaRepository,
+    private val userSavedPostRepository: UserSavedPostJpaRepository,
+    private val userPlaceBookmarkRepository: UserPlaceBookmarkJpaRepository,
 ) : PlaceParsingJobPort {
     @Transactional
     override fun claimNext(): ClaimedPlaceParsingJob? {
@@ -48,10 +51,14 @@ class PlaceParsingPersistenceAdapter(
                 postId = postId,
                 placeId = requireNotNull(place.id),
                 sequence = sequence,
-                bookmarked = true,
             )
         }
         postPlaceRepository.saveAll(postPlaces)
+        userSavedPostRepository.findDistinctUserIdsByPostId(postId).forEach { userId ->
+            postPlaces.forEach { postPlace ->
+                userPlaceBookmarkRepository.insertIgnore(userId, postPlace.placeId)
+            }
+        }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
     }
