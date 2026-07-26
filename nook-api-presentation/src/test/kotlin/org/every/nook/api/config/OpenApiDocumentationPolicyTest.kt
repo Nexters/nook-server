@@ -1,7 +1,9 @@
 package org.every.nook.api.config
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.place.PlaceCandidateController
 import org.every.nook.api.presentation.post.PostController
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import java.lang.reflect.Method
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class OpenApiDocumentationPolicyTest {
     @Test
@@ -29,6 +32,20 @@ class OpenApiDocumentationPolicyTest {
             .forEach { method ->
                 assertNotNull(method.getAnnotation(Operation::class.java), method.toString())
             }
+    }
+
+    @Test
+    fun `UserContext parameters are hidden from OpenAPI`() {
+        val userContextParameters = controllers
+            .flatMap { it.declaredMethods.toList() }
+            .filter { it.isApiHandler() }
+            .flatMap { it.parameters.toList() }
+            .filter { it.type == UserContext::class.java }
+
+        assertTrue(userContextParameters.isNotEmpty())
+        userContextParameters.forEach { parameter ->
+            assertTrue(parameter.getAnnotation(Parameter::class.java)?.hidden == true)
+        }
     }
 
     private fun Method.isApiHandler(): Boolean = apiMappingAnnotations.any(::isAnnotationPresent)

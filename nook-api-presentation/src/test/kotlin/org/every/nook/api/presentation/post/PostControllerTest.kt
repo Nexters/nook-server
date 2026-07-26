@@ -6,8 +6,10 @@ import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.UpdatePostPlaceBookmarkUseCase
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PlaceView
+import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
@@ -22,6 +24,7 @@ import kotlin.test.Test
 class PostControllerTest {
     private lateinit var mockMvc: MockMvc
     private lateinit var createUseCase: CreatePostUseCase
+    private lateinit var updateBookmarkUseCase: UpdatePostPlaceBookmarkUseCase
 
     @BeforeTest
     fun setUp() {
@@ -29,7 +32,7 @@ class PostControllerTest {
         `when`(
             createUseCase(
                 CreatePostUseCase.Command(
-                    userId = 7,
+                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
                     url = "https://www.instagram.com/p/ABC123/",
                     memo = "주말에 방문",
                 ),
@@ -42,7 +45,12 @@ class PostControllerTest {
         )
         val findUseCase = mock(FindPostPlaceParsingUseCase::class.java)
         `when`(
-            findUseCase(FindPostPlaceParsingUseCase.Query(userId = 7, postId = 11)),
+            findUseCase(
+                FindPostPlaceParsingUseCase.Query(
+                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    postId = 11,
+                ),
+            ),
         ).thenReturn(
             FindPostPlaceParsingUseCase.Result(
                 postId = 11,
@@ -64,9 +72,10 @@ class PostControllerTest {
                 ),
             ),
         )
-        val updateBookmarkUseCase = mock(UpdatePostPlaceBookmarkUseCase::class.java)
+        updateBookmarkUseCase = mock(UpdatePostPlaceBookmarkUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(PostController(createUseCase, findUseCase, updateBookmarkUseCase))
+            .setCustomArgumentResolvers(UserContextArgumentResolver())
             .setControllerAdvice(GlobalExceptionHandler())
             .build()
     }
@@ -74,7 +83,6 @@ class PostControllerTest {
     @Test
     fun `creates a post from a URL`() {
         mockMvc.post("/api/v1/posts") {
-            header(PostController.USER_ID_HEADER, 7)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -94,7 +102,6 @@ class PostControllerTest {
     @Test
     fun `returns completed parsing with places`() {
         mockMvc.get("/api/v1/posts/11/place-parsing") {
-            header(PostController.USER_ID_HEADER, 7)
         }.andExpect {
             status { isOk() }
             jsonPath("$.success.postId") { value(11) }
@@ -109,19 +116,26 @@ class PostControllerTest {
     @Test
     fun `updates an associated place bookmark`() {
         mockMvc.patch("/api/v1/posts/11/places/17/bookmark") {
-            header(PostController.USER_ID_HEADER, 7)
             contentType = MediaType.APPLICATION_JSON
             content = """{"bookmarked":false}"""
         }.andExpect {
             status { isOk() }
             jsonPath("$.resultType") { value("SUCCESS") }
         }
+
+        verify(updateBookmarkUseCase)(
+            UpdatePostPlaceBookmarkUseCase.Command(
+                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                postId = 11,
+                placeId = 17,
+                bookmarked = false,
+            ),
+        )
     }
 
     @Test
     fun `rejects a blank URL`() {
         mockMvc.post("/api/v1/posts") {
-            header(PostController.USER_ID_HEADER, 7)
             contentType = MediaType.APPLICATION_JSON
             content = """{"url":""}"""
         }.andExpect {
@@ -135,11 +149,15 @@ class PostControllerTest {
     fun `rejects an unsupported URL with a source agnostic error`() {
         val unsupportedUrl = "https://example.com/post/1"
         `when`(
-            createUseCase(CreatePostUseCase.Command(userId = 7, url = unsupportedUrl)),
+            createUseCase(
+                CreatePostUseCase.Command(
+                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    url = unsupportedUrl,
+                ),
+            ),
         ).thenThrow(UnsupportedPostUrlException())
 
         mockMvc.post("/api/v1/posts") {
-            header(PostController.USER_ID_HEADER, 7)
             contentType = MediaType.APPLICATION_JSON
             content = """{"url":"$unsupportedUrl"}"""
         }.andExpect {
