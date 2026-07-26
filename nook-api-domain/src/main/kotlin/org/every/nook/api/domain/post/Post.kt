@@ -9,6 +9,8 @@ data class Post(
     val title: String? = null,
     val body: String? = null,
     val publishedAt: Instant? = null,
+    val sourceLocationTag: String? = null,
+    val hashtags: List<String> = emptyList(),
     val media: List<PostMedia> = emptyList(),
     val id: Long? = null,
 ) {
@@ -24,6 +26,15 @@ data class Post(
         require(title == null || title.length <= MAX_TITLE_LENGTH) {
             "Post title must not exceed $MAX_TITLE_LENGTH characters"
         }
+        require(sourceLocationTag == null || sourceLocationTag.length <= MAX_SOURCE_LOCATION_TAG_LENGTH) {
+            "Post source location tag must not exceed $MAX_SOURCE_LOCATION_TAG_LENGTH characters"
+        }
+        require(hashtags.all { it.isNotBlank() && it.length <= MAX_HASHTAG_LENGTH }) {
+            "Post hashtags must not be blank or exceed $MAX_HASHTAG_LENGTH characters"
+        }
+        require(hashtags.distinct().size == hashtags.size) {
+            "Post hashtags must be unique"
+        }
         require(media.map(PostMedia::sequence).distinct().size == media.size) {
             "Post media sequence must be unique"
         }
@@ -33,5 +44,7 @@ data class Post(
         const val MAX_CANONICAL_URL_LENGTH = 2048
         const val MAX_AUTHOR_IDENTIFIER_LENGTH = 255
         const val MAX_TITLE_LENGTH = 500
+        const val MAX_SOURCE_LOCATION_TAG_LENGTH = 500
+        const val MAX_HASHTAG_LENGTH = 100
     }
 }

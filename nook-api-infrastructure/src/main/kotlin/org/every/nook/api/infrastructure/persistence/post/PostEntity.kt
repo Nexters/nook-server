@@ -47,6 +47,12 @@ class PostEntity(
     val body: String? = null,
     @Column(name = "published_at", nullable = true)
     val publishedAt: Instant? = null,
+    @Column(
+        name = "source_location_tag",
+        nullable = true,
+        length = Post.MAX_SOURCE_LOCATION_TAG_LENGTH,
+    )
+    val sourceLocationTag: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

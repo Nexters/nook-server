@@ -42,4 +42,28 @@ class PostTest {
             PostSource(type = "instagram", externalPostId = "ABC123")
         }
     }
+
+    @Test
+    fun `accepts unique ordered hashtags and source location tag`() {
+        val post = Post(
+            source = PostSource(type = "INSTAGRAM", externalPostId = "ABC123"),
+            canonicalUrl = "https://www.instagram.com/p/ABC123/",
+            sourceLocationTag = "Seoul",
+            hashtags = listOf("cafe", "seoul"),
+        )
+
+        assertEquals("Seoul", post.sourceLocationTag)
+        assertEquals(listOf("cafe", "seoul"), post.hashtags)
+    }
+
+    @Test
+    fun `rejects duplicate hashtags`() {
+        assertFailsWith<IllegalArgumentException> {
+            Post(
+                source = PostSource(type = "INSTAGRAM", externalPostId = "ABC123"),
+                canonicalUrl = "https://www.instagram.com/p/ABC123/",
+                hashtags = listOf("cafe", "cafe"),
+            )
+        }
+    }
 }
