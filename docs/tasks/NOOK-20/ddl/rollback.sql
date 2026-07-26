@@ -1,0 +1,2 @@
+-- NOOK-20 does not change the database schema.
+-- No rollback operation is required.
