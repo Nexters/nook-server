@@ -10,6 +10,6 @@ data class ApiError(
     @field:Schema(description = "클라이언트에 공개 가능한 오류 사유")
     val reason: String,
     @field:JsonInclude(JsonInclude.Include.ALWAYS)
-    @field:Schema(description = "오류별 부가 데이터", nullable = true)
-    val data: Map<String, Any?>? = null,
+    @field:Schema(description = "오류별 부가 데이터", type = "object", nullable = true)
+    val data: Any? = null,
 )
