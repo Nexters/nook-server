@@ -1,0 +1,2 @@
+-- NOOK-20 does not change the database schema.
+-- Existing post, media, hashtag, and source location columns are reused.
