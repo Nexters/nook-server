@@ -2,9 +2,8 @@ package org.every.nook.api.config
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.every.nook.api.presentation.instagram.InstagramContentController
 import org.every.nook.api.presentation.place.PlaceCandidateController
-import org.every.nook.api.presentation.save.SavedPostController
+import org.every.nook.api.presentation.post.PostController
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -36,9 +35,8 @@ class OpenApiDocumentationPolicyTest {
 
     private companion object {
         val controllers = listOf(
-            InstagramContentController::class.java,
             PlaceCandidateController::class.java,
-            SavedPostController::class.java,
+            PostController::class.java,
         )
         val apiMappingAnnotations = listOf(
             GetMapping::class.java,

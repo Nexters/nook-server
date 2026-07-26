@@ -2,19 +2,16 @@ package org.every.nook.api.infrastructure.instagram
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import org.every.nook.api.application.instagram.ExtractedInstagramContent
-import org.every.nook.api.application.instagram.InstagramContentUrl
 import org.every.nook.api.domain.post.PostMedia
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class BrightDataInstagramMapperTest {
     private val objectMapper = jacksonObjectMapper()
     private val mapper = BrightDataInstagramMapper()
 
     @Test
-    fun `carousel post preserves media order and available location details`() {
+    fun `carousel post preserves media order and location names`() {
         val record = objectMapper.readValue<BrightDataInstagramRecord>(
             """
             {
@@ -43,13 +40,9 @@ class BrightDataInstagramMapperTest {
 
         val result = mapper.map(InstagramContentUrl.parse(record.url!!), record)
 
-        assertEquals(ExtractedInstagramContent.ContentType.CAROUSEL, result.contentType)
         assertEquals(listOf(PostMedia.MediaType.IMAGE, PostMedia.MediaType.VIDEO), result.post.media.map { it.type })
         assertEquals(listOf(0, 1), result.post.media.map { it.sequence })
-        assertEquals(listOf("Nook Cafe"), result.locationNames)
-        assertEquals("place-1", result.locationDetails?.id)
-        assertEquals(37.1234, result.locationDetails?.latitude)
-        assertEquals(127.5678, result.locationDetails?.longitude)
+        assertEquals(listOf("Nook Cafe"), result.sourceLocationNames)
     }
 
     @Test
@@ -70,10 +63,8 @@ class BrightDataInstagramMapperTest {
 
         val result = mapper.map(InstagramContentUrl.parse(record.url!!), record)
 
-        assertEquals(ExtractedInstagramContent.ContentType.REEL, result.contentType)
         assertEquals(PostMedia.MediaType.VIDEO, result.post.media.single().type)
         assertEquals("https://cdn.example/reel.mp4", result.post.media.single().url)
-        assertEquals(emptyList(), result.locationNames)
-        assertNull(result.locationDetails)
+        assertEquals(emptyList(), result.sourceLocationNames)
     }
 }
