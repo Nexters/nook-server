@@ -19,6 +19,17 @@
 - `@Tag` 이름은 도메인 또는 리소스 단위의 명사형 영문 이름을 사용합니다.
 - `@Operation` 요약은 구현 방식이 아니라 클라이언트가 호출하는 사용자 의도를 설명합니다.
 
+## HTTP Client 요청
+
+- 모든 controller는 같은 패키지에 controller 파일명과 동일한 `.http` 파일을 둡니다.
+  예를 들어 `PostController.kt`에는 `PostController.http`가 대응합니다.
+- `.http` 파일에는 해당 controller의 모든 공개 endpoint를 실행 가능한 예제로 작성합니다.
+- `.http` 파일 최상단에는 다른 요청보다 먼저 로그인 요청을 둡니다. 로그인 API가 아직 구현되지 않았다면
+  로그인 요청이 들어갈 위치에 TODO 주석을 둡니다.
+- 서버 주소를 직접 작성하지 않고 `http-client.env.json`의 `{{baseUrl}}`을 사용합니다.
+- `http-client.env.json`은 `local`, `dev`, `staging`, `live` 환경을 유지합니다.
+- endpoint, method, header 또는 request body 계약을 변경할 때 대응하는 `.http` 파일도 함께 갱신합니다.
+
 ## 오류 처리
 
 - 예상 가능한 오류는 `NookException`으로 표현합니다.
