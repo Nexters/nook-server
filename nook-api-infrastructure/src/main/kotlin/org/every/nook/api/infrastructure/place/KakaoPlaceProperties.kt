@@ -1,0 +1,17 @@
+package org.every.nook.api.infrastructure.place
+
+import org.springframework.boot.context.properties.ConfigurationProperties
+import java.time.Duration
+
+@ConfigurationProperties("external.kakao-local")
+data class KakaoPlaceProperties(
+    val baseUrl: String = "https://dapi.kakao.com",
+    val restApiKey: String = "",
+    val connectTimeout: Duration = Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS),
+    val readTimeout: Duration = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS),
+) {
+    private companion object {
+        const val DEFAULT_CONNECT_TIMEOUT_SECONDS = 3L
+        const val DEFAULT_READ_TIMEOUT_SECONDS = 5L
+    }
+}
