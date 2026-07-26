@@ -1,12 +1,14 @@
 package org.every.nook.api.presentation.post
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.UpdatePostPlaceBookmarkUseCase
+import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.post.request.CreatePostRequest
 import org.every.nook.api.presentation.post.request.UpdatePlaceBookmarkRequest
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
@@ -20,7 +22,6 @@ import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -36,12 +37,12 @@ class PostController(
     @Operation(summary = "URL로 게시물 생성")
     @PostMapping
     fun createPost(
-        @RequestHeader(USER_ID_HEADER) @Positive userId: Long,
+        @Parameter(hidden = true) userContext: UserContext,
         @Valid @RequestBody request: CreatePostRequest,
     ): ResponseEntity<ApiResponse<PostResponse>> {
         val result = createPostUseCase(
             CreatePostUseCase.Command(
-                userId = userId,
+                userId = userContext.userId,
                 url = request.url,
                 memo = request.memo,
             ),
@@ -55,14 +56,14 @@ class PostController(
     @Operation(summary = "게시물 연관 장소 북마크 변경")
     @PatchMapping("/{postId}/places/{placeId}/bookmark")
     fun updatePlaceBookmark(
-        @RequestHeader(USER_ID_HEADER) @Positive userId: Long,
+        @Parameter(hidden = true) userContext: UserContext,
         @PathVariable @Positive postId: Long,
         @PathVariable @Positive placeId: Long,
         @Valid @RequestBody request: UpdatePlaceBookmarkRequest,
     ): ApiResponse<Unit> {
         updatePostPlaceBookmarkUseCase(
             UpdatePostPlaceBookmarkUseCase.Command(
-                userId = userId,
+                userId = userContext.userId,
                 postId = postId,
                 placeId = placeId,
                 bookmarked = request.bookmarked,
@@ -74,20 +75,16 @@ class PostController(
     @Operation(summary = "게시물 장소 파싱 결과 조회")
     @GetMapping("/{postId}/place-parsing")
     fun findPlaceParsing(
-        @RequestHeader(USER_ID_HEADER) @Positive userId: Long,
+        @Parameter(hidden = true) userContext: UserContext,
         @PathVariable @Positive postId: Long,
     ): ApiResponse<PostPlaceParsingResponse> {
         val result = findPostPlaceParsingUseCase(
             FindPostPlaceParsingUseCase.Query(
-                userId = userId,
+                userId = userContext.userId,
                 postId = postId,
             ),
         )
 
         return ApiResponse.success(PostPlaceParsingResponse.from(result))
-    }
-
-    companion object {
-        const val USER_ID_HEADER = "X-Nook-User-Id"
     }
 }
