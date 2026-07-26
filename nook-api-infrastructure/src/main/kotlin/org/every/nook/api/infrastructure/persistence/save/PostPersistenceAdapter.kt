@@ -1,0 +1,145 @@
+package org.every.nook.api.infrastructure.persistence.save
+
+import org.every.nook.api.application.post.port.CreatePostPort
+import org.every.nook.api.application.post.port.CreatedPost
+import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
+import org.every.nook.api.application.post.port.PostPlaceParsingSnapshot
+import org.every.nook.api.application.post.port.UpdatePostPlaceBookmarkPort
+import org.every.nook.api.domain.place.GeoPoint
+import org.every.nook.api.domain.place.Place
+import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceProviderReference
+import org.every.nook.api.domain.post.Post
+import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
+import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
+import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostEntity
+import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
+import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
+import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
+
+@Component
+class PostPersistenceAdapter(
+    private val postJpaRepository: PostJpaRepository,
+    private val postMediaJpaRepository: PostMediaJpaRepository,
+    private val postHashtagJpaRepository: PostHashtagJpaRepository,
+    private val userSavedPostJpaRepository: UserSavedPostJpaRepository,
+    private val placeParsingJobJpaRepository: PlaceParsingJobJpaRepository,
+    private val postPlaceJpaRepository: PostPlaceJpaRepository,
+    private val placeJpaRepository: PlaceJpaRepository,
+) : CreatePostPort,
+    FindPostPlaceParsingPort,
+    UpdatePostPlaceBookmarkPort {
+    @Transactional
+    override fun create(userId: Long, post: Post): CreatedPost {
+        val postEntity = saveNewPost(post)
+        val sourcePostId = requireNotNull(postEntity.id)
+        val parsingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
+            ?: placeParsingJobJpaRepository.save(
+                PlaceParsingJobEntity(
+                    postId = sourcePostId,
+                    status = PlaceParsingStatus.PENDING,
+                ),
+            )
+        val userPost = userSavedPostJpaRepository.save(
+            UserSavedPostEntity(
+                userId = userId,
+                postId = sourcePostId,
+            ),
+        )
+
+        return CreatedPost(
+            postId = requireNotNull(userPost.id),
+            placeParsingStatus = parsingJob.status,
+        )
+    }
+
+    @Transactional(readOnly = true)
+    override fun find(userId: Long, postId: Long): PostPlaceParsingSnapshot? {
+        val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return null
+        val parsingJob = placeParsingJobJpaRepository.findByPostId(userPost.postId) ?: return null
+        val postPlaces = postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(userPost.postId)
+        val placesById = placeJpaRepository.findAllById(postPlaces.map { it.placeId })
+            .associateBy { requireNotNull(it.id) }
+
+        return PostPlaceParsingSnapshot(
+            postId = postId,
+            placeParsingStatus = parsingJob.status,
+            failureReason = parsingJob.failureReason,
+            places = postPlaces.mapNotNull { postPlace ->
+                placesById[postPlace.placeId]?.toDomain()?.let { place ->
+                    PostPlaceParsingSnapshot.RelatedPlace(
+                        place = place,
+                        bookmarked = postPlace.bookmarked,
+                    )
+                }
+            },
+        )
+    }
+
+    @Transactional
+    override fun update(userId: Long, postId: Long, placeId: Long, bookmarked: Boolean): Boolean {
+        val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return false
+        val postPlace = postPlaceJpaRepository.findByPostIdAndPlaceId(userPost.postId, placeId) ?: return false
+        postPlace.bookmarked = bookmarked
+        return true
+    }
+
+    private fun saveNewPost(post: Post): PostEntity {
+        val postEntity = postJpaRepository.save(
+            PostEntity(
+                sourceType = post.source.type,
+                externalPostId = post.source.externalPostId,
+                canonicalUrl = post.canonicalUrl,
+                authorIdentifier = post.authorIdentifier,
+                title = post.title,
+                memo = post.memo,
+                body = post.body,
+                publishedAt = post.publishedAt,
+                sourceLocationTag = post.sourceLocationTag,
+            ),
+        )
+        val postId = requireNotNull(postEntity.id)
+
+        postMediaJpaRepository.saveAll(
+            post.media.map { media ->
+                PostMediaEntity(
+                    postId = postId,
+                    mediaType = media.type,
+                    mediaUrl = media.url,
+                    sequence = media.sequence,
+                )
+            },
+        )
+        postHashtagJpaRepository.saveAll(
+            post.hashtags.mapIndexed { sequence, hashtag ->
+                PostHashtagEntity(
+                    postId = postId,
+                    hashtag = hashtag,
+                    sequence = sequence,
+                )
+            },
+        )
+
+        return postEntity
+    }
+
+    private fun PlaceEntity.toDomain(): Place = Place(
+        providerReference = PlaceProviderReference(
+            provider = provider,
+            externalPlaceId = externalPlaceId,
+        ),
+        name = name,
+        address = address,
+        location = GeoPoint(latitude = latitude, longitude = longitude),
+        category = category,
+        phoneNumber = phoneNumber,
+        id = id,
+    )
+}
