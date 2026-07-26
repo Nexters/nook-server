@@ -1,13 +1,16 @@
 package org.every.nook.api.application.save
 
+import org.every.nook.api.application.instagram.ExtractInstagramContentUseCase
+import org.every.nook.api.application.instagram.ExtractedInstagramContent
+import org.every.nook.api.application.instagram.InvalidInstagramUrlException
 import org.every.nook.api.application.save.error.InvalidInstagramPostUrlException
 import org.every.nook.api.application.save.model.PlaceParsingStatusView
-import org.every.nook.api.application.save.port.InstagramPostProviderPort
 import org.every.nook.api.application.save.port.PostMediaStoragePort
 import org.every.nook.api.application.save.port.SaveInstagramPostPort
+import org.every.nook.api.domain.post.Post
 
 class SaveInstagramPostUseCase(
-    private val instagramPostProviderPort: InstagramPostProviderPort,
+    private val extractInstagramContentUseCase: ExtractInstagramContentUseCase,
     private val postMediaStoragePort: PostMediaStoragePort,
     private val saveInstagramPostPort: SaveInstagramPostPort,
 ) {
@@ -16,7 +19,11 @@ class SaveInstagramPostUseCase(
             throw InvalidInstagramPostUrlException()
         }
 
-        val providedPost = instagramPostProviderPort.fetch(command.instagramUrl)
+        val extractedContent = extractContent(command.instagramUrl)
+        val providedPost = extractedContent.post.copy(
+            sourceLocationTag = extractedContent.toSourceLocationTag(),
+            hashtags = extractedContent.hashtags.toPersistentHashtags(),
+        )
         val storedPost = providedPost.copy(
             media = providedPost.media.map(postMediaStoragePort::store),
         )
@@ -28,6 +35,26 @@ class SaveInstagramPostUseCase(
             placeParsingStatus = PlaceParsingStatusView.from(saved.placeParsingStatus),
         )
     }
+
+    private fun extractContent(instagramUrl: String): ExtractedInstagramContent = try {
+        extractInstagramContentUseCase(instagramUrl)
+    } catch (_: InvalidInstagramUrlException) {
+        throw InvalidInstagramPostUrlException()
+    }
+
+    private fun ExtractedInstagramContent.toSourceLocationTag(): String? = sequence {
+        yieldAll(locationNames)
+        locationDetails?.name?.let { yield(it) }
+    }
+        .map(String::trim)
+        .firstOrNull { it.isNotEmpty() && it.length <= Post.MAX_SOURCE_LOCATION_TAG_LENGTH }
+
+    private fun List<String>.toPersistentHashtags(): List<String> = asSequence()
+        .map(String::trim)
+        .map { it.removePrefix("#").trim() }
+        .filter { it.isNotEmpty() && it.length <= Post.MAX_HASHTAG_LENGTH }
+        .distinct()
+        .toList()
 
     data class Command(val userId: Long, val instagramUrl: String)
 
