@@ -3,18 +3,15 @@ package org.every.nook.api.presentation.post
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
-import org.every.nook.api.application.post.UpdatePostPlaceBookmarkUseCase
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PlaceView
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
-import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
@@ -24,7 +21,6 @@ import kotlin.test.Test
 class PostControllerTest {
     private lateinit var mockMvc: MockMvc
     private lateinit var createUseCase: CreatePostUseCase
-    private lateinit var updateBookmarkUseCase: UpdatePostPlaceBookmarkUseCase
 
     @BeforeTest
     fun setUp() {
@@ -72,9 +68,8 @@ class PostControllerTest {
                 ),
             ),
         )
-        updateBookmarkUseCase = mock(UpdatePostPlaceBookmarkUseCase::class.java)
         mockMvc = MockMvcBuilders
-            .standaloneSetup(PostController(createUseCase, findUseCase, updateBookmarkUseCase))
+            .standaloneSetup(PostController(createUseCase, findUseCase))
             .setCustomArgumentResolvers(UserContextArgumentResolver())
             .setControllerAdvice(GlobalExceptionHandler())
             .build()
@@ -111,26 +106,6 @@ class PostControllerTest {
             jsonPath("$.success.places[0].name") { value("Nook Cafe") }
             jsonPath("$.success.places[0].bookmarked") { value(true) }
         }
-    }
-
-    @Test
-    fun `updates an associated place bookmark`() {
-        mockMvc.patch("/api/v1/posts/11/places/17/bookmark") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"bookmarked":false}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.resultType") { value("SUCCESS") }
-        }
-
-        verify(updateBookmarkUseCase)(
-            UpdatePostPlaceBookmarkUseCase.Command(
-                userId = UserContextArgumentResolver.DUMMY_USER_ID,
-                postId = 11,
-                placeId = 17,
-                bookmarked = false,
-            ),
-        )
     }
 
     @Test

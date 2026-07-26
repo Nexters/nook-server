@@ -1,4 +1,4 @@
-package org.every.nook.api.infrastructure.persistence.post
+package org.every.nook.api.infrastructure.persistence.place
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -12,20 +12,17 @@ import org.every.nook.api.infrastructure.persistence.BaseEntity
 
 @Entity
 @Table(
-    name = "post_places",
+    name = "user_place_bookmarks",
     indexes = [Index(name = "idx_place_id", columnList = "place_id")],
     uniqueConstraints = [
-        UniqueConstraint(name = "idx_u_post_id_place_id", columnNames = ["post_id", "place_id"]),
-        UniqueConstraint(name = "idx_u_post_id_display_order", columnNames = ["post_id", "display_order"]),
+        UniqueConstraint(name = "idx_u_user_id_place_id", columnNames = ["user_id", "place_id"]),
     ],
 )
-class PostPlaceEntity(
-    @Column(name = "post_id", nullable = false)
-    val postId: Long,
+class UserPlaceBookmarkEntity(
+    @Column(name = "user_id", nullable = false)
+    val userId: Long,
     @Column(name = "place_id", nullable = false)
     val placeId: Long,
-    @Column(name = "display_order", nullable = false)
-    val sequence: Int,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

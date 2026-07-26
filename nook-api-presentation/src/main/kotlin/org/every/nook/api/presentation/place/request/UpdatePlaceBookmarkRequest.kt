@@ -1,3 +1,3 @@
-package org.every.nook.api.presentation.post.request
+package org.every.nook.api.presentation.place.request
 
 data class UpdatePlaceBookmarkRequest(val bookmarked: Boolean)

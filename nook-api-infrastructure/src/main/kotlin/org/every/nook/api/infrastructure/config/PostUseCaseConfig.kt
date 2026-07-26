@@ -5,11 +5,9 @@ import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.PostTitleGenerator
-import org.every.nook.api.application.post.UpdatePostPlaceBookmarkUseCase
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostMediaStoragePort
-import org.every.nook.api.application.post.port.UpdatePostPlaceBookmarkPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -35,9 +33,4 @@ class PostUseCaseConfig {
     @Bean
     fun findPostPlaceParsingUseCase(findPostPlaceParsingPort: FindPostPlaceParsingPort): FindPostPlaceParsingUseCase =
         FindPostPlaceParsingUseCase(findPostPlaceParsingPort)
-
-    @Bean
-    fun updatePostPlaceBookmarkUseCase(
-        updatePostPlaceBookmarkPort: UpdatePostPlaceBookmarkPort,
-    ): UpdatePostPlaceBookmarkUseCase = UpdatePostPlaceBookmarkUseCase(updatePostPlaceBookmarkPort)
 }
