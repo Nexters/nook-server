@@ -26,6 +26,8 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
 
     fun findByIdAndUserId(id: Long, userId: Long): GroupEntity?
 
+    fun findAllByUserIdAndIdIn(userId: Long, ids: Set<Long>): List<GroupEntity>
+
     fun existsByIdAndUserId(id: Long, userId: Long): Boolean
 
     fun existsByUserIdAndName(userId: Long, name: String): Boolean

@@ -3,8 +3,11 @@ package org.every.nook.api.presentation.group
 import org.every.nook.api.application.group.CreateGroupUseCase
 import org.every.nook.api.application.group.DeleteGroupUseCase
 import org.every.nook.api.application.group.GroupView
+import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
+import org.every.nook.api.application.post.model.SavedPostPage
+import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
@@ -17,6 +20,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -26,6 +30,7 @@ class GroupControllerTest {
     private lateinit var createGroupUseCase: CreateGroupUseCase
     private lateinit var updateGroupUseCase: UpdateGroupUseCase
     private lateinit var deleteGroupUseCase: DeleteGroupUseCase
+    private lateinit var listGroupPostsUseCase: ListGroupPostsUseCase
 
     @BeforeTest
     fun setUp() {
@@ -33,6 +38,7 @@ class GroupControllerTest {
         createGroupUseCase = mock(CreateGroupUseCase::class.java)
         updateGroupUseCase = mock(UpdateGroupUseCase::class.java)
         deleteGroupUseCase = mock(DeleteGroupUseCase::class.java)
+        listGroupPostsUseCase = mock(ListGroupPostsUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 GroupController(
@@ -40,6 +46,7 @@ class GroupControllerTest {
                     createGroupUseCase,
                     updateGroupUseCase,
                     deleteGroupUseCase,
+                    listGroupPostsUseCase,
                 ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
@@ -57,6 +64,42 @@ class GroupControllerTest {
             jsonPath("$.success[0].id") { value(17) }
             jsonPath("$.success[0].postCount") { value(3) }
         }
+    }
+
+    @Test
+    fun `lists saved posts in an owned group`() {
+        val query = ListGroupPostsUseCase.Query(
+            userId = UserContextArgumentResolver.DUMMY_USER_ID,
+            groupId = 17,
+            page = 0,
+            size = 20,
+        )
+        `when`(listGroupPostsUseCase(query)).thenReturn(
+            SavedPostPage(
+                items = listOf(
+                    SavedPostSummary(
+                        postId = 11,
+                        title = "성수 카페",
+                        authorIdentifier = "nook",
+                        representativeMedia = null,
+                        memo = null,
+                        savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                    ),
+                ),
+                page = 0,
+                size = 20,
+                totalElements = 1,
+                totalPages = 1,
+                hasNext = false,
+            ),
+        )
+
+        mockMvc.get("/api/v1/groups/17/posts?page=0&size=20").andExpect {
+            status { isOk() }
+            jsonPath("$.success.items[0].postId") { value(11) }
+            jsonPath("$.success.totalElements") { value(1) }
+        }
+        verify(listGroupPostsUseCase)(query)
     }
 
     @Test

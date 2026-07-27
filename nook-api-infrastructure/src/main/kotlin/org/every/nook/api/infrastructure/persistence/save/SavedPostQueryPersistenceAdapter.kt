@@ -9,6 +9,7 @@ import org.every.nook.api.application.post.model.SavedPostPlace
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
@@ -18,6 +19,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
@@ -33,6 +35,7 @@ class SavedPostQueryPersistenceAdapter(
     private val placeRepository: PlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
+    private val groupRepository: GroupJpaRepository,
 ) : SavedPostQueryPort {
     @Transactional(readOnly = true)
     override fun findAll(userId: Long, page: Int, size: Int): SavedPostPage {
@@ -41,7 +44,24 @@ class SavedPostQueryPersistenceAdapter(
             size,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
         )
-        val savedPosts = savedPostRepository.findAllByUserId(userId, pageable)
+        return savedPostRepository.findAllByUserId(userId, pageable).toPage()
+    }
+
+    @Transactional(readOnly = true)
+    override fun findAllByGroup(userId: Long, groupId: Long, page: Int, size: Int): SavedPostPage? {
+        if (!groupRepository.existsByIdAndUserId(groupId, userId)) {
+            return null
+        }
+        val pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
+        )
+        return savedPostRepository.findAllByUserIdAndGroupId(userId, groupId, pageable).toPage()
+    }
+
+    private fun Page<UserSavedPostEntity>.toPage(): SavedPostPage {
+        val savedPosts = this
         val sourcePostIds = savedPosts.content.map(UserSavedPostEntity::postId)
         val postsById = if (sourcePostIds.isEmpty()) {
             emptyMap()

@@ -7,6 +7,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Positive
+import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
@@ -14,6 +15,7 @@ import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.post.request.CreatePostRequest
+import org.every.nook.api.presentation.post.request.ReplaceSavedPostGroupsRequest
 import org.every.nook.api.presentation.post.request.UpdatePostMemoRequest
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
 import org.every.nook.api.presentation.post.response.PostResponse
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -44,6 +47,7 @@ class PostController(
     private val listSavedPostsUseCase: ListSavedPostsUseCase,
     private val getSavedPostDetailUseCase: GetSavedPostDetailUseCase,
     private val updatePostMemoUseCase: UpdatePostMemoUseCase,
+    private val replaceSavedPostGroupsUseCase: ReplaceSavedPostGroupsUseCase,
 ) {
     @Operation(summary = "URL로 게시물 생성")
     @PostMapping
@@ -56,6 +60,7 @@ class PostController(
                 userId = userContext.userId,
                 url = request.url,
                 memo = request.memo,
+                groupIds = request.groupIds.orEmpty(),
             ),
         )
 
@@ -108,6 +113,23 @@ class PostController(
                 userId = userContext.userId,
                 postId = postId,
                 memo = request.memo,
+            ),
+        )
+        return ApiResponse.success(Unit)
+    }
+
+    @Operation(summary = "내 저장 게시물 그룹 재지정")
+    @PutMapping("/{postId}/groups")
+    fun replaceGroups(
+        @Parameter(hidden = true) userContext: UserContext,
+        @PathVariable @Positive postId: Long,
+        @Valid @RequestBody request: ReplaceSavedPostGroupsRequest,
+    ): ApiResponse<Unit> {
+        replaceSavedPostGroupsUseCase(
+            ReplaceSavedPostGroupsUseCase.Command(
+                userId = userContext.userId,
+                savedPostId = postId,
+                groupIds = request.groupIds,
             ),
         )
         return ApiResponse.success(Unit)

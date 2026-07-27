@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.save
 
+import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
@@ -10,6 +11,9 @@ import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.domain.post.Post
+import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
+import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
+import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
@@ -35,11 +39,14 @@ class PostPersistenceAdapter(
     private val postPlaceJpaRepository: PostPlaceJpaRepository,
     private val placeJpaRepository: PlaceJpaRepository,
     private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
+    private val groupJpaRepository: GroupJpaRepository,
+    private val groupPostJpaRepository: GroupPostJpaRepository,
 ) : CreatePostPort,
     FindPostPlaceParsingPort,
     UpdatePostMemoPort {
     @Transactional
-    override fun create(userId: Long, post: Post, memo: String?): CreatedPost {
+    override fun create(userId: Long, post: Post, memo: String?, groupIds: Set<Long>): CreatedPost {
+        validateOwnedGroups(userId, groupIds)
         val postEntity = saveNewPost(post)
         val sourcePostId = requireNotNull(postEntity.id)
         val parsingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
@@ -56,9 +63,18 @@ class PostPersistenceAdapter(
                 memo = memo,
             ),
         )
+        val userSavedPostId = requireNotNull(userPost.id)
+        groupPostJpaRepository.saveAll(
+            groupIds.map { groupId ->
+                GroupPostEntity(
+                    groupId = groupId,
+                    userSavedPostId = userSavedPostId,
+                )
+            },
+        )
 
         return CreatedPost(
-            postId = requireNotNull(userPost.id),
+            postId = userSavedPostId,
             placeParsingStatus = parsingJob.status,
         )
     }
@@ -136,6 +152,17 @@ class PostPersistenceAdapter(
         )
 
         return postEntity
+    }
+
+    private fun validateOwnedGroups(userId: Long, groupIds: Set<Long>) {
+        if (groupIds.isEmpty()) {
+            return
+        }
+        val ownedGroupIds = groupJpaRepository.findAllByUserIdAndIdIn(userId, groupIds)
+            .mapTo(mutableSetOf()) { requireNotNull(it.id) }
+        if (ownedGroupIds != groupIds) {
+            throw GroupNotFoundException()
+        }
     }
 
     private fun PlaceEntity.toDomain(): Place = Place(
