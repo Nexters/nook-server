@@ -1,6 +1,6 @@
 package org.every.nook.api.domain.group
 
-data class Group(val userId: Long, val name: String, val id: Long? = null) {
+data class Group(val userId: Long, val name: String, val color: GroupColor, val id: Long? = null) {
     init {
         require(id == null || id > 0) { "Group id must be positive" }
         require(userId > 0) { "User id must be positive" }
@@ -9,6 +9,6 @@ data class Group(val userId: Long, val name: String, val id: Long? = null) {
     }
 
     companion object {
-        const val MAX_NAME_LENGTH = 100
+        const val MAX_NAME_LENGTH = 20
     }
 }
