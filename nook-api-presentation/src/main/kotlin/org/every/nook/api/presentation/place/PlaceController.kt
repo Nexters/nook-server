@@ -4,23 +4,53 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Positive
+import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.place.request.UpdatePlaceBookmarkRequest
+import org.every.nook.api.presentation.place.response.PlaceDetailResponse
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.validation.annotation.Validated
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+
+private const val MAX_PLACE_POST_PAGE_SIZE = 100L
 
 @Tag(name = "Place")
 @Validated
 @RestController
 @RequestMapping("/api/v1/places")
-class PlaceController(private val updatePlaceBookmarkUseCase: UpdatePlaceBookmarkUseCase) {
+class PlaceController(
+    private val updatePlaceBookmarkUseCase: UpdatePlaceBookmarkUseCase,
+    private val getPlaceDetailUseCase: GetPlaceDetailUseCase,
+) {
+    @Operation(summary = "장소 상세 및 연관 게시물 조회")
+    @GetMapping("/{placeId}")
+    fun getDetail(
+        @Parameter(hidden = true) userContext: UserContext,
+        @PathVariable @Positive placeId: Long,
+        @RequestParam(defaultValue = "0") @Min(0) page: Int,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PLACE_POST_PAGE_SIZE) size: Int,
+    ): ApiResponse<PlaceDetailResponse> {
+        val detail = getPlaceDetailUseCase(
+            GetPlaceDetailUseCase.Query(
+                userId = userContext.userId,
+                placeId = placeId,
+                page = page,
+                size = size,
+            ),
+        )
+        return ApiResponse.success(PlaceDetailResponse.from(detail))
+    }
+
     @Operation(summary = "장소 북마크 변경")
     @PatchMapping("/{placeId}/bookmark")
     fun updateBookmark(

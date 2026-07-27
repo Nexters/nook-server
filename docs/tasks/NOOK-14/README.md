@@ -7,7 +7,7 @@ API에서 실제 장소 후보를 검색하고 공통 형식으로 정규화한�
 
 ## 범위
 
-- 검색어 목록과 선택적인 중심 좌표·반경을 받는 장소 후보 검색 API
+- 검색어 목록과 선택적인 중심 좌표·반경을 받는 내부 장소 후보 검색 유스케이스
 - application 계층의 장소 검색 provider port와 유스케이스
 - Kakao Local 키워드 장소 검색 adapter
 - 장소 ID, 이름, 주소, 좌표, 카테고리, 전화번호, 카카오맵 URL 정규화
@@ -25,9 +25,10 @@ API에서 실제 장소 후보를 검색하고 공통 형식으로 정규화한�
 - `Post`, `Place`, `PostPlace` 영속화
 - 네이버·Google 등 추가 지도 provider
 
-## API
+## 내부 계약
 
-`POST /api/v1/places/candidates/search`
+장소 후보 검색은 외부 HTTP API로 노출하지 않습니다. 장소 파싱 worker가
+`SearchPlaceCandidatesUseCase`를 호출하며 다음 검색 조건을 전달합니다.
 
 ```json
 {
@@ -42,27 +43,22 @@ API에서 실제 장소 후보를 검색하고 공통 형식으로 정규화한�
 - `longitude`, `latitude`: 선택값이지만 둘 중 하나만 입력할 수 없다.
 - `radius`: 중심 좌표와 함께 입력하며 1~20,000m 범위다.
 
-성공 응답:
+검색 결과:
 
 ```json
-{
-  "resultType": "SUCCESS",
-  "success": {
-    "candidates": [
-      {
-        "provider": "KAKAO",
-        "externalPlaceId": "26338954",
-        "name": "Nook Cafe",
-        "address": "서울 성동구 아차산로 1",
-        "latitude": 37.5120741,
-        "longitude": 127.0590297,
-        "category": "음식점 > 카페",
-        "phoneNumber": "02-1234-5678",
-        "providerUrl": "https://place.map.kakao.com/26338954"
-      }
-    ]
+[
+  {
+    "provider": "KAKAO",
+    "externalPlaceId": "26338954",
+    "name": "Nook Cafe",
+    "address": "서울 성동구 아차산로 1",
+    "latitude": 37.5120741,
+    "longitude": 127.0590297,
+    "category": "음식점 > 카페",
+    "phoneNumber": "02-1234-5678",
+    "providerUrl": "https://place.map.kakao.com/26338954"
   }
-}
+]
 ```
 
 ## Mock scraping data 연결
@@ -91,9 +87,9 @@ Authorization: KakaoAK {KAKAO_REST_API_KEY}
 
 ## 오류
 
-- 잘못된 검색 조건: `400 Bad Request`
-- 카카오 Local API 오류 또는 응답 형식 오류: `502 Bad Gateway`
-- timeout: `504 Gateway Timeout`
+- 잘못된 검색 조건: `PlaceSearchInvalidRequestException`
+- 카카오 Local API 오류 또는 응답 형식 오류: `PlaceSearchProviderException`
+- timeout: `PlaceSearchProviderTimeoutException`
 
 ## 검증
 
@@ -109,7 +105,7 @@ Authorization: KakaoAK {KAKAO_REST_API_KEY}
 - 카카오 응답 필드와 도로명·지번 주소 fallback 매핑
 - 빈 후보 정상 응답
 - provider 오류 변환
-- 공통 API 응답 형식
+- 장소 파싱 worker의 내부 유스케이스 호출
 
 ## DDL
 
