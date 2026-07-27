@@ -16,6 +16,9 @@ dependencies {
     implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-boot4-support:3.9.0")
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.security:spring-security-oauth2-jose")
+    implementation(platform("software.amazon.awssdk:bom:2.49.3"))
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:url-connection-client")
     runtimeOnly("com.mysql:mysql-connector-j")
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")

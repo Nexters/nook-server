@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: NOOK environment-specific private media bucket and CloudFront distribution
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - live
+  PriceClass:
+    Type: String
+    Default: PriceClass_200
+    AllowedValues:
+      - PriceClass_100
+      - PriceClass_200
+      - PriceClass_All
+  MediaWriterRoleName:
+    Type: String
+    Description: Existing application role that receives environment-scoped media permissions
+
+Resources:
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: nook
+        - Key: Environment
+          Value: !Ref Environment
+
+  MediaOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Description: !Sub "NOOK ${Environment} media S3 access"
+        Name: !Sub "nook-${Environment}-media-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  MediaDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub "NOOK ${Environment} media"
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          Compress: true
+          TargetOriginId: MediaS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        Origins:
+          - DomainName: !GetAtt MediaBucket.RegionalDomainName
+            Id: MediaS3Origin
+            OriginAccessControlId: !GetAtt MediaOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        PriceClass: !Ref PriceClass
+      Tags:
+        - Key: Project
+          Value: nook
+        - Key: Environment
+          Value: !Ref Environment
+
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MediaBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${MediaBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub
+                  - "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+                  - DistributionId: !Ref MediaDistribution
+
+  MediaWriterPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "nook-${Environment}-media-writer"
+      Roles:
+        - !Ref MediaWriterRoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CheckMediaObjectExistence
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: !GetAtt MediaBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix:
+                  - post-media/*
+          - Sid: ReadAndWriteMediaObjects
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+            Resource: !Sub "${MediaBucket.Arn}/post-media/*"
+
+Outputs:
+  BucketName:
+    Description: Private S3 bucket used by the application
+    Value: !Ref MediaBucket
+  DistributionId:
+    Description: CloudFront distribution ID
+    Value: !Ref MediaDistribution
+  CloudFrontBaseUrl:
+    Description: Public immutable media base URL
+    Value: !Sub "https://${MediaDistribution.DomainName}"
+  MediaWriterRoleArn:
+    Description: Application role receiving environment-scoped media permissions
+    Value: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${MediaWriterRoleName}"
