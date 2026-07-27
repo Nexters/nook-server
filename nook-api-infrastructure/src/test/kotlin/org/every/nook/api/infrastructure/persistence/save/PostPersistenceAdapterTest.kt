@@ -1,8 +1,13 @@
 package org.every.nook.api.infrastructure.persistence.save
 
+import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostSource
+import org.every.nook.api.infrastructure.persistence.group.GroupEntity
+import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
+import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
+import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
@@ -15,9 +20,11 @@ import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -25,6 +32,8 @@ class PostPersistenceAdapterTest {
     private val postRepository = mock(PostJpaRepository::class.java)
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
+    private val groupRepository = mock(GroupJpaRepository::class.java)
+    private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val adapter = PostPersistenceAdapter(
         postJpaRepository = postRepository,
         postMediaJpaRepository = mock(PostMediaJpaRepository::class.java),
@@ -34,6 +43,8 @@ class PostPersistenceAdapterTest {
         postPlaceJpaRepository = mock(PostPlaceJpaRepository::class.java),
         placeJpaRepository = mock(PlaceJpaRepository::class.java),
         userPlaceBookmarkJpaRepository = mock(UserPlaceBookmarkJpaRepository::class.java),
+        groupJpaRepository = groupRepository,
+        groupPostJpaRepository = groupPostRepository,
     )
 
     @Test
@@ -59,6 +70,7 @@ class PostPersistenceAdapterTest {
                 canonicalUrl = "https://www.instagram.com/p/ABC123/",
             ),
             memo = "주말에 방문",
+            groupIds = emptySet(),
         )
 
         val captor = ArgumentCaptor.forClass(UserSavedPostEntity::class.java)
@@ -66,6 +78,66 @@ class PostPersistenceAdapterTest {
         assertEquals(7, captor.value.userId)
         assertEquals(101, captor.value.postId)
         assertEquals("주말에 방문", captor.value.memo)
+    }
+
+    @Test
+    fun `stores the saved post in each owned group`() {
+        val firstGroup = mock(GroupEntity::class.java)
+        val secondGroup = mock(GroupEntity::class.java)
+        val postEntity = mock(PostEntity::class.java)
+        val parsingJob = mock(PlaceParsingJobEntity::class.java)
+        val savedPost = mock(UserSavedPostEntity::class.java)
+        `when`(firstGroup.id).thenReturn(17)
+        `when`(secondGroup.id).thenReturn(18)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17, 18)))
+            .thenReturn(listOf(firstGroup, secondGroup))
+        `when`(postEntity.id).thenReturn(101)
+        `when`(parsingJob.status).thenReturn(PlaceParsingStatus.PENDING)
+        `when`(savedPost.id).thenReturn(11)
+        `when`(postRepository.save(org.mockito.ArgumentMatchers.any(PostEntity::class.java))).thenReturn(postEntity)
+        `when`(parsingJobRepository.findByPostId(101)).thenReturn(parsingJob)
+        `when`(
+            userSavedPostRepository.save(
+                org.mockito.ArgumentMatchers.any(UserSavedPostEntity::class.java),
+            ),
+        ).thenReturn(savedPost)
+
+        adapter.create(
+            userId = 7,
+            post = Post(
+                source = PostSource(type = "INSTAGRAM", externalPostId = "ABC123"),
+                canonicalUrl = "https://www.instagram.com/p/ABC123/",
+            ),
+            memo = null,
+            groupIds = setOf(17, 18),
+        )
+
+        @Suppress("UNCHECKED_CAST")
+        val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<GroupPostEntity>>
+        verify(groupPostRepository).saveAll(captor.capture())
+        assertEquals(setOf(17L, 18L), captor.value.map { it.groupId }.toSet())
+        assertTrue(captor.value.all { it.userSavedPostId == 11L })
+    }
+
+    @Test
+    fun `rejects inaccessible groups before creating any post data`() {
+        val ownedGroup = mock(GroupEntity::class.java)
+        `when`(ownedGroup.id).thenReturn(17)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17, 18))).thenReturn(listOf(ownedGroup))
+
+        assertFailsWith<GroupNotFoundException> {
+            adapter.create(
+                userId = 7,
+                post = Post(
+                    source = PostSource(type = "INSTAGRAM", externalPostId = "ABC123"),
+                    canonicalUrl = "https://www.instagram.com/p/ABC123/",
+                ),
+                memo = null,
+                groupIds = setOf(17, 18),
+            )
+        }
+
+        verifyNoInteractions(postRepository)
     }
 
     @Test

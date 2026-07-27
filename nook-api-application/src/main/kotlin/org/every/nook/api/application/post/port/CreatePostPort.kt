@@ -4,7 +4,7 @@ import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 
 fun interface CreatePostPort {
-    fun create(userId: Long, post: Post, memo: String?): CreatedPost
+    fun create(userId: Long, post: Post, memo: String?, groupIds: Set<Long>): CreatedPost
 }
 
 data class CreatedPost(val postId: Long, val placeParsingStatus: PlaceParsingStatus)

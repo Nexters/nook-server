@@ -49,7 +49,7 @@ class CreatePostUseCaseTest {
             calls += "title"
             "용산 맛집 방문"
         }
-        val persistence = CreatePostPort { userId, post, memo ->
+        val persistence = CreatePostPort { userId, post, memo, groupIds ->
             calls += "persistence"
             assertEquals(7, userId)
             assertEquals("nook_user", post.authorIdentifier)
@@ -62,6 +62,7 @@ class CreatePostUseCaseTest {
                 post.canonicalUrl,
             )
             assertEquals("주말에 방문", memo)
+            assertEquals(setOf(1L, 2L), groupIds)
             assertEquals("https://cdn/image.jpg", post.media.single().url)
             assertEquals("용산 맛집 방문", post.title)
             CreatedPost(11, PlaceParsingStatus.PENDING)
@@ -78,6 +79,7 @@ class CreatePostUseCaseTest {
                 userId = 7,
                 url = "https://www.instagram.com/p/ABC123/?igsh=tracking-value",
                 memo = "주말에 방문",
+                groupIds = listOf(1, 2, 1),
             ),
         )
 
@@ -92,7 +94,7 @@ class CreatePostUseCaseTest {
             ExtractPostContentUseCase(emptyList()),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { it },
-            CreatePostPort { _, _, _ -> error("persistence must not be called") },
+            CreatePostPort { _, _, _, _ -> error("persistence must not be called") },
         )
 
         assertFailsWith<UnsupportedPostUrlException> {
@@ -111,7 +113,7 @@ class CreatePostUseCaseTest {
             ExtractPostContentUseCase(listOf(extractor)),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { it },
-            CreatePostPort { _, _, _ -> error("persistence must not be called") },
+            CreatePostPort { _, _, _, _ -> error("persistence must not be called") },
         )
 
         assertFailsWith<PostContentProviderTimeoutException> {

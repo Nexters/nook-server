@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
@@ -39,6 +40,7 @@ class SavedPostQueryPersistenceAdapterTest {
     private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
+    private val groupRepository = mock(GroupJpaRepository::class.java)
     private val adapter = SavedPostQueryPersistenceAdapter(
         savedPostRepository,
         postRepository,
@@ -48,6 +50,7 @@ class SavedPostQueryPersistenceAdapterTest {
         placeRepository,
         bookmarkRepository,
         parsingJobRepository,
+        groupRepository,
     )
 
     @Test
@@ -132,6 +135,30 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(21L, result.totalElements)
         assertEquals(false, result.hasNext)
         assertEquals("목록 메모", result.items.single().memo)
+    }
+
+    @Test
+    fun `group list requires ownership and uses stable pagination`() {
+        val requestedPage = PageRequest.of(
+            0,
+            20,
+            Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
+        )
+        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(true)
+        `when`(savedPostRepository.findAllByUserIdAndGroupId(7, 17, requestedPage))
+            .thenReturn(PageImpl(emptyList(), requestedPage, 0))
+
+        val result = requireNotNull(adapter.findAllByGroup(userId = 7, groupId = 17, page = 0, size = 20))
+
+        assertEquals(0, result.totalElements)
+        verify(savedPostRepository).findAllByUserIdAndGroupId(7, 17, requestedPage)
+    }
+
+    @Test
+    fun `another users group is not returned`() {
+        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(false)
+
+        assertNull(adapter.findAllByGroup(userId = 7, groupId = 17, page = 0, size = 20))
     }
 
     private fun place(id: Long, name: String): PlaceEntity {

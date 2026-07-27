@@ -30,7 +30,12 @@ class CreatePostUseCase(
             ),
             media = providedPost.media.map(postMediaStoragePort::store),
         )
-        val created = createPostPort.create(command.userId, storedPost, command.memo)
+        val created = createPostPort.create(
+            userId = command.userId,
+            post = storedPost,
+            memo = command.memo,
+            groupIds = command.groupIds.toSet(),
+        )
 
         return Result(
             postId = created.postId,
@@ -50,7 +55,12 @@ class CreatePostUseCase(
         .distinct()
         .toList()
 
-    data class Command(val userId: Long, val url: String, val memo: String? = null)
+    data class Command(
+        val userId: Long,
+        val url: String,
+        val memo: String? = null,
+        val groupIds: List<Long> = emptyList(),
+    )
 
     data class Result(val postId: Long, val placeParsingStatus: PlaceParsingStatusView)
 }

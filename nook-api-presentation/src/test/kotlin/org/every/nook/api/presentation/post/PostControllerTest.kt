@@ -1,6 +1,7 @@
 package org.every.nook.api.presentation.post
 
 import org.every.nook.api.application.content.UnsupportedPostUrlException
+import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
 import java.time.Instant
@@ -35,6 +37,7 @@ class PostControllerTest {
     private lateinit var listUseCase: ListSavedPostsUseCase
     private lateinit var detailUseCase: GetSavedPostDetailUseCase
     private lateinit var updateMemoUseCase: UpdatePostMemoUseCase
+    private lateinit var replaceGroupsUseCase: ReplaceSavedPostGroupsUseCase
 
     @BeforeTest
     fun setUp() {
@@ -43,13 +46,21 @@ class PostControllerTest {
         listUseCase = mock(ListSavedPostsUseCase::class.java)
         detailUseCase = mock(GetSavedPostDetailUseCase::class.java)
         updateMemoUseCase = mock(UpdatePostMemoUseCase::class.java)
+        replaceGroupsUseCase = mock(ReplaceSavedPostGroupsUseCase::class.java)
         stubCreate()
         stubPlaceParsing(findUseCase)
         stubSavedPostList()
         stubSavedPostDetail()
         mockMvc = MockMvcBuilders
             .standaloneSetup(
-                PostController(createUseCase, findUseCase, listUseCase, detailUseCase, updateMemoUseCase),
+                PostController(
+                    createUseCase,
+                    findUseCase,
+                    listUseCase,
+                    detailUseCase,
+                    updateMemoUseCase,
+                    replaceGroupsUseCase,
+                ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
             .setControllerAdvice(GlobalExceptionHandler())
@@ -105,6 +116,24 @@ class PostControllerTest {
         }
     }
 
+    @Test
+    fun `replaces saved post groups`() {
+        mockMvc.put("/api/v1/posts/11/groups") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"groupIds":[17,18,17]}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        verify(replaceGroupsUseCase)(
+            ReplaceSavedPostGroupsUseCase.Command(
+                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                savedPostId = 11,
+                groupIds = listOf(17, 18, 17),
+            ),
+        )
+    }
+
     private fun stubCreate() {
         `when`(
             createUseCase(
@@ -112,6 +141,7 @@ class PostControllerTest {
                     userId = UserContextArgumentResolver.DUMMY_USER_ID,
                     url = "https://www.instagram.com/p/ABC123/",
                     memo = "주말에 방문",
+                    groupIds = listOf(17, 18),
                 ),
             ),
         ).thenReturn(
@@ -227,7 +257,8 @@ class PostControllerTest {
             content = """
                 {
                   "url": "https://www.instagram.com/p/ABC123/",
-                  "memo": "주말에 방문"
+                  "memo": "주말에 방문",
+                  "groupIds": [17, 18]
                 }
             """.trimIndent()
         }.andExpect {
@@ -285,6 +316,17 @@ class PostControllerTest {
             status { isBadRequest() }
             jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
             jsonPath("$.error.data.violations[0].field") { value("url") }
+        }
+    }
+
+    @Test
+    fun `rejects non-positive group ids`() {
+        mockMvc.put("/api/v1/posts/11/groups") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"groupIds":[0]}"""
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
         }
     }
 

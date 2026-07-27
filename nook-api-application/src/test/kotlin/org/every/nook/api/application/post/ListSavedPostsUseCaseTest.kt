@@ -16,6 +16,9 @@ class ListSavedPostsUseCaseTest {
                 return SavedPostPage(emptyList(), page, size, 0, 0, false)
             }
 
+            override fun findAllByGroup(userId: Long, groupId: Long, page: Int, size: Int): SavedPostPage? =
+                error("not used")
+
             override fun findDetail(userId: Long, postId: Long): SavedPostDetail? = error("not used")
         }
 
