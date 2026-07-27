@@ -51,6 +51,7 @@ class PostPersistenceAdapter(
             UserSavedPostEntity(
                 userId = userId,
                 postId = sourcePostId,
+                memo = post.memo,
             ),
         )
 

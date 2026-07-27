@@ -3,8 +3,15 @@ package org.every.nook.api.presentation.post
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
+import org.every.nook.api.application.post.GetSavedPostDetailUseCase
+import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PlaceView
+import org.every.nook.api.application.post.model.SavedPostDetail
+import org.every.nook.api.application.post.model.SavedPostMedia
+import org.every.nook.api.application.post.model.SavedPostMediaType
+import org.every.nook.api.application.post.model.SavedPostPage
+import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
@@ -15,16 +22,34 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
+import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
 class PostControllerTest {
     private lateinit var mockMvc: MockMvc
     private lateinit var createUseCase: CreatePostUseCase
+    private lateinit var listUseCase: ListSavedPostsUseCase
+    private lateinit var detailUseCase: GetSavedPostDetailUseCase
 
     @BeforeTest
     fun setUp() {
         createUseCase = mock(CreatePostUseCase::class.java)
+        val findUseCase = mock(FindPostPlaceParsingUseCase::class.java)
+        listUseCase = mock(ListSavedPostsUseCase::class.java)
+        detailUseCase = mock(GetSavedPostDetailUseCase::class.java)
+        stubCreate()
+        stubPlaceParsing(findUseCase)
+        stubSavedPostList()
+        stubSavedPostDetail()
+        mockMvc = MockMvcBuilders
+            .standaloneSetup(PostController(createUseCase, findUseCase, listUseCase, detailUseCase))
+            .setCustomArgumentResolvers(UserContextArgumentResolver())
+            .setControllerAdvice(GlobalExceptionHandler())
+            .build()
+    }
+
+    private fun stubCreate() {
         `when`(
             createUseCase(
                 CreatePostUseCase.Command(
@@ -39,7 +64,9 @@ class PostControllerTest {
                 placeParsingStatus = PlaceParsingStatusView.PENDING,
             ),
         )
-        val findUseCase = mock(FindPostPlaceParsingUseCase::class.java)
+    }
+
+    private fun stubPlaceParsing(findUseCase: FindPostPlaceParsingUseCase) {
         `when`(
             findUseCase(
                 FindPostPlaceParsingUseCase.Query(
@@ -68,11 +95,73 @@ class PostControllerTest {
                 ),
             ),
         )
-        mockMvc = MockMvcBuilders
-            .standaloneSetup(PostController(createUseCase, findUseCase))
-            .setCustomArgumentResolvers(UserContextArgumentResolver())
-            .setControllerAdvice(GlobalExceptionHandler())
-            .build()
+    }
+
+    private fun stubSavedPostList() {
+        `when`(
+            listUseCase(
+                ListSavedPostsUseCase.Query(
+                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    page = 0,
+                    size = 20,
+                ),
+            ),
+        ).thenReturn(
+            SavedPostPage(
+                items = listOf(
+                    SavedPostSummary(
+                        postId = 11,
+                        title = "성수 카페",
+                        authorIdentifier = "nook",
+                        representativeMedia = SavedPostMedia(
+                            type = SavedPostMediaType.IMAGE,
+                            url = "https://example.com/1.jpg",
+                            sequence = 0,
+                        ),
+                        memo = "주말에 방문",
+                        savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                    ),
+                ),
+                page = 0,
+                size = 20,
+                totalElements = 1,
+                totalPages = 1,
+                hasNext = false,
+            ),
+        )
+    }
+
+    private fun stubSavedPostDetail() {
+        `when`(
+            detailUseCase(
+                GetSavedPostDetailUseCase.Query(
+                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    postId = 11,
+                ),
+            ),
+        ).thenReturn(
+            SavedPostDetail(
+                postId = 11,
+                title = "성수 카페",
+                body = "본문",
+                authorIdentifier = "nook",
+                canonicalUrl = "https://www.instagram.com/p/ABC123/",
+                publishedAt = Instant.parse("2026-07-20T00:00:00Z"),
+                media = listOf(
+                    SavedPostMedia(
+                        type = SavedPostMediaType.IMAGE,
+                        url = "https://example.com/1.jpg",
+                        sequence = 0,
+                    ),
+                ),
+                hashtags = listOf("성수"),
+                memo = "주말에 방문",
+                savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                placeParsingStatus = PlaceParsingStatusView.COMPLETED,
+                placeParsingFailureReason = null,
+                places = emptyList(),
+            ),
+        )
     }
 
     @Test
@@ -105,6 +194,29 @@ class PostControllerTest {
             jsonPath("$.success.places[0].id") { value(17) }
             jsonPath("$.success.places[0].name") { value("Nook Cafe") }
             jsonPath("$.success.places[0].bookmarked") { value(true) }
+        }
+    }
+
+    @Test
+    fun `returns paged saved posts`() {
+        mockMvc.get("/api/v1/posts?page=0&size=20").andExpect {
+            status { isOk() }
+            jsonPath("$.success.items[0].postId") { value(11) }
+            jsonPath("$.success.items[0].representativeMedia.sequence") { value(0) }
+            jsonPath("$.success.totalElements") { value(1) }
+            jsonPath("$.success.hasNext") { value(false) }
+        }
+    }
+
+    @Test
+    fun `returns a saved post detail`() {
+        mockMvc.get("/api/v1/posts/11").andExpect {
+            status { isOk() }
+            jsonPath("$.success.postId") { value(11) }
+            jsonPath("$.success.body") { value("본문") }
+            jsonPath("$.success.media[0].url") { value("https://example.com/1.jpg") }
+            jsonPath("$.success.hashtags[0]") { value("성수") }
+            jsonPath("$.success.places") { isEmpty() }
         }
     }
 

@@ -4,10 +4,13 @@ import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
+import org.every.nook.api.application.post.GetSavedPostDetailUseCase
+import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.PostTitleGenerator
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -33,4 +36,12 @@ class PostUseCaseConfig {
     @Bean
     fun findPostPlaceParsingUseCase(findPostPlaceParsingPort: FindPostPlaceParsingPort): FindPostPlaceParsingUseCase =
         FindPostPlaceParsingUseCase(findPostPlaceParsingPort)
+
+    @Bean
+    fun listSavedPostsUseCase(savedPostQueryPort: SavedPostQueryPort): ListSavedPostsUseCase =
+        ListSavedPostsUseCase(savedPostQueryPort)
+
+    @Bean
+    fun getSavedPostDetailUseCase(savedPostQueryPort: SavedPostQueryPort): GetSavedPostDetailUseCase =
+        GetSavedPostDetailUseCase(savedPostQueryPort)
 }

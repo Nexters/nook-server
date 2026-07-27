@@ -4,4 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface PostHashtagJpaRepository : JpaRepository<PostHashtagEntity, Long> {
     fun findAllByPostIdOrderBySequenceAsc(postId: Long): List<PostHashtagEntity>
+
+    fun findAllByPostIdInOrderByPostIdAscSequenceAsc(postIds: Collection<Long>): List<PostHashtagEntity>
 }
