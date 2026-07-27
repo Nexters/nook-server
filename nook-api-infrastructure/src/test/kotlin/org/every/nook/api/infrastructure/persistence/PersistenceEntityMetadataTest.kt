@@ -1,6 +1,10 @@
 package org.every.nook.api.infrastructure.persistence
 
+import jakarta.persistence.Column
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
+import org.every.nook.api.domain.group.Group
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
@@ -66,9 +70,21 @@ class PersistenceEntityMetadataTest {
     fun `group name is unique within a user`() {
         val table = requireNotNull(GroupEntity::class.findAnnotation<Table>())
         val uniqueConstraint = table.uniqueConstraints.single()
+        val nameColumn =
+            requireNotNull(
+                GroupEntity::class.java
+                    .getDeclaredField("name")
+                    .getAnnotation(Column::class.java),
+            )
+        val colorField = GroupEntity::class.java.getDeclaredField("color")
+        val colorColumn = requireNotNull(colorField.getAnnotation(Column::class.java))
+        val colorEnum = requireNotNull(colorField.getAnnotation(Enumerated::class.java))
 
         assertEquals("idx_u_user_id_name", uniqueConstraint.name)
         assertEquals(listOf("user_id", "name"), uniqueConstraint.columnNames.toList())
+        assertEquals(Group.MAX_NAME_LENGTH, nameColumn.length)
+        assertEquals(GroupEntity.COLOR_COLUMN_LENGTH, colorColumn.length)
+        assertEquals(EnumType.STRING, colorEnum.value)
     }
 
     @Test
