@@ -7,16 +7,12 @@ Content-Type: application/json
   "accessToken": "replace-with-kakao-access-token"
 }
 
-### 장소 후보 조회
-POST {{baseUrl}}/api/v1/places/candidates/search
+### 회원가입 완료
+POST {{baseUrl}}/api/v1/members
+Authorization: Bearer replace-with-signup-token
 Content-Type: application/json
 
 {
-  "queries": [
-    "성수 카페",
-    "서울숲 맛집"
-  ],
-  "longitude": 127.0436,
-  "latitude": 37.5445,
-  "radius": 5000
+  "nickname": "누커",
+  "profileImageUrl": "https://example.com/profile.png"
 }

@@ -13,6 +13,8 @@ import org.every.nook.api.infrastructure.auth.AppleAuthProperties
 import org.every.nook.api.infrastructure.auth.AppleClientSecretGenerator
 import org.every.nook.api.infrastructure.auth.AppleSocialIdentityProvider
 import org.every.nook.api.infrastructure.auth.CompositeSocialIdentityProvider
+import org.every.nook.api.infrastructure.auth.GoogleAuthProperties
+import org.every.nook.api.infrastructure.auth.GoogleSocialIdentityProvider
 import org.every.nook.api.infrastructure.auth.JwtProperties
 import org.every.nook.api.infrastructure.auth.JwtTokenProvider
 import org.every.nook.api.infrastructure.auth.KakaoAuthProperties
@@ -34,10 +36,17 @@ import java.time.Clock
 import javax.crypto.spec.SecretKeySpec
 
 private const val APPLE_ISSUER = "https://appleid.apple.com"
+private const val GOOGLE_JWK_SET_URI = "https://www.googleapis.com/oauth2/v3/certs"
+private val GOOGLE_ISSUERS = setOf("accounts.google.com", "https://accounts.google.com")
 
 @Configuration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-@EnableConfigurationProperties(JwtProperties::class, AppleAuthProperties::class, KakaoAuthProperties::class)
+@EnableConfigurationProperties(
+    JwtProperties::class,
+    AppleAuthProperties::class,
+    KakaoAuthProperties::class,
+    GoogleAuthProperties::class,
+)
 class AuthConfig {
     @Bean
     fun clock(): Clock = Clock.systemUTC()
@@ -66,12 +75,32 @@ class AuthConfig {
         restClientBuilder: RestClient.Builder,
         properties: AppleAuthProperties,
         kakaoProperties: KakaoAuthProperties,
+        googleProperties: GoogleAuthProperties,
         clock: Clock,
     ): SocialIdentityProvider {
         val kakao = KakaoSocialIdentityProvider(
             restClientBuilder.baseUrl("https://kapi.kakao.com").build(),
             kakaoProperties,
         )
+        val googleDecoder = NimbusJwtDecoder.withJwkSetUri(GOOGLE_JWK_SET_URI).build().apply {
+            val defaultValidator = JwtValidators.createDefault()
+            val issuerValidator = OAuth2TokenValidator<Jwt> { jwt ->
+                if (jwt.issuer?.toString() in GOOGLE_ISSUERS) {
+                    OAuth2TokenValidatorResult.success()
+                } else {
+                    OAuth2TokenValidatorResult.failure(OAuth2Error("invalid_token", "Invalid issuer", null))
+                }
+            }
+            val audienceValidator = OAuth2TokenValidator<Jwt> { jwt ->
+                if (jwt.audience.contains(googleProperties.clientId)) {
+                    OAuth2TokenValidatorResult.success()
+                } else {
+                    OAuth2TokenValidatorResult.failure(OAuth2Error("invalid_token", "Invalid audience", null))
+                }
+            }
+            setJwtValidator(DelegatingOAuth2TokenValidator(defaultValidator, issuerValidator, audienceValidator))
+        }
+        val google = GoogleSocialIdentityProvider(googleDecoder)
         val decoder = NimbusJwtDecoder.withJwkSetUri("$APPLE_ISSUER/auth/keys").build().apply {
             val issuerValidator = JwtValidators.createDefaultWithIssuer(APPLE_ISSUER)
             val audienceValidator = OAuth2TokenValidator<Jwt> { jwt ->
@@ -89,7 +118,7 @@ class AuthConfig {
             clientSecretGenerator = AppleClientSecretGenerator(properties, clock),
             properties = properties,
         )
-        return CompositeSocialIdentityProvider(kakao, apple)
+        return CompositeSocialIdentityProvider(kakao, google, apple)
     }
 
     @Bean

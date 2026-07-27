@@ -2,6 +2,7 @@ package org.every.nook.api.application.auth
 
 enum class SocialLoginProvider {
     KAKAO,
+    GOOGLE,
     APPLE,
 }
 

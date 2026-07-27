@@ -49,7 +49,7 @@ class AuthControllerTest {
     fun `unsupported provider uses common invalid request response`() {
         mockMvc.post("/api/v1/auth/social") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"provider":"GOOGLE","accessToken":"provider-token"}"""
+            content = """{"provider":"UNKNOWN","accessToken":"provider-token"}"""
         }.andExpect {
             status { isBadRequest() }
             jsonPath("$.code") { value("INVALID_REQUEST") }

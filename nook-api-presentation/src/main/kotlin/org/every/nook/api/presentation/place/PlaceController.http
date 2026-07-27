@@ -7,16 +7,12 @@ Content-Type: application/json
   "accessToken": "replace-with-kakao-access-token"
 }
 
-### 장소 후보 조회
-POST {{baseUrl}}/api/v1/places/candidates/search
+@placeId = 1
+
+### 장소 북마크 변경
+PATCH {{baseUrl}}/api/v1/places/{{placeId}}/bookmark
 Content-Type: application/json
 
 {
-  "queries": [
-    "성수 카페",
-    "서울숲 맛집"
-  ],
-  "longitude": 127.0436,
-  "latitude": 37.5445,
-  "radius": 5000
+  "bookmarked": true
 }
