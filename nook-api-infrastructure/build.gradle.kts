@@ -14,6 +14,8 @@ dependencies {
     implementation("org.springframework:spring-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-boot4-support:3.9.0")
+    implementation("org.springframework.boot:spring-boot-starter-restclient")
+    implementation("org.springframework.security:spring-security-oauth2-jose")
     runtimeOnly("com.mysql:mysql-connector-j")
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")

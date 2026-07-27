@@ -1,4 +1,11 @@
-# TODO: 로그인 API 구현 후 이 위치에 로그인 요청을 추가합니다.
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
 
 @postId = 1
 @placeId = 1
