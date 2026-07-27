@@ -53,6 +53,16 @@ external:
     reels-dataset-id: ${BRIGHT_DATA_REELS_DATASET_ID:gd_lyclm20il4r5helnj}
     connect-timeout: ${BRIGHT_DATA_CONNECT_TIMEOUT:3s}
     read-timeout: ${BRIGHT_DATA_READ_TIMEOUT:60s}
+  media-storage:
+    enabled: ${MEDIA_STORAGE_ENABLED:false}
+    bucket: ${AWS_S3_BUCKET:}
+    region: ${AWS_REGION:ap-northeast-2}
+    cloud-front-base-url: ${AWS_CLOUDFRONT_BASE_URL:}
+    connect-timeout: ${MEDIA_DOWNLOAD_CONNECT_TIMEOUT:3s}
+    read-timeout: ${MEDIA_DOWNLOAD_READ_TIMEOUT:30s}
+    max-image-bytes: ${MEDIA_MAX_IMAGE_BYTES:20971520}
+    max-video-bytes: ${MEDIA_MAX_VIDEO_BYTES:104857600}
+    max-redirects: ${MEDIA_MAX_REDIRECTS:3}
 
 auth:
   kakao:
