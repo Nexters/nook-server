@@ -21,7 +21,6 @@ class CreatePostUseCase(
         )
         val storedPost = providedPost.copy(
             canonicalUrl = command.url,
-            memo = command.memo,
             title = postTitleGenerator.generate(
                 PostTitleGenerator.Request(
                     body = providedPost.body,
@@ -31,7 +30,7 @@ class CreatePostUseCase(
             ),
             media = providedPost.media.map(postMediaStoragePort::store),
         )
-        val created = createPostPort.create(command.userId, storedPost)
+        val created = createPostPort.create(command.userId, storedPost, command.memo)
 
         return Result(
             postId = created.postId,

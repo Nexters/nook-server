@@ -7,10 +7,12 @@ import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.PostTitleGenerator
+import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.application.post.port.SavedPostQueryPort
+import org.every.nook.api.application.post.port.UpdatePostMemoPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -44,4 +46,8 @@ class PostUseCaseConfig {
     @Bean
     fun getSavedPostDetailUseCase(savedPostQueryPort: SavedPostQueryPort): GetSavedPostDetailUseCase =
         GetSavedPostDetailUseCase(savedPostQueryPort)
+
+    @Bean
+    fun updatePostMemoUseCase(updatePostMemoPort: UpdatePostMemoPort): UpdatePostMemoUseCase =
+        UpdatePostMemoUseCase(updatePostMemoPort)
 }

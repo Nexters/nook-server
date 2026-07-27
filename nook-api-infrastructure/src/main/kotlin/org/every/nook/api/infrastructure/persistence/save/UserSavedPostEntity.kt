@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import org.every.nook.api.domain.save.UserSavedPost
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 
 @Entity
@@ -22,8 +23,13 @@ class UserSavedPostEntity(
     val userId: Long,
     @Column(name = "post_id", nullable = false)
     val postId: Long,
-    @Column(name = "memo", nullable = true, columnDefinition = "TEXT")
-    val memo: String? = null,
+    @Column(
+        name = "memo",
+        nullable = true,
+        length = UserSavedPost.MAX_MEMO_LENGTH,
+        columnDefinition = "TEXT",
+    )
+    var memo: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

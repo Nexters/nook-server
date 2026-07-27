@@ -5,6 +5,7 @@ import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
+import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PlaceView
 import org.every.nook.api.application.post.model.SavedPostDetail
@@ -15,10 +16,12 @@ import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
@@ -31,6 +34,7 @@ class PostControllerTest {
     private lateinit var createUseCase: CreatePostUseCase
     private lateinit var listUseCase: ListSavedPostsUseCase
     private lateinit var detailUseCase: GetSavedPostDetailUseCase
+    private lateinit var updateMemoUseCase: UpdatePostMemoUseCase
 
     @BeforeTest
     fun setUp() {
@@ -38,15 +42,67 @@ class PostControllerTest {
         val findUseCase = mock(FindPostPlaceParsingUseCase::class.java)
         listUseCase = mock(ListSavedPostsUseCase::class.java)
         detailUseCase = mock(GetSavedPostDetailUseCase::class.java)
+        updateMemoUseCase = mock(UpdatePostMemoUseCase::class.java)
         stubCreate()
         stubPlaceParsing(findUseCase)
         stubSavedPostList()
         stubSavedPostDetail()
         mockMvc = MockMvcBuilders
-            .standaloneSetup(PostController(createUseCase, findUseCase, listUseCase, detailUseCase))
+            .standaloneSetup(
+                PostController(createUseCase, findUseCase, listUseCase, detailUseCase, updateMemoUseCase),
+            )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
             .setControllerAdvice(GlobalExceptionHandler())
             .build()
+    }
+
+    @Test
+    fun `updates my saved post memo`() {
+        mockMvc.patch("/api/v1/posts/11/memo") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"memo":"다음 주 평일에 방문"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.resultType") { value("SUCCESS") }
+        }
+
+        verify(updateMemoUseCase)(
+            UpdatePostMemoUseCase.Command(
+                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                postId = 11,
+                memo = "다음 주 평일에 방문",
+            ),
+        )
+    }
+
+    @Test
+    fun `deletes my saved post memo with null`() {
+        mockMvc.patch("/api/v1/posts/11/memo") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"memo":null}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        verify(updateMemoUseCase)(
+            UpdatePostMemoUseCase.Command(
+                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                postId = 11,
+                memo = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `rejects an overlong memo`() {
+        mockMvc.patch("/api/v1/posts/11/memo") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"memo":"${"x".repeat(2001)}"}"""
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
+            jsonPath("$.error.data.violations[0].field") { value("memo") }
+        }
     }
 
     private fun stubCreate() {

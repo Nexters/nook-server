@@ -25,6 +25,22 @@ Content-Type: application/json
   "memo": "주말에 방문"
 }
 
+### 내 저장 게시물 메모 변경
+PATCH {{baseUrl}}/api/v1/posts/{{postId}}/memo
+Content-Type: application/json
+
+{
+  "memo": "다음 주 평일에 방문"
+}
+
+### 내 저장 게시물 메모 삭제
+PATCH {{baseUrl}}/api/v1/posts/{{postId}}/memo
+Content-Type: application/json
+
+{
+  "memo": null
+}
+
 ### 게시물 연관 장소 북마크 변경
 PATCH {{baseUrl}}/api/v1/posts/{{postId}}/places/{{placeId}}/bookmark
 Content-Type: application/json

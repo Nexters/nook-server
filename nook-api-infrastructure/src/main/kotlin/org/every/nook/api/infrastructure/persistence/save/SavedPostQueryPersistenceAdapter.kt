@@ -103,7 +103,7 @@ class SavedPostQueryPersistenceAdapter(
             publishedAt = sourcePost.publishedAt,
             media = media,
             hashtags = hashtags,
-            memo = savedPost.memo ?: sourcePost.memo,
+            memo = savedPost.memo,
             savedAt = savedPost.createdAt,
             placeParsingStatus = PlaceParsingStatusView.from(parsingJob?.status ?: PlaceParsingStatus.PENDING),
             placeParsingFailureReason = parsingJob?.failureReason,
@@ -135,7 +135,7 @@ class SavedPostQueryPersistenceAdapter(
         title = title,
         authorIdentifier = authorIdentifier,
         representativeMedia = representativeMedia,
-        memo = savedPost.memo ?: memo,
+        memo = savedPost.memo,
         savedAt = savedPost.createdAt,
     )
 
