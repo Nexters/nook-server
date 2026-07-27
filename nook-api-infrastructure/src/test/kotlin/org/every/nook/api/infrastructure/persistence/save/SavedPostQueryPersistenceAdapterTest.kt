@@ -109,6 +109,7 @@ class SavedPostQueryPersistenceAdapterTest {
         val savedPost = mock(UserSavedPostEntity::class.java)
         `when`(savedPost.id).thenReturn(11)
         `when`(savedPost.postId).thenReturn(101)
+        `when`(savedPost.memo).thenReturn("목록 메모")
         `when`(savedPost.createdAt).thenReturn(Instant.parse("2026-07-27T00:00:00Z"))
         val post = mock(PostEntity::class.java)
         `when`(post.id).thenReturn(101)
@@ -130,6 +131,7 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(2, result.page)
         assertEquals(21L, result.totalElements)
         assertEquals(false, result.hasNext)
+        assertEquals("목록 메모", result.items.single().memo)
     }
 
     private fun place(id: Long, name: String): PlaceEntity {

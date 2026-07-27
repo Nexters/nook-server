@@ -11,8 +11,10 @@ import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
+import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.post.request.CreatePostRequest
+import org.every.nook.api.presentation.post.request.UpdatePostMemoRequest
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
 import org.every.nook.api.presentation.post.response.PostResponse
 import org.every.nook.api.presentation.post.response.SavedPostDetailResponse
@@ -22,6 +24,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -40,6 +43,7 @@ class PostController(
     private val findPostPlaceParsingUseCase: FindPostPlaceParsingUseCase,
     private val listSavedPostsUseCase: ListSavedPostsUseCase,
     private val getSavedPostDetailUseCase: GetSavedPostDetailUseCase,
+    private val updatePostMemoUseCase: UpdatePostMemoUseCase,
 ) {
     @Operation(summary = "URL로 게시물 생성")
     @PostMapping
@@ -90,6 +94,23 @@ class PostController(
             ),
         )
         return ApiResponse.success(SavedPostDetailResponse.from(result))
+    }
+
+    @Operation(summary = "내 저장 게시물 메모 변경")
+    @PatchMapping("/{postId}/memo")
+    fun updateMemo(
+        @Parameter(hidden = true) userContext: UserContext,
+        @PathVariable @Positive postId: Long,
+        @Valid @RequestBody request: UpdatePostMemoRequest,
+    ): ApiResponse<Unit> {
+        updatePostMemoUseCase(
+            UpdatePostMemoUseCase.Command(
+                userId = userContext.userId,
+                postId = postId,
+                memo = request.memo,
+            ),
+        )
+        return ApiResponse.success(Unit)
     }
 
     @Operation(summary = "게시물 장소 파싱 결과 조회")

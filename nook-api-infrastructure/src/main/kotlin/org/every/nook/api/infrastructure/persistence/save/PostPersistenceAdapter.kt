@@ -4,6 +4,7 @@ import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostPlaceParsingSnapshot
+import org.every.nook.api.application.post.port.UpdatePostMemoPort
 import org.every.nook.api.domain.place.GeoPoint
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -35,9 +36,10 @@ class PostPersistenceAdapter(
     private val placeJpaRepository: PlaceJpaRepository,
     private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
 ) : CreatePostPort,
-    FindPostPlaceParsingPort {
+    FindPostPlaceParsingPort,
+    UpdatePostMemoPort {
     @Transactional
-    override fun create(userId: Long, post: Post): CreatedPost {
+    override fun create(userId: Long, post: Post, memo: String?): CreatedPost {
         val postEntity = saveNewPost(post)
         val sourcePostId = requireNotNull(postEntity.id)
         val parsingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
@@ -51,7 +53,7 @@ class PostPersistenceAdapter(
             UserSavedPostEntity(
                 userId = userId,
                 postId = sourcePostId,
-                memo = post.memo,
+                memo = memo,
             ),
         )
 
@@ -59,6 +61,13 @@ class PostPersistenceAdapter(
             postId = requireNotNull(userPost.id),
             placeParsingStatus = parsingJob.status,
         )
+    }
+
+    @Transactional
+    override fun update(userId: Long, postId: Long, memo: String?): Boolean {
+        val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return false
+        userPost.memo = memo
+        return true
     }
 
     @Transactional(readOnly = true)
@@ -99,7 +108,6 @@ class PostPersistenceAdapter(
                 canonicalUrl = post.canonicalUrl,
                 authorIdentifier = post.authorIdentifier,
                 title = post.title,
-                memo = post.memo,
                 body = post.body,
                 publishedAt = post.publishedAt,
                 sourceLocationTag = post.sourceLocationTag,

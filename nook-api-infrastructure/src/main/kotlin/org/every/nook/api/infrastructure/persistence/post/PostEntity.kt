@@ -34,8 +34,6 @@ class PostEntity(
     val authorIdentifier: String? = null,
     @Column(name = "title", nullable = true, length = Post.MAX_TITLE_LENGTH)
     val title: String? = null,
-    @Column(name = "memo", nullable = true, columnDefinition = "TEXT")
-    val memo: String? = null,
     @Column(name = "body", nullable = true, columnDefinition = "TEXT")
     val body: String? = null,
     @Column(name = "published_at", nullable = true)

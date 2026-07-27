@@ -5,5 +5,12 @@ data class UserSavedPost(val userId: Long, val postId: Long, val memo: String? =
         require(id == null || id > 0) { "User saved post id must be positive" }
         require(userId > 0) { "User id must be positive" }
         require(postId > 0) { "Post id must be positive" }
+        require(memo == null || memo.length <= MAX_MEMO_LENGTH) {
+            "User saved post memo must not exceed $MAX_MEMO_LENGTH characters"
+        }
+    }
+
+    companion object {
+        const val MAX_MEMO_LENGTH = 2000
     }
 }
