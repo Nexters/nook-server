@@ -4,13 +4,19 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Positive
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
+import org.every.nook.api.application.post.GetSavedPostDetailUseCase
+import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.post.request.CreatePostRequest
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
 import org.every.nook.api.presentation.post.response.PostResponse
+import org.every.nook.api.presentation.post.response.SavedPostDetailResponse
+import org.every.nook.api.presentation.post.response.SavedPostPageResponse
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -20,7 +26,10 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+
+private const val MAX_PAGE_SIZE = 100L
 
 @Tag(name = "Post")
 @Validated
@@ -29,6 +38,8 @@ import org.springframework.web.bind.annotation.RestController
 class PostController(
     private val createPostUseCase: CreatePostUseCase,
     private val findPostPlaceParsingUseCase: FindPostPlaceParsingUseCase,
+    private val listSavedPostsUseCase: ListSavedPostsUseCase,
+    private val getSavedPostDetailUseCase: GetSavedPostDetailUseCase,
 ) {
     @Operation(summary = "URL로 게시물 생성")
     @PostMapping
@@ -47,6 +58,38 @@ class PostController(
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse.success(PostResponse.from(result)))
+    }
+
+    @Operation(summary = "저장 게시물 목록 조회")
+    @GetMapping
+    fun listSavedPosts(
+        @Parameter(hidden = true) userContext: UserContext,
+        @RequestParam(defaultValue = "0") @Min(0) page: Int,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) size: Int,
+    ): ApiResponse<SavedPostPageResponse> {
+        val result = listSavedPostsUseCase(
+            ListSavedPostsUseCase.Query(
+                userId = userContext.userId,
+                page = page,
+                size = size,
+            ),
+        )
+        return ApiResponse.success(SavedPostPageResponse.from(result))
+    }
+
+    @Operation(summary = "저장 게시물 상세 조회")
+    @GetMapping("/{postId}")
+    fun getSavedPostDetail(
+        @Parameter(hidden = true) userContext: UserContext,
+        @PathVariable @Positive postId: Long,
+    ): ApiResponse<SavedPostDetailResponse> {
+        val result = getSavedPostDetailUseCase(
+            GetSavedPostDetailUseCase.Query(
+                userId = userContext.userId,
+                postId = postId,
+            ),
+        )
+        return ApiResponse.success(SavedPostDetailResponse.from(result))
     }
 
     @Operation(summary = "게시물 장소 파싱 결과 조회")
