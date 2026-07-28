@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -58,9 +59,11 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(
         HttpMessageNotReadableException::class,
+        MissingRequestHeaderException::class,
         MissingServletRequestParameterException::class,
         MethodArgumentTypeMismatchException::class,
         HandlerMethodValidationException::class,
+        IllegalArgumentException::class,
     )
     fun handleInvalidRequest(): ResponseEntity<ApiResponse<Nothing>> = failureResponse(
         status = HttpStatus.BAD_REQUEST,

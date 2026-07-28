@@ -19,6 +19,8 @@ dependencies {
     implementation(kotlin("reflect"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.security:spring-security-oauth2-jose")
+    testImplementation("org.springframework.security:spring-security-test")
     testImplementation(kotlin("test"))
 }
 

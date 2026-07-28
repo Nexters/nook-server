@@ -1,5 +1,7 @@
 package org.every.nook.api.member
 
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
@@ -8,6 +10,7 @@ import org.every.nook.api.application.auth.InvalidSignupTokenException
 import org.every.nook.api.application.member.SignupMemberCommand
 import org.every.nook.api.application.member.SignupMemberUseCase
 import org.every.nook.api.auth.TokenResponse
+import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -21,12 +24,14 @@ private const val BEARER_PREFIX = "Bearer "
 
 @RestController
 @RequestMapping("/api/v1/members")
+@Tag(name = "Member", description = "회원 API")
 class MemberController(private val signupMemberUseCase: SignupMemberUseCase) {
+    @Operation(summary = "회원가입", security = [])
     @PostMapping
     fun signup(
         @RequestHeader(HttpHeaders.AUTHORIZATION) authorization: String,
         @Valid @RequestBody request: SignupMemberRequest,
-    ): ResponseEntity<TokenResponse> {
+    ): ResponseEntity<ApiResponse<TokenResponse>> {
         val signupToken = authorization.takeIf { it.startsWith(BEARER_PREFIX) }
             ?.removePrefix(BEARER_PREFIX)
             ?.takeIf(String::isNotBlank)
@@ -38,7 +43,9 @@ class MemberController(private val signupMemberUseCase: SignupMemberUseCase) {
                 profileImageUrl = request.profileImageUrl,
             ),
         )
-        return ResponseEntity.status(HttpStatus.CREATED).body(TokenResponse.from(tokens))
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            ApiResponse.success(TokenResponse.from(tokens)),
+        )
     }
 }
 
