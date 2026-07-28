@@ -20,9 +20,6 @@ class GetSavedPostDetailUseCaseTest {
     private object EmptySavedPostQueryPort : SavedPostQueryPort {
         override fun findAll(userId: Long, page: Int, size: Int): SavedPostPage = error("not used")
 
-        override fun findAllByGroup(userId: Long, groupId: Long, page: Int, size: Int): SavedPostPage? =
-            error("not used")
-
         override fun findDetail(userId: Long, postId: Long): SavedPostDetail? = null
     }
 }

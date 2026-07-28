@@ -15,8 +15,8 @@ import org.every.nook.api.application.group.UpdateGroupUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.request.CreateGroupRequest
 import org.every.nook.api.presentation.group.request.UpdateGroupRequest
+import org.every.nook.api.presentation.group.response.GroupPostPageResponse
 import org.every.nook.api.presentation.group.response.GroupResponse
-import org.every.nook.api.presentation.post.response.SavedPostPageResponse
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.validation.annotation.Validated
@@ -66,7 +66,7 @@ class GroupController(
         @Min(1)
         @Max(MAX_GROUP_POST_PAGE_SIZE)
         size: Int,
-    ): ApiResponse<SavedPostPageResponse> {
+    ): ApiResponse<GroupPostPageResponse> {
         val result = listGroupPostsUseCase(
             ListGroupPostsUseCase.Query(
                 userId = userContext.userId,
@@ -75,7 +75,7 @@ class GroupController(
                 size = size,
             ),
         )
-        return ApiResponse.success(SavedPostPageResponse.from(result))
+        return ApiResponse.success(GroupPostPageResponse.from(result))
     }
 
     @Operation(summary = "그룹 생성")

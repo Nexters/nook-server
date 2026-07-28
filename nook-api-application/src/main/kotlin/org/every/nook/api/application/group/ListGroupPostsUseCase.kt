@@ -1,11 +1,10 @@
 package org.every.nook.api.application.group
 
 import org.every.nook.api.application.group.error.GroupNotFoundException
-import org.every.nook.api.application.post.model.SavedPostPage
-import org.every.nook.api.application.post.port.SavedPostQueryPort
+import org.every.nook.api.application.group.port.GroupPostQueryPort
 
-class ListGroupPostsUseCase(private val savedPostQueryPort: SavedPostQueryPort) {
-    operator fun invoke(query: Query): SavedPostPage = savedPostQueryPort.findAllByGroup(
+class ListGroupPostsUseCase(private val groupPostQueryPort: GroupPostQueryPort) {
+    operator fun invoke(query: Query): GroupPostPage = groupPostQueryPort.findAll(
         userId = query.userId,
         groupId = query.groupId,
         page = query.page,

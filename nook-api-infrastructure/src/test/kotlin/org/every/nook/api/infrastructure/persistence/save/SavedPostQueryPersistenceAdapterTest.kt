@@ -3,7 +3,10 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
+import org.every.nook.api.infrastructure.persistence.member.MemberEntity
+import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
@@ -41,6 +44,7 @@ class SavedPostQueryPersistenceAdapterTest {
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
+    private val memberRepository = mock(MemberJpaRepository::class.java)
     private val adapter = SavedPostQueryPersistenceAdapter(
         savedPostRepository,
         postRepository,
@@ -51,6 +55,7 @@ class SavedPostQueryPersistenceAdapterTest {
         bookmarkRepository,
         parsingJobRepository,
         groupRepository,
+        memberRepository,
     )
 
     @Test
@@ -138,27 +143,60 @@ class SavedPostQueryPersistenceAdapterTest {
     }
 
     @Test
-    fun `group list requires ownership and uses stable pagination`() {
+    fun `group list returns the actual owner nickname and batched place counts`() {
+        val firstSavedPost = savedPost(id = 11, sourcePostId = 101)
+        val secondSavedPost = savedPost(id = 12, sourcePostId = 102)
+        val firstPost = sourcePost(id = 101, title = "첫 게시물")
+        val secondPost = sourcePost(id = 102, title = "둘째 게시물")
+        val group = mock(GroupEntity::class.java)
+        val owner = mock(MemberEntity::class.java)
         val requestedPage = PageRequest.of(
             0,
             20,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
         )
-        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(true)
+        `when`(group.userId).thenReturn(9)
+        `when`(owner.nickname).thenReturn("Purr")
+        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
+        `when`(memberRepository.findById(9)).thenReturn(Optional.of(owner))
         `when`(savedPostRepository.findAllByUserIdAndGroupId(7, 17, requestedPage))
-            .thenReturn(PageImpl(emptyList(), requestedPage, 0))
+            .thenReturn(PageImpl(listOf(firstSavedPost, secondSavedPost), requestedPage, 2))
+        `when`(postRepository.findAllById(listOf(101L, 102L))).thenReturn(listOf(firstPost, secondPost))
+        `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
+            .thenReturn(emptyList())
+        `when`(postPlaceRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
+            .thenReturn(listOf(PostPlaceEntity(101, 201, 0), PostPlaceEntity(101, 202, 1)))
 
-        val result = requireNotNull(adapter.findAllByGroup(userId = 7, groupId = 17, page = 0, size = 20))
+        val result = requireNotNull(adapter.findAll(userId = 7, groupId = 17, page = 0, size = 20))
 
-        assertEquals(0, result.totalElements)
+        assertEquals("Purr", result.ownerNickname)
+        assertEquals(listOf(2L, 0L), result.items.map { it.placeCount })
+        assertEquals(2, result.totalElements)
+        verify(memberRepository).findById(9)
+        verify(postPlaceRepository).findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L))
         verify(savedPostRepository).findAllByUserIdAndGroupId(7, 17, requestedPage)
     }
 
     @Test
     fun `another users group is not returned`() {
-        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(false)
+        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(null)
 
-        assertNull(adapter.findAllByGroup(userId = 7, groupId = 17, page = 0, size = 20))
+        assertNull(adapter.findAll(userId = 7, groupId = 17, page = 0, size = 20))
+    }
+
+    private fun savedPost(id: Long, sourcePostId: Long): UserSavedPostEntity {
+        val savedPost = mock(UserSavedPostEntity::class.java)
+        `when`(savedPost.id).thenReturn(id)
+        `when`(savedPost.postId).thenReturn(sourcePostId)
+        `when`(savedPost.createdAt).thenReturn(Instant.parse("2026-07-27T00:00:00Z"))
+        return savedPost
+    }
+
+    private fun sourcePost(id: Long, title: String): PostEntity {
+        val post = mock(PostEntity::class.java)
+        `when`(post.id).thenReturn(id)
+        `when`(post.title).thenReturn(title)
+        return post
     }
 
     private fun place(id: Long, name: String): PlaceEntity {
