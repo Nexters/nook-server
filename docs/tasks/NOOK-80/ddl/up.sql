@@ -1,4 +1,5 @@
 DROP PROCEDURE IF EXISTS drop_all_foreign_keys;
+SET @target_schema = DATABASE();
 
 DELIMITER //
 
@@ -12,7 +13,7 @@ BEGIN
         SELECT COUNT(*)
         INTO remaining_foreign_keys
         FROM information_schema.table_constraints
-        WHERE constraint_schema = DATABASE()
+        WHERE constraint_schema = @target_schema
           AND constraint_type = 'FOREIGN KEY';
 
         IF remaining_foreign_keys = 0 THEN
@@ -22,7 +23,7 @@ BEGIN
         SELECT table_name, constraint_name
         INTO target_table, target_constraint
         FROM information_schema.table_constraints
-        WHERE constraint_schema = DATABASE()
+        WHERE constraint_schema = @target_schema
           AND constraint_type = 'FOREIGN KEY'
         ORDER BY table_name, constraint_name
         LIMIT 1;
@@ -42,13 +43,13 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM information_schema.statistics
-        WHERE table_schema = DATABASE()
+        WHERE table_schema = @target_schema
           AND table_name = 'refresh_tokens'
           AND index_name = 'fk_refresh_tokens_replaced_by_token_id'
     ) AND NOT EXISTS (
         SELECT 1
         FROM information_schema.statistics
-        WHERE table_schema = DATABASE()
+        WHERE table_schema = @target_schema
           AND table_name = 'refresh_tokens'
           AND index_name = 'idx_replaced_by_token_id'
     ) THEN
@@ -57,7 +58,7 @@ BEGIN
     ELSEIF EXISTS (
         SELECT 1
         FROM information_schema.statistics
-        WHERE table_schema = DATABASE()
+        WHERE table_schema = @target_schema
           AND table_name = 'refresh_tokens'
           AND index_name = 'fk_refresh_tokens_replaced_by_token_id'
     ) THEN
