@@ -32,7 +32,22 @@ class ProcessPlaceParsingJobUseCase(
                 "OpenAI place clues received: postId=${job.postId}, attempt=${job.attempt}, " +
                     "placeCount=${clues.size}, places=$clues"
             }
-            val places = clues.map(::resolve)
+            var lastResolutionFailure: PlaceResolutionException? = null
+            val places = clues.mapNotNull { clue ->
+                try {
+                    resolve(clue)
+                } catch (exception: PlaceResolutionException) {
+                    lastResolutionFailure = exception
+                    logger.warn {
+                        "Place clue skipped: postId=${job.postId}, placeName=${clue.name}, " +
+                            "region=${clue.region}, reason=${exception.message}"
+                    }
+                    null
+                }
+            }
+            if (places.isEmpty()) {
+                throw requireNotNull(lastResolutionFailure)
+            }
             jobPort.complete(job.postId, places)
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
             logger.info {
@@ -46,9 +61,7 @@ class ProcessPlaceParsingJobUseCase(
     }
 
     private fun resolve(clue: PlaceClue): PlaceCandidate {
-        require(clue.name.isNotBlank() && clue.queries.isNotEmpty() && clue.queries.size <= MAX_QUERY_COUNT) {
-            "Invalid place clue"
-        }
+        validate(clue)
         val candidates = searchPlaceCandidates(
             SearchPlaceCandidatesUseCase.Command(queries = clue.queries),
         )
@@ -69,9 +82,13 @@ class ProcessPlaceParsingJobUseCase(
         }
 
         val resolved = when (matches.size) {
-            0 -> error("No place candidate matched: ${clue.name}")
+            0 -> failResolution("No place candidate matched: ${clue.name}")
+
             1 -> matches.single()
-            else -> error("Multiple place candidates matched: ${clue.name}, matchCount=${matches.size}")
+
+            else -> failResolution(
+                "Multiple place candidates matched: ${clue.name}, matchCount=${matches.size}",
+            )
         }
         logger.info {
             "Place resolved: provider=${resolved.provider}, externalPlaceId=${resolved.externalPlaceId}, " +
@@ -79,6 +96,14 @@ class ProcessPlaceParsingJobUseCase(
         }
         return resolved
     }
+
+    private fun validate(clue: PlaceClue) {
+        if (clue.name.isBlank() || clue.queries.isEmpty() || clue.queries.size > MAX_QUERY_COUNT) {
+            failResolution("Invalid place clue")
+        }
+    }
+
+    private fun failResolution(message: String): Nothing = throw PlaceResolutionException(message)
 
     private fun handleFailure(job: ClaimedPlaceParsingJob, exception: Throwable, startedAt: Instant): Result {
         val reason = exception.message.orEmpty()
@@ -126,4 +151,6 @@ class ProcessPlaceParsingJobUseCase(
         const val DEFAULT_FAILURE_REASON = "Place parsing failed"
         const val NO_PLACE_CLUE_REASON = "No place clue was extracted"
     }
+
+    private class PlaceResolutionException(message: String) : IllegalStateException(message)
 }
