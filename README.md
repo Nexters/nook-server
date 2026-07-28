@@ -23,23 +23,15 @@
 
 ## 실행 준비
 
-다음 환경변수가 필요합니다.
+저장소 루트의 `.env.example`을 복사해 `.env`를 만들면 API와 batch 애플리케이션이 로컬 실행 시
+자동으로 값을 읽습니다. `.env`는 Git에 포함되지 않습니다.
 
 ```shell
-export DB_URL='jdbc:mysql://localhost:3306/nook?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC'
-export DB_USERNAME='nook'
-export DB_PASSWORD='nook'
-export KAKAO_REST_API_KEY='your-kakao-rest-api-key'
-export BRIGHT_DATA_API_TOKEN='your-bright-data-api-token'
-export JWT_ACCESS_SECRET='replace-with-at-least-32-byte-secret'
-export JWT_REFRESH_SECRET='replace-with-at-least-32-byte-secret'
-export KAKAO_APP_ID='your-kakao-app-id'
-export GOOGLE_CLIENT_ID='your-google-web-client-id'
-export APPLE_CLIENT_ID='your-apple-service-or-bundle-id'
-export APPLE_TEAM_ID='your-apple-team-id'
-export APPLE_KEY_ID='your-apple-key-id'
-export APPLE_PRIVATE_KEY='your-pkcs8-private-key'
+cp .env.example .env
 ```
+
+필요한 값을 `.env`에 입력합니다. OS 환경변수, JVM system property와 명령행 인자는 `.env`보다
+우선합니다. dev, staging, live 환경은 기존처럼 실행 환경에서 환경변수를 직접 주입합니다.
 
 장소 후보 검색에는 카카오 디벨로퍼스 애플리케이션의 REST API 키를 사용합니다.
 
@@ -49,13 +41,13 @@ Instagram 게시물·릴스 수집 dataset ID는 Bright Data 공식 기본값을
 API 애플리케이션을 실행합니다.
 
 ```shell
-SPRING_PROFILES_ACTIVE=local ./gradlew :nook-api-presentation:bootRun
+./gradlew :nook-api-presentation:bootRun
 ```
 
 배치 애플리케이션을 실행합니다.
 
 ```shell
-SPRING_PROFILES_ACTIVE=local ./gradlew :nook-api-batch:bootRun
+./gradlew :nook-api-batch:bootRun
 ```
 
 ## 검증

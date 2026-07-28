@@ -10,5 +10,6 @@ class NookApiBatchApplication
 fun main(args: Array<String>) {
     SpringApplicationBuilder(NookApiBatchApplication::class.java)
         .web(WebApplicationType.NONE)
+        .properties(loadDotenvProperties())
         .run(*args)
 }
