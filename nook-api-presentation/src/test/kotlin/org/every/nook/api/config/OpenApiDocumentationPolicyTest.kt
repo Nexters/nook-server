@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.GroupController
-import org.every.nook.api.presentation.place.PlaceCandidateController
+import org.every.nook.api.presentation.place.PlaceController
 import org.every.nook.api.presentation.post.PostController
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -54,7 +54,7 @@ class OpenApiDocumentationPolicyTest {
     private companion object {
         val controllers = listOf(
             GroupController::class.java,
-            PlaceCandidateController::class.java,
+            PlaceController::class.java,
             PostController::class.java,
         )
         val apiMappingAnnotations = listOf(

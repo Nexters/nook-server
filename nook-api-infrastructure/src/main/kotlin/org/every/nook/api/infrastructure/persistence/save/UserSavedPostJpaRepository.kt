@@ -29,6 +29,24 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
         pageable: Pageable,
     ): Page<UserSavedPostEntity>
 
+    @Query(
+        """
+            SELECT savedPost
+            FROM UserSavedPostEntity savedPost
+            WHERE savedPost.userId = :userId
+              AND savedPost.postId IN (
+                  SELECT postPlace.postId
+                  FROM PostPlaceEntity postPlace
+                  WHERE postPlace.placeId = :placeId
+              )
+        """,
+    )
+    fun findAllByUserIdAndPlaceId(
+        @Param("userId") userId: Long,
+        @Param("placeId") placeId: Long,
+        pageable: Pageable,
+    ): Page<UserSavedPostEntity>
+
     @Query("SELECT DISTINCT savedPost.userId FROM UserSavedPostEntity savedPost WHERE savedPost.postId = :postId")
     fun findDistinctUserIdsByPostId(@Param("postId") postId: Long): List<Long>
 }

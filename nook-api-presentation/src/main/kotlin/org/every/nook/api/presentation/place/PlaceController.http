@@ -9,6 +9,9 @@ Content-Type: application/json
 
 @placeId = 1
 
+### 장소 상세 및 연관 게시물 조회
+GET {{baseUrl}}/api/v1/places/{{placeId}}?page=0&size=20
+
 ### 장소 북마크 변경
 PATCH {{baseUrl}}/api/v1/places/{{placeId}}/bookmark
 Content-Type: application/json

@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param
 interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity, Long> {
     fun findAllByUserIdAndPlaceIdIn(userId: Long, placeIds: Collection<Long>): List<UserPlaceBookmarkEntity>
 
+    fun existsByUserIdAndPlaceId(userId: Long, placeId: Long): Boolean
+
     @Query(
         value = """
             SELECT EXISTS (
