@@ -18,6 +18,7 @@ dependencies {
     implementation("org.springframework.security:spring-security-oauth2-jose")
     implementation(platform("software.amazon.awssdk:bom:2.49.3"))
     implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:sts")
     implementation("software.amazon.awssdk:url-connection-client")
     runtimeOnly("com.mysql:mysql-connector-j")
 
