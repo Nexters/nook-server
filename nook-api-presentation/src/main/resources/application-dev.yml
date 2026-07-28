@@ -1,3 +1,8 @@
 logging:
   level:
     org.every.nook.api: debug
+
+nook:
+  openapi:
+    servers:
+      - https://api-dev.everynook.co.kr
