@@ -21,6 +21,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
@@ -28,6 +29,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PostPersistenceAdapterTest {
@@ -63,7 +65,11 @@ class PostPersistenceAdapterTest {
         `when`(parsingJob.status).thenReturn(PlaceParsingStatus.PENDING)
         `when`(savedPost.id).thenReturn(11)
         `when`(postRepository.save(org.mockito.ArgumentMatchers.any(PostEntity::class.java))).thenReturn(postEntity)
-        `when`(parsingJobRepository.findByPostId(101)).thenReturn(parsingJob)
+        `when`(
+            parsingJobRepository.save(
+                org.mockito.ArgumentMatchers.any(PlaceParsingJobEntity::class.java),
+            ),
+        ).thenReturn(parsingJob)
         `when`(
             userSavedPostRepository.save(
                 org.mockito.ArgumentMatchers.any(UserSavedPostEntity::class.java),
@@ -144,6 +150,54 @@ class PostPersistenceAdapterTest {
         verify(groupPostRepository).saveAll(captor.capture())
         assertEquals(setOf(17L, 18L), captor.value.map { it.groupId }.toSet())
         assertTrue(captor.value.all { it.userSavedPostId == 11L })
+    }
+
+    @Test
+    fun `reuses the user saved post and restarts only a failed parsing job`() {
+        val firstGroup = mock(GroupEntity::class.java)
+        val secondGroup = mock(GroupEntity::class.java)
+        val postEntity = mock(PostEntity::class.java)
+        val savedPost = mock(UserSavedPostEntity::class.java)
+        val existingGroupPost = GroupPostEntity(groupId = 17, userSavedPostId = 11)
+        val parsingJob = PlaceParsingJobEntity(
+            postId = 101,
+            status = PlaceParsingStatus.FAILED,
+            failureReason = "No place candidate matched",
+            attemptCount = 4,
+        )
+        `when`(firstGroup.id).thenReturn(17)
+        `when`(secondGroup.id).thenReturn(18)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17, 18)))
+            .thenReturn(listOf(firstGroup, secondGroup))
+        `when`(postEntity.id).thenReturn(101)
+        `when`(postRepository.findBySourceForUpdate("INSTAGRAM", "ABC123")).thenReturn(postEntity)
+        `when`(parsingJobRepository.findByPostId(101)).thenReturn(parsingJob)
+        `when`(savedPost.id).thenReturn(11)
+        `when`(userSavedPostRepository.findByUserIdAndPostId(7, 101)).thenReturn(savedPost)
+        `when`(groupPostRepository.findAllByUserSavedPostId(11)).thenReturn(listOf(existingGroupPost))
+
+        val result = adapter.reuse(
+            userId = 7,
+            source = PostSource(type = "INSTAGRAM", externalPostId = "ABC123"),
+            memo = "덮어쓰지 않을 메모",
+            groupIds = setOf(17, 18),
+        )
+
+        assertEquals(11, result.postId)
+        assertEquals(PlaceParsingStatus.PENDING, result.placeParsingStatus)
+        assertEquals(PlaceParsingStatus.PENDING, parsingJob.status)
+        assertEquals(0, parsingJob.attemptCount)
+        assertNull(parsingJob.failureReason)
+        verify(userSavedPostRepository, never()).save(
+            org.mockito.ArgumentMatchers.any(UserSavedPostEntity::class.java),
+        )
+        @Suppress("UNCHECKED_CAST")
+        val groupCaptor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<GroupPostEntity>>
+        verify(groupPostRepository).saveAll(groupCaptor.capture())
+        assertEquals(listOf(18L), groupCaptor.value.map(GroupPostEntity::groupId))
+        val eventCaptor = ArgumentCaptor.forClass(PlaceParsingJobRequestedEvent::class.java)
+        verify(eventPublisher).publishEvent(eventCaptor.capture())
+        assertEquals(101, eventCaptor.value.postId)
     }
 
     @Test

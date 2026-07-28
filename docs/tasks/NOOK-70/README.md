@@ -9,7 +9,7 @@
 
 - 게시물과 장소 파싱 작업이 저장된 트랜잭션의 커밋 후 비동기 이벤트 처리
 - API 시작 시 남아 있는 `PENDING` 및 timeout된 `PROCESSING` 작업 복구
-- 최초 처리 실패 후 5초, 15초, 45초 간격으로 최대 3회 재시도
+- 최초 처리 실패 후 최대 3회 재시도
 - `attempt_count`, `next_attempt_at` 영속화
 - `mu.KotlinLogging` 기반 파이프라인 진행 로그
 - batch 모듈의 장소 파싱 scheduler 제거
@@ -33,9 +33,11 @@
 ## 설정
 
 ```text
-PLACE_PARSING_RETRY_BACKOFFS=5s,15s,45s
+PLACE_PARSING_RETRY_BACKOFFS=3s,3s,3s
 PLACE_PARSING_PROCESSING_TIMEOUT=1m
 ```
+
+재시도 간격과 빈 장소 단서의 실패 정책은 NOOK-71에서 변경되었습니다.
 
 ## 검증
 

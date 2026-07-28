@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param
 interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> {
     fun findByIdAndUserId(id: Long, userId: Long): UserSavedPostEntity?
 
+    fun findByUserIdAndPostId(userId: Long, postId: Long): UserSavedPostEntity?
+
     fun findAllByUserId(userId: Long, pageable: Pageable): Page<UserSavedPostEntity>
 
     @Query(

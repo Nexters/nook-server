@@ -4,6 +4,7 @@ import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
+import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
@@ -11,7 +12,10 @@ import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
+import org.every.nook.api.application.post.port.ExistingPost
+import org.every.nook.api.application.post.port.FindExistingPostPort
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.post.port.ReusePostPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostMedia
@@ -61,7 +65,7 @@ class CreatePostUseCaseTest {
             assertEquals(listOf("cafe", "seoul"), post.hashtags)
             assertEquals("Nook Seoul", post.sourceLocationTag)
             assertEquals(
-                "https://www.instagram.com/p/ABC123/?igsh=tracking-value",
+                "https://www.instagram.com/p/ABC123/",
                 post.canonicalUrl,
             )
             assertEquals("주말에 방문", memo)
@@ -77,6 +81,12 @@ class CreatePostUseCaseTest {
                 assertEquals(setOf(1L, 2L), groupIds)
                 true
             },
+            PostSourceResolver {
+                calls += "source"
+                SOURCE
+            },
+            FindExistingPostPort { null },
+            ReusePostPort { _, _, _, _ -> error("existing post must not be reused") },
             ExtractPostContentUseCase(listOf(extractor)),
             titleGenerator,
             mediaStorage,
@@ -92,7 +102,7 @@ class CreatePostUseCaseTest {
             ),
         )
 
-        assertEquals(listOf("groups", "extractor", "title", "media", "persistence"), calls)
+        assertEquals(listOf("groups", "source", "extractor", "title", "media", "persistence"), calls)
         assertEquals(11, result.postId)
         assertEquals(PlaceParsingStatusView.PENDING, result.placeParsingStatus)
     }
@@ -101,6 +111,9 @@ class CreatePostUseCaseTest {
     fun `rejects an unsupported post URL`() {
         val useCase = CreatePostUseCase(
             GroupOwnershipPort { _, _ -> true },
+            PostSourceResolver { null },
+            FindExistingPostPort { error("existing post must not be queried") },
+            ReusePostPort { _, _, _, _ -> error("existing post must not be reused") },
             ExtractPostContentUseCase(emptyList()),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { it },
@@ -121,6 +134,9 @@ class CreatePostUseCaseTest {
         }
         val useCase = CreatePostUseCase(
             GroupOwnershipPort { _, _ -> true },
+            PostSourceResolver { SOURCE },
+            FindExistingPostPort { null },
+            ReusePostPort { _, _, _, _ -> error("existing post must not be reused") },
             ExtractPostContentUseCase(listOf(extractor)),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { it },
@@ -142,6 +158,9 @@ class CreatePostUseCaseTest {
     fun `rejects an empty group list before calling external providers`() {
         val useCase = CreatePostUseCase(
             GroupOwnershipPort { _, _ -> error("group ownership must not be queried") },
+            PostSourceResolver { error("source must not be resolved") },
+            FindExistingPostPort { error("existing post must not be queried") },
+            ReusePostPort { _, _, _, _ -> error("existing post must not be reused") },
             ExtractPostContentUseCase(emptyList()),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { error("media storage must not be called") },
@@ -167,6 +186,9 @@ class CreatePostUseCaseTest {
                 assertEquals(setOf(1L, 2L), groupIds)
                 false
             },
+            PostSourceResolver { error("source must not be resolved") },
+            FindExistingPostPort { error("existing post must not be queried") },
+            ReusePostPort { _, _, _, _ -> error("existing post must not be reused") },
             ExtractPostContentUseCase(emptyList()),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { error("media storage must not be called") },
@@ -182,5 +204,53 @@ class CreatePostUseCaseTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `reuses an existing post without calling content providers`() {
+        val calls = mutableListOf<String>()
+        val useCase = CreatePostUseCase(
+            GroupOwnershipPort { _, _ ->
+                calls += "groups"
+                true
+            },
+            PostSourceResolver {
+                calls += "source"
+                SOURCE
+            },
+            FindExistingPostPort {
+                calls += "find"
+                ExistingPost(PlaceParsingStatus.COMPLETED)
+            },
+            ReusePostPort { userId, source, memo, groupIds ->
+                calls += "reuse"
+                assertEquals(7, userId)
+                assertEquals(SOURCE, source)
+                assertEquals("새 메모", memo)
+                assertEquals(setOf(1L, 2L), groupIds)
+                CreatedPost(11, PlaceParsingStatus.COMPLETED)
+            },
+            ExtractPostContentUseCase(emptyList()),
+            PostTitleGenerator { error("title generator must not be called") },
+            PostMediaStoragePort { error("media storage must not be called") },
+            CreatePostPort { _, _, _, _ -> error("new post must not be persisted") },
+        )
+
+        val result = useCase(
+            CreatePostUseCase.Command(
+                userId = 7,
+                url = "https://www.instagram.com/p/ABC123/?img_index=14",
+                memo = "새 메모",
+                groupIds = listOf(1, 2),
+            ),
+        )
+
+        assertEquals(listOf("groups", "source", "find", "reuse"), calls)
+        assertEquals(11, result.postId)
+        assertEquals(PlaceParsingStatusView.COMPLETED, result.placeParsingStatus)
+    }
+
+    private companion object {
+        val SOURCE = PostSource(type = "INSTAGRAM", externalPostId = "ABC123")
     }
 }

@@ -126,7 +126,8 @@ class SavedPostQueryPersistenceAdapter(
             memo = savedPost.memo,
             savedAt = savedPost.createdAt,
             placeParsingStatus = PlaceParsingStatusView.from(parsingJob?.status ?: PlaceParsingStatus.PENDING),
-            placeParsingFailureReason = parsingJob?.failureReason,
+            placeParsingFailureReason = parsingJob?.failureReason
+                .takeIf { parsingJob?.status == PlaceParsingStatus.FAILED },
             places = postPlaces.mapNotNull { postPlace ->
                 placesById[postPlace.placeId]?.let { place ->
                     SavedPostPlace(

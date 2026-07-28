@@ -12,6 +12,7 @@ import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class FindPostPlaceParsingUseCaseTest {
     @Test
@@ -51,5 +52,23 @@ class FindPostPlaceParsingUseCaseTest {
         assertFailsWith<PostNotFoundException> {
             useCase(FindPostPlaceParsingUseCase.Query(7, 11))
         }
+    }
+
+    @Test
+    fun `hides a retained retry failure reason until the job is failed`() {
+        val useCase = FindPostPlaceParsingUseCase(
+            FindPostPlaceParsingPort { _, postId ->
+                PostPlaceParsingSnapshot(
+                    postId = postId,
+                    placeParsingStatus = PlaceParsingStatus.PENDING,
+                    failureReason = "No place candidate matched",
+                    places = emptyList(),
+                )
+            },
+        )
+
+        val result = useCase(FindPostPlaceParsingUseCase.Query(7, 11))
+
+        assertNull(result.failureReason)
     }
 }
