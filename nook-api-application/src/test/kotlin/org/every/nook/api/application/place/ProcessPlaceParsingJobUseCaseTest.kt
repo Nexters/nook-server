@@ -71,7 +71,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         )
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Retry>(useCase(1))
-        assertEquals(NOW.plusSeconds(15), port.nextAttemptAt)
+        assertEquals(NOW.plusSeconds(3), port.nextAttemptAt)
         assertEquals(emptyList(), port.completed)
     }
 
