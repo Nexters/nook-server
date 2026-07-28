@@ -2,10 +2,8 @@ package org.every.nook.api.application.group
 
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.port.GroupPostManagementPort
+import org.every.nook.api.application.group.port.GroupPostQueryPort
 import org.every.nook.api.application.post.error.PostNotFoundException
-import org.every.nook.api.application.post.model.SavedPostDetail
-import org.every.nook.api.application.post.model.SavedPostPage
-import org.every.nook.api.application.post.port.SavedPostQueryPort
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -13,8 +11,8 @@ import kotlin.test.assertFailsWith
 class GroupPostUseCasesTest {
     @Test
     fun `lists posts only from a group owned by the user`() {
-        val port = FakeSavedPostQueryPort(
-            groupPage = SavedPostPage(emptyList(), page = 1, size = 10, 0, 0, false),
+        val port = FakeGroupPostQueryPort(
+            groupPage = GroupPostPage("Purr", emptyList(), page = 1, size = 10, 0, 0, false),
         )
 
         val result = ListGroupPostsUseCase(port)(
@@ -22,13 +20,14 @@ class GroupPostUseCasesTest {
         )
 
         assertEquals(listOf(7L, 17L, 1L, 10L), port.captured)
+        assertEquals("Purr", result.ownerNickname)
         assertEquals(1, result.page)
     }
 
     @Test
     fun `inaccessible group is exposed as not found`() {
         assertFailsWith<GroupNotFoundException> {
-            ListGroupPostsUseCase(FakeSavedPostQueryPort(groupPage = null))(
+            ListGroupPostsUseCase(FakeGroupPostQueryPort(groupPage = null))(
                 ListGroupPostsUseCase.Query(userId = 7, groupId = 17, page = 0, size = 20),
             )
         }
@@ -77,16 +76,12 @@ class GroupPostUseCasesTest {
         }
     }
 
-    private class FakeSavedPostQueryPort(private val groupPage: SavedPostPage?) : SavedPostQueryPort {
+    private class FakeGroupPostQueryPort(private val groupPage: GroupPostPage?) : GroupPostQueryPort {
         var captured: List<Long>? = null
 
-        override fun findAll(userId: Long, page: Int, size: Int): SavedPostPage = error("not used")
-
-        override fun findAllByGroup(userId: Long, groupId: Long, page: Int, size: Int): SavedPostPage? {
+        override fun findAll(userId: Long, groupId: Long, page: Int, size: Int): GroupPostPage? {
             captured = listOf(userId, groupId, page.toLong(), size.toLong())
             return groupPage
         }
-
-        override fun findDetail(userId: Long, postId: Long): SavedPostDetail? = error("not used")
     }
 }

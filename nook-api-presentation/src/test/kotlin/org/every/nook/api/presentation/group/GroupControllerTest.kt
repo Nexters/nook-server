@@ -2,11 +2,12 @@ package org.every.nook.api.presentation.group
 
 import org.every.nook.api.application.group.CreateGroupUseCase
 import org.every.nook.api.application.group.DeleteGroupUseCase
+import org.every.nook.api.application.group.GroupPostPage
+import org.every.nook.api.application.group.GroupPostSummary
 import org.every.nook.api.application.group.GroupView
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
-import org.every.nook.api.application.post.model.SavedPostPage
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -85,15 +86,19 @@ class GroupControllerTest {
             size = 20,
         )
         `when`(listGroupPostsUseCase(query)).thenReturn(
-            SavedPostPage(
+            GroupPostPage(
+                ownerNickname = "Purr",
                 items = listOf(
-                    SavedPostSummary(
-                        postId = 11,
-                        title = "성수 카페",
-                        authorIdentifier = "nook",
-                        representativeMedia = null,
-                        memo = null,
-                        savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                    GroupPostSummary(
+                        post = SavedPostSummary(
+                            postId = 11,
+                            title = "성수 카페",
+                            authorIdentifier = "nook",
+                            representativeMedia = null,
+                            memo = null,
+                            savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                        ),
+                        placeCount = 3,
                     ),
                 ),
                 page = 0,
@@ -106,7 +111,9 @@ class GroupControllerTest {
 
         mockMvc.get("/api/v1/groups/17/posts?page=0&size=20").andExpect {
             status { isOk() }
+            jsonPath("$.success.ownerNickname") { value("Purr") }
             jsonPath("$.success.items[0].postId") { value(11) }
+            jsonPath("$.success.items[0].placeCount") { value(3) }
             jsonPath("$.success.totalElements") { value(1) }
         }
         verify(listGroupPostsUseCase)(query)
