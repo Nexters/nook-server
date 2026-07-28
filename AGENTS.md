@@ -85,6 +85,7 @@ pre-commit hook은 모든 커밋 전에 `./gradlew detekt`를 실행하며 실�
 
 ## Pull Requests
 
+- PR base branch는 항상 `main`으로 잡는다.
 - PR 제목은 `[ISSUE-ID] 요약` 형식을 사용한다. 예: `[NOOK-5] 프로젝트 초기 구성`.
 - PR 본문은 `docs/tasks/{ISSUE-ID}/README.md`의 목적, 범위, 제외 범위와 검증 내용을 기준으로 작성한다.
 - 하나의 PR은 하나의 이슈 범위만 다루며, 관련 없는 변경을 포함하지 않는다.
