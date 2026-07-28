@@ -139,6 +139,48 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
+    fun `prioritizes Instagram location tag and allows four grounded queries`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("sourceLocationTag가 상호명인 경우")))
+            .andExpect(content().string(containsString("name은 Lodge190")))
+            .andExpect(content().string(containsString("\\\"sourceLocationTag\\\":\\\"Lodge190\\\"")))
+            .andExpect(content().string(containsString("\"maxItems\":4")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {
+                          "places": [{
+                            "name": "Lodge190",
+                            "region": "연희동",
+                            "queries": ["Lodge190", "롯지190", "롯지 190", "연희동 Lodge"]
+                          }]
+                        }
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val places = fixture.adapter.extract(
+            PlaceClueExtractor.Request(
+                body = "연희동 사랑방 롯지190 매년 여름이 오면 이 집 빙수를 먹으러 와야 합니다",
+                hashtags = emptyList(),
+                sourceLocationTag = "Lodge190",
+            ),
+        )
+
+        assertEquals("Lodge190", places.single().name)
+        assertEquals("연희동", places.single().region)
+        assertEquals(
+            listOf("Lodge190", "롯지190", "롯지 190", "연희동 Lodge"),
+            places.single().queries,
+        )
+        fixture.server.verify()
+    }
+
+    @Test
     fun `fails when OpenAI refuses the request`() {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))

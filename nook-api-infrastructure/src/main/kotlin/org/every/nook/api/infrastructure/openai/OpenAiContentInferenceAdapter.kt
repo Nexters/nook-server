@@ -193,7 +193,7 @@ class OpenAiContentInferenceAdapter(
 
         const val MAX_TITLE_LENGTH = 25
         const val MAX_PLACE_COUNT = 10
-        const val MAX_QUERY_COUNT = 3
+        const val MAX_QUERY_COUNT = 4
         const val TITLE_MAX_OUTPUT_TOKENS = 200
         const val PLACE_MAX_OUTPUT_TOKENS = 800
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
@@ -210,8 +210,17 @@ class OpenAiContentInferenceAdapter(
                 "가게는 음식점, 카페, 술집, 상점, 숙박업소처럼 상호명이 있는 영업 장소를 뜻한다. " +
                 "도시, 구, 동, 거리, 역, 공원, 관광지는 가게로 반환하지 말고 가게 검색을 위한 region과 query 단서로만 사용한다. " +
                 "상호명이 확인되지 않으면 추측하거나 일반 업종명으로 만들지 않는다. 좌표와 주소도 만들지 않는다. " +
+                "sourceLocationTag가 상호명인 경우 Instagram이 제공한 명시적 장소 정보이므로 본문과 해시태그보다 우선한다. " +
+                "이때 name은 sourceLocationTag 원문을 그대로 사용하고, 본문의 수식어나 별칭을 name에 붙이지 않는다. " +
+                "sourceLocationTag와 본문이 같은 가게를 가리키면 하나의 장소로 합친다. " +
+                "sourceLocationTag가 없거나 지역명 같은 비상호명 정보인 경우에만 본문과 해시태그에서 name을 결정한다. " +
                 "장소별 상호명 name, 확인 가능한 region, 카카오 장소 검색용 queries를 반환한다. " +
-                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 10개 가게와 가게당 최대 3개 검색어만 반환한다."
+                "queries의 첫 항목은 sourceLocationTag가 상호명이면 원문 그대로 사용하고, 이후에는 본문에서 확인되는 " +
+                "한글·영문 표기와 지역 조합을 우선해 서로 다른 검색어 3~4개를 만든다. " +
+                "예를 들어 sourceLocationTag가 Lodge190이고 본문이 '연희동 사랑방 롯지190'이면 name은 Lodge190이고 " +
+                "queries는 원문 Lodge190, 한글 음차 롯지190, 띄어쓰기 변형 롯지 190, " +
+                "지역을 붙인 축약형 연희동 Lodge 순서로 반환한다. " +
+                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 10개 가게와 가게당 최대 4개 검색어만 반환한다."
         const val CANDIDATE_SELECTION_INSTRUCTIONS =
             "placeClue는 Instagram 게시물에서 추출한 장소 단서이고 candidates는 실제 장소 검색 결과다. " +
                 "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, 주소, region, matchedQueries를 함께 비교해 " +
