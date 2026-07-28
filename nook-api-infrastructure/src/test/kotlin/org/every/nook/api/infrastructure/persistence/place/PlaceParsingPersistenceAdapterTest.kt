@@ -2,8 +2,11 @@ package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
+import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.mockito.Mockito.mock
@@ -22,6 +25,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val jobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val postRepository = mock(PostJpaRepository::class.java)
     private val hashtagRepository = mock(PostHashtagJpaRepository::class.java)
+    private val mediaRepository = mock(PostMediaJpaRepository::class.java)
     private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
@@ -30,6 +34,7 @@ class PlaceParsingPersistenceAdapterTest {
         jobRepository = jobRepository,
         postRepository = postRepository,
         hashtagRepository = hashtagRepository,
+        mediaRepository = mediaRepository,
         placeRepository = placeRepository,
         postPlaceRepository = postPlaceRepository,
         userSavedPostRepository = userSavedPostRepository,
@@ -50,10 +55,19 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(jobRepository.findByPostIdForUpdate(11)).thenReturn(job)
         `when`(postRepository.findById(11)).thenReturn(Optional.of(post))
         `when`(hashtagRepository.findAllByPostIdOrderBySequenceAsc(11)).thenReturn(emptyList())
+        `when`(
+            mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(11, PostMedia.MediaType.IMAGE),
+        ).thenReturn(
+            listOf(
+                PostMediaEntity(11, PostMedia.MediaType.IMAGE, "https://cdn.test/1.jpg", 0),
+                PostMediaEntity(11, PostMedia.MediaType.IMAGE, "https://cdn.test/2.jpg", 1),
+            ),
+        )
 
         val claimed = requireNotNull(adapter.claim(11, Duration.ofMinutes(1)))
 
         assertEquals(2, claimed.attempt)
+        assertEquals(listOf("https://cdn.test/1.jpg", "https://cdn.test/2.jpg"), claimed.imageUrls)
         assertEquals(PlaceParsingStatus.PROCESSING, job.status)
         assertEquals("previous failure", job.failureReason)
         assertEquals(NOW, job.nextAttemptAt)
