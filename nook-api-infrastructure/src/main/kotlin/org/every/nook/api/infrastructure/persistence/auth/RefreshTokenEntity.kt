@@ -1,8 +1,10 @@
 package org.every.nook.api.infrastructure.persistence.auth
 
 import jakarta.persistence.Column
+import jakarta.persistence.ConstraintMode
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
+import jakarta.persistence.ForeignKey
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -19,7 +21,10 @@ import java.time.Instant
 @Entity
 @Table(
     name = "refresh_tokens",
-    indexes = [Index(name = "idx_member_id", columnList = "member_id")],
+    indexes = [
+        Index(name = "idx_member_id", columnList = "member_id"),
+        Index(name = "idx_replaced_by_token_id", columnList = "replaced_by_token_id"),
+    ],
     uniqueConstraints = [
         UniqueConstraint(name = "idx_u_token_identifier", columnNames = ["token_identifier"]),
         UniqueConstraint(name = "idx_u_token_hash", columnNames = ["token_hash"]),
@@ -27,7 +32,11 @@ import java.time.Instant
 )
 class RefreshTokenEntity(
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "member_id", nullable = false)
+    @JoinColumn(
+        name = "member_id",
+        nullable = false,
+        foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT),
+    )
     var member: MemberEntity,
     @Column(name = "token_identifier", nullable = false, length = 36)
     var tokenIdentifier: String,
@@ -38,7 +47,11 @@ class RefreshTokenEntity(
     @Column(name = "revoked_at", nullable = true)
     var revokedAt: Instant? = null,
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "replaced_by_token_id", nullable = true)
+    @JoinColumn(
+        name = "replaced_by_token_id",
+        nullable = true,
+        foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT),
+    )
     var replacedByToken: RefreshTokenEntity? = null,
 ) : BaseEntity() {
     @Id
