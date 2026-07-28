@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 
 @Schema(description = "API 오류")
 data class ApiError(
-    @field:Schema(description = "안정적인 오류 코드", example = "GROUP_NAME_DUPLICATED")
+    @field:Schema(description = "안정적인 오류 코드", example = "GROUP_NOT_FOUND")
     val errorCode: String,
     @field:Schema(description = "클라이언트에 공개 가능한 오류 사유")
     val reason: String,

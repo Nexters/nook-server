@@ -75,9 +75,8 @@ class PersistenceEntityMetadataTest {
     }
 
     @Test
-    fun `group name is unique within a user`() {
+    fun `group name allows duplicates within a user`() {
         val table = requireNotNull(GroupEntity::class.findAnnotation<Table>())
-        val uniqueConstraint = table.uniqueConstraints.single()
         val nameColumn =
             requireNotNull(
                 GroupEntity::class.java
@@ -88,8 +87,7 @@ class PersistenceEntityMetadataTest {
         val colorColumn = requireNotNull(colorField.getAnnotation(Column::class.java))
         val colorEnum = requireNotNull(colorField.getAnnotation(Enumerated::class.java))
 
-        assertEquals("idx_u_user_id_name", uniqueConstraint.name)
-        assertEquals(listOf("user_id", "name"), uniqueConstraint.columnNames.toList())
+        assertTrue(table.uniqueConstraints.isEmpty())
         assertEquals(Group.MAX_NAME_LENGTH, nameColumn.length)
         assertEquals(GroupEntity.COLOR_COLUMN_LENGTH, colorColumn.length)
         assertEquals(EnumType.STRING, colorEnum.value)
