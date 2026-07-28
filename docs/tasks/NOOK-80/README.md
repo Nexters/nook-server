@@ -36,8 +36,9 @@
 
 ## DDL
 
-- `ddl/up.sql`은 현재 database의 `FOREIGN KEY` constraint를 `information_schema`에서 조회해 모두
-  제거하므로 이미 적용된 환경에서도 반복 실행할 수 있습니다. FK가 자동 생성했던
+- `ddl/up.sql`은 적용 전 인벤토리에서 확인한 13개 `FOREIGN KEY` constraint를 명시적으로 제거합니다.
+  MySQL은 `DROP FOREIGN KEY IF EXISTS`를 지원하지 않으므로 반복 실행할 수 없으며, 적용 전
+  `information_schema`에서 constraint 이름과 개수가 정확히 일치하는지 확인해야 합니다. FK가 자동 생성했던
   `refresh_tokens.replaced_by_token_id` 인덱스는 `idx_replaced_by_token_id`로 변경합니다.
 - `ddl/rollback.sql`은 NOOK-80 적용 직전의 알려진 13개 constraint를 복원합니다. 정책까지 되돌리는
   비상 상황에서만 사용하며, 실행 전 orphan 데이터가 없는지 다시 확인해야 합니다.
