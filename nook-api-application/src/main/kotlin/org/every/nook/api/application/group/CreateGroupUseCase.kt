@@ -1,6 +1,5 @@
 package org.every.nook.api.application.group
 
-import org.every.nook.api.application.group.error.GroupNameDuplicatedException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.Group
@@ -12,7 +11,6 @@ class CreateGroupUseCase(private val groupPort: GroupPort) {
         val color = parseColor(command.color)
         validateGroup(command.userId, name, color)
         return groupPort.create(command.userId, name, color)
-            ?: throw GroupNameDuplicatedException()
     }
 
     data class Command(val userId: Long, val name: String, val color: String)

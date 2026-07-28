@@ -14,11 +14,6 @@ enum class GroupErrorCode(
         defaultReason = "그룹을 찾을 수 없습니다.",
         type = ErrorType.NOT_FOUND,
     ),
-    GROUP_NAME_DUPLICATED(
-        code = "GROUP_NAME_DUPLICATED",
-        defaultReason = "같은 이름의 그룹이 이미 존재합니다.",
-        type = ErrorType.CONFLICT,
-    ),
     INVALID_GROUP(
         code = "INVALID_GROUP",
         defaultReason = "그룹 값이 올바르지 않습니다.",
@@ -27,8 +22,6 @@ enum class GroupErrorCode(
 }
 
 class GroupNotFoundException : NookException(GroupErrorCode.GROUP_NOT_FOUND)
-
-class GroupNameDuplicatedException : NookException(GroupErrorCode.GROUP_NAME_DUPLICATED)
 
 class InvalidGroupException(cause: IllegalArgumentException) :
     NookException(errorCode = GroupErrorCode.INVALID_GROUP, cause = cause)

@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.GroupColor
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -11,7 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GroupPersistenceAdapterTest {
@@ -20,12 +20,25 @@ class GroupPersistenceAdapterTest {
     private val adapter = GroupPersistenceAdapter(groupRepository, groupPostRepository)
 
     @Test
-    fun `duplicate group name is rejected within a user`() {
-        `when`(groupRepository.existsByUserIdAndName(7, "카페")).thenReturn(true)
+    fun `duplicate group name is saved as a distinct group`() {
+        val firstSaved = mock(GroupEntity::class.java)
+        val secondSaved = mock(GroupEntity::class.java)
+        `when`(firstSaved.id).thenReturn(17)
+        `when`(firstSaved.name).thenReturn("카페")
+        `when`(firstSaved.color).thenReturn(GroupColor.YELLOW)
+        `when`(secondSaved.id).thenReturn(18)
+        `when`(secondSaved.name).thenReturn("카페")
+        `when`(secondSaved.color).thenReturn(GroupColor.GREEN)
+        `when`(groupRepository.saveAndFlush(any(GroupEntity::class.java)))
+            .thenReturn(firstSaved, secondSaved)
 
-        val created = adapter.create(7, "카페", GroupColor.YELLOW)
+        val first = adapter.create(7, "카페", GroupColor.YELLOW)
+        val second = adapter.create(7, "카페", GroupColor.GREEN)
 
-        assertNull(created)
+        assertEquals(17, first.id)
+        assertEquals(18, second.id)
+        assertEquals("카페", first.name)
+        assertEquals("카페", second.name)
     }
 
     @Test
@@ -58,9 +71,8 @@ class GroupPersistenceAdapterTest {
     }
 
     @Test
-    fun `updated summary includes current post count`() {
+    fun `updates to a duplicate group name and includes current post count`() {
         `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(true)
-        `when`(groupRepository.existsByUserIdAndNameAndIdNot(7, "서울 카페", 17)).thenReturn(false)
         `when`(groupRepository.updateByIdAndUserId(17, 7, "서울 카페", GroupColor.GREEN)).thenReturn(1)
         `when`(groupPostRepository.countByGroupId(17)).thenReturn(3)
 
