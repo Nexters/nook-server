@@ -2,9 +2,11 @@ package org.every.nook.api.infrastructure.config
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.content.PostContentExtractor
+import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.infrastructure.instagram.BrightDataInstagramMapper
 import org.every.nook.api.infrastructure.instagram.BrightDataInstagramPostContentExtractor
 import org.every.nook.api.infrastructure.instagram.BrightDataProperties
+import org.every.nook.api.infrastructure.instagram.InstagramPostSourceResolver
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -14,6 +16,9 @@ import org.springframework.web.client.RestClient
 @Configuration
 @EnableConfigurationProperties(BrightDataProperties::class)
 class InstagramContentConfig {
+    @Bean
+    fun instagramPostSourceResolver(): PostSourceResolver = InstagramPostSourceResolver()
+
     @Bean
     fun brightDataInstagramMapper(): BrightDataInstagramMapper = BrightDataInstagramMapper()
 

@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.springframework.context.ApplicationEventPublisher
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -27,8 +28,24 @@ class PlaceParsingEventListenerTest {
     private val listener = PlaceParsingEventListener(
         processPlaceParsingJob = ProcessPlaceParsingJobUseCase(
             jobPort = jobPort,
-            clueExtractor = PlaceClueExtractor { emptyList() },
-            searchPlaceCandidates = SearchPlaceCandidatesUseCase { emptyList() },
+            clueExtractor = PlaceClueExtractor {
+                listOf(org.every.nook.api.application.place.PlaceClue("롯지190", null, listOf("롯지190")))
+            },
+            searchPlaceCandidates = SearchPlaceCandidatesUseCase {
+                listOf(
+                    PlaceCandidate(
+                        provider = "KAKAO",
+                        externalPlaceId = "1",
+                        name = "롯지190",
+                        address = "서울 서대문구",
+                        latitude = BigDecimal("37.0"),
+                        longitude = BigDecimal("127.0"),
+                        category = null,
+                        phoneNumber = null,
+                        providerUrl = null,
+                    ),
+                )
+            },
             retryBackoffs = listOf(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(3)),
             processingTimeout = PROCESSING_TIMEOUT,
             clock = Clock.fixed(NOW, ZoneOffset.UTC),
@@ -70,7 +87,7 @@ class PlaceParsingEventListenerTest {
             completed = true
         }
 
-        override fun retry(postId: Long, nextAttemptAt: Instant) = Unit
+        override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) = Unit
 
         override fun fail(postId: Long, reason: String) = Unit
     }
