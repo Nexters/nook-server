@@ -13,11 +13,15 @@ import jakarta.persistence.UniqueConstraint
 import org.every.nook.api.domain.place.PlaceParsingJob
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.infrastructure.persistence.BaseEntity
+import java.time.Instant
 
 @Entity
 @Table(
     name = "place_parsing_jobs",
-    indexes = [Index(name = "idx_status_updated_at", columnList = "status, updated_at")],
+    indexes = [
+        Index(name = "idx_status_updated_at", columnList = "status, updated_at"),
+        Index(name = "idx_status_next_attempt_at", columnList = "status, next_attempt_at"),
+    ],
     uniqueConstraints = [
         UniqueConstraint(name = "idx_u_post_id", columnNames = ["post_id"]),
     ],
@@ -39,6 +43,10 @@ class PlaceParsingJobEntity(
         length = PlaceParsingJob.MAX_FAILURE_REASON_LENGTH,
     )
     var failureReason: String? = null,
+    @Column(name = "attempt_count", nullable = false)
+    var attemptCount: Int = 0,
+    @Column(name = "next_attempt_at", nullable = false, columnDefinition = "TIMESTAMP(6)")
+    var nextAttemptAt: Instant = Instant.now(),
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

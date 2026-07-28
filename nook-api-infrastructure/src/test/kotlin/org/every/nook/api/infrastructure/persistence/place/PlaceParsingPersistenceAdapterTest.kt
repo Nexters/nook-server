@@ -10,6 +10,11 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.math.BigDecimal
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -29,7 +34,41 @@ class PlaceParsingPersistenceAdapterTest {
         postPlaceRepository = postPlaceRepository,
         userSavedPostRepository = userSavedPostRepository,
         userPlaceBookmarkRepository = bookmarkRepository,
+        clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
+
+    @Test
+    fun `claims an available pending job and increments its attempt`() {
+        val job = PlaceParsingJobEntity(
+            postId = 11,
+            status = PlaceParsingStatus.PENDING,
+            attemptCount = 1,
+            nextAttemptAt = NOW.minusSeconds(1),
+        )
+        val post = mock(org.every.nook.api.infrastructure.persistence.post.PostEntity::class.java)
+        `when`(jobRepository.findByPostIdForUpdate(11)).thenReturn(job)
+        `when`(postRepository.findById(11)).thenReturn(Optional.of(post))
+        `when`(hashtagRepository.findAllByPostIdOrderBySequenceAsc(11)).thenReturn(emptyList())
+
+        val claimed = requireNotNull(adapter.claim(11, Duration.ofMinutes(1)))
+
+        assertEquals(2, claimed.attempt)
+        assertEquals(PlaceParsingStatus.PROCESSING, job.status)
+        assertEquals(NOW, job.nextAttemptAt)
+    }
+
+    @Test
+    fun `does not claim a pending job before its backoff expires`() {
+        val job = PlaceParsingJobEntity(
+            postId = 11,
+            status = PlaceParsingStatus.PENDING,
+            nextAttemptAt = NOW.plusSeconds(1),
+        )
+        `when`(jobRepository.findByPostIdForUpdate(11)).thenReturn(job)
+
+        assertEquals(null, adapter.claim(11, Duration.ofMinutes(1)))
+        assertEquals(0, job.attemptCount)
+    }
 
     @Test
     fun `completed places are bookmarked on by default for every user who saved the post`() {
@@ -60,5 +99,9 @@ class PlaceParsingPersistenceAdapterTest {
         verify(bookmarkRepository).insertIgnore(7, 17)
         verify(bookmarkRepository).insertIgnore(8, 17)
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
+    }
+
+    private companion object {
+        val NOW: Instant = Instant.parse("2026-07-28T00:00:00Z")
     }
 }

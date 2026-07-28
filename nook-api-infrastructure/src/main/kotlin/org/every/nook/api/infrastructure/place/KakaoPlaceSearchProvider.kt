@@ -1,11 +1,11 @@
 package org.every.nook.api.infrastructure.place
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import mu.KotlinLogging
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
-import org.slf4j.LoggerFactory
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
@@ -44,6 +44,11 @@ class KakaoPlaceSearchProvider(
 
         return runCatching {
             mapper.map(objectMapper.readValue(responseBody, KakaoPlaceResponse::class.java))
+                .also { candidates ->
+                    logger.info {
+                        "Kakao place search completed: query=${request.query}, candidateCount=${candidates.size}"
+                    }
+                }
         }.getOrElse { exception ->
             logger.warn("Failed to map Kakao Local place response", exception)
             providerFailure(exception)
@@ -64,7 +69,7 @@ class KakaoPlaceSearchProvider(
     private fun providerFailure(cause: Throwable? = null): Nothing = throw PlaceSearchProviderException(cause)
 
     private companion object {
-        val logger = LoggerFactory.getLogger(KakaoPlaceSearchProvider::class.java)
+        val logger = KotlinLogging.logger {}
 
         const val SEARCH_PATH = "/v2/local/search/keyword.json"
         const val QUERY = "query"

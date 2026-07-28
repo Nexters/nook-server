@@ -39,4 +39,5 @@ external:
 
 place-parsing:
   worker:
-    fixed-delay: ${PLACE_PARSING_WORKER_FIXED_DELAY:5s}
+    retry-backoffs: ${PLACE_PARSING_RETRY_BACKOFFS:5s,15s,45s}
+    processing-timeout: ${PLACE_PARSING_PROCESSING_TIMEOUT:1m}
