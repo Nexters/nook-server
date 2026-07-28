@@ -145,7 +145,7 @@ class ProcessPlaceParsingJobUseCase(
         val logger = KotlinLogging.logger {}
 
         const val MAX_PLACE_COUNT = 10
-        const val MAX_QUERY_COUNT = 3
+        const val MAX_QUERY_COUNT = 4
         const val CANDIDATE_LOG_LIMIT = 5
         const val MAX_FAILURE_REASON_LENGTH = 500
         const val DEFAULT_FAILURE_REASON = "Place parsing failed"
