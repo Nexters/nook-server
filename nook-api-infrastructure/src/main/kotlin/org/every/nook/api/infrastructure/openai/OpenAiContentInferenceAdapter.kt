@@ -64,7 +64,7 @@ class OpenAiContentInferenceAdapter(
     private fun requestStructured(
         name: String,
         instructions: String,
-        input: String,
+        input: Any,
         schema: Map<String, Any>,
         maxOutputTokens: Int,
     ): JsonNode {
@@ -108,7 +108,29 @@ class OpenAiContentInferenceAdapter(
 
     private fun PostTitleGenerator.Request.toInput(): String = contentInput(body, hashtags, sourceLocationTag)
 
-    private fun PlaceClueExtractor.Request.toInput(): String = contentInput(body, hashtags, sourceLocationTag)
+    private fun PlaceClueExtractor.Request.toInput(): Any {
+        val context = contentInput(body, hashtags, sourceLocationTag)
+        if (imageUrls.isEmpty()) {
+            return context
+        }
+        return listOf(
+            mapOf(
+                "role" to "user",
+                "content" to buildList {
+                    add(mapOf("type" to "input_text", "text" to context))
+                    imageUrls.forEach { imageUrl ->
+                        add(
+                            mapOf(
+                                "type" to "input_image",
+                                "image_url" to imageUrl,
+                                "detail" to IMAGE_DETAIL,
+                            ),
+                        )
+                    }
+                },
+            ),
+        )
+    }
 
     private fun PlaceCandidateSelector.Request.toInput(): String = objectMapper.writeValueAsString(
         mapOf(
@@ -197,6 +219,7 @@ class OpenAiContentInferenceAdapter(
         const val TITLE_MAX_OUTPUT_TOKENS = 200
         const val PLACE_MAX_OUTPUT_TOKENS = 800
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
+        const val IMAGE_DETAIL = "low"
         const val DEFAULT_TITLE = "Instagram 게시물"
         const val TITLE_INSTRUCTIONS =
             "입력된 Instagram 본문, 해시태그, 장소 태그에 명시된 사실만 사용해 검색과 보관에 적합한 한국어 제목을 작성한다. " +
@@ -206,7 +229,7 @@ class OpenAiContentInferenceAdapter(
                 "투어, 감동, 보물, 한자리 같은 홍보성·감상적 표현과 따옴표, 해시태그를 사용하지 않는다. " +
                 "정보가 부족하면 'Instagram 게시물'을 반환한다."
         const val PLACE_INSTRUCTIONS =
-            "입력된 Instagram 본문, 해시태그, 장소 태그에 명시된 실제 방문 가게만 추출한다. " +
+            "입력된 Instagram 본문, 해시태그, 장소 태그와 제공된 이미지에 명시된 실제 방문 가게만 추출한다. " +
                 "가게는 음식점, 카페, 술집, 상점, 숙박업소처럼 상호명이 있는 영업 장소를 뜻한다. " +
                 "도시, 구, 동, 거리, 역, 공원, 관광지는 가게로 반환하지 말고 가게 검색을 위한 region과 query 단서로만 사용한다. " +
                 "상호명이 확인되지 않으면 추측하거나 일반 업종명으로 만들지 않는다. 좌표와 주소도 만들지 않는다. " +
@@ -214,6 +237,8 @@ class OpenAiContentInferenceAdapter(
                 "이때 name은 sourceLocationTag 원문을 그대로 사용하고, 본문의 수식어나 별칭을 name에 붙이지 않는다. " +
                 "sourceLocationTag와 본문이 같은 가게를 가리키면 하나의 장소로 합친다. " +
                 "sourceLocationTag가 없거나 지역명 같은 비상호명 정보인 경우에만 본문과 해시태그에서 name을 결정한다. " +
+                "이미지가 제공되면 이미지에 실제로 보이는 상호명과 지역 텍스트를 근거로 사용하되, " +
+                "읽을 수 없는 작은 글씨나 로고를 추측하지 않는다. 같은 장소가 여러 이미지에 나오면 하나로 합친다. " +
                 "장소별 상호명 name, 확인 가능한 region, 카카오 장소 검색용 queries를 반환한다. " +
                 "queries의 첫 항목은 sourceLocationTag가 상호명이면 원문 그대로 사용하고, 이후에는 본문에서 확인되는 " +
                 "한글·영문 표기와 지역 조합을 우선해 서로 다른 검색어 3~4개를 만든다. " +
