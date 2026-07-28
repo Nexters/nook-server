@@ -20,34 +20,26 @@ class ProcessPlaceParsingJobUseCase(
         logger.info { "Place parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
-            val clues = clueExtractor.extract(
-                PlaceClueExtractor.Request(
-                    body = job.body,
-                    hashtags = job.hashtags,
-                    sourceLocationTag = job.sourceLocationTag,
-                ),
-            )
-            check(clues.isNotEmpty()) { NO_PLACE_CLUE_REASON }
-            require(clues.size <= MAX_PLACE_COUNT) { "Too many place clues" }
-            logger.info {
-                "OpenAI place clues received: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "placeCount=${clues.size}, places=$clues"
-            }
-            var lastResolutionFailure: PlaceResolutionException? = null
-            val places = clues.mapNotNull { clue ->
-                try {
-                    resolve(clue)
-                } catch (exception: PlaceResolutionException) {
-                    lastResolutionFailure = exception
-                    logger.warn {
-                        "Place clue skipped: postId=${job.postId}, placeName=${clue.name}, " +
-                            "region=${clue.region}, reason=${exception.message}"
-                    }
-                    null
+            val textClues = extractClues(job)
+            val textResolution = resolveClues(job, textClues)
+            val places = if (textResolution.places.isNotEmpty()) {
+                textResolution.places
+            } else {
+                val imageUrls = job.imageUrls.take(MAX_IMAGE_COUNT)
+                if (imageUrls.isEmpty()) {
+                    terminalFailure(textResolution.failure?.message ?: NO_PLACE_RESOLVED_REASON)
                 }
-            }
-            if (places.isEmpty()) {
-                throw requireNotNull(lastResolutionFailure)
+                logger.info {
+                    "Place parsing image fallback started: postId=${job.postId}, attempt=${job.attempt}, " +
+                        "imageCount=${imageUrls.size}"
+                }
+                val imageClues = extractClues(job, imageUrls)
+                val imageResolution = resolveClues(job, imageClues)
+                imageResolution.places.ifEmpty {
+                    terminalFailure(
+                        imageResolution.failure?.message ?: NO_PLACE_RESOLVED_AFTER_IMAGE_REASON,
+                    )
+                }
             }
             jobPort.complete(job.postId, places)
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
@@ -59,6 +51,39 @@ class ProcessPlaceParsingJobUseCase(
         }.getOrElse { exception ->
             handleFailure(job, exception, startedAt)
         }
+    }
+
+    private fun extractClues(job: ClaimedPlaceParsingJob, imageUrls: List<String> = emptyList()): List<PlaceClue> =
+        clueExtractor.extract(
+            PlaceClueExtractor.Request(
+                body = job.body,
+                hashtags = job.hashtags,
+                sourceLocationTag = job.sourceLocationTag,
+                imageUrls = imageUrls,
+            ),
+        ).also { clues ->
+            require(clues.size <= MAX_PLACE_COUNT) { "Too many place clues" }
+            logger.info {
+                "OpenAI place clues received: postId=${job.postId}, attempt=${job.attempt}, " +
+                    "imageCount=${imageUrls.size}, placeCount=${clues.size}, places=$clues"
+            }
+        }
+
+    private fun resolveClues(job: ClaimedPlaceParsingJob, clues: List<PlaceClue>): ClueResolution {
+        var lastFailure: PlaceResolutionException? = null
+        val places = clues.mapNotNull { clue ->
+            try {
+                resolve(clue)
+            } catch (exception: PlaceResolutionException) {
+                lastFailure = exception
+                logger.warn {
+                    "Place clue skipped: postId=${job.postId}, placeName=${clue.name}, " +
+                        "region=${clue.region}, reason=${exception.message}"
+                }
+                null
+            }
+        }
+        return ClueResolution(places, lastFailure)
     }
 
     private fun resolve(clue: PlaceClue): PlaceCandidate {
@@ -131,10 +156,17 @@ class ProcessPlaceParsingJobUseCase(
     private fun failResolution(message: String): Nothing = throw PlaceResolutionException(message)
 
     private fun handleFailure(job: ClaimedPlaceParsingJob, exception: Throwable, startedAt: Instant): Result {
-        val reason = exception.message.orEmpty()
-            .ifBlank { DEFAULT_FAILURE_REASON }
-            .take(MAX_FAILURE_REASON_LENGTH)
+        val reason = failureReason(exception)
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
+        if (exception is TerminalPlaceParsingException) {
+            jobPort.fail(job.postId, reason)
+            logger.warn {
+                "Place parsing failed without retry: postId=${job.postId}, attempt=${job.attempt}, " +
+                    "durationMs=$duration, reason=$reason"
+            }
+            return Result.Failed
+        }
+
         val backoff = retryBackoffs.getOrNull(job.attempt - 1)
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(backoff)
@@ -154,6 +186,12 @@ class ProcessPlaceParsingJobUseCase(
         return Result.Failed
     }
 
+    private fun failureReason(exception: Throwable): String = exception.message.orEmpty()
+        .ifBlank { DEFAULT_FAILURE_REASON }
+        .take(MAX_FAILURE_REASON_LENGTH)
+
+    private fun terminalFailure(message: String): Nothing = throw TerminalPlaceParsingException(message)
+
     private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)
 
     sealed interface Result {
@@ -171,11 +209,17 @@ class ProcessPlaceParsingJobUseCase(
 
         const val MAX_PLACE_COUNT = 10
         const val MAX_QUERY_COUNT = 4
+        const val MAX_IMAGE_COUNT = 20
         const val CANDIDATE_LOG_LIMIT = 5
         const val MAX_FAILURE_REASON_LENGTH = 500
         const val DEFAULT_FAILURE_REASON = "Place parsing failed"
-        const val NO_PLACE_CLUE_REASON = "No place clue was extracted"
+        const val NO_PLACE_RESOLVED_REASON = "No place could be resolved from text"
+        const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
     }
 
     private class PlaceResolutionException(message: String) : IllegalStateException(message)
+
+    private class TerminalPlaceParsingException(message: String) : IllegalStateException(message)
+
+    private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
 }

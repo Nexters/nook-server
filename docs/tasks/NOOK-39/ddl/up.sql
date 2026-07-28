@@ -1,0 +1,1 @@
+-- NOOK-39 does not change the database schema.

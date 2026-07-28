@@ -6,4 +6,5 @@ data class ClaimedPlaceParsingJob(
     val body: String?,
     val hashtags: List<String>,
     val sourceLocationTag: String?,
+    val imageUrls: List<String> = emptyList(),
 )
