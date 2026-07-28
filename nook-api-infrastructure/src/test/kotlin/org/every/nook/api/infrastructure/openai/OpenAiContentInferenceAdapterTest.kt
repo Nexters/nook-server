@@ -4,9 +4,11 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClue
+import org.every.nook.api.application.place.PlaceClueEvidence
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.post.PostTitleGenerator
 import org.hamcrest.Matchers.containsString
+import org.hamcrest.Matchers.not
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.content
@@ -67,21 +69,42 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
-    fun `extracts image place clues in one low detail request`() {
+    fun `extracts grounded image place clues from varied layouts in one high detail request`() {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(containsString("\"type\":\"input_image\"")))
-            .andExpect(content().string(containsString("\"image_url\":\"https://cdn.test/1.jpg\"")))
-            .andExpect(content().string(containsString("\"image_url\":\"https://cdn.test/2.jpg\"")))
-            .andExpect(content().string(containsString("\"detail\":\"low\"")))
-            .andExpect(content().string(containsString("이미지에 실제로 보이는 상호명")))
+            .andExpect(content().string(containsString(TEST_IMAGE_URLS.first())))
+            .andExpect(content().string(containsString(TEST_IMAGE_URLS.last())))
+            .andExpect(content().string(containsString("\"detail\":\"high\"")))
+            .andExpect(content().string(containsString("\"max_output_tokens\":1600")))
+            .andExpect(content().string(containsString("텍스트의 위치, 크기, 번호, 카드 형식")))
+            .andExpect(content().string(containsString("한 이미지에서 장소가 없거나 여러 개일 수 있고")))
+            .andExpect(content().string(containsString("imageIndex")))
+            .andExpect(content().string(not(containsString("좌측 하단"))))
             .andRespond(
                 withSuccess(
                     response(
                         """
                         {
                           "places": [
-                            {"name":"이미지 카페","region":"연희동","queries":["연희동 이미지 카페"]}
+                            {
+                              "name":"빈브라더스 커피하우스 서울",
+                              "region":"서울 마포구 상수동",
+                              "queries":["빈브라더스 커피하우스 서울","상수동 빈브라더스"],
+                              "evidence":[{
+                                "imageIndex":2,
+                                "evidenceText":"빈브라더스 커피하우스 서울 / 서울 마포구 상수동 354-12"
+                              }]
+                            },
+                            {
+                              "name":"누뗀",
+                              "region":"서울 서초구 신원동",
+                              "queries":["누뗀","신원동 누뗀"],
+                              "evidence":[{
+                                "imageIndex":3,
+                                "evidenceText":"누뗀 / 서울 서초구 신원동 489-7"
+                              }]
+                            }
                           ]
                         }
                         """.trimIndent(),
@@ -95,11 +118,16 @@ class OpenAiContentInferenceAdapterTest {
                 body = null,
                 hashtags = emptyList(),
                 sourceLocationTag = null,
-                imageUrls = listOf("https://cdn.test/1.jpg", "https://cdn.test/2.jpg"),
+                imageUrls = TEST_IMAGE_URLS,
             ),
         )
 
-        assertEquals("이미지 카페", places.single().name)
+        assertEquals(listOf("빈브라더스 커피하우스 서울", "누뗀"), places.map(PlaceClue::name))
+        assertEquals(2, places.first().evidence.single().imageIndex)
+        assertEquals(
+            "빈브라더스 커피하우스 서울 / 서울 마포구 상수동 354-12",
+            places.first().evidence.single().evidenceText,
+        )
         fixture.server.verify()
     }
 
@@ -109,6 +137,7 @@ class OpenAiContentInferenceAdapterTest {
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(containsString("place_candidate_selection")))
             .andExpect(content().string(containsString("matchedQueries")))
+            .andExpect(content().string(containsString("evidenceText")))
             .andExpect(content().string(containsString("상수동 이츠야")))
             .andRespond(withSuccess(response("""{"candidateIndex":0}"""), MediaType.APPLICATION_JSON))
         val candidate = PlaceCandidate(
@@ -129,6 +158,7 @@ class OpenAiContentInferenceAdapterTest {
                     name = "이츠야",
                     region = "서울특별시 서초구 상수역 인근",
                     queries = listOf("이츠야", "상수동 이츠야"),
+                    evidence = listOf(PlaceClueEvidence(2, "이츠야 / 서울 마포구 양화로6길 99-9")),
                 ),
                 candidates = listOf(
                     PlaceCandidateSelector.Candidate(
@@ -263,5 +293,22 @@ class OpenAiContentInferenceAdapterTest {
               }]
             }
             """.trimIndent()
+
+        val TEST_IMAGE_URLS = listOf(
+            "https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/92/" +
+                "9289d25c46d072bb44c029ac4bc1c50db9309cf587306698027e2cbb7030d091.jpg",
+            "https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/ed/" +
+                "ede59b899f821acced2fd262fe917790101c912cc28004759d851c55486d25bb.jpg",
+            "https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/fb/" +
+                "fb5d58281d59e33733466809aacf1ef2e1e64546341749c32058fad899050a58.jpg",
+            "https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/23/" +
+                "236b82c2fc5bc8d1b74f916b3723602cbb9885378bef78e7ff3c5d553372cca2.jpg",
+            "https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/94/" +
+                "94dc4c636d73497f15f84c5308863583713a9c2cab459fa69f44408b965f76d0.jpg",
+            "https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/8c/" +
+                "8cdb4fb329f245a65ad5f7de7298ea12ec1c3bfea6954824989a9c09fbd1d8b5.jpg",
+            "https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/1c/" +
+                "1c8a8308f270eeb448ebc83a618268e2345251a162ad25fa29b191d35385483c.jpg",
+        )
     }
 }
