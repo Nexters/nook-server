@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.openai
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import mu.KotlinLogging
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.post.PostTitleGenerator
@@ -82,7 +83,9 @@ class OpenAiContentInferenceAdapter(
             ?.path("text")
             ?.asText()
             ?: error("OpenAI returned no structured output")
-        return objectMapper.readTree(text)
+        return objectMapper.readTree(text).also { result ->
+            logger.info { "OpenAI structured output received: name=$name, output=$result" }
+        }
     }
 
     private fun PostTitleGenerator.Request.toInput(): String = contentInput(body, hashtags, sourceLocationTag)
@@ -135,6 +138,8 @@ class OpenAiContentInferenceAdapter(
     )
 
     private companion object {
+        val logger = KotlinLogging.logger {}
+
         const val MAX_TITLE_LENGTH = 25
         const val MAX_PLACE_COUNT = 10
         const val MAX_QUERY_COUNT = 3

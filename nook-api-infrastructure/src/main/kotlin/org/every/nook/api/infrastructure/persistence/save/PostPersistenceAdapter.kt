@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
+import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
@@ -27,6 +28,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -42,6 +44,7 @@ class PostPersistenceAdapter(
     private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
     private val groupJpaRepository: GroupJpaRepository,
     private val groupPostJpaRepository: GroupPostJpaRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) : CreatePostPort,
     FindPostPlaceParsingPort,
     UpdatePostMemoPort {
@@ -73,6 +76,7 @@ class PostPersistenceAdapter(
                 )
             },
         )
+        eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(sourcePostId))
 
         return CreatedPost(
             postId = userSavedPostId,
