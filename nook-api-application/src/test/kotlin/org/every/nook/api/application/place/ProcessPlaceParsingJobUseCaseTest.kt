@@ -82,6 +82,51 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `resolves a single exact name candidate despite an incorrect region`() {
+        val port = FakeJobPort()
+        val extractor = PlaceClueExtractor {
+            listOf(
+                PlaceClue(
+                    name = "이츠야",
+                    region = "서울특별시 서초구 상수역 인근",
+                    queries = listOf("이츠야", "상수동 이츠야"),
+                ),
+            )
+        }
+        val provider = PlaceSearchProvider { request ->
+            if (request.query == "이츠야") {
+                listOf(candidate("1", "이츠야", "서울 마포구 양화로6길 99-9"))
+            } else {
+                emptyList()
+            }
+        }
+        val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf("1"), port.completed.map { it.externalPlaceId })
+        assertNull(port.failedReason)
+    }
+
+    @Test
+    fun `does not choose arbitrarily when multiple exact name candidates do not match region`() {
+        val port = FakeJobPort(attempt = 4)
+        val extractor = PlaceClueExtractor {
+            listOf(PlaceClue("동일상호", "서초구", listOf("동일상호")))
+        }
+        val provider = PlaceSearchProvider {
+            listOf(
+                candidate("1", "동일상호", "서울 마포구"),
+                candidate("2", "동일상호", "서울 종로구"),
+            )
+        }
+        val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
+        assertEquals(emptyList(), port.completed)
+        assertEquals("No place candidate matched: 동일상호", port.failedReason)
+    }
+
+    @Test
     fun `retries when every place clue fails to match`() {
         val port = FakeJobPort(attempt = 2)
         val extractor = PlaceClueExtractor {
