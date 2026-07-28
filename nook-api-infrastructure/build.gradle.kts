@@ -15,6 +15,7 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-boot4-support:3.9.0")
     implementation("org.springframework.boot:spring-boot-starter-restclient")
+    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     implementation("org.springframework.security:spring-security-oauth2-jose")
     implementation(platform("software.amazon.awssdk:bom:2.49.3"))
     implementation("software.amazon.awssdk:s3")

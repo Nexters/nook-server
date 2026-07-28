@@ -1,9 +1,18 @@
 package org.every.nook.api.application.place
 
+import java.time.Duration
+import java.time.Instant
+
 interface PlaceParsingJobPort {
-    fun claimNext(): ClaimedPlaceParsingJob?
+    fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob?
+
+    fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob>
 
     fun complete(postId: Long, places: List<PlaceCandidate>)
 
+    fun retry(postId: Long, nextAttemptAt: Instant)
+
     fun fail(postId: Long, reason: String)
 }
+
+data class OutstandingPlaceParsingJob(val postId: Long, val availableAt: Instant)

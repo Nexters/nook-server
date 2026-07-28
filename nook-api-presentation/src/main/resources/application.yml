@@ -35,6 +35,11 @@ management:
       probes:
         enabled: true
 
+place-parsing:
+  worker:
+    retry-backoffs: ${PLACE_PARSING_RETRY_BACKOFFS:5s,15s,45s}
+    processing-timeout: ${PLACE_PARSING_PROCESSING_TIMEOUT:1m}
+
 external:
   openai:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com}

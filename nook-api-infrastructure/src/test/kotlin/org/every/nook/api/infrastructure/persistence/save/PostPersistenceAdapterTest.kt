@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
+import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostSource
@@ -35,6 +36,7 @@ class PostPersistenceAdapterTest {
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
+    private val eventPublisher = mock(org.springframework.context.ApplicationEventPublisher::class.java)
     private val adapter = PostPersistenceAdapter(
         postJpaRepository = postRepository,
         postMediaJpaRepository = mock(PostMediaJpaRepository::class.java),
@@ -46,6 +48,7 @@ class PostPersistenceAdapterTest {
         userPlaceBookmarkJpaRepository = mock(UserPlaceBookmarkJpaRepository::class.java),
         groupJpaRepository = groupRepository,
         groupPostJpaRepository = groupPostRepository,
+        eventPublisher = eventPublisher,
     )
 
     @Test
@@ -82,6 +85,9 @@ class PostPersistenceAdapterTest {
         assertEquals(7, captor.value.userId)
         assertEquals(101, captor.value.postId)
         assertEquals("주말에 방문", captor.value.memo)
+        val eventCaptor = ArgumentCaptor.forClass(PlaceParsingJobRequestedEvent::class.java)
+        verify(eventPublisher).publishEvent(eventCaptor.capture())
+        assertEquals(101, eventCaptor.value.postId)
     }
 
     @Test
