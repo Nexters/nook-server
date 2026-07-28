@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
+import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
 import org.every.nook.api.application.post.port.ExistingPost
@@ -16,6 +17,7 @@ import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.domain.post.Post
+import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.domain.post.PostSource
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
@@ -25,12 +27,10 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
-import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
-import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
-import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
@@ -40,8 +40,7 @@ import java.time.Clock
 @Component
 class PostPersistenceAdapter(
     private val postJpaRepository: PostJpaRepository,
-    private val postMediaJpaRepository: PostMediaJpaRepository,
-    private val postHashtagJpaRepository: PostHashtagJpaRepository,
+    private val postContentParsingJobJpaRepository: PostContentParsingJobJpaRepository,
     private val userSavedPostJpaRepository: UserSavedPostJpaRepository,
     private val placeParsingJobJpaRepository: PlaceParsingJobJpaRepository,
     private val postPlaceJpaRepository: PostPlaceJpaRepository,
@@ -60,9 +59,13 @@ class PostPersistenceAdapter(
     override fun find(source: PostSource): ExistingPost? {
         val post = postJpaRepository.findBySourceTypeAndExternalPostId(source.type, source.externalPostId)
             ?: return null
-        val parsingJob = placeParsingJobJpaRepository.findByPostId(requireNotNull(post.id))
+        val postId = requireNotNull(post.id)
+        val contentJob = postContentParsingJobJpaRepository.findByPostId(postId)
             ?: return null
-        return ExistingPost(parsingJob.status)
+        return ExistingPost(
+            contentParsingStatus = contentJob.status,
+            placeParsingStatus = placeParsingJobJpaRepository.findByPostId(postId)?.status,
+        )
     }
 
     @Transactional
@@ -73,25 +76,27 @@ class PostPersistenceAdapter(
             post.source.externalPostId,
         ) ?: saveNewPost(post)
         val sourcePostId = requireNotNull(postEntity.id)
-        val existingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
-        val parsingJob = existingJob
-            ?: placeParsingJobJpaRepository.save(
-                PlaceParsingJobEntity(
+        val existingContentJob = postContentParsingJobJpaRepository.findByPostId(sourcePostId)
+        val contentJob = existingContentJob
+            ?: postContentParsingJobJpaRepository.save(
+                PostContentParsingJobEntity(
                     postId = sourcePostId,
-                    status = PlaceParsingStatus.PENDING,
+                    status = PostContentParsingStatus.PENDING,
+                    nextAttemptAt = clock.instant(),
                 ),
             )
         val userPost = findOrCreateUserPost(userId, sourcePostId, memo)
         addToGroups(requireNotNull(userPost.id), groupIds)
-        if (existingJob == null) {
-            eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(sourcePostId))
-        } else if (parsingJob.status == PlaceParsingStatus.FAILED) {
-            restart(parsingJob)
+        if (existingContentJob == null) {
+            eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(sourcePostId))
+        } else {
+            restartFailedJob(sourcePostId, contentJob)
         }
 
         return CreatedPost(
             postId = requireNotNull(userPost.id),
-            placeParsingStatus = parsingJob.status,
+            contentParsingStatus = contentJob.status,
+            placeParsingStatus = placeParsingJobJpaRepository.findByPostId(sourcePostId)?.status,
         )
     }
 
@@ -102,15 +107,15 @@ class PostPersistenceAdapter(
             postJpaRepository.findBySourceForUpdate(source.type, source.externalPostId),
         )
         val sourcePostId = requireNotNull(post.id)
-        val parsingJob = requireNotNull(placeParsingJobJpaRepository.findByPostId(sourcePostId))
+        val contentJob = requireNotNull(postContentParsingJobJpaRepository.findByPostId(sourcePostId))
         val userPost = findOrCreateUserPost(userId, sourcePostId, memo)
         addToGroups(requireNotNull(userPost.id), groupIds)
-        if (parsingJob.status == PlaceParsingStatus.FAILED) {
-            restart(parsingJob)
-        }
+        restartFailedJob(sourcePostId, contentJob)
+        val placeParsingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
         return CreatedPost(
             postId = requireNotNull(userPost.id),
-            placeParsingStatus = parsingJob.status,
+            contentParsingStatus = contentJob.status,
+            placeParsingStatus = placeParsingJob?.status,
         )
     }
 
@@ -124,7 +129,7 @@ class PostPersistenceAdapter(
     @Transactional(readOnly = true)
     override fun find(userId: Long, postId: Long): PostPlaceParsingSnapshot? {
         val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return null
-        val parsingJob = placeParsingJobJpaRepository.findByPostId(userPost.postId) ?: return null
+        val parsingJob = placeParsingJobJpaRepository.findByPostId(userPost.postId)
         val postPlaces = postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(userPost.postId)
         val bookmarkedPlaceIds = if (postPlaces.isEmpty()) {
             emptySet()
@@ -138,8 +143,8 @@ class PostPersistenceAdapter(
 
         return PostPlaceParsingSnapshot(
             postId = postId,
-            placeParsingStatus = parsingJob.status,
-            failureReason = parsingJob.failureReason,
+            placeParsingStatus = parsingJob?.status ?: PlaceParsingStatus.PENDING,
+            failureReason = parsingJob?.failureReason,
             places = postPlaces.mapNotNull { postPlace ->
                 placesById[postPlace.placeId]?.toDomain()?.let { place ->
                     PostPlaceParsingSnapshot.RelatedPlace(
@@ -164,28 +169,6 @@ class PostPersistenceAdapter(
                 sourceLocationTag = post.sourceLocationTag,
             ),
         )
-        val postId = requireNotNull(postEntity.id)
-
-        postMediaJpaRepository.saveAll(
-            post.media.map { media ->
-                PostMediaEntity(
-                    postId = postId,
-                    mediaType = media.type,
-                    mediaUrl = media.url,
-                    sequence = media.sequence,
-                )
-            },
-        )
-        postHashtagJpaRepository.saveAll(
-            post.hashtags.mapIndexed { sequence, hashtag ->
-                PostHashtagEntity(
-                    postId = postId,
-                    hashtag = hashtag,
-                    sequence = sequence,
-                )
-            },
-        )
-
         return postEntity
     }
 
@@ -212,12 +195,35 @@ class PostPersistenceAdapter(
         )
     }
 
-    private fun restart(job: PlaceParsingJobEntity) {
-        job.status = PlaceParsingStatus.PENDING
-        job.failureReason = null
-        job.attemptCount = 0
-        job.nextAttemptAt = clock.instant()
-        eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(job.postId))
+    private fun restartFailedJob(postId: Long, contentJob: PostContentParsingJobEntity) {
+        if (contentJob.status == PostContentParsingStatus.FAILED) {
+            contentJob.status = PostContentParsingStatus.PENDING
+            contentJob.failureReason = null
+            contentJob.attemptCount = 0
+            contentJob.nextAttemptAt = clock.instant()
+            eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(postId))
+            return
+        }
+        if (contentJob.status != PostContentParsingStatus.COMPLETED) {
+            return
+        }
+        val placeJob = placeParsingJobJpaRepository.findByPostId(postId)
+            ?: placeParsingJobJpaRepository.save(
+                PlaceParsingJobEntity(
+                    postId = postId,
+                    status = PlaceParsingStatus.PENDING,
+                    nextAttemptAt = clock.instant(),
+                ),
+            ).also {
+                eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId))
+            }
+        if (placeJob.status == PlaceParsingStatus.FAILED) {
+            placeJob.status = PlaceParsingStatus.PENDING
+            placeJob.failureReason = null
+            placeJob.attemptCount = 0
+            placeJob.nextAttemptAt = clock.instant()
+            eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(placeJob.postId))
+        }
     }
 
     private fun validateOwnedGroups(userId: Long, groupIds: Set<Long>) {

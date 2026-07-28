@@ -13,6 +13,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkEntity
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
@@ -43,6 +44,7 @@ class SavedPostQueryPersistenceAdapterTest {
     private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
+    private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val memberRepository = mock(MemberJpaRepository::class.java)
     private val adapter = SavedPostQueryPersistenceAdapter(
@@ -54,6 +56,7 @@ class SavedPostQueryPersistenceAdapterTest {
         placeRepository,
         bookmarkRepository,
         parsingJobRepository,
+        contentParsingJobRepository,
         groupRepository,
         memberRepository,
     )
