@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.openai
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
+import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.post.PostTitleGenerator
@@ -13,7 +14,8 @@ class OpenAiContentInferenceAdapter(
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
 ) : PostTitleGenerator,
-    PlaceClueExtractor {
+    PlaceClueExtractor,
+    PlaceCandidateSelector {
     override fun generate(request: PostTitleGenerator.Request): String {
         val result = requestStructured(
             name = "post_title",
@@ -41,6 +43,22 @@ class OpenAiContentInferenceAdapter(
                 queries = place.path("queries").map(JsonNode::asText).map(String::trim).filter(String::isNotEmpty),
             )
         }
+    }
+
+    override fun select(request: PlaceCandidateSelector.Request): org.every.nook.api.application.place.PlaceCandidate? {
+        val result = requestStructured(
+            name = "place_candidate_selection",
+            instructions = CANDIDATE_SELECTION_INSTRUCTIONS,
+            input = request.toInput(),
+            schema = candidateSelectionSchema(request.candidates.lastIndex),
+            maxOutputTokens = CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS,
+        )
+        val selectedIndex = result.path("candidateIndex")
+            .takeUnless(JsonNode::isNull)
+            ?.asInt()
+            ?: return null
+        return request.candidates.getOrNull(selectedIndex)?.place
+            ?: error("OpenAI selected an unknown place candidate")
     }
 
     private fun requestStructured(
@@ -92,6 +110,26 @@ class OpenAiContentInferenceAdapter(
 
     private fun PlaceClueExtractor.Request.toInput(): String = contentInput(body, hashtags, sourceLocationTag)
 
+    private fun PlaceCandidateSelector.Request.toInput(): String = objectMapper.writeValueAsString(
+        mapOf(
+            "placeClue" to mapOf(
+                "name" to clue.name,
+                "region" to clue.region,
+                "queries" to clue.queries,
+            ),
+            "candidates" to candidates.mapIndexed { index, candidate ->
+                mapOf(
+                    "candidateIndex" to index,
+                    "provider" to candidate.place.provider,
+                    "name" to candidate.place.name,
+                    "address" to candidate.place.address,
+                    "category" to candidate.place.category,
+                    "matchedQueries" to candidate.matchedQueries,
+                )
+            },
+        ),
+    )
+
     private fun contentInput(body: String?, hashtags: List<String>, sourceLocationTag: String?): String =
         objectMapper.writeValueAsString(
             mapOf(
@@ -137,6 +175,19 @@ class OpenAiContentInferenceAdapter(
         "additionalProperties" to false,
     )
 
+    private fun candidateSelectionSchema(lastCandidateIndex: Int): Map<String, Any> = mapOf(
+        "type" to "object",
+        "properties" to mapOf(
+            "candidateIndex" to mapOf(
+                "type" to listOf("integer", "null"),
+                "minimum" to 0,
+                "maximum" to lastCandidateIndex,
+            ),
+        ),
+        "required" to listOf("candidateIndex"),
+        "additionalProperties" to false,
+    )
+
     private companion object {
         val logger = KotlinLogging.logger {}
 
@@ -145,6 +196,7 @@ class OpenAiContentInferenceAdapter(
         const val MAX_QUERY_COUNT = 3
         const val TITLE_MAX_OUTPUT_TOKENS = 200
         const val PLACE_MAX_OUTPUT_TOKENS = 800
+        const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
         const val DEFAULT_TITLE = "Instagram 게시물"
         const val TITLE_INSTRUCTIONS =
             "입력된 Instagram 본문, 해시태그, 장소 태그에 명시된 사실만 사용해 검색과 보관에 적합한 한국어 제목을 작성한다. " +
@@ -160,5 +212,11 @@ class OpenAiContentInferenceAdapter(
                 "상호명이 확인되지 않으면 추측하거나 일반 업종명으로 만들지 않는다. 좌표와 주소도 만들지 않는다. " +
                 "장소별 상호명 name, 확인 가능한 region, 카카오 장소 검색용 queries를 반환한다. " +
                 "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 10개 가게와 가게당 최대 3개 검색어만 반환한다."
+        const val CANDIDATE_SELECTION_INSTRUCTIONS =
+            "placeClue는 Instagram 게시물에서 추출한 장소 단서이고 candidates는 실제 장소 검색 결과다. " +
+                "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, 주소, region, matchedQueries를 함께 비교해 " +
+                "게시물이 가리키는 장소와 가장 일치하는 candidateIndex 하나를 선택한다. " +
+                "후보에 없는 장소를 만들거나 후보 정보를 수정하지 않는다. " +
+                "명확한 근거가 없거나 서로 다른 후보를 하나로 확정할 수 없으면 candidateIndex를 null로 반환한다."
     }
 }
