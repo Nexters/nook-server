@@ -16,6 +16,15 @@ class InstagramContentUrlTest {
     }
 
     @Test
+    fun `source resolver identifies the shortcode without provider access`() {
+        val source = InstagramPostSourceResolver()
+            .resolve("https://www.instagram.com/p/Ab_12-xy/?img_index=14&igsh=test")
+
+        assertEquals("INSTAGRAM", source?.type)
+        assertEquals("Ab_12-xy", source?.externalPostId)
+    }
+
+    @Test
     fun `reel URL is accepted`() {
         val url = InstagramContentUrl.parse("https://www.instagram.com/reel/Reel123/")
 

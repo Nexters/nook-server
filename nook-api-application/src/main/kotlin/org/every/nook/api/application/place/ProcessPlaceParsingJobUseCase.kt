@@ -26,6 +26,7 @@ class ProcessPlaceParsingJobUseCase(
                     sourceLocationTag = job.sourceLocationTag,
                 ),
             )
+            check(clues.isNotEmpty()) { NO_PLACE_CLUE_REASON }
             require(clues.size <= MAX_PLACE_COUNT) { "Too many place clues" }
             logger.info {
                 "OpenAI place clues received: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -76,6 +77,11 @@ class ProcessPlaceParsingJobUseCase(
             candidate.name.normalize() == normalizedName &&
                 (normalizedRegion == null || candidate.address.normalize().contains(normalizedRegion))
         }
+        logger.info {
+            "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
+                "candidateCount=${candidates.size}, matchCount=${matches.size}, " +
+                "candidates=${candidates.take(CANDIDATE_LOG_LIMIT).map { "${it.name}|${it.address}" }}"
+        }
 
         val resolved = when (matches.size) {
             0 -> failResolution("No place candidate matched: ${clue.name}")
@@ -109,7 +115,7 @@ class ProcessPlaceParsingJobUseCase(
         val backoff = retryBackoffs.getOrNull(job.attempt - 1)
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(backoff)
-            jobPort.retry(job.postId, nextAttemptAt)
+            jobPort.retry(job.postId, nextAttemptAt, reason)
             logger.warn(exception) {
                 "Place parsing retry scheduled: postId=${job.postId}, attempt=${job.attempt}, " +
                     "nextAttemptAt=$nextAttemptAt, durationMs=$duration, reason=$reason"
@@ -142,8 +148,10 @@ class ProcessPlaceParsingJobUseCase(
 
         const val MAX_PLACE_COUNT = 10
         const val MAX_QUERY_COUNT = 3
+        const val CANDIDATE_LOG_LIMIT = 5
         const val MAX_FAILURE_REASON_LENGTH = 500
         const val DEFAULT_FAILURE_REASON = "Place parsing failed"
+        const val NO_PLACE_CLUE_REASON = "No place clue was extracted"
     }
 
     private class PlaceResolutionException(message: String) : IllegalStateException(message)

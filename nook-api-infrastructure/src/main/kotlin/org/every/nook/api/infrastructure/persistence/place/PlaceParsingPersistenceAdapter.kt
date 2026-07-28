@@ -36,7 +36,6 @@ class PlaceParsingPersistenceAdapter(
         }
         val post = postRepository.findById(job.postId).orElseThrow()
         job.status = PlaceParsingStatus.PROCESSING
-        job.failureReason = null
         job.attemptCount += 1
         job.nextAttemptAt = now
 
@@ -89,11 +88,11 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun retry(postId: Long, nextAttemptAt: Instant) {
+    override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
         job.status = PlaceParsingStatus.PENDING
-        job.failureReason = null
+        job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
         job.nextAttemptAt = nextAttemptAt
     }
 

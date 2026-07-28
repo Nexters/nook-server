@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import org.every.nook.api.domain.save.UserSavedPost
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 
@@ -16,6 +17,12 @@ import org.every.nook.api.infrastructure.persistence.BaseEntity
     indexes = [
         Index(name = "idx_user_id", columnList = "user_id"),
         Index(name = "idx_post_id", columnList = "post_id"),
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "idx_u_user_id_post_id",
+            columnNames = ["user_id", "post_id"],
+        ),
     ],
 )
 class UserSavedPostEntity(

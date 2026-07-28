@@ -9,7 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class ProcessPlaceParsingJobUseCaseTest {
     @Test
@@ -72,7 +71,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         )
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Retry>(useCase(1))
-        assertEquals(NOW.plusSeconds(15), port.nextAttemptAt)
+        assertEquals(NOW.plusSeconds(3), port.nextAttemptAt)
         assertEquals(emptyList(), port.completed)
     }
 
@@ -99,16 +98,16 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
-    fun `completes without places when no clue is grounded`() {
-        val port = FakeJobPort()
+    fun `fails permanently when the final attempt extracts no place clue`() {
+        val port = FakeJobPort(attempt = 4)
         val useCase = useCase(
             port,
             PlaceClueExtractor { emptyList() },
             SearchPlaceCandidatesUseCase { emptyList() },
         )
 
-        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
-        assertTrue(port.completed.isEmpty())
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
+        assertEquals("No place clue was extracted", port.failedReason)
     }
 
     @Test
@@ -122,8 +121,9 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         val result = assertIs<ProcessPlaceParsingJobUseCase.Result.Retry>(useCase(1))
 
-        assertEquals(NOW.plusSeconds(15), result.nextAttemptAt)
-        assertEquals(NOW.plusSeconds(15), port.nextAttemptAt)
+        assertEquals(NOW.plusSeconds(3), result.nextAttemptAt)
+        assertEquals(NOW.plusSeconds(3), port.nextAttemptAt)
+        assertEquals("temporary provider failure", port.retryReason)
         assertNull(port.failedReason)
     }
 
@@ -158,6 +158,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         var completed = emptyList<PlaceCandidate>()
         var failedReason: String? = null
         var nextAttemptAt: Instant? = null
+        var retryReason: String? = null
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob =
             ClaimedPlaceParsingJob(postId, attempt, "본문", emptyList(), null)
@@ -168,8 +169,9 @@ class ProcessPlaceParsingJobUseCaseTest {
             completed = places
         }
 
-        override fun retry(postId: Long, nextAttemptAt: Instant) {
+        override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
             this.nextAttemptAt = nextAttemptAt
+            retryReason = reason
         }
 
         override fun fail(postId: Long, reason: String) {
@@ -180,9 +182,9 @@ class ProcessPlaceParsingJobUseCaseTest {
     private companion object {
         val NOW: Instant = Instant.parse("2026-07-28T00:00:00Z")
         val RETRY_BACKOFFS = listOf(
-            Duration.ofSeconds(5),
-            Duration.ofSeconds(15),
-            Duration.ofSeconds(45),
+            Duration.ofSeconds(3),
+            Duration.ofSeconds(3),
+            Duration.ofSeconds(3),
         )
 
         fun candidate(id: String, name: String, address: String) = PlaceCandidate(

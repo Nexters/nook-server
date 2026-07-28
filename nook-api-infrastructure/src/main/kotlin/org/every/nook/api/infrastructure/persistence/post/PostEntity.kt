@@ -6,13 +6,22 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostSource
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 import java.time.Instant
 
 @Entity
-@Table(name = "posts")
+@Table(
+    name = "posts",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "idx_u_source_type_external_post_id",
+            columnNames = ["source_type", "external_post_id"],
+        ),
+    ],
+)
 class PostEntity(
     @Column(
         name = "source_type",

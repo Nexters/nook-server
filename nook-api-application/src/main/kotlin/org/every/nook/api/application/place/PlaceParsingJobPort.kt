@@ -10,7 +10,7 @@ interface PlaceParsingJobPort {
 
     fun complete(postId: Long, places: List<PlaceCandidate>)
 
-    fun retry(postId: Long, nextAttemptAt: Instant)
+    fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
 
     fun fail(postId: Long, reason: String)
 }
