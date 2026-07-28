@@ -42,6 +42,7 @@ class PlaceParsingPersistenceAdapterTest {
         val job = PlaceParsingJobEntity(
             postId = 11,
             status = PlaceParsingStatus.PENDING,
+            failureReason = "previous failure",
             attemptCount = 1,
             nextAttemptAt = NOW.minusSeconds(1),
         )
@@ -54,7 +55,24 @@ class PlaceParsingPersistenceAdapterTest {
 
         assertEquals(2, claimed.attempt)
         assertEquals(PlaceParsingStatus.PROCESSING, job.status)
+        assertEquals("previous failure", job.failureReason)
         assertEquals(NOW, job.nextAttemptAt)
+    }
+
+    @Test
+    fun `retains the latest failure reason while waiting for retry`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+
+        adapter.retry(
+            postId = 11,
+            nextAttemptAt = NOW.plusSeconds(3),
+            reason = "No place candidate matched: Lodge190",
+        )
+
+        assertEquals(PlaceParsingStatus.PENDING, job.status)
+        assertEquals("No place candidate matched: Lodge190", job.failureReason)
+        assertEquals(NOW.plusSeconds(3), job.nextAttemptAt)
     }
 
     @Test

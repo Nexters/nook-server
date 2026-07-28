@@ -2,16 +2,24 @@ package org.every.nook.api.application.post
 
 import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.ExtractedPostContent
+import org.every.nook.api.application.content.PostSourceResolver
+import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.port.CreatePostPort
+import org.every.nook.api.application.post.port.CreatedPost
+import org.every.nook.api.application.post.port.FindExistingPostPort
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.post.port.ReusePostPort
 import org.every.nook.api.domain.post.Post
 
 class CreatePostUseCase(
     private val groupOwnershipPort: GroupOwnershipPort,
+    private val postSourceResolver: PostSourceResolver,
+    private val findExistingPostPort: FindExistingPostPort,
+    private val reusePostPort: ReusePostPort,
     private val extractPostContentUseCase: ExtractPostContentUseCase,
     private val postTitleGenerator: PostTitleGenerator,
     private val postMediaStoragePort: PostMediaStoragePort,
@@ -20,13 +28,22 @@ class CreatePostUseCase(
     operator fun invoke(command: Command): Result {
         val groupIds = command.groupIds.toSet()
         validateGroups(command.userId, groupIds)
+        val source = postSourceResolver.resolve(command.url) ?: throw UnsupportedPostUrlException()
+        val existingPost = findExistingPostPort.find(source)
+        if (existingPost != null) {
+            return reusePostPort.reuse(
+                userId = command.userId,
+                source = source,
+                memo = command.memo,
+                groupIds = groupIds,
+            ).toResult()
+        }
         val extractedContent = extractPostContentUseCase(command.url)
         val providedPost = extractedContent.post.copy(
             sourceLocationTag = extractedContent.toSourceLocationTag(),
             hashtags = extractedContent.hashtags.toPersistentHashtags(),
         )
         val storedPost = providedPost.copy(
-            canonicalUrl = command.url,
             title = postTitleGenerator.generate(
                 PostTitleGenerator.Request(
                     body = providedPost.body,
@@ -43,11 +60,13 @@ class CreatePostUseCase(
             groupIds = groupIds,
         )
 
-        return Result(
-            postId = created.postId,
-            placeParsingStatus = PlaceParsingStatusView.from(created.placeParsingStatus),
-        )
+        return created.toResult()
     }
+
+    private fun CreatedPost.toResult(): Result = Result(
+        postId = postId,
+        placeParsingStatus = PlaceParsingStatusView.from(placeParsingStatus),
+    )
 
     private fun validateGroups(userId: Long, groupIds: Set<Long>) {
         if (groupIds.isEmpty()) {

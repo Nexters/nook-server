@@ -6,9 +6,9 @@ import java.time.Duration
 @ConfigurationProperties("place-parsing.worker")
 data class PlaceParsingProperties(
     val retryBackoffs: List<Duration> = listOf(
-        Duration.ofSeconds(FIRST_RETRY_SECONDS),
-        Duration.ofSeconds(SECOND_RETRY_SECONDS),
-        Duration.ofSeconds(THIRD_RETRY_SECONDS),
+        Duration.ofSeconds(RETRY_SECONDS),
+        Duration.ofSeconds(RETRY_SECONDS),
+        Duration.ofSeconds(RETRY_SECONDS),
     ),
     val processingTimeout: Duration = Duration.ofMinutes(1),
 ) {
@@ -20,8 +20,6 @@ data class PlaceParsingProperties(
 
     private companion object {
         const val RETRY_COUNT = 3
-        const val FIRST_RETRY_SECONDS = 5L
-        const val SECOND_RETRY_SECONDS = 15L
-        const val THIRD_RETRY_SECONDS = 45L
+        const val RETRY_SECONDS = 3L
     }
 }

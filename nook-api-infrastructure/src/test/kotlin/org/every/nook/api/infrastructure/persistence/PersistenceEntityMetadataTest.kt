@@ -30,11 +30,13 @@ class PersistenceEntityMetadataTest {
     }
 
     @Test
-    fun `Instagram requests can create independent posts from the same source`() {
+    fun `post source identity is unique`() {
         val table = requireNotNull(PostEntity::class.findAnnotation<Table>())
+        val uniqueConstraint = table.uniqueConstraints.single()
 
         assertEquals("posts", table.name)
-        assertTrue(table.uniqueConstraints.isEmpty())
+        assertEquals("idx_u_source_type_external_post_id", uniqueConstraint.name)
+        assertEquals(listOf("source_type", "external_post_id"), uniqueConstraint.columnNames.toList())
     }
 
     @Test
@@ -48,10 +50,12 @@ class PersistenceEntityMetadataTest {
     }
 
     @Test
-    fun `user can save the same post more than once`() {
+    fun `user saved post is unique per source post`() {
         val table = requireNotNull(UserSavedPostEntity::class.findAnnotation<Table>())
+        val uniqueConstraint = table.uniqueConstraints.single()
 
-        assertTrue(table.uniqueConstraints.isEmpty())
+        assertEquals("idx_u_user_id_post_id", uniqueConstraint.name)
+        assertEquals(listOf("user_id", "post_id"), uniqueConstraint.columnNames.toList())
         assertEquals(setOf("idx_user_id", "idx_post_id"), table.indexes.map { it.name }.toSet())
     }
 
