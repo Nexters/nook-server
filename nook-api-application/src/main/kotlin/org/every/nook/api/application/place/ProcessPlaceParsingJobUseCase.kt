@@ -71,13 +71,19 @@ class ProcessPlaceParsingJobUseCase(
         }
         val normalizedName = clue.name.normalize()
         val normalizedRegion = clue.region?.normalize()?.takeIf(String::isNotEmpty)
-        val matches = candidates.filter { candidate ->
-            candidate.name.normalize() == normalizedName &&
-                (normalizedRegion == null || candidate.address.normalize().contains(normalizedRegion))
+        val nameMatches = candidates.filter { candidate ->
+            candidate.name.normalize() == normalizedName
+        }
+        val matches = if (nameMatches.size <= 1 || normalizedRegion == null) {
+            nameMatches
+        } else {
+            nameMatches.filter { candidate ->
+                candidate.address.normalize().contains(normalizedRegion)
+            }
         }
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
-                "candidateCount=${candidates.size}, matchCount=${matches.size}, " +
+                "candidateCount=${candidates.size}, nameMatchCount=${nameMatches.size}, matchCount=${matches.size}, " +
                 "candidates=${candidates.take(CANDIDATE_LOG_LIMIT).map { "${it.name}|${it.address}" }}"
         }
 
