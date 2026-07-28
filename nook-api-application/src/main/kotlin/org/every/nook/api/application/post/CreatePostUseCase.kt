@@ -1,17 +1,17 @@
 package org.every.nook.api.application.post
 
-import org.every.nook.api.application.content.ExtractPostContentUseCase
-import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
+import org.every.nook.api.application.post.model.PostProcessingStageView
+import org.every.nook.api.application.post.model.PostProcessingStatusView
+import org.every.nook.api.application.post.model.PostProcessingView
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
 import org.every.nook.api.application.post.port.FindExistingPostPort
-import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.application.post.port.ReusePostPort
 import org.every.nook.api.domain.post.Post
 
@@ -20,9 +20,6 @@ class CreatePostUseCase(
     private val postSourceResolver: PostSourceResolver,
     private val findExistingPostPort: FindExistingPostPort,
     private val reusePostPort: ReusePostPort,
-    private val extractPostContentUseCase: ExtractPostContentUseCase,
-    private val postTitleGenerator: PostTitleGenerator,
-    private val postMediaStoragePort: PostMediaStoragePort,
     private val createPostPort: CreatePostPort,
 ) {
     operator fun invoke(command: Command): Result {
@@ -38,24 +35,12 @@ class CreatePostUseCase(
                 groupIds = groupIds,
             ).toResult()
         }
-        val extractedContent = extractPostContentUseCase(command.url)
-        val providedPost = extractedContent.post.copy(
-            sourceLocationTag = extractedContent.toSourceLocationTag(),
-            hashtags = extractedContent.hashtags.toPersistentHashtags(),
-        )
-        val storedPost = providedPost.copy(
-            title = postTitleGenerator.generate(
-                PostTitleGenerator.Request(
-                    body = providedPost.body,
-                    hashtags = providedPost.hashtags,
-                    sourceLocationTag = providedPost.sourceLocationTag,
-                ),
-            ),
-            media = providedPost.media.map(postMediaStoragePort::store),
-        )
         val created = createPostPort.create(
             userId = command.userId,
-            post = storedPost,
+            post = Post(
+                source = source,
+                canonicalUrl = command.url.toCanonicalUrl(),
+            ),
             memo = command.memo,
             groupIds = groupIds,
         )
@@ -63,10 +48,17 @@ class CreatePostUseCase(
         return created.toResult()
     }
 
-    private fun CreatedPost.toResult(): Result = Result(
-        postId = postId,
-        placeParsingStatus = PlaceParsingStatusView.from(placeParsingStatus),
-    )
+    private fun CreatedPost.toResult(): Result {
+        val processing = PostProcessingView.from(contentParsingStatus, placeParsingStatus)
+        return Result(
+            postId = postId,
+            placeParsingStatus = placeParsingStatus
+                ?.let(PlaceParsingStatusView::from)
+                ?: PlaceParsingStatusView.PENDING,
+            processingStatus = processing.status,
+            processingStage = processing.stage,
+        )
+    }
 
     private fun validateGroups(userId: Long, groupIds: Set<Long>) {
         if (groupIds.isEmpty()) {
@@ -77,19 +69,14 @@ class CreatePostUseCase(
         }
     }
 
-    private fun ExtractedPostContent.toSourceLocationTag(): String? = sourceLocationNames
-        .asSequence()
-        .map(String::trim)
-        .firstOrNull { it.isNotEmpty() && it.length <= Post.MAX_SOURCE_LOCATION_TAG_LENGTH }
-
-    private fun List<String>.toPersistentHashtags(): List<String> = asSequence()
-        .map(String::trim)
-        .map { it.removePrefix("#").trim() }
-        .filter { it.isNotEmpty() && it.length <= Post.MAX_HASHTAG_LENGTH }
-        .distinct()
-        .toList()
+    private fun String.toCanonicalUrl(): String = substringBefore('?').trimEnd('/') + "/"
 
     data class Command(val userId: Long, val url: String, val memo: String? = null, val groupIds: List<Long>)
 
-    data class Result(val postId: Long, val placeParsingStatus: PlaceParsingStatusView)
+    data class Result(
+        val postId: Long,
+        val placeParsingStatus: PlaceParsingStatusView,
+        val processingStatus: PostProcessingStatusView = PostProcessingStatusView.PENDING,
+        val processingStage: PostProcessingStageView? = PostProcessingStageView.CONTENT,
+    )
 }

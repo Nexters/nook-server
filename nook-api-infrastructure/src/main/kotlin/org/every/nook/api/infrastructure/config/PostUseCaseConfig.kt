@@ -5,10 +5,13 @@ import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.CreatePostUseCase
+import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobsUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
+import org.every.nook.api.application.post.PostContentParsingJobPort
 import org.every.nook.api.application.post.PostTitleGenerator
+import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.FindExistingPostPort
@@ -17,10 +20,12 @@ import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.application.post.port.ReusePostPort
 import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.application.post.port.UpdatePostMemoPort
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
+@EnableConfigurationProperties(PostContentParsingProperties::class)
 class PostUseCaseConfig {
     @Bean
     fun extractPostContentUseCase(extractors: List<PostContentExtractor>): ExtractPostContentUseCase =
@@ -32,19 +37,38 @@ class PostUseCaseConfig {
         postSourceResolver: PostSourceResolver,
         findExistingPostPort: FindExistingPostPort,
         reusePostPort: ReusePostPort,
-        extractPostContentUseCase: ExtractPostContentUseCase,
-        postTitleGenerator: PostTitleGenerator,
-        postMediaStoragePort: PostMediaStoragePort,
         createPostPort: CreatePostPort,
     ): CreatePostUseCase = CreatePostUseCase(
         groupOwnershipPort = groupOwnershipPort,
         postSourceResolver = postSourceResolver,
         findExistingPostPort = findExistingPostPort,
         reusePostPort = reusePostPort,
-        extractPostContentUseCase = extractPostContentUseCase,
-        postTitleGenerator = postTitleGenerator,
-        postMediaStoragePort = postMediaStoragePort,
         createPostPort = createPostPort,
+    )
+
+    @Bean
+    fun processPostContentParsingJobUseCase(
+        jobPort: PostContentParsingJobPort,
+        extractPostContentUseCase: ExtractPostContentUseCase,
+        postTitleGenerator: PostTitleGenerator,
+        postMediaStoragePort: PostMediaStoragePort,
+        properties: PostContentParsingProperties,
+    ): ProcessPostContentParsingJobUseCase = ProcessPostContentParsingJobUseCase(
+        jobPort = jobPort,
+        extractPostContent = extractPostContentUseCase,
+        titleGenerator = postTitleGenerator,
+        mediaStorage = postMediaStoragePort,
+        retryBackoffs = properties.retryBackoffs,
+        processingTimeout = properties.processingTimeout,
+    )
+
+    @Bean
+    fun findOutstandingPostContentParsingJobsUseCase(
+        jobPort: PostContentParsingJobPort,
+        properties: PostContentParsingProperties,
+    ): FindOutstandingPostContentParsingJobsUseCase = FindOutstandingPostContentParsingJobsUseCase(
+        jobPort = jobPort,
+        processingTimeout = properties.processingTimeout,
     )
 
     @Bean

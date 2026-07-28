@@ -41,3 +41,8 @@ place-parsing:
   worker:
     retry-backoffs: ${PLACE_PARSING_RETRY_BACKOFFS:3s,3s,3s}
     processing-timeout: ${PLACE_PARSING_PROCESSING_TIMEOUT:1m}
+
+post-content-parsing:
+  worker:
+    retry-backoffs: ${POST_CONTENT_PARSING_RETRY_BACKOFFS:3s,3s,3s}
+    processing-timeout: ${POST_CONTENT_PARSING_PROCESSING_TIMEOUT:15m}

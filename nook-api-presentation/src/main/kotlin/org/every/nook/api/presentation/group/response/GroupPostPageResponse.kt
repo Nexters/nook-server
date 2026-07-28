@@ -3,6 +3,8 @@ package org.every.nook.api.presentation.group.response
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.group.GroupPostPage
 import org.every.nook.api.application.group.GroupPostSummary
+import org.every.nook.api.application.post.model.PostProcessingStageView
+import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.presentation.post.response.SavedPostMediaResponse
 import java.time.Instant
 
@@ -50,6 +52,10 @@ data class GroupPostSummaryResponse(
     val placeCount: Long,
     @field:Schema(description = "게시물 저장 시각")
     val savedAt: Instant,
+    @field:Schema(description = "게시물 전체 처리 상태")
+    val processingStatus: PostProcessingStatusView,
+    @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
+    val processingStage: PostProcessingStageView?,
 ) {
     companion object {
         fun from(result: GroupPostSummary): GroupPostSummaryResponse = GroupPostSummaryResponse(
@@ -60,6 +66,8 @@ data class GroupPostSummaryResponse(
             memo = result.post.memo,
             placeCount = result.placeCount,
             savedAt = result.post.savedAt,
+            processingStatus = result.post.processingStatus,
+            processingStage = result.post.processingStage,
         )
     }
 }

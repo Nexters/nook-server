@@ -1,9 +1,9 @@
-package org.every.nook.api.place
+package org.every.nook.api.post
 
 import mu.KotlinLogging
-import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
-import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
-import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
+import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobsUseCase
+import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
+import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
@@ -17,19 +17,19 @@ import java.time.Duration
 import java.time.Instant
 
 @Component
-class PlaceParsingEventListener(
-    private val processPlaceParsingJob: ProcessPlaceParsingJobUseCase,
-    private val findOutstandingJobs: FindOutstandingPlaceParsingJobsUseCase,
+class PostContentParsingEventListener(
+    private val processPostContentParsingJob: ProcessPostContentParsingJobUseCase,
+    private val findOutstandingJobs: FindOutstandingPostContentParsingJobsUseCase,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @EventListener(ApplicationReadyEvent::class)
     fun recoverOutstandingJobs() {
         val jobs = findOutstandingJobs()
-        logger.info { "Recovering outstanding place parsing jobs: jobCount=${jobs.size}" }
+        logger.info { "Recovering outstanding post content parsing jobs: jobCount=${jobs.size}" }
         jobs.forEach { job ->
             eventPublisher.publishEvent(
-                PlaceParsingJobRequestedEvent(
+                PostContentParsingJobRequestedEvent(
                     postId = job.postId,
                     availableAt = job.availableAt,
                 ),
@@ -42,11 +42,11 @@ class PlaceParsingEventListener(
         val now = clock.instant()
         val jobs = findOutstandingJobs().filterNot { it.availableAt.isAfter(now) }
         if (jobs.isNotEmpty()) {
-            logger.info { "Dispatching outstanding place parsing jobs: jobCount=${jobs.size}" }
+            logger.info { "Dispatching outstanding post content parsing jobs: jobCount=${jobs.size}" }
         }
         jobs.forEach { job ->
             eventPublisher.publishEvent(
-                PlaceParsingJobRequestedEvent(
+                PostContentParsingJobRequestedEvent(
                     postId = job.postId,
                     availableAt = job.availableAt,
                 ),
@@ -54,23 +54,23 @@ class PlaceParsingEventListener(
         }
     }
 
-    @Async("placeParsingTaskExecutor")
+    @Async("postContentParsingTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    fun process(event: PlaceParsingJobRequestedEvent) {
+    fun process(event: PostContentParsingJobRequestedEvent) {
         logger.info {
-            "Place parsing event received: postId=${event.postId}, availableAt=${event.availableAt}"
+            "Post content parsing event received: postId=${event.postId}, availableAt=${event.availableAt}"
         }
         if (!waitUntil(event.availableAt)) {
             return
         }
         while (true) {
-            when (val result = processPlaceParsingJob(event.postId)) {
-                ProcessPlaceParsingJobUseCase.Result.Completed,
-                ProcessPlaceParsingJobUseCase.Result.Failed,
-                ProcessPlaceParsingJobUseCase.Result.Skipped,
+            when (val result = processPostContentParsingJob(event.postId)) {
+                ProcessPostContentParsingJobUseCase.Result.Completed,
+                ProcessPostContentParsingJobUseCase.Result.Failed,
+                ProcessPostContentParsingJobUseCase.Result.Skipped,
                 -> return
 
-                is ProcessPlaceParsingJobUseCase.Result.Retry -> if (!waitUntil(result.nextAttemptAt)) {
+                is ProcessPostContentParsingJobUseCase.Result.Retry -> if (!waitUntil(result.nextAttemptAt)) {
                     return
                 }
             }
@@ -84,14 +84,11 @@ class PlaceParsingEventListener(
             if (delay.isNegative || delay.isZero) {
                 return true
             }
-            logger.info {
-                "Place parsing waiting for backoff or timeout: delayMs=${delay.toMillis()}, availableAt=$target"
-            }
             try {
                 Thread.sleep(delay)
             } catch (exception: InterruptedException) {
                 Thread.currentThread().interrupt()
-                logger.warn(exception) { "Place parsing wait interrupted" }
+                logger.warn(exception) { "Post content parsing wait interrupted" }
                 return false
             }
         }
