@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.group.error.GroupNotFoundException
+import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostSource
@@ -49,9 +50,12 @@ class PostPersistenceAdapterTest {
 
     @Test
     fun `stores a creation memo on the user saved post`() {
+        val group = mock(GroupEntity::class.java)
         val postEntity = mock(PostEntity::class.java)
         val parsingJob = mock(PlaceParsingJobEntity::class.java)
         val savedPost = mock(UserSavedPostEntity::class.java)
+        `when`(group.id).thenReturn(17)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17))).thenReturn(listOf(group))
         `when`(postEntity.id).thenReturn(101)
         `when`(parsingJob.status).thenReturn(PlaceParsingStatus.PENDING)
         `when`(savedPost.id).thenReturn(11)
@@ -70,7 +74,7 @@ class PostPersistenceAdapterTest {
                 canonicalUrl = "https://www.instagram.com/p/ABC123/",
             ),
             memo = "주말에 방문",
-            groupIds = emptySet(),
+            groupIds = setOf(17),
         )
 
         val captor = ArgumentCaptor.forClass(UserSavedPostEntity::class.java)
@@ -78,6 +82,23 @@ class PostPersistenceAdapterTest {
         assertEquals(7, captor.value.userId)
         assertEquals(101, captor.value.postId)
         assertEquals("주말에 방문", captor.value.memo)
+    }
+
+    @Test
+    fun `rejects empty groups before creating any post data`() {
+        assertFailsWith<InvalidGroupException> {
+            adapter.create(
+                userId = 7,
+                post = Post(
+                    source = PostSource(type = "INSTAGRAM", externalPostId = "ABC123"),
+                    canonicalUrl = "https://www.instagram.com/p/ABC123/",
+                ),
+                memo = null,
+                groupIds = emptySet(),
+            )
+        }
+
+        verifyNoInteractions(postRepository)
     }
 
     @Test

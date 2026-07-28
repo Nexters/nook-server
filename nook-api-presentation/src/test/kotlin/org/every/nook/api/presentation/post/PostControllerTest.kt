@@ -2,6 +2,7 @@ package org.every.nook.api.presentation.post
 
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
+import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
@@ -18,6 +19,7 @@ import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.TestingAuthenticationToken
@@ -281,6 +283,63 @@ class PostControllerTest {
     }
 
     @Test
+    fun `rejects a post without group ids`() {
+        mockMvc.post("/api/v1/posts") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"url":"https://www.instagram.com/p/ABC123/"}"""
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
+        }
+
+        verifyNoInteractions(createUseCase)
+    }
+
+    @Test
+    fun `rejects a post with null group ids`() {
+        mockMvc.post("/api/v1/posts") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"url":"https://www.instagram.com/p/ABC123/","groupIds":null}"""
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
+        }
+
+        verifyNoInteractions(createUseCase)
+    }
+
+    @Test
+    fun `rejects a post with empty group ids`() {
+        mockMvc.post("/api/v1/posts") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"url":"https://www.instagram.com/p/ABC123/","groupIds":[]}"""
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
+        }
+
+        verifyNoInteractions(createUseCase)
+    }
+
+    @Test
+    fun `rejects a post with an inaccessible group`() {
+        val command = CreatePostUseCase.Command(
+            userId = TEST_USER_ID,
+            url = "https://www.instagram.com/p/ABC123/",
+            groupIds = listOf(999),
+        )
+        `when`(createUseCase(command)).thenThrow(GroupNotFoundException())
+
+        mockMvc.post("/api/v1/posts") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"url":"https://www.instagram.com/p/ABC123/","groupIds":[999]}"""
+        }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.error.errorCode") { value("GROUP_NOT_FOUND") }
+        }
+    }
+
+    @Test
     fun `returns completed parsing with places`() {
         mockMvc.get("/api/v1/posts/11/place-parsing") {
         }.andExpect {
@@ -321,7 +380,7 @@ class PostControllerTest {
     fun `rejects a blank URL`() {
         mockMvc.post("/api/v1/posts") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"url":""}"""
+            content = """{"url":"","groupIds":[17]}"""
         }.andExpect {
             status { isBadRequest() }
             jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
@@ -348,13 +407,14 @@ class PostControllerTest {
                 CreatePostUseCase.Command(
                     userId = TEST_USER_ID,
                     url = unsupportedUrl,
+                    groupIds = listOf(17),
                 ),
             ),
         ).thenThrow(UnsupportedPostUrlException())
 
         mockMvc.post("/api/v1/posts") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"url":"$unsupportedUrl"}"""
+            content = """{"url":"$unsupportedUrl","groupIds":[17]}"""
         }.andExpect {
             status { isBadRequest() }
             jsonPath("$.error.errorCode") { value("UNSUPPORTED_POST_URL") }
