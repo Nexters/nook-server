@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.group.error.GroupNotFoundException
+import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
@@ -156,7 +157,7 @@ class PostPersistenceAdapter(
 
     private fun validateOwnedGroups(userId: Long, groupIds: Set<Long>) {
         if (groupIds.isEmpty()) {
-            return
+            throw InvalidGroupException(IllegalArgumentException("At least one group is required"))
         }
         val ownedGroupIds = groupJpaRepository.findAllByUserIdAndIdIn(userId, groupIds)
             .mapTo(mutableSetOf()) { requireNotNull(it.id) }

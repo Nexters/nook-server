@@ -60,7 +60,7 @@ class PostController(
                 userId = userContext.userId,
                 url = request.url,
                 memo = request.memo,
-                groupIds = request.groupIds.orEmpty(),
+                groupIds = request.groupIds,
             ),
         )
 
