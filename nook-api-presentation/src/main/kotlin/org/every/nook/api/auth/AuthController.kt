@@ -1,6 +1,7 @@
 package org.every.nook.api.auth
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
@@ -43,10 +44,14 @@ class AuthController(
 }
 
 data class SocialAuthRequest(
+    @field:Schema(description = "소셜 로그인 provider", nullable = true)
     @field:NotNull
     val provider: SocialLoginProvider?,
+    @field:Schema(description = "provider access token", nullable = true)
     val accessToken: String? = null,
+    @field:Schema(description = "provider identity token", nullable = true)
     val identityToken: String? = null,
+    @field:Schema(description = "provider authorization code", nullable = true)
     val authorizationCode: String? = null,
 ) {
     fun toCredential(): SocialCredential = SocialCredential(
@@ -58,6 +63,7 @@ data class SocialAuthRequest(
 }
 
 data class RefreshTokenRequest(
+    @field:Schema(description = "서비스 refresh token")
     @field:NotBlank
     val refreshToken: String,
 )
@@ -68,9 +74,13 @@ enum class SocialAuthStatus {
 }
 
 data class SocialAuthResponse(
+    @field:Schema(description = "소셜 인증 결과 상태")
     val status: SocialAuthStatus,
+    @field:Schema(description = "서비스 access token. 로그인 완료 상태에서만 내려갑니다.", nullable = true)
     val accessToken: String? = null,
+    @field:Schema(description = "서비스 refresh token. 로그인 완료 상태에서만 내려갑니다.", nullable = true)
     val refreshToken: String? = null,
+    @field:Schema(description = "회원가입에 사용할 임시 token. 회원가입 필요 상태에서만 내려갑니다.", nullable = true)
     val signupToken: String? = null,
 ) {
     companion object {
@@ -89,7 +99,12 @@ data class SocialAuthResponse(
     }
 }
 
-data class TokenResponse(val accessToken: String, val refreshToken: String) {
+data class TokenResponse(
+    @field:Schema(description = "서비스 access token")
+    val accessToken: String,
+    @field:Schema(description = "서비스 refresh token")
+    val refreshToken: String,
+) {
     companion object {
         fun from(tokens: LoginTokens): TokenResponse = TokenResponse(tokens.accessToken, tokens.refreshToken)
     }

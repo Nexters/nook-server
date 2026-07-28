@@ -53,9 +53,19 @@ class GroupController(
     @GetMapping("/{groupId}/posts")
     fun listPosts(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive groupId: Long,
-        @RequestParam(defaultValue = "0") @Min(0) page: Int,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_GROUP_POST_PAGE_SIZE) size: Int,
+        @Parameter(description = "조회할 그룹 식별자")
+        @PathVariable
+        @Positive
+        groupId: Long,
+        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
+        @RequestParam(defaultValue = "0")
+        @Min(0)
+        page: Int,
+        @Parameter(description = "페이지당 게시물 수")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(MAX_GROUP_POST_PAGE_SIZE)
+        size: Int,
     ): ApiResponse<SavedPostPageResponse> {
         val result = listGroupPostsUseCase(
             ListGroupPostsUseCase.Query(
@@ -90,7 +100,10 @@ class GroupController(
     @PatchMapping("/{groupId}")
     fun update(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive groupId: Long,
+        @Parameter(description = "수정할 그룹 식별자")
+        @PathVariable
+        @Positive
+        groupId: Long,
         @Valid @RequestBody request: UpdateGroupRequest,
     ): ApiResponse<GroupResponse> = ApiResponse.success(
         GroupResponse.from(
@@ -108,7 +121,13 @@ class GroupController(
     @Operation(summary = "그룹 삭제")
     @DeleteMapping("/{groupId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@Parameter(hidden = true) userContext: UserContext, @PathVariable @Positive groupId: Long) {
+    fun delete(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "삭제할 그룹 식별자")
+        @PathVariable
+        @Positive
+        groupId: Long,
+    ) {
         deleteGroupUseCase(DeleteGroupUseCase.Command(userId = userContext.userId, groupId = groupId))
     }
 }

@@ -9,11 +9,14 @@ import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
 
 data class CreatePostRequest(
+    @field:Schema(description = "저장할 게시물 URL", example = "https://www.instagram.com/p/example", maxLength = 2048)
     @field:NotBlank
     @field:Size(max = MAX_URL_LENGTH)
     val url: String,
+    @field:Schema(description = "사용자 메모", example = "다음 주말에 방문", maxLength = 2000, nullable = true)
     @field:Size(max = MAX_MEMO_LENGTH)
     val memo: String? = null,
+    @field:Schema(description = "게시물을 함께 저장할 그룹 식별자 목록", nullable = true)
     @field:Valid
     val groupIds: List<@Positive Long>? = null,
 ) {
