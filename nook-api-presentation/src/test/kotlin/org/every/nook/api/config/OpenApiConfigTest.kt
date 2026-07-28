@@ -1,6 +1,7 @@
 package org.every.nook.api.config
 
 import io.swagger.v3.oas.models.media.Schema
+import io.swagger.v3.oas.models.security.SecurityScheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -28,5 +29,17 @@ class OpenApiConfigTest {
         assertEquals("object", dataSchema.type)
         assertTrue(dataSchema.nullable)
         assertNull(dataSchema.additionalProperties)
+    }
+
+    @Test
+    fun `bearer JWT authentication is configured globally`() {
+        val openAPI = OpenApiConfig().openAPI()
+
+        val securityScheme = openAPI.components.securitySchemes.getValue("bearerAuth")
+
+        assertEquals(SecurityScheme.Type.HTTP, securityScheme.type)
+        assertEquals("bearer", securityScheme.scheme)
+        assertEquals("JWT", securityScheme.bearerFormat)
+        assertTrue(openAPI.security.single().containsKey("bearerAuth"))
     }
 }

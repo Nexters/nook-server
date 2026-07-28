@@ -20,6 +20,8 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
+import org.springframework.security.authentication.TestingAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
@@ -28,6 +30,7 @@ import org.springframework.test.web.servlet.put
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
 import java.time.Instant
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -41,6 +44,8 @@ class PostControllerTest {
 
     @BeforeTest
     fun setUp() {
+        SecurityContextHolder.getContext().authentication =
+            TestingAuthenticationToken(TEST_USER_ID.toString(), "credentials", "ROLE_USER")
         createUseCase = mock(CreatePostUseCase::class.java)
         val findUseCase = mock(FindPostPlaceParsingUseCase::class.java)
         listUseCase = mock(ListSavedPostsUseCase::class.java)
@@ -67,6 +72,11 @@ class PostControllerTest {
             .build()
     }
 
+    @AfterTest
+    fun tearDown() {
+        SecurityContextHolder.clearContext()
+    }
+
     @Test
     fun `updates my saved post memo`() {
         mockMvc.patch("/api/v1/posts/11/memo") {
@@ -79,7 +89,7 @@ class PostControllerTest {
 
         verify(updateMemoUseCase)(
             UpdatePostMemoUseCase.Command(
-                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                userId = TEST_USER_ID,
                 postId = 11,
                 memo = "다음 주 평일에 방문",
             ),
@@ -97,7 +107,7 @@ class PostControllerTest {
 
         verify(updateMemoUseCase)(
             UpdatePostMemoUseCase.Command(
-                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                userId = TEST_USER_ID,
                 postId = 11,
                 memo = null,
             ),
@@ -127,7 +137,7 @@ class PostControllerTest {
 
         verify(replaceGroupsUseCase)(
             ReplaceSavedPostGroupsUseCase.Command(
-                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                userId = TEST_USER_ID,
                 savedPostId = 11,
                 groupIds = listOf(17, 18, 17),
             ),
@@ -138,7 +148,7 @@ class PostControllerTest {
         `when`(
             createUseCase(
                 CreatePostUseCase.Command(
-                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    userId = TEST_USER_ID,
                     url = "https://www.instagram.com/p/ABC123/",
                     memo = "주말에 방문",
                     groupIds = listOf(17, 18),
@@ -156,7 +166,7 @@ class PostControllerTest {
         `when`(
             findUseCase(
                 FindPostPlaceParsingUseCase.Query(
-                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    userId = TEST_USER_ID,
                     postId = 11,
                 ),
             ),
@@ -187,7 +197,7 @@ class PostControllerTest {
         `when`(
             listUseCase(
                 ListSavedPostsUseCase.Query(
-                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    userId = TEST_USER_ID,
                     page = 0,
                     size = 20,
                 ),
@@ -221,7 +231,7 @@ class PostControllerTest {
         `when`(
             detailUseCase(
                 GetSavedPostDetailUseCase.Query(
-                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    userId = TEST_USER_ID,
                     postId = 11,
                 ),
             ),
@@ -336,7 +346,7 @@ class PostControllerTest {
         `when`(
             createUseCase(
                 CreatePostUseCase.Command(
-                    userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                    userId = TEST_USER_ID,
                     url = unsupportedUrl,
                 ),
             ),
@@ -349,5 +359,8 @@ class PostControllerTest {
             status { isBadRequest() }
             jsonPath("$.error.errorCode") { value("UNSUPPORTED_POST_URL") }
         }
+    }
+    private companion object {
+        const val TEST_USER_ID = 1L
     }
 }

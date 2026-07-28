@@ -14,6 +14,8 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
+import org.springframework.security.authentication.TestingAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -21,6 +23,7 @@ import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Instant
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -34,6 +37,8 @@ class GroupControllerTest {
 
     @BeforeTest
     fun setUp() {
+        SecurityContextHolder.getContext().authentication =
+            TestingAuthenticationToken(TEST_USER_ID.toString(), "credentials", "ROLE_USER")
         listGroupsUseCase = mock(ListGroupsUseCase::class.java)
         createGroupUseCase = mock(CreateGroupUseCase::class.java)
         updateGroupUseCase = mock(UpdateGroupUseCase::class.java)
@@ -54,9 +59,14 @@ class GroupControllerTest {
             .build()
     }
 
+    @AfterTest
+    fun tearDown() {
+        SecurityContextHolder.clearContext()
+    }
+
     @Test
     fun `lists current users groups with post counts`() {
-        `when`(listGroupsUseCase(UserContextArgumentResolver.DUMMY_USER_ID))
+        `when`(listGroupsUseCase(TEST_USER_ID))
             .thenReturn(listOf(GroupView(17, "카페", "YELLOW", 3)))
 
         mockMvc.get("/api/v1/groups").andExpect {
@@ -69,7 +79,7 @@ class GroupControllerTest {
     @Test
     fun `lists saved posts in an owned group`() {
         val query = ListGroupPostsUseCase.Query(
-            userId = UserContextArgumentResolver.DUMMY_USER_ID,
+            userId = TEST_USER_ID,
             groupId = 17,
             page = 0,
             size = 20,
@@ -105,7 +115,7 @@ class GroupControllerTest {
     @Test
     fun `creates a group`() {
         val command = CreateGroupUseCase.Command(
-            userId = UserContextArgumentResolver.DUMMY_USER_ID,
+            userId = TEST_USER_ID,
             name = "카페",
             color = "YELLOW",
         )
@@ -135,7 +145,7 @@ class GroupControllerTest {
     @Test
     fun `updates and deletes only through current user commands`() {
         val updateCommand = UpdateGroupUseCase.Command(
-            userId = UserContextArgumentResolver.DUMMY_USER_ID,
+            userId = TEST_USER_ID,
             groupId = 17,
             name = "서울 카페",
             color = "GREEN",
@@ -155,7 +165,10 @@ class GroupControllerTest {
 
         verify(updateGroupUseCase)(updateCommand)
         verify(deleteGroupUseCase)(
-            DeleteGroupUseCase.Command(userId = UserContextArgumentResolver.DUMMY_USER_ID, groupId = 17),
+            DeleteGroupUseCase.Command(userId = TEST_USER_ID, groupId = 17),
         )
+    }
+    private companion object {
+        const val TEST_USER_ID = 1L
     }
 }

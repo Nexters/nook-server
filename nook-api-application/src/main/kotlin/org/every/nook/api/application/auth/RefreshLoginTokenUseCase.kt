@@ -3,7 +3,6 @@ package org.every.nook.api.application.auth
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.StoredRefreshToken
 import org.every.nook.api.application.auth.port.TokenProvider
-import org.every.nook.api.application.member.MemberNotFoundException
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
 import java.time.Clock
@@ -34,7 +33,7 @@ class RefreshLoginTokenUseCase(
             return RefreshResult.Reused
         }
         validateStoredToken(stored, rawToken, memberId, now)
-        if (!memberRepository.existsMember(memberId)) throw MemberNotFoundException()
+        if (!memberRepository.existsMember(memberId)) throw InvalidRefreshTokenException()
 
         val replacement = tokenProvider.issueRefreshToken(memberId)
         val savedReplacement = refreshTokenRepository.save(
