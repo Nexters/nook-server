@@ -11,6 +11,7 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-batch")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("io.github.cdimascio:dotenv-kotlin:6.5.1")
     implementation(kotlin("reflect"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-batch-test")

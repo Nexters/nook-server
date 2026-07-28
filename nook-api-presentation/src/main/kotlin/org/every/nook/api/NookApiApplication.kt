@@ -7,5 +7,7 @@ import org.springframework.boot.runApplication
 class NookApiApplication
 
 fun main(args: Array<String>) {
-    runApplication<NookApiApplication>(*args)
+    runApplication<NookApiApplication>(*args) {
+        setDefaultProperties(loadDotenvProperties())
+    }
 }
