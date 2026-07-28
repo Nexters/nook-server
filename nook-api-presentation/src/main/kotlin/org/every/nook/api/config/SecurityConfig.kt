@@ -3,6 +3,7 @@ package org.every.nook.api.config
 import jakarta.servlet.http.HttpServletResponse
 import org.every.nook.api.presentation.response.ApiError
 import org.every.nook.api.presentation.response.ApiResponse
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
@@ -10,13 +11,18 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(CorsProperties::class)
 class SecurityConfig {
     @Bean
     fun securityFilterChain(http: HttpSecurity, objectMapper: ObjectMapper): SecurityFilterChain {
+        http.cors { }
         http.csrf { it.disable() }
         http.sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
         http.authorizeHttpRequests {
@@ -53,6 +59,22 @@ class SecurityConfig {
             }
         }
         return http.build()
+    }
+
+    @Bean
+    fun corsConfigurationSource(properties: CorsProperties): CorsConfigurationSource {
+        val configuration = CorsConfiguration().apply {
+            allowedOriginPatterns = properties.allowedOriginPatterns
+            allowedMethods = properties.allowedMethods
+            allowedHeaders = properties.allowedHeaders
+            exposedHeaders = properties.exposedHeaders
+            allowCredentials = properties.allowCredentials
+            maxAge = properties.maxAgeSeconds
+        }
+
+        return UrlBasedCorsConfigurationSource().apply {
+            registerCorsConfiguration("/**", configuration)
+        }
     }
 
     private fun writeErrorResponse(
