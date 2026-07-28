@@ -56,8 +56,12 @@
 ## 검증 및 적용 기록
 
 - 로컬 검증: 2026-07-29 `./gradlew check` 성공
-- dev 적용 일시: 실행 후 기록
+- dev 적용 일시: 2026-07-29 02:28 KST
 - 실행자: 권기준
 - 적용 전 foreign key: 13개
 - 적용 전 orphan 점검: 13개 관계 모두 0건
-- 적용 후 foreign key: 실행 후 기록
+- 적용 후 foreign key: 0개
+- 적용 후 인덱스:
+  `idx_replaced_by_token_id` 1개, 기존 `fk_refresh_tokens_replaced_by_token_id` 이름 0개
+- 실행 기록:
+  [GitHub Actions NOOK-80 dev DB FK 작업](https://github.com/Nexters/nook-server/actions/runs/30382993347)
