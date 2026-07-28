@@ -13,12 +13,15 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
+import org.springframework.security.authentication.TestingAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
 import java.time.Instant
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -29,6 +32,8 @@ class PlaceControllerTest {
 
     @BeforeTest
     fun setUp() {
+        SecurityContextHolder.getContext().authentication =
+            TestingAuthenticationToken(TEST_USER_ID.toString(), "credentials", "ROLE_USER")
         updatePlaceBookmarkUseCase = mock(UpdatePlaceBookmarkUseCase::class.java)
         getPlaceDetailUseCase = mock(GetPlaceDetailUseCase::class.java)
         mockMvc = MockMvcBuilders
@@ -38,10 +43,15 @@ class PlaceControllerTest {
             .build()
     }
 
+    @AfterTest
+    fun tearDown() {
+        SecurityContextHolder.clearContext()
+    }
+
     @Test
     fun `returns place detail and only the current user's related posts`() {
         val query = GetPlaceDetailUseCase.Query(
-            userId = UserContextArgumentResolver.DUMMY_USER_ID,
+            userId = TEST_USER_ID,
             placeId = 17,
             page = 1,
             size = 10,
@@ -106,10 +116,14 @@ class PlaceControllerTest {
 
         verify(updatePlaceBookmarkUseCase)(
             UpdatePlaceBookmarkUseCase.Command(
-                userId = UserContextArgumentResolver.DUMMY_USER_ID,
+                userId = TEST_USER_ID,
                 placeId = 17,
                 bookmarked = false,
             ),
         )
+    }
+
+    private companion object {
+        const val TEST_USER_ID = 1L
     }
 }

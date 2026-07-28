@@ -4,6 +4,8 @@ import io.swagger.v3.core.converter.ModelConverters
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.every.nook.api.auth.AuthController
+import org.every.nook.api.member.MemberController
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.GroupController
 import org.every.nook.api.presentation.place.PlaceController
@@ -72,11 +74,23 @@ class OpenApiDocumentationPolicyTest {
         }
     }
 
+    @Test
+    fun `authentication entry points do not require an access token in OpenAPI`() {
+        listOf(AuthController::class.java, MemberController::class.java)
+            .flatMap { it.declaredMethods.toList() }
+            .filter { it.isApiHandler() }
+            .forEach { method ->
+                assertTrue(method.getAnnotation(Operation::class.java).security.isEmpty(), method.toString())
+            }
+    }
+
     private fun Method.isApiHandler(): Boolean = apiMappingAnnotations.any(::isAnnotationPresent)
 
     private companion object {
         val controllers = listOf(
+            AuthController::class.java,
             GroupController::class.java,
+            MemberController::class.java,
             PlaceController::class.java,
             PostController::class.java,
         )

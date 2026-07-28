@@ -1,6 +1,8 @@
 package org.every.nook.api.auth
 
 import org.every.nook.api.application.auth.AuthenticateSocialUserUseCase
+import org.every.nook.api.application.auth.InvalidSocialCredentialException
+import org.every.nook.api.application.auth.LoginTokens
 import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
 import org.every.nook.api.application.auth.SocialAuthenticationResult
 import org.every.nook.api.application.auth.SocialCredential
@@ -40,8 +42,67 @@ class AuthControllerTest {
             content = """{"provider":"KAKAO","accessToken":"provider-token"}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.status") { value("SIGNUP_REQUIRED") }
-            jsonPath("$.signupToken") { value("signup-token") }
+            jsonPath("$.resultType") { value("SUCCESS") }
+            jsonPath("$.success.status") { value("SIGNUP_REQUIRED") }
+            jsonPath("$.success.signupToken") { value("signup-token") }
+        }
+    }
+
+    @Test
+    fun `existing social user receives login tokens`() {
+        val credential = SocialCredential(
+            provider = SocialLoginProvider.KAKAO,
+            accessToken = "provider-token",
+        )
+        `when`(authenticateSocialUserUseCase(credential)).thenReturn(
+            SocialAuthenticationResult.SignedIn(LoginTokens("access-token", "refresh-token")),
+        )
+
+        mockMvc.post("/api/v1/auth/social") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"provider":"KAKAO","accessToken":"provider-token"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.resultType") { value("SUCCESS") }
+            jsonPath("$.success.status") { value("SIGNED_IN") }
+            jsonPath("$.success.accessToken") { value("access-token") }
+            jsonPath("$.success.refreshToken") { value("refresh-token") }
+        }
+    }
+
+    @Test
+    fun `refresh returns tokens in common success response`() {
+        `when`(refreshLoginTokenUseCase("refresh-token")).thenReturn(
+            LoginTokens("new-access-token", "new-refresh-token"),
+        )
+
+        mockMvc.post("/api/v1/auth/token/refresh") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refreshToken":"refresh-token"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.resultType") { value("SUCCESS") }
+            jsonPath("$.success.accessToken") { value("new-access-token") }
+            jsonPath("$.success.refreshToken") { value("new-refresh-token") }
+        }
+    }
+
+    @Test
+    fun `invalid social credential uses common unauthorized response`() {
+        val credential = SocialCredential(
+            provider = SocialLoginProvider.KAKAO,
+            accessToken = "invalid-provider-token",
+        )
+        `when`(authenticateSocialUserUseCase(credential)).thenThrow(InvalidSocialCredentialException())
+
+        mockMvc.post("/api/v1/auth/social") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"provider":"KAKAO","accessToken":"invalid-provider-token"}"""
+        }.andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.resultType") { value("FAIL") }
+            jsonPath("$.error.errorCode") { value("INVALID_SOCIAL_CREDENTIAL") }
+            jsonPath("$.error.reason") { value("인증 정보가 유효하지 않습니다.") }
         }
     }
 
@@ -52,7 +113,8 @@ class AuthControllerTest {
             content = """{"provider":"UNKNOWN","accessToken":"provider-token"}"""
         }.andExpect {
             status { isBadRequest() }
-            jsonPath("$.code") { value("INVALID_REQUEST") }
+            jsonPath("$.resultType") { value("FAIL") }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
         }
     }
 }
