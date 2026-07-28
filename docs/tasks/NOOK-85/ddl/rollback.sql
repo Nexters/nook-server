@@ -1,0 +1,1 @@
+-- NOOK-85 does not change the database schema.
