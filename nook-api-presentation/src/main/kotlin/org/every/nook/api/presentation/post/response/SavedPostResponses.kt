@@ -1,5 +1,6 @@
 package org.every.nook.api.presentation.post.response
 
+import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.SavedPostDetail
 import org.every.nook.api.application.post.model.SavedPostMedia
@@ -11,11 +12,17 @@ import java.math.BigDecimal
 import java.time.Instant
 
 data class SavedPostPageResponse(
+    @field:Schema(description = "저장 게시물 목록")
     val items: List<SavedPostSummaryResponse>,
+    @field:Schema(description = "현재 페이지 번호")
     val page: Int,
+    @field:Schema(description = "페이지당 게시물 수")
     val size: Int,
+    @field:Schema(description = "전체 게시물 수")
     val totalElements: Long,
+    @field:Schema(description = "전체 페이지 수")
     val totalPages: Int,
+    @field:Schema(description = "다음 페이지 존재 여부")
     val hasNext: Boolean,
 ) {
     companion object {
@@ -31,11 +38,17 @@ data class SavedPostPageResponse(
 }
 
 data class SavedPostSummaryResponse(
+    @field:Schema(description = "저장 게시물 식별자")
     val postId: Long,
+    @field:Schema(description = "게시물 제목", nullable = true)
     val title: String?,
+    @field:Schema(description = "게시물 작성자 식별자", nullable = true)
     val authorIdentifier: String?,
+    @field:Schema(description = "대표 미디어", nullable = true)
     val representativeMedia: SavedPostMediaResponse?,
+    @field:Schema(description = "사용자 메모", nullable = true)
     val memo: String?,
+    @field:Schema(description = "게시물 저장 시각")
     val savedAt: Instant,
 ) {
     companion object {
@@ -51,18 +64,31 @@ data class SavedPostSummaryResponse(
 }
 
 data class SavedPostDetailResponse(
+    @field:Schema(description = "저장 게시물 식별자")
     val postId: Long,
+    @field:Schema(description = "게시물 제목", nullable = true)
     val title: String?,
+    @field:Schema(description = "게시물 본문", nullable = true)
     val body: String?,
+    @field:Schema(description = "게시물 작성자 식별자", nullable = true)
     val authorIdentifier: String?,
+    @field:Schema(description = "게시물 원본 URL")
     val canonicalUrl: String,
+    @field:Schema(description = "게시물 발행 시각", nullable = true)
     val publishedAt: Instant?,
+    @field:Schema(description = "게시물 미디어 목록")
     val media: List<SavedPostMediaResponse>,
+    @field:Schema(description = "게시물 해시태그 목록")
     val hashtags: List<String>,
+    @field:Schema(description = "사용자 메모", nullable = true)
     val memo: String?,
+    @field:Schema(description = "게시물 저장 시각")
     val savedAt: Instant,
+    @field:Schema(description = "게시물 장소 파싱 상태")
     val placeParsingStatus: PlaceParsingStatusView,
+    @field:Schema(description = "장소 파싱 실패 사유", nullable = true)
     val placeParsingFailureReason: String?,
+    @field:Schema(description = "게시물에서 파싱된 장소 목록")
     val places: List<SavedPostPlaceResponse>,
 ) {
     companion object {
@@ -84,7 +110,14 @@ data class SavedPostDetailResponse(
     }
 }
 
-data class SavedPostMediaResponse(val type: SavedPostMediaType, val url: String, val sequence: Int) {
+data class SavedPostMediaResponse(
+    @field:Schema(description = "미디어 유형")
+    val type: SavedPostMediaType,
+    @field:Schema(description = "미디어 URL")
+    val url: String,
+    @field:Schema(description = "게시물 내 미디어 순서")
+    val sequence: Int,
+) {
     companion object {
         fun from(result: SavedPostMedia): SavedPostMediaResponse = SavedPostMediaResponse(
             type = result.type,
@@ -95,16 +128,27 @@ data class SavedPostMediaResponse(val type: SavedPostMediaType, val url: String,
 }
 
 data class SavedPostPlaceResponse(
+    @field:Schema(description = "장소 식별자")
     val id: Long,
+    @field:Schema(description = "장소 provider")
     val provider: String,
+    @field:Schema(description = "provider의 장소 식별자")
     val externalPlaceId: String,
+    @field:Schema(description = "장소명")
     val name: String,
+    @field:Schema(description = "장소 주소")
     val address: String,
+    @field:Schema(description = "장소 위도")
     val latitude: BigDecimal,
+    @field:Schema(description = "장소 경도")
     val longitude: BigDecimal,
+    @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 전화번호", nullable = true)
     val phoneNumber: String?,
+    @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
+    @field:Schema(description = "게시물 내 장소 순서")
     val sequence: Int,
 ) {
     companion object {

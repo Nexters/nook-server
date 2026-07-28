@@ -16,8 +16,11 @@
 
 - 모든 controller에는 Swagger UI 그룹명이 명확히 보이도록 `@Tag(name = "...")`를 명시합니다.
 - 모든 공개 API handler에는 endpoint 목적을 한국어로 설명하는 `@Operation(summary = "...")`를 명시합니다.
+- 공개 API의 request/response schema 필드는 `@Schema(description = "...")`로 필드 의미를 설명합니다.
+- path, query, header parameter는 `@Parameter(description = "...")`로 호출자가 입력해야 하는 값의 의미를 설명합니다.
 - `@Tag` 이름은 도메인 또는 리소스 단위의 명사형 영문 이름을 사용합니다.
 - `@Operation` 요약은 구현 방식이 아니라 클라이언트가 호출하는 사용자 의도를 설명합니다.
+- validation 전용 보조 property처럼 API 계약이 아닌 필드는 `@Schema(hidden = true)`로 숨깁니다.
 
 ## HTTP Client 요청
 

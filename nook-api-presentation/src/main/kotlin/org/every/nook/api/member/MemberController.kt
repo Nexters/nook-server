@@ -1,6 +1,8 @@
 package org.every.nook.api.member
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
@@ -29,6 +31,7 @@ class MemberController(private val signupMemberUseCase: SignupMemberUseCase) {
     @Operation(summary = "회원가입", security = [])
     @PostMapping
     fun signup(
+        @Parameter(description = "소셜 로그인 후 발급받은 signup token")
         @RequestHeader(HttpHeaders.AUTHORIZATION) authorization: String,
         @Valid @RequestBody request: SignupMemberRequest,
     ): ResponseEntity<ApiResponse<TokenResponse>> {
@@ -50,9 +53,16 @@ class MemberController(private val signupMemberUseCase: SignupMemberUseCase) {
 }
 
 data class SignupMemberRequest(
+    @field:Schema(description = "회원 닉네임", example = "누커", minLength = 2, maxLength = 20)
     @field:NotBlank
     @field:Size(min = 2, max = 20)
     val nickname: String,
+    @field:Schema(
+        description = "프로필 이미지 URL",
+        example = "https://example.com/profile.png",
+        maxLength = 2048,
+        nullable = true,
+    )
     @field:Size(max = 2048)
     @field:Pattern(regexp = "^https://.+")
     val profileImageUrl: String? = null,

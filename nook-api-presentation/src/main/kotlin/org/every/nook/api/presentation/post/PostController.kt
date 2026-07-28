@@ -73,8 +73,15 @@ class PostController(
     @GetMapping
     fun listSavedPosts(
         @Parameter(hidden = true) userContext: UserContext,
-        @RequestParam(defaultValue = "0") @Min(0) page: Int,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) size: Int,
+        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
+        @RequestParam(defaultValue = "0")
+        @Min(0)
+        page: Int,
+        @Parameter(description = "페이지당 게시물 수")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(MAX_PAGE_SIZE)
+        size: Int,
     ): ApiResponse<SavedPostPageResponse> {
         val result = listSavedPostsUseCase(
             ListSavedPostsUseCase.Query(
@@ -90,7 +97,10 @@ class PostController(
     @GetMapping("/{postId}")
     fun getSavedPostDetail(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive postId: Long,
+        @Parameter(description = "조회할 저장 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
     ): ApiResponse<SavedPostDetailResponse> {
         val result = getSavedPostDetailUseCase(
             GetSavedPostDetailUseCase.Query(
@@ -105,7 +115,10 @@ class PostController(
     @PatchMapping("/{postId}/memo")
     fun updateMemo(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive postId: Long,
+        @Parameter(description = "메모를 변경할 저장 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
         @Valid @RequestBody request: UpdatePostMemoRequest,
     ): ApiResponse<Unit> {
         updatePostMemoUseCase(
@@ -122,7 +135,10 @@ class PostController(
     @PutMapping("/{postId}/groups")
     fun replaceGroups(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive postId: Long,
+        @Parameter(description = "그룹을 재지정할 저장 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
         @Valid @RequestBody request: ReplaceSavedPostGroupsRequest,
     ): ApiResponse<Unit> {
         replaceSavedPostGroupsUseCase(
@@ -139,7 +155,10 @@ class PostController(
     @GetMapping("/{postId}/place-parsing")
     fun findPlaceParsing(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive postId: Long,
+        @Parameter(description = "장소 파싱 결과를 조회할 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
     ): ApiResponse<PostPlaceParsingResponse> {
         val result = findPostPlaceParsingUseCase(
             FindPostPlaceParsingUseCase.Query(

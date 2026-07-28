@@ -1,5 +1,6 @@
 package org.every.nook.api.presentation.place.response
 
+import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.place.PlaceDetailView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
@@ -8,16 +9,27 @@ import java.math.BigDecimal
 import java.time.Instant
 
 data class PlaceDetailResponse(
+    @field:Schema(description = "장소 식별자")
     val id: Long,
+    @field:Schema(description = "장소 provider")
     val provider: String,
+    @field:Schema(description = "provider의 장소 식별자")
     val externalPlaceId: String,
+    @field:Schema(description = "장소명")
     val name: String,
+    @field:Schema(description = "장소 주소")
     val address: String,
+    @field:Schema(description = "장소 위도")
     val latitude: BigDecimal,
+    @field:Schema(description = "장소 경도")
     val longitude: BigDecimal,
+    @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 전화번호", nullable = true)
     val phoneNumber: String?,
+    @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
+    @field:Schema(description = "이 장소와 연결된 저장 게시물 페이지")
     val posts: PlacePostPageResponse,
 ) {
     companion object {
@@ -38,11 +50,17 @@ data class PlaceDetailResponse(
 }
 
 data class PlacePostPageResponse(
+    @field:Schema(description = "저장 게시물 목록")
     val items: List<PlacePostResponse>,
+    @field:Schema(description = "현재 페이지 번호")
     val page: Int,
+    @field:Schema(description = "페이지당 게시물 수")
     val size: Int,
+    @field:Schema(description = "전체 게시물 수")
     val totalElements: Long,
+    @field:Schema(description = "전체 페이지 수")
     val totalPages: Int,
+    @field:Schema(description = "다음 페이지 존재 여부")
     val hasNext: Boolean,
 ) {
     companion object {
@@ -58,11 +76,17 @@ data class PlacePostPageResponse(
 }
 
 data class PlacePostResponse(
+    @field:Schema(description = "저장 게시물 식별자")
     val postId: Long,
+    @field:Schema(description = "게시물 제목", nullable = true)
     val title: String?,
+    @field:Schema(description = "게시물 작성자 식별자", nullable = true)
     val authorIdentifier: String?,
+    @field:Schema(description = "대표 미디어", nullable = true)
     val representativeMedia: PlacePostMediaResponse?,
+    @field:Schema(description = "사용자 메모", nullable = true)
     val memo: String?,
+    @field:Schema(description = "게시물 저장 시각")
     val savedAt: Instant,
 ) {
     companion object {
@@ -77,7 +101,12 @@ data class PlacePostResponse(
     }
 }
 
-data class PlacePostMediaResponse(val type: String, val url: String) {
+data class PlacePostMediaResponse(
+    @field:Schema(description = "미디어 유형")
+    val type: String,
+    @field:Schema(description = "미디어 URL")
+    val url: String,
+) {
     companion object {
         fun from(view: PlacePostMediaView): PlacePostMediaResponse = PlacePostMediaResponse(
             type = view.type.name,

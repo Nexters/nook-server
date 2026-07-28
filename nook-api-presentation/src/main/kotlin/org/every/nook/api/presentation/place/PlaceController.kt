@@ -36,9 +36,19 @@ class PlaceController(
     @GetMapping("/{placeId}")
     fun getDetail(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive placeId: Long,
-        @RequestParam(defaultValue = "0") @Min(0) page: Int,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PLACE_POST_PAGE_SIZE) size: Int,
+        @Parameter(description = "조회할 장소 식별자")
+        @PathVariable
+        @Positive
+        placeId: Long,
+        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
+        @RequestParam(defaultValue = "0")
+        @Min(0)
+        page: Int,
+        @Parameter(description = "페이지당 게시물 수")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(MAX_PLACE_POST_PAGE_SIZE)
+        size: Int,
     ): ApiResponse<PlaceDetailResponse> {
         val detail = getPlaceDetailUseCase(
             GetPlaceDetailUseCase.Query(
@@ -55,7 +65,10 @@ class PlaceController(
     @PatchMapping("/{placeId}/bookmark")
     fun updateBookmark(
         @Parameter(hidden = true) userContext: UserContext,
-        @PathVariable @Positive placeId: Long,
+        @Parameter(description = "북마크를 변경할 장소 식별자")
+        @PathVariable
+        @Positive
+        placeId: Long,
         @Valid @RequestBody request: UpdatePlaceBookmarkRequest,
     ): ApiResponse<Unit> {
         updatePlaceBookmarkUseCase(
