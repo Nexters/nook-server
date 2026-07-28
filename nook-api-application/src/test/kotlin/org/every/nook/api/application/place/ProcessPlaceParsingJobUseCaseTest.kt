@@ -39,6 +39,29 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `resolves a place clue with four search queries`() {
+        val port = FakeJobPort()
+        val queries = listOf("Lodge190", "롯지190", "롯지 190", "연희동 Lodge")
+        val extractor = PlaceClueExtractor {
+            listOf(PlaceClue("Lodge190", "연희동", queries))
+        }
+        val searchedQueries = mutableListOf<String>()
+        val provider = PlaceSearchProvider { request ->
+            searchedQueries += request.query
+            if (request.query == "Lodge190") {
+                listOf(candidate("1", "Lodge190", "서울 서대문구 연희동"))
+            } else {
+                emptyList()
+            }
+        }
+        val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(queries, searchedQueries)
+        assertEquals(listOf("1"), port.completed.map { it.externalPlaceId })
+    }
+
+    @Test
     fun `completes with resolved places when some place clues do not match`() {
         val port = FakeJobPort()
         val extractor = PlaceClueExtractor {
