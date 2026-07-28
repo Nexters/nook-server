@@ -1,10 +1,12 @@
 package org.every.nook.api.infrastructure.persistence.member
 
 import jakarta.persistence.Column
+import jakarta.persistence.ConstraintMode
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
+import jakarta.persistence.ForeignKey
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -30,7 +32,11 @@ import org.every.nook.api.infrastructure.persistence.BaseEntity
 )
 class SocialAccountEntity(
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "member_id", nullable = false)
+    @JoinColumn(
+        name = "member_id",
+        nullable = false,
+        foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT),
+    )
     var member: MemberEntity,
     @Enumerated(EnumType.STRING)
     @Column(name = "provider", nullable = false, length = 20)
