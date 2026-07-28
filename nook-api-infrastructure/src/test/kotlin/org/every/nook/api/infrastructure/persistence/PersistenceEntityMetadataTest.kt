@@ -1,12 +1,16 @@
 package org.every.nook.api.infrastructure.persistence
 
 import jakarta.persistence.Column
+import jakarta.persistence.ConstraintMode
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import jakarta.persistence.JoinColumn
 import jakarta.persistence.Table
 import org.every.nook.api.domain.group.Group
+import org.every.nook.api.infrastructure.persistence.auth.RefreshTokenEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
+import org.every.nook.api.infrastructure.persistence.member.SocialAccountEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkEntity
@@ -101,7 +105,24 @@ class PersistenceEntityMetadataTest {
         assertEquals(listOf("post_id"), uniqueConstraint.columnNames.toList())
     }
 
+    @Test
+    fun `jpa relationships never request physical foreign keys`() {
+        val joinColumns = relationshipEntities.flatMap { entity ->
+            entity.java.declaredFields.mapNotNull { field -> field.getAnnotation(JoinColumn::class.java) }
+        }
+
+        assertTrue(joinColumns.isNotEmpty())
+        joinColumns.forEach { joinColumn ->
+            assertEquals(ConstraintMode.NO_CONSTRAINT, joinColumn.foreignKey.value)
+        }
+    }
+
     private companion object {
+        val relationshipEntities: List<KClass<*>> = listOf(
+            SocialAccountEntity::class,
+            RefreshTokenEntity::class,
+        )
+
         val persistenceEntities: List<KClass<*>> = listOf(
             PostEntity::class,
             PostMediaEntity::class,

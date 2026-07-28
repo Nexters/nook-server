@@ -37,6 +37,13 @@ nook-api-infrastructure -> nook-api-application, nook-api-domain
 - ORM 기본 이름이나 자동 DDL에 의존하지 않는다. DB 변경은 `docs/policies/database.md`를 따른다.
 - 스키마 변경이 있는 작업 이슈 디렉터리에는 `ddl/up.sql`, `ddl/rollback.sql`을 둔다.
 - DDL은 MySQL 8.4 LTS 기준으로 작성한다.
+- 모든 환경에서 물리적인 foreign key constraint를 생성하지 않는다. 테이블 관계는 식별자 칼럼과
+  인덱스로만 표현하고 참조 무결성과 삭제 순서는 애플리케이션의 짧은 트랜잭션에서 명시적으로 보장한다.
+- 연관 식별자 칼럼에는 조회와 정리 작업에 필요한 인덱스를 둔다. 기존 복합 인덱스의 선두 칼럼으로
+  같은 용도를 충족하면 중복 인덱스를 추가하지 않는다.
+- JPA 연관 매핑이 필요하면 `@JoinColumn`에
+  `foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT)`를 명시해 schema export에서도
+  foreign key가 생성되지 않게 한다.
 - 테이블과 칼럼에는 `COMMENT`를 반드시 작성한다.
 - 일반 인덱스 이름은 `idx_칼럼명`, 유니크 인덱스 이름은 `idx_u_칼럼명` 형식을 따른다. 여러 칼럼이면 칼럼명을 순서대로 이어 붙인다.
 
