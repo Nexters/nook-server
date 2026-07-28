@@ -9,6 +9,7 @@ class ProcessPlaceParsingJobUseCase(
     private val jobPort: PlaceParsingJobPort,
     private val clueExtractor: PlaceClueExtractor,
     private val searchPlaceCandidates: SearchPlaceCandidatesUseCase,
+    private val candidateSelector: PlaceCandidateSelector,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
     private val clock: Clock = Clock.systemUTC(),
@@ -62,38 +63,36 @@ class ProcessPlaceParsingJobUseCase(
 
     private fun resolve(clue: PlaceClue): PlaceCandidate {
         validate(clue)
-        val candidates = searchPlaceCandidates(
-            SearchPlaceCandidatesUseCase.Command(queries = clue.queries),
-        )
+        val candidates = searchCandidates(clue.queries)
         logger.info {
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
                 "queries=${clue.queries}, candidateCount=${candidates.size}"
         }
         val normalizedName = clue.name.normalize()
         val normalizedRegion = clue.region?.normalize()?.takeIf(String::isNotEmpty)
-        val nameMatches = candidates.filter { candidate ->
-            candidate.name.normalize() == normalizedName
-        }
-        val matches = if (nameMatches.size <= 1 || normalizedRegion == null) {
-            nameMatches
-        } else {
-            nameMatches.filter { candidate ->
-                candidate.address.normalize().contains(normalizedRegion)
-            }
+        val matches = candidates.filter { candidate ->
+            candidate.place.name.normalize() == normalizedName &&
+                (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion))
         }
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
-                "candidateCount=${candidates.size}, nameMatchCount=${nameMatches.size}, matchCount=${matches.size}, " +
-                "candidates=${candidates.take(CANDIDATE_LOG_LIMIT).map { "${it.name}|${it.address}" }}"
+                "candidateCount=${candidates.size}, matchCount=${matches.size}, " +
+                "candidates=${candidates.take(CANDIDATE_LOG_LIMIT).map { "${it.place.name}|${it.place.address}" }}"
         }
 
-        val resolved = when (matches.size) {
-            0 -> failResolution("No place candidate matched: ${clue.name}")
-
-            1 -> matches.single()
-
-            else -> failResolution(
-                "Multiple place candidates matched: ${clue.name}, matchCount=${matches.size}",
+        val resolved = if (matches.size == 1) {
+            matches.single().place
+        } else {
+            if (candidates.isEmpty()) {
+                failResolution("No place candidate found: ${clue.name}")
+            }
+            candidateSelector.select(
+                PlaceCandidateSelector.Request(
+                    clue = clue,
+                    candidates = candidates,
+                ),
+            ) ?: failResolution(
+                "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
             )
         }
         logger.info {
@@ -101,6 +100,26 @@ class ProcessPlaceParsingJobUseCase(
                 "name=${resolved.name}, address=${resolved.address}"
         }
         return resolved
+    }
+
+    private fun searchCandidates(queries: List<String>): List<PlaceCandidateSelector.Candidate> {
+        val candidatesById = linkedMapOf<Pair<String, String>, PlaceCandidateSelector.Candidate>()
+        queries.asSequence()
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinct()
+            .forEach { query ->
+                searchPlaceCandidates(SearchPlaceCandidatesUseCase.Command(queries = listOf(query)))
+                    .forEach { candidate ->
+                        val key = candidate.provider to candidate.externalPlaceId
+                        val existing = candidatesById[key]
+                        candidatesById[key] = PlaceCandidateSelector.Candidate(
+                            place = candidate,
+                            matchedQueries = existing?.matchedQueries.orEmpty() + query,
+                        )
+                    }
+            }
+        return candidatesById.values.toList()
     }
 
     private fun validate(clue: PlaceClue) {

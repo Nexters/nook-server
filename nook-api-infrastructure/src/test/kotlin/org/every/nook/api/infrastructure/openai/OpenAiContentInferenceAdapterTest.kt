@@ -1,6 +1,9 @@
 package org.every.nook.api.infrastructure.openai
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceCandidateSelector
+import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.post.PostTitleGenerator
 import org.hamcrest.Matchers.containsString
@@ -11,6 +14,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
+import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -60,6 +64,78 @@ class OpenAiContentInferenceAdapterTest {
 
         assertEquals(listOf("원동미나리삼겹살", "서울역"), places.map { it.name })
         assertEquals(null, places.last().region)
+    }
+
+    @Test
+    fun `selects a candidate from all search evidence`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("place_candidate_selection")))
+            .andExpect(content().string(containsString("matchedQueries")))
+            .andExpect(content().string(containsString("상수동 이츠야")))
+            .andRespond(withSuccess(response("""{"candidateIndex":0}"""), MediaType.APPLICATION_JSON))
+        val candidate = PlaceCandidate(
+            provider = "KAKAO",
+            externalPlaceId = "1",
+            name = "이츠야",
+            address = "서울 마포구 양화로6길 99-9",
+            latitude = BigDecimal("37.0"),
+            longitude = BigDecimal("126.0"),
+            category = "음식점 > 일식 > 돈까스",
+            phoneNumber = null,
+            providerUrl = null,
+        )
+
+        val selected = fixture.adapter.select(
+            PlaceCandidateSelector.Request(
+                clue = PlaceClue(
+                    name = "이츠야",
+                    region = "서울특별시 서초구 상수역 인근",
+                    queries = listOf("이츠야", "상수동 이츠야"),
+                ),
+                candidates = listOf(
+                    PlaceCandidateSelector.Candidate(
+                        place = candidate,
+                        matchedQueries = listOf("이츠야", "상수동 이츠야"),
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(candidate, selected)
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `returns null when no candidate has enough evidence`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andRespond(withSuccess(response("""{"candidateIndex":null}"""), MediaType.APPLICATION_JSON))
+
+        val selected = fixture.adapter.select(
+            PlaceCandidateSelector.Request(
+                clue = PlaceClue("없는 장소", null, listOf("없는 장소")),
+                candidates = listOf(
+                    PlaceCandidateSelector.Candidate(
+                        place = PlaceCandidate(
+                            provider = "KAKAO",
+                            externalPlaceId = "1",
+                            name = "다른 장소",
+                            address = "서울 마포구",
+                            latitude = BigDecimal("37.0"),
+                            longitude = BigDecimal("126.0"),
+                            category = null,
+                            phoneNumber = null,
+                            providerUrl = null,
+                        ),
+                        matchedQueries = listOf("없는 장소"),
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(null, selected)
+        fixture.server.verify()
     }
 
     @Test

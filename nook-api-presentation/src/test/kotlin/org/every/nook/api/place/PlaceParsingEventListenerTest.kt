@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
@@ -46,6 +47,7 @@ class PlaceParsingEventListenerTest {
                     ),
                 )
             },
+            candidateSelector = PlaceCandidateSelector { null },
             retryBackoffs = listOf(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(3)),
             processingTimeout = PROCESSING_TIMEOUT,
             clock = Clock.fixed(NOW, ZoneOffset.UTC),

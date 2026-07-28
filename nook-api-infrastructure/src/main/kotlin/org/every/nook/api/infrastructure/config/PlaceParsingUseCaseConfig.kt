@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
+import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
@@ -17,11 +18,13 @@ class PlaceParsingUseCaseConfig {
         jobPort: PlaceParsingJobPort,
         clueExtractor: PlaceClueExtractor,
         searchPlaceCandidates: SearchPlaceCandidatesUseCase,
+        candidateSelector: PlaceCandidateSelector,
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = jobPort,
         clueExtractor = clueExtractor,
         searchPlaceCandidates = searchPlaceCandidates,
+        candidateSelector = candidateSelector,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
     )
