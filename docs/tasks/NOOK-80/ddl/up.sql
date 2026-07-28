@@ -1,73 +1,33 @@
-DROP PROCEDURE IF EXISTS drop_all_foreign_keys;
-SET @target_schema = DATABASE();
+ALTER TABLE group_posts
+    DROP FOREIGN KEY fk_group_posts_group,
+    DROP FOREIGN KEY fk_group_posts_user_saved_post;
 
-DELIMITER //
+ALTER TABLE place_parsing_jobs
+    DROP FOREIGN KEY fk_place_parsing_jobs_post;
 
-CREATE PROCEDURE drop_all_foreign_keys()
-BEGIN
-    DECLARE remaining_foreign_keys INT DEFAULT 0;
-    DECLARE target_table VARCHAR(64);
-    DECLARE target_constraint VARCHAR(64);
+ALTER TABLE post_content_parsing_jobs
+    DROP FOREIGN KEY fk_post_content_parsing_jobs_post;
 
-    drop_loop: LOOP
-        SELECT COUNT(*)
-        INTO remaining_foreign_keys
-        FROM information_schema.table_constraints
-        WHERE constraint_schema = @target_schema
-          AND constraint_type = 'FOREIGN KEY';
+ALTER TABLE post_hashtags
+    DROP FOREIGN KEY fk_post_hashtags_post;
 
-        IF remaining_foreign_keys = 0 THEN
-            LEAVE drop_loop;
-        END IF;
+ALTER TABLE post_media
+    DROP FOREIGN KEY fk_post_media_post;
 
-        SELECT table_name, constraint_name
-        INTO target_table, target_constraint
-        FROM information_schema.table_constraints
-        WHERE constraint_schema = @target_schema
-          AND constraint_type = 'FOREIGN KEY'
-        ORDER BY table_name, constraint_name
-        LIMIT 1;
+ALTER TABLE post_places
+    DROP FOREIGN KEY fk_post_places_post,
+    DROP FOREIGN KEY fk_post_places_place;
 
-        SET @drop_foreign_key = CONCAT(
-            'ALTER TABLE `',
-            REPLACE(target_table, '`', '``'),
-            '` DROP FOREIGN KEY `',
-            REPLACE(target_constraint, '`', '``'),
-            '`'
-        );
-        PREPARE drop_statement FROM @drop_foreign_key;
-        EXECUTE drop_statement;
-        DEALLOCATE PREPARE drop_statement;
-    END LOOP;
+ALTER TABLE refresh_tokens
+    DROP FOREIGN KEY fk_refresh_tokens_member_id,
+    DROP FOREIGN KEY fk_refresh_tokens_replaced_by_token_id,
+    RENAME INDEX fk_refresh_tokens_replaced_by_token_id TO idx_replaced_by_token_id;
 
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.statistics
-        WHERE table_schema = @target_schema
-          AND table_name = 'refresh_tokens'
-          AND index_name = 'fk_refresh_tokens_replaced_by_token_id'
-    ) AND NOT EXISTS (
-        SELECT 1
-        FROM information_schema.statistics
-        WHERE table_schema = @target_schema
-          AND table_name = 'refresh_tokens'
-          AND index_name = 'idx_replaced_by_token_id'
-    ) THEN
-        ALTER TABLE refresh_tokens
-            RENAME INDEX fk_refresh_tokens_replaced_by_token_id TO idx_replaced_by_token_id;
-    ELSEIF EXISTS (
-        SELECT 1
-        FROM information_schema.statistics
-        WHERE table_schema = @target_schema
-          AND table_name = 'refresh_tokens'
-          AND index_name = 'fk_refresh_tokens_replaced_by_token_id'
-    ) THEN
-        ALTER TABLE refresh_tokens
-            DROP INDEX fk_refresh_tokens_replaced_by_token_id;
-    END IF;
-END//
+ALTER TABLE social_accounts
+    DROP FOREIGN KEY fk_social_accounts_member_id;
 
-DELIMITER ;
+ALTER TABLE user_place_bookmarks
+    DROP FOREIGN KEY fk_user_place_bookmarks_place;
 
-CALL drop_all_foreign_keys();
-DROP PROCEDURE drop_all_foreign_keys;
+ALTER TABLE user_saved_posts
+    DROP FOREIGN KEY fk_user_saved_posts_post;
