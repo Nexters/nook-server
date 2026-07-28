@@ -34,6 +34,70 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `completes with resolved places when some place clues do not match`() {
+        val port = FakeJobPort()
+        val extractor = PlaceClueExtractor {
+            listOf(
+                PlaceClue("첫 번째 장소", "서울", listOf("첫 번째 장소")),
+                PlaceClue("매칭 실패 장소", "서울", listOf("매칭 실패 장소")),
+                PlaceClue("두 번째 장소", "서울", listOf("두 번째 장소")),
+            )
+        }
+        val provider = PlaceSearchProvider { request ->
+            when (request.query) {
+                "첫 번째 장소" -> listOf(candidate("1", "첫 번째 장소", "서울 중구"))
+                "두 번째 장소" -> listOf(candidate("2", "두 번째 장소", "서울 종로구"))
+                else -> emptyList()
+            }
+        }
+        val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf("1", "2"), port.completed.map { it.externalPlaceId })
+        assertNull(port.nextAttemptAt)
+        assertNull(port.failedReason)
+    }
+
+    @Test
+    fun `retries when every place clue fails to match`() {
+        val port = FakeJobPort(attempt = 2)
+        val extractor = PlaceClueExtractor {
+            listOf(PlaceClue("매칭 실패 장소", "서울", listOf("매칭 실패 장소")))
+        }
+        val useCase = useCase(
+            port,
+            extractor,
+            SearchPlaceCandidatesUseCase { emptyList() },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Retry>(useCase(1))
+        assertEquals(NOW.plusSeconds(3), port.nextAttemptAt)
+        assertEquals(emptyList(), port.completed)
+    }
+
+    @Test
+    fun `retries the whole job when place search provider fails after a resolved clue`() {
+        val port = FakeJobPort(attempt = 2)
+        val extractor = PlaceClueExtractor {
+            listOf(
+                PlaceClue("정상 장소", "서울", listOf("정상 장소")),
+                PlaceClue("검색 오류 장소", "서울", listOf("검색 오류 장소")),
+            )
+        }
+        val provider = PlaceSearchProvider { request ->
+            when (request.query) {
+                "정상 장소" -> listOf(candidate("1", "정상 장소", "서울 중구"))
+                else -> throw PlaceSearchProviderException()
+            }
+        }
+        val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Retry>(useCase(1))
+        assertEquals(emptyList(), port.completed)
+        assertNull(port.failedReason)
+    }
+
+    @Test
     fun `fails permanently when the final attempt extracts no place clue`() {
         val port = FakeJobPort(attempt = 4)
         val useCase = useCase(
