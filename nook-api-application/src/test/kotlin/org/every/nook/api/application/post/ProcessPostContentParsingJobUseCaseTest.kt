@@ -1,0 +1,134 @@
+package org.every.nook.api.application.post
+
+import org.every.nook.api.application.content.ExtractPostContentUseCase
+import org.every.nook.api.application.content.ExtractedPostContent
+import org.every.nook.api.application.content.PostContentExtractor
+import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.domain.post.Post
+import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.domain.post.PostSource
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+
+class ProcessPostContentParsingJobUseCaseTest {
+    @Test
+    fun `extracts stores and completes post content outside the job claim`() {
+        val calls = mutableListOf<String>()
+        val port = RecordingPort(calls)
+        val extractor = object : PostContentExtractor {
+            override fun supports(url: String): Boolean = true
+
+            override fun extract(url: String): ExtractedPostContent {
+                calls += "extract"
+                return ExtractedPostContent(
+                    post = Post(
+                        source = SOURCE,
+                        canonicalUrl = url,
+                        authorIdentifier = "nook",
+                        body = "게시물 본문",
+                        media = listOf(
+                            PostMedia(PostMedia.MediaType.IMAGE, "https://source/image.jpg", 0),
+                        ),
+                    ),
+                    hashtags = listOf("#맛집", "맛집", "서울"),
+                    sourceLocationNames = listOf("", "성수"),
+                )
+            }
+        }
+        val useCase = ProcessPostContentParsingJobUseCase(
+            jobPort = port,
+            extractPostContent = ExtractPostContentUseCase(listOf(extractor)),
+            titleGenerator = PostTitleGenerator {
+                calls += "title"
+                "성수 맛집"
+            },
+            mediaStorage = PostMediaStoragePort { media ->
+                calls += "media"
+                media.copy(url = "https://cdn/image.jpg")
+            },
+            retryBackoffs = listOf(Duration.ofSeconds(3)),
+            processingTimeout = Duration.ofMinutes(2),
+            clock = CLOCK,
+        )
+
+        assertEquals(ProcessPostContentParsingJobUseCase.Result.Completed, useCase(101))
+        assertEquals(listOf("claim", "extract", "title", "media", "complete"), calls)
+        val completed = requireNotNull(port.completedPost)
+        assertEquals("성수 맛집", completed.title)
+        assertEquals("성수", completed.sourceLocationTag)
+        assertEquals(listOf("맛집", "서울"), completed.hashtags)
+        assertEquals("https://cdn/image.jpg", completed.media.single().url)
+    }
+
+    @Test
+    fun `schedules retry without completing partial content`() {
+        val port = RecordingPort()
+        val useCase = ProcessPostContentParsingJobUseCase(
+            jobPort = port,
+            extractPostContent = ExtractPostContentUseCase(
+                listOf(
+                    object : PostContentExtractor {
+                        override fun supports(url: String): Boolean = true
+
+                        override fun extract(url: String): ExtractedPostContent = error("provider timeout")
+                    },
+                ),
+            ),
+            titleGenerator = PostTitleGenerator { error("title must not be generated") },
+            mediaStorage = PostMediaStoragePort { error("media must not be stored") },
+            retryBackoffs = listOf(Duration.ofSeconds(3)),
+            processingTimeout = Duration.ofMinutes(2),
+            clock = CLOCK,
+        )
+
+        val result = assertIs<ProcessPostContentParsingJobUseCase.Result.Retry>(useCase(101))
+
+        assertEquals(NOW.plusSeconds(3), result.nextAttemptAt)
+        assertEquals(NOW.plusSeconds(3), port.retryAt)
+        assertEquals("provider timeout", port.failureReason)
+        assertEquals(null, port.completedPost)
+    }
+
+    private class RecordingPort(private val calls: MutableList<String> = mutableListOf()) :
+        PostContentParsingJobPort {
+        var completedPost: Post? = null
+        var retryAt: Instant? = null
+        var failureReason: String? = null
+
+        override fun claim(postId: Long, processingTimeout: Duration): ClaimedPostContentParsingJob {
+            calls += "claim"
+            return ClaimedPostContentParsingJob(
+                postId = postId,
+                attempt = 1,
+                canonicalUrl = "https://www.instagram.com/p/ABC123/",
+            )
+        }
+
+        override fun findOutstanding(processingTimeout: Duration): List<OutstandingPostContentParsingJob> = emptyList()
+
+        override fun complete(postId: Long, post: Post) {
+            calls += "complete"
+            completedPost = post
+        }
+
+        override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
+            retryAt = nextAttemptAt
+            failureReason = reason
+        }
+
+        override fun fail(postId: Long, reason: String) {
+            failureReason = reason
+        }
+    }
+
+    private companion object {
+        val NOW: Instant = Instant.parse("2026-07-29T00:00:00Z")
+        val CLOCK: Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+        val SOURCE = PostSource("INSTAGRAM", "ABC123")
+    }
+}

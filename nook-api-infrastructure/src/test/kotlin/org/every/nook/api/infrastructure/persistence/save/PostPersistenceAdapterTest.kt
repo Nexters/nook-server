@@ -3,8 +3,10 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
+import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
+import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.domain.post.PostSource
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
@@ -14,10 +16,10 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
-import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
@@ -29,6 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -36,13 +39,13 @@ class PostPersistenceAdapterTest {
     private val postRepository = mock(PostJpaRepository::class.java)
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
+    private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val eventPublisher = mock(org.springframework.context.ApplicationEventPublisher::class.java)
     private val adapter = PostPersistenceAdapter(
         postJpaRepository = postRepository,
-        postMediaJpaRepository = mock(PostMediaJpaRepository::class.java),
-        postHashtagJpaRepository = mock(PostHashtagJpaRepository::class.java),
+        postContentParsingJobJpaRepository = contentParsingJobRepository,
         userSavedPostJpaRepository = userSavedPostRepository,
         placeParsingJobJpaRepository = parsingJobRepository,
         postPlaceJpaRepository = mock(PostPlaceJpaRepository::class.java),
@@ -57,19 +60,18 @@ class PostPersistenceAdapterTest {
     fun `stores a creation memo on the user saved post`() {
         val group = mock(GroupEntity::class.java)
         val postEntity = mock(PostEntity::class.java)
-        val parsingJob = mock(PlaceParsingJobEntity::class.java)
+        val contentParsingJob = PostContentParsingJobEntity(101, PostContentParsingStatus.PENDING)
         val savedPost = mock(UserSavedPostEntity::class.java)
         `when`(group.id).thenReturn(17)
         `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17))).thenReturn(listOf(group))
         `when`(postEntity.id).thenReturn(101)
-        `when`(parsingJob.status).thenReturn(PlaceParsingStatus.PENDING)
         `when`(savedPost.id).thenReturn(11)
         `when`(postRepository.save(org.mockito.ArgumentMatchers.any(PostEntity::class.java))).thenReturn(postEntity)
         `when`(
-            parsingJobRepository.save(
-                org.mockito.ArgumentMatchers.any(PlaceParsingJobEntity::class.java),
+            contentParsingJobRepository.save(
+                org.mockito.ArgumentMatchers.any(PostContentParsingJobEntity::class.java),
             ),
-        ).thenReturn(parsingJob)
+        ).thenReturn(contentParsingJob)
         `when`(
             userSavedPostRepository.save(
                 org.mockito.ArgumentMatchers.any(UserSavedPostEntity::class.java),
@@ -91,9 +93,12 @@ class PostPersistenceAdapterTest {
         assertEquals(7, captor.value.userId)
         assertEquals(101, captor.value.postId)
         assertEquals("주말에 방문", captor.value.memo)
-        val eventCaptor = ArgumentCaptor.forClass(PlaceParsingJobRequestedEvent::class.java)
+        val eventCaptor = ArgumentCaptor.forClass(PostContentParsingJobRequestedEvent::class.java)
         verify(eventPublisher).publishEvent(eventCaptor.capture())
         assertEquals(101, eventCaptor.value.postId)
+        verify(parsingJobRepository, never()).save(
+            org.mockito.ArgumentMatchers.any(PlaceParsingJobEntity::class.java),
+        )
     }
 
     @Test
@@ -118,17 +123,20 @@ class PostPersistenceAdapterTest {
         val firstGroup = mock(GroupEntity::class.java)
         val secondGroup = mock(GroupEntity::class.java)
         val postEntity = mock(PostEntity::class.java)
-        val parsingJob = mock(PlaceParsingJobEntity::class.java)
+        val contentParsingJob = PostContentParsingJobEntity(101, PostContentParsingStatus.PENDING)
         val savedPost = mock(UserSavedPostEntity::class.java)
         `when`(firstGroup.id).thenReturn(17)
         `when`(secondGroup.id).thenReturn(18)
         `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17, 18)))
             .thenReturn(listOf(firstGroup, secondGroup))
         `when`(postEntity.id).thenReturn(101)
-        `when`(parsingJob.status).thenReturn(PlaceParsingStatus.PENDING)
         `when`(savedPost.id).thenReturn(11)
         `when`(postRepository.save(org.mockito.ArgumentMatchers.any(PostEntity::class.java))).thenReturn(postEntity)
-        `when`(parsingJobRepository.findByPostId(101)).thenReturn(parsingJob)
+        `when`(
+            contentParsingJobRepository.save(
+                org.mockito.ArgumentMatchers.any(PostContentParsingJobEntity::class.java),
+            ),
+        ).thenReturn(contentParsingJob)
         `when`(
             userSavedPostRepository.save(
                 org.mockito.ArgumentMatchers.any(UserSavedPostEntity::class.java),
@@ -165,12 +173,17 @@ class PostPersistenceAdapterTest {
             failureReason = "No place candidate matched",
             attemptCount = 4,
         )
+        val contentParsingJob = PostContentParsingJobEntity(
+            postId = 101,
+            status = PostContentParsingStatus.COMPLETED,
+        )
         `when`(firstGroup.id).thenReturn(17)
         `when`(secondGroup.id).thenReturn(18)
         `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17, 18)))
             .thenReturn(listOf(firstGroup, secondGroup))
         `when`(postEntity.id).thenReturn(101)
         `when`(postRepository.findBySourceForUpdate("INSTAGRAM", "ABC123")).thenReturn(postEntity)
+        `when`(contentParsingJobRepository.findByPostId(101)).thenReturn(contentParsingJob)
         `when`(parsingJobRepository.findByPostId(101)).thenReturn(parsingJob)
         `when`(savedPost.id).thenReturn(11)
         `when`(userSavedPostRepository.findByUserIdAndPostId(7, 101)).thenReturn(savedPost)
@@ -219,6 +232,17 @@ class PostPersistenceAdapterTest {
         }
 
         verifyNoInteractions(postRepository)
+    }
+
+    @Test
+    fun `returns pending place parsing while content is still processing`() {
+        val savedPost = UserSavedPostEntity(userId = 7, postId = 101)
+        `when`(userSavedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
+
+        val result = assertNotNull(adapter.find(userId = 7, postId = 11))
+
+        assertEquals(PlaceParsingStatus.PENDING, result.placeParsingStatus)
+        assertTrue(result.places.isEmpty())
     }
 
     @Test

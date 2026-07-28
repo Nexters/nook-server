@@ -2,6 +2,8 @@ package org.every.nook.api.presentation.post.response
 
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
+import org.every.nook.api.application.post.model.PostProcessingStageView
+import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.model.SavedPostDetail
 import org.every.nook.api.application.post.model.SavedPostMedia
 import org.every.nook.api.application.post.model.SavedPostMediaType
@@ -50,6 +52,10 @@ data class SavedPostSummaryResponse(
     val memo: String?,
     @field:Schema(description = "게시물 저장 시각")
     val savedAt: Instant,
+    @field:Schema(description = "게시물 전체 처리 상태")
+    val processingStatus: PostProcessingStatusView,
+    @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
+    val processingStage: PostProcessingStageView?,
 ) {
     companion object {
         fun from(result: SavedPostSummary): SavedPostSummaryResponse = SavedPostSummaryResponse(
@@ -59,6 +65,8 @@ data class SavedPostSummaryResponse(
             representativeMedia = result.representativeMedia?.let(SavedPostMediaResponse::from),
             memo = result.memo,
             savedAt = result.savedAt,
+            processingStatus = result.processingStatus,
+            processingStage = result.processingStage,
         )
     }
 }
@@ -90,6 +98,10 @@ data class SavedPostDetailResponse(
     val placeParsingFailureReason: String?,
     @field:Schema(description = "게시물에서 파싱된 장소 목록")
     val places: List<SavedPostPlaceResponse>,
+    @field:Schema(description = "게시물 전체 처리 상태")
+    val processingStatus: PostProcessingStatusView,
+    @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
+    val processingStage: PostProcessingStageView?,
 ) {
     companion object {
         fun from(result: SavedPostDetail): SavedPostDetailResponse = SavedPostDetailResponse(
@@ -106,6 +118,8 @@ data class SavedPostDetailResponse(
             placeParsingStatus = result.placeParsingStatus,
             placeParsingFailureReason = result.placeParsingFailureReason,
             places = result.places.map(SavedPostPlaceResponse::from),
+            processingStatus = result.processingStatus,
+            processingStage = result.processingStage,
         )
     }
 }

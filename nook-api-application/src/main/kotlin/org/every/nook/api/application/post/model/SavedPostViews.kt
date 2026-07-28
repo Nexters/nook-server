@@ -19,6 +19,8 @@ data class SavedPostSummary(
     val representativeMedia: SavedPostMedia?,
     val memo: String?,
     val savedAt: Instant,
+    val processingStatus: PostProcessingStatusView = PostProcessingStatusView.COMPLETED,
+    val processingStage: PostProcessingStageView? = null,
 )
 
 data class SavedPostDetail(
@@ -35,6 +37,8 @@ data class SavedPostDetail(
     val placeParsingStatus: PlaceParsingStatusView,
     val placeParsingFailureReason: String?,
     val places: List<SavedPostPlace>,
+    val processingStatus: PostProcessingStatusView = PostProcessingStatusView.COMPLETED,
+    val processingStage: PostProcessingStageView? = null,
 )
 
 data class SavedPostMedia(val type: SavedPostMediaType, val url: String, val sequence: Int)

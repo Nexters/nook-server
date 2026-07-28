@@ -49,7 +49,7 @@ class PostController(
     private val updatePostMemoUseCase: UpdatePostMemoUseCase,
     private val replaceSavedPostGroupsUseCase: ReplaceSavedPostGroupsUseCase,
 ) {
-    @Operation(summary = "URL로 게시물 생성")
+    @Operation(summary = "URL로 게시물 저장 시작")
     @PostMapping
     fun createPost(
         @Parameter(hidden = true) userContext: UserContext,
