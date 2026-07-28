@@ -5,7 +5,7 @@ import java.time.Duration
 
 @ConfigurationProperties("external.naver-map")
 data class NaverPlaceProperties(
-    val baseUrl: String = "https://naveropenapi.apigw.ntruss.com",
+    val baseUrl: String = "https://maps.apigw.ntruss.com",
     val clientId: String = "",
     val clientSecret: String = "",
     val connectTimeout: Duration = Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS),

@@ -26,6 +26,7 @@ class NaverPlaceSearchProviderTest {
             .andExpect(method(HttpMethod.GET))
             .andExpect(header("X-NCP-APIGW-API-KEY-ID", "test-client-id"))
             .andExpect(header("X-NCP-APIGW-API-KEY", "test-client-secret"))
+            .andExpect(header("Accept", containsString(MediaType.APPLICATION_JSON_VALUE)))
             .andRespond(withSuccess(SUCCESS_RESPONSE, MediaType.APPLICATION_JSON))
 
         val result = fixture.provider.search(PlaceSearchProvider.Request(query = "Nook Cafe"))

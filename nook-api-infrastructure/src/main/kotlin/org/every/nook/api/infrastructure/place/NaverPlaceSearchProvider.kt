@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
+import org.springframework.http.MediaType
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
@@ -28,6 +29,7 @@ class NaverPlaceSearchProvider(
                 }
                 .header(CLIENT_ID, properties.clientId)
                 .header(CLIENT_SECRET, properties.clientSecret)
+                .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .body(String::class.java)
         } catch (exception: RestClientResponseException) {

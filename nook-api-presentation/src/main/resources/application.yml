@@ -53,7 +53,7 @@ external:
     connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:3s}
     read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:5s}
   naver-map:
-    base-url: ${NAVER_MAP_BASE_URL:https://naveropenapi.apigw.ntruss.com}
+    base-url: ${NAVER_MAP_BASE_URL:https://maps.apigw.ntruss.com}
     client-id: ${NAVER_CLIENT_ID:}
     client-secret: ${NAVER_CLIENT_SECRET:}
     connect-timeout: ${NAVER_MAP_CONNECT_TIMEOUT:3s}
