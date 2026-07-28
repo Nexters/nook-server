@@ -1,3 +1,8 @@
 logging:
   level:
     org.every.nook.api: info
+
+nook:
+  openapi:
+    servers:
+      - https://api-staging.everynook.co.kr

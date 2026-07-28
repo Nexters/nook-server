@@ -42,4 +42,16 @@ class OpenApiConfigTest {
         assertEquals("JWT", securityScheme.bearerFormat)
         assertTrue(openAPI.security.single().containsKey("bearerAuth"))
     }
+
+    @Test
+    fun `configured public server urls are exposed`() {
+        val openAPI =
+            OpenApiConfig(
+                OpenApiProperties(
+                    servers = listOf("https://api-dev.everynook.co.kr"),
+                ),
+            ).openAPI()
+
+        assertEquals("https://api-dev.everynook.co.kr", openAPI.servers.single().url)
+    }
 }
