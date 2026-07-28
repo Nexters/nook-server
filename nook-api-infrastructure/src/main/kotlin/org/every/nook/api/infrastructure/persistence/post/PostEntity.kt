@@ -40,23 +40,31 @@ class PostEntity(
     @Column(name = "canonical_url", nullable = false, length = Post.MAX_CANONICAL_URL_LENGTH)
     val canonicalUrl: String,
     @Column(name = "author_identifier", nullable = true, length = Post.MAX_AUTHOR_IDENTIFIER_LENGTH)
-    val authorIdentifier: String? = null,
+    var authorIdentifier: String? = null,
     @Column(name = "title", nullable = true, length = Post.MAX_TITLE_LENGTH)
-    val title: String? = null,
+    var title: String? = null,
     @Column(name = "body", nullable = true, columnDefinition = "TEXT")
-    val body: String? = null,
+    var body: String? = null,
     @Column(name = "published_at", nullable = true)
-    val publishedAt: Instant? = null,
+    var publishedAt: Instant? = null,
     @Column(
         name = "source_location_tag",
         nullable = true,
         length = Post.MAX_SOURCE_LOCATION_TAG_LENGTH,
     )
-    val sourceLocationTag: String? = null,
+    var sourceLocationTag: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     var id: Long? = null
         protected set
+
+    fun updateContent(post: Post) {
+        authorIdentifier = post.authorIdentifier
+        title = post.title
+        body = post.body
+        publishedAt = post.publishedAt
+        sourceLocationTag = post.sourceLocationTag
+    }
 }

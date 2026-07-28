@@ -10,6 +10,8 @@ import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PlaceView
+import org.every.nook.api.application.post.model.PostProcessingStageView
+import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.model.SavedPostDetail
 import org.every.nook.api.application.post.model.SavedPostMedia
 import org.every.nook.api.application.post.model.SavedPostMediaType
@@ -160,6 +162,8 @@ class PostControllerTest {
             CreatePostUseCase.Result(
                 postId = 11,
                 placeParsingStatus = PlaceParsingStatusView.PENDING,
+                processingStatus = PostProcessingStatusView.PENDING,
+                processingStage = PostProcessingStageView.CONTENT,
             ),
         )
     }
@@ -218,6 +222,8 @@ class PostControllerTest {
                         ),
                         memo = "주말에 방문",
                         savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                        processingStatus = PostProcessingStatusView.PROCESSING,
+                        processingStage = PostProcessingStageView.CONTENT,
                     ),
                 ),
                 page = 0,
@@ -279,6 +285,8 @@ class PostControllerTest {
             jsonPath("$.success.postId") { value(11) }
             jsonPath("$.success.savedPostId") { doesNotExist() }
             jsonPath("$.success.placeParsingStatus") { value("PENDING") }
+            jsonPath("$.success.processingStatus") { value("PENDING") }
+            jsonPath("$.success.processingStage") { value("CONTENT") }
         }
     }
 
@@ -359,6 +367,8 @@ class PostControllerTest {
             status { isOk() }
             jsonPath("$.success.items[0].postId") { value(11) }
             jsonPath("$.success.items[0].representativeMedia.sequence") { value(0) }
+            jsonPath("$.success.items[0].processingStatus") { value("PROCESSING") }
+            jsonPath("$.success.items[0].processingStage") { value("CONTENT") }
             jsonPath("$.success.totalElements") { value(1) }
             jsonPath("$.success.hasNext") { value(false) }
         }
@@ -373,6 +383,8 @@ class PostControllerTest {
             jsonPath("$.success.media[0].url") { value("https://example.com/1.jpg") }
             jsonPath("$.success.hashtags[0]") { value("성수") }
             jsonPath("$.success.places") { isEmpty() }
+            jsonPath("$.success.processingStatus") { value("COMPLETED") }
+            jsonPath("$.success.processingStage") { doesNotExist() }
         }
     }
 

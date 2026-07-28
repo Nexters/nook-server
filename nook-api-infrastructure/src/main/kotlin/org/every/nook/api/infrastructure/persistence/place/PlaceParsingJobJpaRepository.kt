@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param
 interface PlaceParsingJobJpaRepository : JpaRepository<PlaceParsingJobEntity, Long> {
     fun findByPostId(postId: Long): PlaceParsingJobEntity?
 
+    fun findAllByPostIdIn(postIds: Collection<Long>): List<PlaceParsingJobEntity>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT job FROM PlaceParsingJobEntity job WHERE job.postId = :postId")
     fun findByPostIdForUpdate(@Param("postId") postId: Long): PlaceParsingJobEntity?

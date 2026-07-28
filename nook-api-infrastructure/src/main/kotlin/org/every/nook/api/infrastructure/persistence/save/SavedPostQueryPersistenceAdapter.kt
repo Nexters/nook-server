@@ -4,6 +4,7 @@ import org.every.nook.api.application.group.GroupPostPage
 import org.every.nook.api.application.group.GroupPostSummary
 import org.every.nook.api.application.group.port.GroupPostQueryPort
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
+import org.every.nook.api.application.post.model.PostProcessingView
 import org.every.nook.api.application.post.model.SavedPostDetail
 import org.every.nook.api.application.post.model.SavedPostMedia
 import org.every.nook.api.application.post.model.SavedPostMediaType
@@ -12,11 +13,13 @@ import org.every.nook.api.application.post.model.SavedPostPlace
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
@@ -39,6 +42,7 @@ class SavedPostQueryPersistenceAdapter(
     private val placeRepository: PlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
+    private val contentParsingJobRepository: PostContentParsingJobJpaRepository,
     private val groupRepository: GroupJpaRepository,
     private val memberRepository: MemberJpaRepository,
 ) : SavedPostQueryPort,
@@ -110,12 +114,32 @@ class SavedPostQueryPersistenceAdapter(
                 .groupBy(PostMediaEntity::postId)
                 .mapValues { (_, media) -> media.first().toView() }
         }
+        val contentStatusByPostId = if (sourcePostIds.isEmpty()) {
+            emptyMap()
+        } else {
+            contentParsingJobRepository.findAllByPostIdIn(sourcePostIds).associate {
+                it.postId to it.status
+            }
+        }
+        val placeStatusByPostId = if (sourcePostIds.isEmpty()) {
+            emptyMap()
+        } else {
+            parsingJobRepository.findAllByPostIdIn(sourcePostIds).associate {
+                it.postId to it.status
+            }
+        }
 
         return SavedPostPage(
             items = savedPosts.content.mapNotNull { savedPost ->
+                val processing = PostProcessingView.from(
+                    contentStatus = contentStatusByPostId[savedPost.postId]
+                        ?: PostContentParsingStatus.COMPLETED,
+                    placeStatus = placeStatusByPostId[savedPost.postId],
+                )
                 postsById[savedPost.postId]?.toSummary(
                     savedPost = savedPost,
                     representativeMedia = firstMediaByPostId[savedPost.postId],
+                    processing = processing,
                 )
             },
             page = savedPosts.number,
@@ -147,6 +171,11 @@ class SavedPostQueryPersistenceAdapter(
                 .mapTo(mutableSetOf()) { it.placeId }
         }
         val parsingJob = parsingJobRepository.findByPostId(savedPost.postId)
+        val contentParsingJob = contentParsingJobRepository.findByPostId(savedPost.postId)
+        val processing = PostProcessingView.from(
+            contentStatus = contentParsingJob?.status ?: PostContentParsingStatus.COMPLETED,
+            placeStatus = parsingJob?.status,
+        )
 
         return SavedPostDetail(
             postId = postId,
@@ -179,12 +208,15 @@ class SavedPostQueryPersistenceAdapter(
                     )
                 }
             },
+            processingStatus = processing.status,
+            processingStage = processing.stage,
         )
     }
 
     private fun PostEntity.toSummary(
         savedPost: UserSavedPostEntity,
         representativeMedia: SavedPostMedia?,
+        processing: PostProcessingView,
     ): SavedPostSummary = SavedPostSummary(
         postId = requireNotNull(savedPost.id),
         title = title,
@@ -192,6 +224,8 @@ class SavedPostQueryPersistenceAdapter(
         representativeMedia = representativeMedia,
         memo = savedPost.memo,
         savedAt = savedPost.createdAt,
+        processingStatus = processing.status,
+        processingStage = processing.stage,
     )
 
     private fun PostMediaEntity.toView(): SavedPostMedia = SavedPostMedia(
