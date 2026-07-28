@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.PostContentExtractor
+import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
@@ -24,11 +25,13 @@ class PostUseCaseConfig {
 
     @Bean
     fun createPostUseCase(
+        groupOwnershipPort: GroupOwnershipPort,
         extractPostContentUseCase: ExtractPostContentUseCase,
         postTitleGenerator: PostTitleGenerator,
         postMediaStoragePort: PostMediaStoragePort,
         createPostPort: CreatePostPort,
     ): CreatePostUseCase = CreatePostUseCase(
+        groupOwnershipPort = groupOwnershipPort,
         extractPostContentUseCase = extractPostContentUseCase,
         postTitleGenerator = postTitleGenerator,
         postMediaStoragePort = postMediaStoragePort,

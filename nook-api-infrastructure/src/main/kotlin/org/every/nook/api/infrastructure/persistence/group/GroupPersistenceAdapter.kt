@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.GroupView
+import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.GroupColor
 import org.springframework.dao.DataIntegrityViolationException
@@ -11,7 +12,8 @@ import org.springframework.transaction.annotation.Transactional
 class GroupPersistenceAdapter(
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
-) : GroupPort {
+) : GroupPort,
+    GroupOwnershipPort {
     @Transactional(readOnly = true)
     override fun findAll(userId: Long): List<GroupView> =
         groupRepository.findAllSummaries(userId).map { projection -> projection.toView() }
@@ -58,6 +60,16 @@ class GroupPersistenceAdapter(
 
     @Transactional
     override fun delete(userId: Long, groupId: Long): Boolean = groupRepository.deleteByIdAndUserId(groupId, userId) > 0
+
+    @Transactional(readOnly = true)
+    override fun ownsAll(userId: Long, groupIds: Set<Long>): Boolean {
+        if (groupIds.isEmpty()) {
+            return false
+        }
+        val ownedGroupIds = groupRepository.findAllByUserIdAndIdIn(userId, groupIds)
+            .mapTo(mutableSetOf()) { requireNotNull(it.id) }
+        return ownedGroupIds == groupIds
+    }
 
     private fun GroupSummaryProjection.toView(): GroupView =
         GroupView(id = id, name = name, color = color.name, postCount = postCount)

@@ -5,6 +5,9 @@ import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
+import org.every.nook.api.application.group.error.GroupNotFoundException
+import org.every.nook.api.application.group.error.InvalidGroupException
+import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
@@ -68,6 +71,12 @@ class CreatePostUseCaseTest {
             CreatedPost(11, PlaceParsingStatus.PENDING)
         }
         val useCase = CreatePostUseCase(
+            GroupOwnershipPort { userId, groupIds ->
+                calls += "groups"
+                assertEquals(7, userId)
+                assertEquals(setOf(1L, 2L), groupIds)
+                true
+            },
             ExtractPostContentUseCase(listOf(extractor)),
             titleGenerator,
             mediaStorage,
@@ -83,7 +92,7 @@ class CreatePostUseCaseTest {
             ),
         )
 
-        assertEquals(listOf("extractor", "title", "media", "persistence"), calls)
+        assertEquals(listOf("groups", "extractor", "title", "media", "persistence"), calls)
         assertEquals(11, result.postId)
         assertEquals(PlaceParsingStatusView.PENDING, result.placeParsingStatus)
     }
@@ -91,6 +100,7 @@ class CreatePostUseCaseTest {
     @Test
     fun `rejects an unsupported post URL`() {
         val useCase = CreatePostUseCase(
+            GroupOwnershipPort { _, _ -> true },
             ExtractPostContentUseCase(emptyList()),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { it },
@@ -98,7 +108,7 @@ class CreatePostUseCaseTest {
         )
 
         assertFailsWith<UnsupportedPostUrlException> {
-            useCase(CreatePostUseCase.Command(7, "https://example.com/p/ABC123/"))
+            useCase(CreatePostUseCase.Command(7, "https://example.com/p/ABC123/", groupIds = listOf(1)))
         }
     }
 
@@ -110,6 +120,7 @@ class CreatePostUseCaseTest {
             override fun extract(url: String): ExtractedPostContent = throw PostContentProviderTimeoutException()
         }
         val useCase = CreatePostUseCase(
+            GroupOwnershipPort { _, _ -> true },
             ExtractPostContentUseCase(listOf(extractor)),
             PostTitleGenerator { error("title generator must not be called") },
             PostMediaStoragePort { it },
@@ -117,7 +128,59 @@ class CreatePostUseCaseTest {
         )
 
         assertFailsWith<PostContentProviderTimeoutException> {
-            useCase(CreatePostUseCase.Command(7, "https://www.instagram.com/p/ABC123/"))
+            useCase(
+                CreatePostUseCase.Command(
+                    userId = 7,
+                    url = "https://www.instagram.com/p/ABC123/",
+                    groupIds = listOf(1),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `rejects an empty group list before calling external providers`() {
+        val useCase = CreatePostUseCase(
+            GroupOwnershipPort { _, _ -> error("group ownership must not be queried") },
+            ExtractPostContentUseCase(emptyList()),
+            PostTitleGenerator { error("title generator must not be called") },
+            PostMediaStoragePort { error("media storage must not be called") },
+            CreatePostPort { _, _, _, _ -> error("persistence must not be called") },
+        )
+
+        assertFailsWith<InvalidGroupException> {
+            useCase(
+                CreatePostUseCase.Command(
+                    userId = 7,
+                    url = "https://www.instagram.com/p/ABC123/",
+                    groupIds = emptyList(),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `rejects inaccessible groups before calling external providers`() {
+        val useCase = CreatePostUseCase(
+            GroupOwnershipPort { userId, groupIds ->
+                assertEquals(7, userId)
+                assertEquals(setOf(1L, 2L), groupIds)
+                false
+            },
+            ExtractPostContentUseCase(emptyList()),
+            PostTitleGenerator { error("title generator must not be called") },
+            PostMediaStoragePort { error("media storage must not be called") },
+            CreatePostPort { _, _, _, _ -> error("persistence must not be called") },
+        )
+
+        assertFailsWith<GroupNotFoundException> {
+            useCase(
+                CreatePostUseCase.Command(
+                    userId = 7,
+                    url = "https://www.instagram.com/p/ABC123/",
+                    groupIds = listOf(1, 2),
+                ),
+            )
         }
     }
 }

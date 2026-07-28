@@ -16,7 +16,7 @@ GET {{baseUrl}}/api/v1/posts?page=0&size=20
 ### 저장 게시물 상세 조회
 GET {{baseUrl}}/api/v1/posts/{{postId}}
 
-### URL로 게시물 생성
+### URL로 게시물 생성 - 하나 이상의 본인 소유 그룹 필수
 POST {{baseUrl}}/api/v1/posts
 Content-Type: application/json
 
@@ -24,6 +24,14 @@ Content-Type: application/json
   "url": "https://www.instagram.com/p/ABC123/",
   "memo": "주말에 방문",
   "groupIds": [1, 2]
+}
+
+### URL로 게시물 생성 실패 - 그룹 누락
+POST {{baseUrl}}/api/v1/posts
+Content-Type: application/json
+
+{
+  "url": "https://www.instagram.com/p/ABC123/"
 }
 
 ### 내 저장 게시물 메모 변경

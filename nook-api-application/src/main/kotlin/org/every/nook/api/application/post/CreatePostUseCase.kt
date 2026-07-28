@@ -2,18 +2,24 @@ package org.every.nook.api.application.post
 
 import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.ExtractedPostContent
+import org.every.nook.api.application.group.error.GroupNotFoundException
+import org.every.nook.api.application.group.error.InvalidGroupException
+import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.domain.post.Post
 
 class CreatePostUseCase(
+    private val groupOwnershipPort: GroupOwnershipPort,
     private val extractPostContentUseCase: ExtractPostContentUseCase,
     private val postTitleGenerator: PostTitleGenerator,
     private val postMediaStoragePort: PostMediaStoragePort,
     private val createPostPort: CreatePostPort,
 ) {
     operator fun invoke(command: Command): Result {
+        val groupIds = command.groupIds.toSet()
+        validateGroups(command.userId, groupIds)
         val extractedContent = extractPostContentUseCase(command.url)
         val providedPost = extractedContent.post.copy(
             sourceLocationTag = extractedContent.toSourceLocationTag(),
@@ -34,13 +40,22 @@ class CreatePostUseCase(
             userId = command.userId,
             post = storedPost,
             memo = command.memo,
-            groupIds = command.groupIds.toSet(),
+            groupIds = groupIds,
         )
 
         return Result(
             postId = created.postId,
             placeParsingStatus = PlaceParsingStatusView.from(created.placeParsingStatus),
         )
+    }
+
+    private fun validateGroups(userId: Long, groupIds: Set<Long>) {
+        if (groupIds.isEmpty()) {
+            throw InvalidGroupException(IllegalArgumentException("At least one group is required"))
+        }
+        if (!groupOwnershipPort.ownsAll(userId, groupIds)) {
+            throw GroupNotFoundException()
+        }
     }
 
     private fun ExtractedPostContent.toSourceLocationTag(): String? = sourceLocationNames
@@ -55,12 +70,7 @@ class CreatePostUseCase(
         .distinct()
         .toList()
 
-    data class Command(
-        val userId: Long,
-        val url: String,
-        val memo: String? = null,
-        val groupIds: List<Long> = emptyList(),
-    )
+    data class Command(val userId: Long, val url: String, val memo: String? = null, val groupIds: List<Long>)
 
     data class Result(val postId: Long, val placeParsingStatus: PlaceParsingStatusView)
 }

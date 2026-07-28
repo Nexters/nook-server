@@ -63,4 +63,25 @@ class GroupPersistenceAdapterTest {
         assertEquals(3, updated.group.postCount)
         assertEquals("GREEN", updated.group.color)
     }
+
+    @Test
+    fun `owns all requested groups only when every group belongs to the user`() {
+        val firstGroup = mock(GroupEntity::class.java)
+        val secondGroup = mock(GroupEntity::class.java)
+        `when`(firstGroup.id).thenReturn(17)
+        `when`(secondGroup.id).thenReturn(18)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17, 18)))
+            .thenReturn(listOf(firstGroup, secondGroup))
+
+        assertTrue(adapter.ownsAll(7, setOf(17, 18)))
+    }
+
+    @Test
+    fun `does not own requested groups when one is missing or belongs to another user`() {
+        val ownedGroup = mock(GroupEntity::class.java)
+        `when`(ownedGroup.id).thenReturn(17)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17, 18))).thenReturn(listOf(ownedGroup))
+
+        assertFalse(adapter.ownsAll(7, setOf(17, 18)))
+    }
 }
