@@ -1,5 +1,7 @@
 package org.every.nook.api.presentation.post.request
 
+import com.fasterxml.jackson.annotation.JsonIgnore
+import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.Valid
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
@@ -16,6 +18,8 @@ data class CreatePostRequest(
     val groupIds: List<@Positive Long>? = null,
 ) {
     @get:AssertTrue(message = "그룹 식별자는 양수여야 합니다.")
+    @get:JsonIgnore
+    @get:Schema(hidden = true)
     val areGroupIdsPositive: Boolean
         get() = groupIds.orEmpty().all { it > 0 }
 

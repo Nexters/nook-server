@@ -1,5 +1,6 @@
 package org.every.nook.api.config
 
+import io.swagger.v3.core.converter.ModelConverters
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -9,6 +10,8 @@ import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.GroupController
 import org.every.nook.api.presentation.place.PlaceController
 import org.every.nook.api.presentation.post.PostController
+import org.every.nook.api.presentation.post.request.CreatePostRequest
+import org.every.nook.api.presentation.post.request.ReplaceSavedPostGroupsRequest
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import java.lang.reflect.Method
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -48,6 +52,25 @@ class OpenApiDocumentationPolicyTest {
         assertTrue(userContextParameters.isNotEmpty())
         userContextParameters.forEach { parameter ->
             assertTrue(parameter.getAnnotation(Parameter::class.java)?.hidden == true)
+        }
+    }
+
+    @Test
+    fun `validation-only request properties are hidden from OpenAPI schemas`() {
+        val requestTypes = listOf(
+            CreatePostRequest::class.java,
+            ReplaceSavedPostGroupsRequest::class.java,
+        )
+
+        requestTypes.forEach { requestType ->
+            val schemas = ModelConverters.getInstance().readAll(requestType)
+
+            schemas.values.forEach { schema ->
+                assertFalse(
+                    schema.properties.orEmpty().containsKey("areGroupIdsPositive"),
+                    requestType.simpleName.orEmpty(),
+                )
+            }
         }
     }
 
