@@ -2,7 +2,9 @@ package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.GroupColor
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import kotlin.test.Test
@@ -36,18 +38,23 @@ class GroupPersistenceAdapterTest {
     }
 
     @Test
-    fun `deleting an owned group delegates to database cascade`() {
+    fun `deleting an owned group deletes links before the group`() {
+        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(true)
         `when`(groupRepository.deleteByIdAndUserId(17, 7)).thenReturn(1)
 
         assertTrue(adapter.delete(7, 17))
-        verify(groupRepository).deleteByIdAndUserId(17, 7)
+        val ordered = inOrder(groupPostRepository, groupRepository)
+        ordered.verify(groupPostRepository).deleteAllByGroupId(17)
+        ordered.verify(groupRepository).deleteByIdAndUserId(17, 7)
     }
 
     @Test
     fun `deleting another users group changes nothing`() {
-        `when`(groupRepository.deleteByIdAndUserId(17, 7)).thenReturn(0)
+        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(false)
 
         assertFalse(adapter.delete(7, 17))
+        verify(groupPostRepository, never()).deleteAllByGroupId(17)
+        verify(groupRepository, never()).deleteByIdAndUserId(17, 7)
     }
 
     @Test

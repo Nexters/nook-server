@@ -59,7 +59,13 @@ class GroupPersistenceAdapter(
     }
 
     @Transactional
-    override fun delete(userId: Long, groupId: Long): Boolean = groupRepository.deleteByIdAndUserId(groupId, userId) > 0
+    override fun delete(userId: Long, groupId: Long): Boolean {
+        if (!groupRepository.existsByIdAndUserId(groupId, userId)) {
+            return false
+        }
+        groupPostRepository.deleteAllByGroupId(groupId)
+        return groupRepository.deleteByIdAndUserId(groupId, userId) > 0
+    }
 
     @Transactional(readOnly = true)
     override fun ownsAll(userId: Long, groupIds: Set<Long>): Boolean {
