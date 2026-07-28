@@ -30,10 +30,6 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
 
     fun existsByIdAndUserId(id: Long, userId: Long): Boolean
 
-    fun existsByUserIdAndName(userId: Long, name: String): Boolean
-
-    fun existsByUserIdAndNameAndIdNot(userId: Long, name: String, id: Long): Boolean
-
     @Modifying
     @Transactional
     @Query(

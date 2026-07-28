@@ -1,6 +1,5 @@
 package org.every.nook.api.application.group
 
-import org.every.nook.api.application.group.error.GroupNameDuplicatedException
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.group.port.GroupPort
@@ -15,7 +14,6 @@ class UpdateGroupUseCase(private val groupPort: GroupPort) {
         return when (val result = groupPort.update(command.userId, command.groupId, name, color)) {
             is GroupPort.UpdateResult.Updated -> result.group
             GroupPort.UpdateResult.NotFound -> throw GroupNotFoundException()
-            GroupPort.UpdateResult.DuplicateName -> throw GroupNameDuplicatedException()
         }
     }
 
