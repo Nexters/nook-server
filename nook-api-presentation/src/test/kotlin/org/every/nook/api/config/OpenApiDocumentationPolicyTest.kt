@@ -15,6 +15,7 @@ import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.GroupController
 import org.every.nook.api.presentation.group.request.CreateGroupRequest
 import org.every.nook.api.presentation.group.request.UpdateGroupRequest
+import org.every.nook.api.presentation.group.response.GroupPostSummaryResponse
 import org.every.nook.api.presentation.group.response.GroupResponse
 import org.every.nook.api.presentation.place.PlaceController
 import org.every.nook.api.presentation.place.request.UpdatePlaceBookmarkRequest
@@ -46,6 +47,7 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -114,6 +116,26 @@ class OpenApiDocumentationPolicyTest {
                         "${schemaType.simpleName}.${field.name}",
                     )
                 }
+        }
+    }
+
+    @Test
+    fun `public response timestamps use date-time schemas`() {
+        val timestampProperties = mapOf(
+            PlacePostResponse::class.java to listOf("savedAt"),
+            SavedPostSummaryResponse::class.java to listOf("savedAt"),
+            SavedPostDetailResponse::class.java to listOf("publishedAt", "savedAt"),
+            GroupPostSummaryResponse::class.java to listOf("savedAt"),
+        )
+
+        timestampProperties.forEach { (responseType, properties) ->
+            val schema = ModelConverters.getInstance().readAll(responseType).getValue(responseType.simpleName)
+
+            properties.forEach { property ->
+                val propertySchema = schema.properties.getValue(property)
+                assertEquals("string", propertySchema.type, "${responseType.simpleName}.$property")
+                assertEquals("date-time", propertySchema.format, "${responseType.simpleName}.$property")
+            }
         }
     }
 

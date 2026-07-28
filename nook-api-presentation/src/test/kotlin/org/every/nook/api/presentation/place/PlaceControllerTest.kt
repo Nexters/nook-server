@@ -98,6 +98,7 @@ class PlaceControllerTest {
                 jsonPath("$.success.bookmarked") { value(true) }
                 jsonPath("$.success.posts.items[0].postId") { value(21) }
                 jsonPath("$.success.posts.items[0].representativeMedia.type") { value("IMAGE") }
+                jsonPath("$.success.posts.items[0].savedAt") { value("2026-07-27T09:00:00+09:00") }
                 jsonPath("$.success.posts.totalElements") { value(11) }
             }
 

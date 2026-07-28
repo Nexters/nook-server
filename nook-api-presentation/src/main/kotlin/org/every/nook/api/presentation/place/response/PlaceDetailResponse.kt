@@ -5,8 +5,9 @@ import org.every.nook.api.application.place.PlaceDetailView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
+import org.every.nook.api.presentation.response.toSeoulOffsetDateTime
 import java.math.BigDecimal
-import java.time.Instant
+import java.time.OffsetDateTime
 
 data class PlaceDetailResponse(
     @field:Schema(description = "장소 식별자")
@@ -87,7 +88,7 @@ data class PlacePostResponse(
     @field:Schema(description = "사용자 메모", nullable = true)
     val memo: String?,
     @field:Schema(description = "게시물 저장 시각")
-    val savedAt: Instant,
+    val savedAt: OffsetDateTime,
 ) {
     companion object {
         fun from(view: PlacePostView): PlacePostResponse = PlacePostResponse(
@@ -96,7 +97,7 @@ data class PlacePostResponse(
             authorIdentifier = view.authorIdentifier,
             representativeMedia = view.representativeMedia?.let(PlacePostMediaResponse::from),
             memo = view.memo,
-            savedAt = view.savedAt,
+            savedAt = view.savedAt.toSeoulOffsetDateTime(),
         )
     }
 }

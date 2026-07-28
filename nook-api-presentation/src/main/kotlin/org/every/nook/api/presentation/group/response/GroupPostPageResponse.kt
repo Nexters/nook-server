@@ -6,7 +6,8 @@ import org.every.nook.api.application.group.GroupPostSummary
 import org.every.nook.api.application.post.model.PostProcessingStageView
 import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.presentation.post.response.SavedPostMediaResponse
-import java.time.Instant
+import org.every.nook.api.presentation.response.toSeoulOffsetDateTime
+import java.time.OffsetDateTime
 
 data class GroupPostPageResponse(
     @field:Schema(description = "그룹 소유자의 닉네임")
@@ -51,7 +52,7 @@ data class GroupPostSummaryResponse(
     @field:Schema(description = "게시물에 연결된 장소 개수")
     val placeCount: Long,
     @field:Schema(description = "게시물 저장 시각")
-    val savedAt: Instant,
+    val savedAt: OffsetDateTime,
     @field:Schema(description = "게시물 전체 처리 상태")
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
@@ -65,7 +66,7 @@ data class GroupPostSummaryResponse(
             representativeMedia = result.post.representativeMedia?.let(SavedPostMediaResponse::from),
             memo = result.post.memo,
             placeCount = result.placeCount,
-            savedAt = result.post.savedAt,
+            savedAt = result.post.savedAt.toSeoulOffsetDateTime(),
             processingStatus = result.post.processingStatus,
             processingStage = result.post.processingStage,
         )
