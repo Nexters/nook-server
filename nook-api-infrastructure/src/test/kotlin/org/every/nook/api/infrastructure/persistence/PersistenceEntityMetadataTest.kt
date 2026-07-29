@@ -68,7 +68,10 @@ class PersistenceEntityMetadataTest {
         val table = requireNotNull(UserPlaceBookmarkEntity::class.findAnnotation<Table>())
 
         assertEquals("user_place_bookmarks", table.name)
-        assertEquals(setOf("idx_place_id"), table.indexes.map { it.name }.toSet())
+        assertEquals(
+            setOf("idx_place_id", "idx_user_id_created_at_id"),
+            table.indexes.map { it.name }.toSet(),
+        )
         val uniqueConstraint = table.uniqueConstraints.single()
         assertEquals("idx_u_user_id_place_id", uniqueConstraint.name)
         assertEquals(listOf("user_id", "place_id"), uniqueConstraint.columnNames.toList())
