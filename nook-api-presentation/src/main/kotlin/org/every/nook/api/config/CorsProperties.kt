@@ -9,6 +9,8 @@ data class CorsProperties(
         "http://127.0.0.1:*",
         "http://everynook.co.kr",
         "https://everynook.co.kr",
+        "http://www.everynook.co.kr",
+        "https://www.everynook.co.kr",
     ),
     val allowedMethods: List<String> = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
     val allowedHeaders: List<String> = listOf("*"),
