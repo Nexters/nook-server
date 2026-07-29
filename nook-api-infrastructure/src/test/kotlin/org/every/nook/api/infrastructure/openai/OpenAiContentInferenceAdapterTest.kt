@@ -67,6 +67,43 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
+    fun `extracts image place clues in one low detail request`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("\"type\":\"input_image\"")))
+            .andExpect(content().string(containsString("\"image_url\":\"https://cdn.test/1.jpg\"")))
+            .andExpect(content().string(containsString("\"image_url\":\"https://cdn.test/2.jpg\"")))
+            .andExpect(content().string(containsString("\"detail\":\"low\"")))
+            .andExpect(content().string(containsString("이미지에 실제로 보이는 상호명")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {
+                          "places": [
+                            {"name":"이미지 카페","region":"연희동","queries":["연희동 이미지 카페"]}
+                          ]
+                        }
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val places = fixture.adapter.extract(
+            PlaceClueExtractor.Request(
+                body = null,
+                hashtags = emptyList(),
+                sourceLocationTag = null,
+                imageUrls = listOf("https://cdn.test/1.jpg", "https://cdn.test/2.jpg"),
+            ),
+        )
+
+        assertEquals("이미지 카페", places.single().name)
+        fixture.server.verify()
+    }
+
+    @Test
     fun `selects a candidate from all search evidence`() {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))

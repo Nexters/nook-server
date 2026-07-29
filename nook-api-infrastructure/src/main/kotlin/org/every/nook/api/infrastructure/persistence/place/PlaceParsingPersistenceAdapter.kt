@@ -5,8 +5,10 @@ import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
@@ -21,6 +23,7 @@ class PlaceParsingPersistenceAdapter(
     private val jobRepository: PlaceParsingJobJpaRepository,
     private val postRepository: PostJpaRepository,
     private val hashtagRepository: PostHashtagJpaRepository,
+    private val mediaRepository: PostMediaJpaRepository,
     private val placeRepository: PlaceJpaRepository,
     private val postPlaceRepository: PostPlaceJpaRepository,
     private val userSavedPostRepository: UserSavedPostJpaRepository,
@@ -45,6 +48,10 @@ class PlaceParsingPersistenceAdapter(
             body = post.body,
             hashtags = hashtagRepository.findAllByPostIdOrderBySequenceAsc(job.postId).map { it.hashtag },
             sourceLocationTag = post.sourceLocationTag,
+            imageUrls = mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(
+                job.postId,
+                PostMedia.MediaType.IMAGE,
+            ).map { it.mediaUrl },
         )
     }
 
