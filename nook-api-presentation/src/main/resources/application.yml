@@ -25,12 +25,6 @@ server:
   shutdown: graceful
   forward-headers-strategy: framework
 
-app:
-  cors:
-    allowed-origin-patterns:
-      - ${CORS_ALLOWED_ORIGIN_PATTERN_LOCALHOST:http://localhost:*}
-      - ${CORS_ALLOWED_ORIGIN_PATTERN_127:http://127.0.0.1:*}
-
 management:
   endpoints:
     web:
