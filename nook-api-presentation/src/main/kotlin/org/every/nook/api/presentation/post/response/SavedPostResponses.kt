@@ -10,8 +10,9 @@ import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.application.post.model.SavedPostPage
 import org.every.nook.api.application.post.model.SavedPostPlace
 import org.every.nook.api.application.post.model.SavedPostSummary
+import org.every.nook.api.presentation.response.toSeoulOffsetDateTime
 import java.math.BigDecimal
-import java.time.Instant
+import java.time.OffsetDateTime
 
 data class SavedPostPageResponse(
     @field:Schema(description = "저장 게시물 목록")
@@ -51,7 +52,7 @@ data class SavedPostSummaryResponse(
     @field:Schema(description = "사용자 메모", nullable = true)
     val memo: String?,
     @field:Schema(description = "게시물 저장 시각")
-    val savedAt: Instant,
+    val savedAt: OffsetDateTime,
     @field:Schema(description = "게시물 전체 처리 상태")
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
@@ -64,7 +65,7 @@ data class SavedPostSummaryResponse(
             authorIdentifier = result.authorIdentifier,
             representativeMedia = result.representativeMedia?.let(SavedPostMediaResponse::from),
             memo = result.memo,
-            savedAt = result.savedAt,
+            savedAt = result.savedAt.toSeoulOffsetDateTime(),
             processingStatus = result.processingStatus,
             processingStage = result.processingStage,
         )
@@ -83,7 +84,7 @@ data class SavedPostDetailResponse(
     @field:Schema(description = "게시물 원본 URL")
     val canonicalUrl: String,
     @field:Schema(description = "게시물 발행 시각", nullable = true)
-    val publishedAt: Instant?,
+    val publishedAt: OffsetDateTime?,
     @field:Schema(description = "게시물 미디어 목록")
     val media: List<SavedPostMediaResponse>,
     @field:Schema(description = "게시물 해시태그 목록")
@@ -91,7 +92,7 @@ data class SavedPostDetailResponse(
     @field:Schema(description = "사용자 메모", nullable = true)
     val memo: String?,
     @field:Schema(description = "게시물 저장 시각")
-    val savedAt: Instant,
+    val savedAt: OffsetDateTime,
     @field:Schema(description = "게시물 장소 파싱 상태")
     val placeParsingStatus: PlaceParsingStatusView,
     @field:Schema(description = "장소 파싱 실패 사유", nullable = true)
@@ -110,11 +111,11 @@ data class SavedPostDetailResponse(
             body = result.body,
             authorIdentifier = result.authorIdentifier,
             canonicalUrl = result.canonicalUrl,
-            publishedAt = result.publishedAt,
+            publishedAt = result.publishedAt?.toSeoulOffsetDateTime(),
             media = result.media.map(SavedPostMediaResponse::from),
             hashtags = result.hashtags,
             memo = result.memo,
-            savedAt = result.savedAt,
+            savedAt = result.savedAt.toSeoulOffsetDateTime(),
             placeParsingStatus = result.placeParsingStatus,
             placeParsingFailureReason = result.placeParsingFailureReason,
             places = result.places.map(SavedPostPlaceResponse::from),

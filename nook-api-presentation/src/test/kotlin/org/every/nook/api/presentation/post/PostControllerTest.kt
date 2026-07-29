@@ -259,7 +259,7 @@ class PostControllerTest {
         )
     }
 
-    private fun stubSavedPostDetail() {
+    private fun stubSavedPostDetail(publishedAt: Instant? = Instant.parse("2026-07-20T00:00:00Z")) {
         `when`(
             detailUseCase(
                 GetSavedPostDetailUseCase.Query(
@@ -274,7 +274,7 @@ class PostControllerTest {
                 body = "본문",
                 authorIdentifier = "nook",
                 canonicalUrl = "https://www.instagram.com/p/ABC123/",
-                publishedAt = Instant.parse("2026-07-20T00:00:00Z"),
+                publishedAt = publishedAt,
                 media = listOf(
                     SavedPostMedia(
                         type = SavedPostMediaType.IMAGE,
@@ -393,6 +393,7 @@ class PostControllerTest {
             jsonPath("$.success.items[0].representativeMedia.sequence") { value(0) }
             jsonPath("$.success.items[0].processingStatus") { value("PROCESSING") }
             jsonPath("$.success.items[0].processingStage") { value("CONTENT") }
+            jsonPath("$.success.items[0].savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.totalElements") { value(1) }
             jsonPath("$.success.hasNext") { value(false) }
         }
@@ -407,8 +408,20 @@ class PostControllerTest {
             jsonPath("$.success.media[0].url") { value("https://example.com/1.jpg") }
             jsonPath("$.success.hashtags[0]") { value("성수") }
             jsonPath("$.success.places") { isEmpty() }
+            jsonPath("$.success.publishedAt") { value("2026-07-20T09:00:00+09:00") }
+            jsonPath("$.success.savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.processingStatus") { value("COMPLETED") }
             jsonPath("$.success.processingStage") { doesNotExist() }
+        }
+    }
+
+    @Test
+    fun `keeps an absent published time nullable`() {
+        stubSavedPostDetail(publishedAt = null)
+
+        mockMvc.get("/api/v1/posts/11").andExpect {
+            status { isOk() }
+            jsonPath("$.success.publishedAt") { doesNotExist() }
         }
     }
 
