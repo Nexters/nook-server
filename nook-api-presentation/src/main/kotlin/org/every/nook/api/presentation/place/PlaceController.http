@@ -9,6 +9,12 @@ Content-Type: application/json
 
 @placeId = 1
 
+### 지도 영역의 북마크 장소 조회
+GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&southLatitude=37.40&eastLongitude=127.20
+
+### 최근 저장 공간 조회
+GET {{baseUrl}}/api/v1/places/recent?size=20
+
 ### 장소 상세 및 연관 게시물 조회
 GET {{baseUrl}}/api/v1/places/{{placeId}}?page=0&size=20
 
