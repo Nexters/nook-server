@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.GetRecentPlacesUseCase
 import org.every.nook.api.application.place.MapPlaceView
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceDetailView
+import org.every.nook.api.application.place.PlacePostGroupView
 import org.every.nook.api.application.place.PlacePostMediaTypeView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
@@ -104,6 +105,7 @@ class PlaceControllerTest {
                             ),
                             memo = "주말 방문",
                             savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                            groups = listOf(PlacePostGroupView(17, "맛집", "YELLOW")),
                         ),
                     ),
                     page = 1,
@@ -122,6 +124,9 @@ class PlaceControllerTest {
                 jsonPath("$.success.bookmarked") { value(true) }
                 jsonPath("$.success.posts.items[0].postId") { value(21) }
                 jsonPath("$.success.posts.items[0].representativeMedia.type") { value("IMAGE") }
+                jsonPath("$.success.posts.items[0].groups[0].id") { value(17) }
+                jsonPath("$.success.posts.items[0].groups[0].name") { value("맛집") }
+                jsonPath("$.success.posts.items[0].groups[0].color") { value("YELLOW") }
                 jsonPath("$.success.posts.items[0].savedAt") { value("2026-07-27T09:00:00+09:00") }
                 jsonPath("$.success.posts.totalElements") { value(11) }
             }

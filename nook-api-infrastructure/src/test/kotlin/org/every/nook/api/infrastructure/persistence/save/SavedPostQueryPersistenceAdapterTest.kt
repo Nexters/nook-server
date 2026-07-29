@@ -1,10 +1,13 @@
 package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
+import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
+import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
+import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.member.MemberEntity
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
@@ -46,6 +49,7 @@ class SavedPostQueryPersistenceAdapterTest {
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
+    private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val memberRepository = mock(MemberJpaRepository::class.java)
     private val adapter = SavedPostQueryPersistenceAdapter(
         savedPostRepository,
@@ -58,6 +62,7 @@ class SavedPostQueryPersistenceAdapterTest {
         parsingJobRepository,
         contentParsingJobRepository,
         groupRepository,
+        groupPostRepository,
         memberRepository,
     )
 
@@ -82,7 +87,11 @@ class SavedPostQueryPersistenceAdapterTest {
         val placeOne = place(id = 201, name = "첫 장소")
         val placeTwo = place(id = 202, name = "둘째 장소")
         val bookmark = mock(UserPlaceBookmarkEntity::class.java)
+        val group = mock(GroupEntity::class.java)
         `when`(bookmark.placeId).thenReturn(202)
+        `when`(group.id).thenReturn(301)
+        `when`(group.name).thenReturn("맛집")
+        `when`(group.color).thenReturn(GroupColor.YELLOW)
 
         `when`(savedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
         `when`(postRepository.findById(101)).thenReturn(Optional.of(post))
@@ -96,6 +105,9 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(bookmarkRepository.findAllByUserIdAndPlaceIdIn(7, listOf(201, 202))).thenReturn(listOf(bookmark))
         `when`(parsingJobRepository.findByPostId(101))
             .thenReturn(PlaceParsingJobEntity(101, PlaceParsingStatus.COMPLETED))
+        `when`(groupPostRepository.findAllByUserSavedPostIdIn(listOf(11)))
+            .thenReturn(listOf(GroupPostEntity(groupId = 301, userSavedPostId = 11)))
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(301))).thenReturn(listOf(group))
 
         val detail = requireNotNull(adapter.findDetail(userId = 7, postId = 11))
 
@@ -105,6 +117,8 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf(false, true), detail.places.map { it.bookmarked })
         assertEquals(PlaceParsingStatusView.COMPLETED, detail.placeParsingStatus)
         assertEquals("내 메모", detail.memo)
+        assertEquals(listOf("맛집"), detail.groups.map { it.name })
+        assertEquals(listOf("YELLOW"), detail.groups.map { it.color })
     }
 
     @Test

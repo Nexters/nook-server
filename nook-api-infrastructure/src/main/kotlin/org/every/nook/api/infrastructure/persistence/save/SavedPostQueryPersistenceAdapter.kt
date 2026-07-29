@@ -6,6 +6,7 @@ import org.every.nook.api.application.group.port.GroupPostQueryPort
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PostProcessingView
 import org.every.nook.api.application.post.model.SavedPostDetail
+import org.every.nook.api.application.post.model.SavedPostGroup
 import org.every.nook.api.application.post.model.SavedPostMedia
 import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.application.post.model.SavedPostPage
@@ -15,7 +16,9 @@ import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
+import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
@@ -25,6 +28,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaReposito
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
@@ -44,6 +48,7 @@ class SavedPostQueryPersistenceAdapter(
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
     private val contentParsingJobRepository: PostContentParsingJobJpaRepository,
     private val groupRepository: GroupJpaRepository,
+    private val groupPostRepository: GroupPostJpaRepository,
     private val memberRepository: MemberJpaRepository,
 ) : SavedPostQueryPort,
     GroupPostQueryPort {
@@ -176,6 +181,7 @@ class SavedPostQueryPersistenceAdapter(
             contentStatus = contentParsingJob?.status ?: PostContentParsingStatus.COMPLETED,
             placeStatus = parsingJob?.status,
         )
+        val groups = findGroups(userId, listOf(postId)).getValue(postId)
 
         return SavedPostDetail(
             postId = postId,
@@ -188,29 +194,35 @@ class SavedPostQueryPersistenceAdapter(
             hashtags = hashtags,
             memo = savedPost.memo,
             savedAt = savedPost.createdAt,
+            groups = groups,
             placeParsingStatus = PlaceParsingStatusView.from(parsingJob?.status ?: PlaceParsingStatus.PENDING),
             placeParsingFailureReason = parsingJob?.failureReason
                 .takeIf { parsingJob?.status == PlaceParsingStatus.FAILED },
-            places = postPlaces.mapNotNull { postPlace ->
-                placesById[postPlace.placeId]?.let { place ->
-                    SavedPostPlace(
-                        id = requireNotNull(place.id),
-                        provider = place.provider,
-                        externalPlaceId = place.externalPlaceId,
-                        name = place.name,
-                        address = place.address,
-                        latitude = place.latitude,
-                        longitude = place.longitude,
-                        category = place.category,
-                        phoneNumber = place.phoneNumber,
-                        bookmarked = postPlace.placeId in bookmarkedPlaceIds,
-                        sequence = postPlace.sequence,
-                    )
-                }
-            },
+            places = postPlaces.toSavedPostPlaces(placesById, bookmarkedPlaceIds),
             processingStatus = processing.status,
             processingStage = processing.stage,
         )
+    }
+
+    private fun List<PostPlaceEntity>.toSavedPostPlaces(
+        placesById: Map<Long, PlaceEntity>,
+        bookmarkedPlaceIds: Set<Long>,
+    ): List<SavedPostPlace> = mapNotNull { postPlace ->
+        placesById[postPlace.placeId]?.let { place ->
+            SavedPostPlace(
+                id = requireNotNull(place.id),
+                provider = place.provider,
+                externalPlaceId = place.externalPlaceId,
+                name = place.name,
+                address = place.address,
+                latitude = place.latitude,
+                longitude = place.longitude,
+                category = place.category,
+                phoneNumber = place.phoneNumber,
+                bookmarked = postPlace.placeId in bookmarkedPlaceIds,
+                sequence = postPlace.sequence,
+            )
+        }
     }
 
     private fun PostEntity.toSummary(
@@ -227,6 +239,35 @@ class SavedPostQueryPersistenceAdapter(
         processingStatus = processing.status,
         processingStage = processing.stage,
     )
+
+    private fun findGroups(userId: Long, savedPostIds: List<Long>): Map<Long, List<SavedPostGroup>> {
+        if (savedPostIds.isEmpty()) {
+            return emptyMap()
+        }
+        val groupPostsBySavedPostId = groupPostRepository
+            .findAllByUserSavedPostIdIn(savedPostIds)
+            .groupBy { it.userSavedPostId }
+        val groupIds = groupPostsBySavedPostId.values
+            .flatten()
+            .mapTo(mutableSetOf()) { it.groupId }
+        val groupsById = if (groupIds.isEmpty()) {
+            emptyMap()
+        } else {
+            groupRepository.findAllByUserIdAndIdIn(userId, groupIds).associateBy { requireNotNull(it.id) }
+        }
+
+        return savedPostIds.associateWith { savedPostId ->
+            groupPostsBySavedPostId[savedPostId].orEmpty().mapNotNull { groupPost ->
+                groupsById[groupPost.groupId]?.let { group ->
+                    SavedPostGroup(
+                        id = requireNotNull(group.id),
+                        name = group.name,
+                        color = group.color.name,
+                    )
+                }
+            }
+        }
+    }
 
     private fun PostMediaEntity.toView(): SavedPostMedia = SavedPostMedia(
         type = SavedPostMediaType.valueOf(mediaType.name),

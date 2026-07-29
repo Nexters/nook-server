@@ -1,6 +1,11 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.group.GroupEntity
+import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
+import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
+import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
@@ -30,12 +35,16 @@ class PlaceDetailQueryPersistenceAdapterTest {
     private val savedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val postRepository = mock(PostJpaRepository::class.java)
     private val mediaRepository = mock(PostMediaJpaRepository::class.java)
+    private val groupRepository = mock(GroupJpaRepository::class.java)
+    private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val adapter = PlaceDetailQueryPersistenceAdapter(
         placeRepository,
         bookmarkRepository,
         savedPostRepository,
         postRepository,
         mediaRepository,
+        groupRepository,
+        groupPostRepository,
     )
 
     @Test
@@ -52,7 +61,7 @@ class PlaceDetailQueryPersistenceAdapterTest {
         assertTrue(detail.bookmarked)
         assertTrue(detail.posts.items.isEmpty())
         assertEquals(0L, detail.posts.totalElements)
-        verifyNoInteractions(postRepository, mediaRepository)
+        verifyNoInteractions(postRepository, mediaRepository, groupRepository, groupPostRepository)
     }
 
     @Test
@@ -62,6 +71,10 @@ class PlaceDetailQueryPersistenceAdapterTest {
         val savedPost = savedPost()
         val sourcePost = sourcePost()
         val media = PostMediaEntity(101, PostMedia.MediaType.IMAGE, "https://example.com/image.jpg", 0)
+        val group = mock(GroupEntity::class.java)
+        `when`(group.id).thenReturn(301)
+        `when`(group.name).thenReturn("맛집")
+        `when`(group.color).thenReturn(GroupColor.YELLOW)
         `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
         `when`(savedPostRepository.findAllByUserIdAndPlaceId(7, 17, pageable))
             .thenReturn(PageImpl(listOf(savedPost), pageable, 11))
@@ -69,12 +82,17 @@ class PlaceDetailQueryPersistenceAdapterTest {
         `when`(postRepository.findAllById(listOf(101))).thenReturn(listOf(sourcePost))
         `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101)))
             .thenReturn(listOf(media))
+        `when`(groupPostRepository.findAllByUserSavedPostIdIn(listOf(21)))
+            .thenReturn(listOf(GroupPostEntity(groupId = 301, userSavedPostId = 21)))
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(301))).thenReturn(listOf(group))
 
         val detail = assertNotNull(adapter.find(userId = 7, placeId = 17, page = 1, size = 10))
 
         assertFalse(detail.bookmarked)
         assertEquals(21, detail.posts.items.single().postId)
         assertEquals("내 메모", detail.posts.items.single().memo)
+        assertEquals(listOf("맛집"), detail.posts.items.single().groups.map { it.name })
+        assertEquals(listOf("YELLOW"), detail.posts.items.single().groups.map { it.color })
         assertEquals("https://example.com/image.jpg", detail.posts.items.single().representativeMedia?.url)
         assertEquals(11L, detail.posts.totalElements)
         assertEquals(listOf("createdAt: DESC", "id: DESC"), pageable.sort.map { it.toString() }.toList())
@@ -91,7 +109,7 @@ class PlaceDetailQueryPersistenceAdapterTest {
         `when`(bookmarkRepository.existsByUserIdAndPlaceId(7, 17)).thenReturn(false)
 
         assertNull(adapter.find(userId = 7, placeId = 17, page = 0, size = 20))
-        verifyNoInteractions(postRepository, mediaRepository)
+        verifyNoInteractions(postRepository, mediaRepository, groupRepository, groupPostRepository)
     }
 
     private fun expectedPageable(page: Int, size: Int): PageRequest = PageRequest.of(
