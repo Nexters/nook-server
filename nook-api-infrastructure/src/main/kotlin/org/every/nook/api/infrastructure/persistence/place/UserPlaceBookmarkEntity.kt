@@ -13,7 +13,10 @@ import org.every.nook.api.infrastructure.persistence.BaseEntity
 @Entity
 @Table(
     name = "user_place_bookmarks",
-    indexes = [Index(name = "idx_place_id", columnList = "place_id")],
+    indexes = [
+        Index(name = "idx_place_id", columnList = "place_id"),
+        Index(name = "idx_user_id_created_at_id", columnList = "user_id, created_at, id"),
+    ],
     uniqueConstraints = [
         UniqueConstraint(name = "idx_u_user_id_place_id", columnNames = ["user_id", "place_id"]),
     ],

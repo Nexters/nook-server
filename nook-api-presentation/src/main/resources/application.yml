@@ -66,6 +66,12 @@ external:
     rest-api-key: ${KAKAO_REST_API_KEY:}
     connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:3s}
     read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:5s}
+  naver-map:
+    base-url: ${NAVER_MAP_BASE_URL:https://maps.apigw.ntruss.com}
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
+    connect-timeout: ${NAVER_MAP_CONNECT_TIMEOUT:3s}
+    read-timeout: ${NAVER_MAP_READ_TIMEOUT:5s}
   bright-data:
     base-url: ${BRIGHT_DATA_BASE_URL:https://api.brightdata.com}
     api-token: ${BRIGHT_DATA_API_TOKEN:}

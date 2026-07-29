@@ -1,11 +1,21 @@
 package org.every.nook.api.presentation.place
 
+import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
+import org.every.nook.api.application.place.GetRecentPlacesUseCase
+import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceDetailView
 import org.every.nook.api.application.place.PlacePostMediaTypeView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
+import org.every.nook.api.application.place.PlaceSearchResultView
+import org.every.nook.api.application.place.PlaceSearchSliceView
+import org.every.nook.api.application.place.RecentPlaceCursor
+import org.every.nook.api.application.place.RecentPlaceSliceView
+import org.every.nook.api.application.place.RecentPlaceView
+import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -29,6 +39,9 @@ class PlaceControllerTest {
     private lateinit var mockMvc: MockMvc
     private lateinit var updatePlaceBookmarkUseCase: UpdatePlaceBookmarkUseCase
     private lateinit var getPlaceDetailUseCase: GetPlaceDetailUseCase
+    private lateinit var getMapPlacesUseCase: GetMapPlacesUseCase
+    private lateinit var getRecentPlacesUseCase: GetRecentPlacesUseCase
+    private lateinit var searchPlacesUseCase: SearchPlacesUseCase
 
     @BeforeTest
     fun setUp() {
@@ -36,8 +49,19 @@ class PlaceControllerTest {
             TestingAuthenticationToken(TEST_USER_ID.toString(), "credentials", "ROLE_USER")
         updatePlaceBookmarkUseCase = mock(UpdatePlaceBookmarkUseCase::class.java)
         getPlaceDetailUseCase = mock(GetPlaceDetailUseCase::class.java)
+        getMapPlacesUseCase = mock(GetMapPlacesUseCase::class.java)
+        getRecentPlacesUseCase = mock(GetRecentPlacesUseCase::class.java)
+        searchPlacesUseCase = mock(SearchPlacesUseCase::class.java)
         mockMvc = MockMvcBuilders
-            .standaloneSetup(PlaceController(updatePlaceBookmarkUseCase, getPlaceDetailUseCase))
+            .standaloneSetup(
+                PlaceController(
+                    updatePlaceBookmarkUseCase,
+                    getPlaceDetailUseCase,
+                    getMapPlacesUseCase,
+                    getRecentPlacesUseCase,
+                    searchPlacesUseCase,
+                ),
+            )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
             .setControllerAdvice(GlobalExceptionHandler())
             .build()
@@ -103,6 +127,124 @@ class PlaceControllerTest {
             }
 
         verify(getPlaceDetailUseCase)(query)
+    }
+
+    @Test
+    fun `returns lightweight map places inside requested bounds`() {
+        val query = GetMapPlacesUseCase.Query(
+            userId = TEST_USER_ID,
+            northLatitude = BigDecimal("37.6"),
+            westLongitude = BigDecimal("126.8"),
+            southLatitude = BigDecimal("37.4"),
+            eastLongitude = BigDecimal("127.2"),
+        )
+        `when`(getMapPlacesUseCase(query)).thenReturn(
+            listOf(MapPlaceView(17, BigDecimal("37.5"), BigDecimal("127.0"))),
+        )
+
+        mockMvc.get(
+            "/api/v1/places/map" +
+                "?northLatitude=37.6&westLongitude=126.8&southLatitude=37.4&eastLongitude=127.2",
+        ).andExpect {
+            status { isOk() }
+            jsonPath("$.success[0].id") { value(17) }
+            jsonPath("$.success[0].latitude") { value(37.5) }
+            jsonPath("$.success[0].longitude") { value(127.0) }
+            jsonPath("$.success[0].name") { doesNotExist() }
+        }
+
+        verify(getMapPlacesUseCase)(query)
+    }
+
+    @Test
+    fun `returns recent places with an opaque next cursor`() {
+        val bookmarkedAt = Instant.parse("2026-07-27T00:00:00Z")
+        `when`(
+            getRecentPlacesUseCase(
+                GetRecentPlacesUseCase.Query(
+                    userId = TEST_USER_ID,
+                    cursor = null,
+                    size = 2,
+                ),
+            ),
+        ).thenReturn(
+            RecentPlaceSliceView(
+                items = listOf(
+                    RecentPlaceView(
+                        bookmarkId = 31,
+                        bookmarkedAt = bookmarkedAt,
+                        id = 17,
+                        name = "퍼머넌트해비탯",
+                        address = "경기 용인시",
+                        category = "카페",
+                        latitude = BigDecimal("37.5"),
+                        longitude = BigDecimal("127.0"),
+                        thumbnailUrl = "https://example.com/place.jpg",
+                    ),
+                ),
+                nextCursor = RecentPlaceCursor(bookmarkedAt, 31),
+                hasNext = true,
+            ),
+        )
+
+        mockMvc.get("/api/v1/places/recent?size=2")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success.items[0].id") { value(17) }
+                jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
+                jsonPath("$.success.items[0].thumbnailUrl") { value("https://example.com/place.jpg") }
+                jsonPath("$.success.nextCursor") { isNotEmpty() }
+                jsonPath("$.success.hasNext") { value(true) }
+            }
+    }
+
+    @Test
+    fun `returns paged place candidates for manual connection`() {
+        val query = SearchPlacesUseCase.Query(
+            userId = TEST_USER_ID,
+            keyword = "퍼머넌트해비탯",
+            page = 1,
+            size = 10,
+            longitude = BigDecimal("127.0"),
+            latitude = BigDecimal("37.5"),
+        )
+        `when`(searchPlacesUseCase(query)).thenReturn(
+            PlaceSearchSliceView(
+                items = listOf(
+                    PlaceSearchResultView(
+                        selectionToken = "signed-token",
+                        candidate = PlaceCandidate(
+                            provider = "KAKAO",
+                            externalPlaceId = "1234",
+                            name = "퍼머넌트해비탯",
+                            address = "경기 용인시",
+                            latitude = BigDecimal("37.5"),
+                            longitude = BigDecimal("127.0"),
+                            category = "카페",
+                            phoneNumber = null,
+                            providerUrl = null,
+                            distanceMeters = 1200,
+                        ),
+                    ),
+                ),
+                page = 1,
+                size = 10,
+                hasNext = true,
+            ),
+        )
+
+        mockMvc.get(
+            "/api/v1/places/search" +
+                "?query=퍼머넌트해비탯&page=1&size=10&longitude=127.0&latitude=37.5",
+        ).andExpect {
+            status { isOk() }
+            jsonPath("$.success.items[0].selectionToken") { value("signed-token") }
+            jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
+            jsonPath("$.success.items[0].distanceMeters") { value(1200) }
+            jsonPath("$.success.hasNext") { value(true) }
+        }
+
+        verify(searchPlacesUseCase)(query)
     }
 
     @Test

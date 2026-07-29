@@ -3,6 +3,7 @@ package org.every.nook.api.presentation.post
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.group.error.GroupNotFoundException
+import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
@@ -45,6 +46,7 @@ class PostControllerTest {
     private lateinit var detailUseCase: GetSavedPostDetailUseCase
     private lateinit var updateMemoUseCase: UpdatePostMemoUseCase
     private lateinit var replaceGroupsUseCase: ReplaceSavedPostGroupsUseCase
+    private lateinit var connectPostPlaceUseCase: ConnectPostPlaceUseCase
 
     @BeforeTest
     fun setUp() {
@@ -56,6 +58,7 @@ class PostControllerTest {
         detailUseCase = mock(GetSavedPostDetailUseCase::class.java)
         updateMemoUseCase = mock(UpdatePostMemoUseCase::class.java)
         replaceGroupsUseCase = mock(ReplaceSavedPostGroupsUseCase::class.java)
+        connectPostPlaceUseCase = mock(ConnectPostPlaceUseCase::class.java)
         stubCreate()
         stubPlaceParsing(findUseCase)
         stubSavedPostList()
@@ -69,6 +72,7 @@ class PostControllerTest {
                     detailUseCase,
                     updateMemoUseCase,
                     replaceGroupsUseCase,
+                    connectPostPlaceUseCase,
                 ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
@@ -98,6 +102,26 @@ class PostControllerTest {
                 memo = "다음 주 평일에 방문",
             ),
         )
+    }
+
+    @Test
+    fun `connects a searched place to my saved post`() {
+        val command = ConnectPostPlaceUseCase.Command(
+            userId = TEST_USER_ID,
+            postId = 11,
+            selectionToken = "signed-token",
+        )
+        `when`(connectPostPlaceUseCase(command)).thenReturn(ConnectPostPlaceUseCase.Result(17))
+
+        mockMvc.post("/api/v1/posts/11/places") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"selectionToken":"signed-token"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.success.placeId") { value(17) }
+        }
+
+        verify(connectPostPlaceUseCase)(command)
     }
 
     @Test

@@ -12,4 +12,5 @@ data class PlaceCandidate(
     val category: String?,
     val phoneNumber: String?,
     val providerUrl: String?,
+    val distanceMeters: Int? = null,
 )

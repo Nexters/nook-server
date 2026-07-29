@@ -19,14 +19,21 @@ import org.every.nook.api.presentation.group.response.GroupPostSummaryResponse
 import org.every.nook.api.presentation.group.response.GroupResponse
 import org.every.nook.api.presentation.place.PlaceController
 import org.every.nook.api.presentation.place.request.UpdatePlaceBookmarkRequest
+import org.every.nook.api.presentation.place.response.MapPlaceResponse
 import org.every.nook.api.presentation.place.response.PlaceDetailResponse
 import org.every.nook.api.presentation.place.response.PlacePostMediaResponse
 import org.every.nook.api.presentation.place.response.PlacePostPageResponse
 import org.every.nook.api.presentation.place.response.PlacePostResponse
+import org.every.nook.api.presentation.place.response.PlaceSearchResponse
+import org.every.nook.api.presentation.place.response.PlaceSearchSliceResponse
+import org.every.nook.api.presentation.place.response.RecentPlaceResponse
+import org.every.nook.api.presentation.place.response.RecentPlaceSliceResponse
 import org.every.nook.api.presentation.post.PostController
+import org.every.nook.api.presentation.post.request.ConnectPostPlaceRequest
 import org.every.nook.api.presentation.post.request.CreatePostRequest
 import org.every.nook.api.presentation.post.request.ReplaceSavedPostGroupsRequest
 import org.every.nook.api.presentation.post.request.UpdatePostMemoRequest
+import org.every.nook.api.presentation.post.response.ConnectedPlaceResponse
 import org.every.nook.api.presentation.post.response.PlaceResponse
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
 import org.every.nook.api.presentation.post.response.PostResponse
@@ -203,10 +210,17 @@ class OpenApiDocumentationPolicyTest {
             UpdateGroupRequest::class.java,
             GroupResponse::class.java,
             UpdatePlaceBookmarkRequest::class.java,
+            MapPlaceResponse::class.java,
+            RecentPlaceSliceResponse::class.java,
+            RecentPlaceResponse::class.java,
             PlaceDetailResponse::class.java,
             PlacePostPageResponse::class.java,
             PlacePostResponse::class.java,
             PlacePostMediaResponse::class.java,
+            PlaceSearchSliceResponse::class.java,
+            PlaceSearchResponse::class.java,
+            ConnectPostPlaceRequest::class.java,
+            ConnectedPlaceResponse::class.java,
             CreatePostRequest::class.java,
             ReplaceSavedPostGroupsRequest::class.java,
             UpdatePostMemoRequest::class.java,

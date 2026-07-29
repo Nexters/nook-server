@@ -22,4 +22,8 @@ interface PostJpaRepository : JpaRepository<PostEntity, Long> {
         @Param("sourceType") sourceType: String,
         @Param("externalPostId") externalPostId: String,
     ): PostEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT post FROM PostEntity post WHERE post.id = :postId")
+    fun findByIdForUpdate(@Param("postId") postId: Long): PostEntity?
 }
