@@ -82,6 +82,18 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `service frontend www preflight request is allowed without authentication`() {
+        mockMvc.perform(
+            options("/test/protected")
+                .header(HttpHeaders.ORIGIN, "https://www.everynook.co.kr")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name()),
+        ).andExpect(status().isOk)
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://www.everynook.co.kr"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+    }
+
+    @Test
     fun `service frontend http preflight request is allowed without authentication`() {
         mockMvc.perform(
             options("/test/protected")

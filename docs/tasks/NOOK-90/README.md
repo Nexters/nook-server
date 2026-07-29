@@ -9,6 +9,8 @@
 - CORS 기본 허용 origin에 서비스 웹 호스트 추가
   - `http://everynook.co.kr`
   - `https://everynook.co.kr`
+  - `http://www.everynook.co.kr`
+  - `https://www.everynook.co.kr`
 - 환경변수 override에 의존하지 않고 애플리케이션 기본 코드 설정에 포함
 - 서비스 웹 호스트 preflight 회귀 테스트 추가
 - 기존 localhost 및 127.0.0.1 로컬 프론트엔드 허용 유지
