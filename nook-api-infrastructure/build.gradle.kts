@@ -24,6 +24,7 @@ dependencies {
     runtimeOnly("com.mysql:mysql-connector-j")
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
+    testImplementation("jakarta.servlet:jakarta.servlet-api")
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
     testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:junit-jupiter")
