@@ -24,7 +24,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
         """,
         nativeQuery = true,
     )
-    fun isAccessible(@Param("userId") userId: Long, @Param("placeId") placeId: Long): Boolean
+    fun isAccessible(@Param("userId") userId: Long, @Param("placeId") placeId: Long): Long
 
     @Modifying
     @Query(

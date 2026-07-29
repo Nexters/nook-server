@@ -9,7 +9,7 @@ class PlaceBookmarkPersistenceAdapter(private val bookmarkRepository: UserPlaceB
     UpdatePlaceBookmarkPort {
     @Transactional
     override fun update(userId: Long, placeId: Long, bookmarked: Boolean): Boolean {
-        if (!bookmarkRepository.isAccessible(userId, placeId)) {
+        if (bookmarkRepository.isAccessible(userId, placeId) == 0L) {
             return false
         }
 
