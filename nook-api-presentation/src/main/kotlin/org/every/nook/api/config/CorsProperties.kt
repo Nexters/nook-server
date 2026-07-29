@@ -7,6 +7,8 @@ data class CorsProperties(
     val allowedOriginPatterns: List<String> = listOf(
         "http://localhost:*",
         "http://127.0.0.1:*",
+        "http://everynook.co.kr",
+        "https://everynook.co.kr",
     ),
     val allowedMethods: List<String> = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
     val allowedHeaders: List<String> = listOf("*"),
