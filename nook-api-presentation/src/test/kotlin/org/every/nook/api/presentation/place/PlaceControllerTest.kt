@@ -4,14 +4,18 @@ import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
 import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceDetailView
 import org.every.nook.api.application.place.PlacePostMediaTypeView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
+import org.every.nook.api.application.place.PlaceSearchResultView
+import org.every.nook.api.application.place.PlaceSearchSliceView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
+import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -37,6 +41,7 @@ class PlaceControllerTest {
     private lateinit var getPlaceDetailUseCase: GetPlaceDetailUseCase
     private lateinit var getMapPlacesUseCase: GetMapPlacesUseCase
     private lateinit var getRecentPlacesUseCase: GetRecentPlacesUseCase
+    private lateinit var searchPlacesUseCase: SearchPlacesUseCase
 
     @BeforeTest
     fun setUp() {
@@ -46,6 +51,7 @@ class PlaceControllerTest {
         getPlaceDetailUseCase = mock(GetPlaceDetailUseCase::class.java)
         getMapPlacesUseCase = mock(GetMapPlacesUseCase::class.java)
         getRecentPlacesUseCase = mock(GetRecentPlacesUseCase::class.java)
+        searchPlacesUseCase = mock(SearchPlacesUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 PlaceController(
@@ -53,6 +59,7 @@ class PlaceControllerTest {
                     getPlaceDetailUseCase,
                     getMapPlacesUseCase,
                     getRecentPlacesUseCase,
+                    searchPlacesUseCase,
                 ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
@@ -188,6 +195,55 @@ class PlaceControllerTest {
                 jsonPath("$.success.nextCursor") { isNotEmpty() }
                 jsonPath("$.success.hasNext") { value(true) }
             }
+    }
+
+    @Test
+    fun `returns paged place candidates for manual connection`() {
+        val query = SearchPlacesUseCase.Query(
+            userId = TEST_USER_ID,
+            keyword = "퍼머넌트해비탯",
+            page = 1,
+            size = 10,
+            longitude = BigDecimal("127.0"),
+            latitude = BigDecimal("37.5"),
+        )
+        `when`(searchPlacesUseCase(query)).thenReturn(
+            PlaceSearchSliceView(
+                items = listOf(
+                    PlaceSearchResultView(
+                        selectionToken = "signed-token",
+                        candidate = PlaceCandidate(
+                            provider = "KAKAO",
+                            externalPlaceId = "1234",
+                            name = "퍼머넌트해비탯",
+                            address = "경기 용인시",
+                            latitude = BigDecimal("37.5"),
+                            longitude = BigDecimal("127.0"),
+                            category = "카페",
+                            phoneNumber = null,
+                            providerUrl = null,
+                            distanceMeters = 1200,
+                        ),
+                    ),
+                ),
+                page = 1,
+                size = 10,
+                hasNext = true,
+            ),
+        )
+
+        mockMvc.get(
+            "/api/v1/places/search" +
+                "?query=퍼머넌트해비탯&page=1&size=10&longitude=127.0&latitude=37.5",
+        ).andExpect {
+            status { isOk() }
+            jsonPath("$.success.items[0].selectionToken") { value("signed-token") }
+            jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
+            jsonPath("$.success.items[0].distanceMeters") { value(1200) }
+            jsonPath("$.success.hasNext") { value(true) }
+        }
+
+        verify(searchPlacesUseCase)(query)
     }
 
     @Test

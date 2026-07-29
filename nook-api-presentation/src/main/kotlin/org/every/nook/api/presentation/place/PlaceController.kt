@@ -12,11 +12,13 @@ import jakarta.validation.constraints.Positive
 import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
+import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.place.request.UpdatePlaceBookmarkRequest
 import org.every.nook.api.presentation.place.response.MapPlaceResponse
 import org.every.nook.api.presentation.place.response.PlaceDetailResponse
+import org.every.nook.api.presentation.place.response.PlaceSearchSliceResponse
 import org.every.nook.api.presentation.place.response.RecentPlaceSliceResponse
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.validation.annotation.Validated
@@ -31,6 +33,8 @@ import java.math.BigDecimal
 
 private const val MAX_PLACE_POST_PAGE_SIZE = 100L
 private const val MAX_RECENT_PLACE_PAGE_SIZE = 100L
+private const val MAX_PLACE_SEARCH_PAGE = 44L
+private const val MAX_PLACE_SEARCH_PAGE_SIZE = 15L
 
 @Tag(name = "Place")
 @Validated
@@ -41,6 +45,7 @@ class PlaceController(
     private val getPlaceDetailUseCase: GetPlaceDetailUseCase,
     private val getMapPlacesUseCase: GetMapPlacesUseCase,
     private val getRecentPlacesUseCase: GetRecentPlacesUseCase,
+    private val searchPlacesUseCase: SearchPlacesUseCase,
 ) {
     @Operation(summary = "지도 영역의 북마크 장소 조회")
     @GetMapping("/map")
@@ -100,6 +105,47 @@ class PlaceController(
             ),
         )
         return ApiResponse.success(RecentPlaceSliceResponse.from(places))
+    }
+
+    @Operation(summary = "직접 연결할 장소 검색")
+    @GetMapping("/search")
+    fun searchPlaces(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "검색할 장소명 또는 장소명과 지역")
+        @RequestParam
+        query: String,
+        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
+        @RequestParam(defaultValue = "0")
+        @Min(0)
+        @Max(MAX_PLACE_SEARCH_PAGE)
+        page: Int,
+        @Parameter(description = "페이지당 장소 수")
+        @RequestParam(defaultValue = "15")
+        @Min(1)
+        @Max(MAX_PLACE_SEARCH_PAGE_SIZE)
+        size: Int,
+        @Parameter(description = "거리 계산 기준 위도")
+        @RequestParam(required = false)
+        @DecimalMin("-90")
+        @DecimalMax("90")
+        latitude: BigDecimal?,
+        @Parameter(description = "거리 계산 기준 경도")
+        @RequestParam(required = false)
+        @DecimalMin("-180")
+        @DecimalMax("180")
+        longitude: BigDecimal?,
+    ): ApiResponse<PlaceSearchSliceResponse> {
+        val result = searchPlacesUseCase(
+            SearchPlacesUseCase.Query(
+                userId = userContext.userId,
+                keyword = query,
+                page = page,
+                size = size,
+                longitude = longitude,
+                latitude = latitude,
+            ),
+        )
+        return ApiResponse.success(PlaceSearchSliceResponse.from(result))
     }
 
     @Operation(summary = "장소 상세 및 연관 게시물 조회")

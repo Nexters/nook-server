@@ -4,7 +4,15 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class KakaoPlaceResponse(val documents: List<Document> = emptyList()) {
+data class KakaoPlaceResponse(val meta: Meta = Meta(), val documents: List<Document> = emptyList()) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class Meta(
+        @JsonProperty("pageable_count")
+        val pageableCount: Int = 0,
+        @JsonProperty("is_end")
+        val isEnd: Boolean = true,
+    )
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Document(
         val id: String?,
@@ -21,5 +29,6 @@ data class KakaoPlaceResponse(val documents: List<Document> = emptyList()) {
         val y: String?,
         @JsonProperty("place_url")
         val placeUrl: String?,
+        val distance: String? = null,
     )
 }

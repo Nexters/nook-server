@@ -8,15 +8,18 @@ import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Positive
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
+import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.presentation.auth.UserContext
+import org.every.nook.api.presentation.post.request.ConnectPostPlaceRequest
 import org.every.nook.api.presentation.post.request.CreatePostRequest
 import org.every.nook.api.presentation.post.request.ReplaceSavedPostGroupsRequest
 import org.every.nook.api.presentation.post.request.UpdatePostMemoRequest
+import org.every.nook.api.presentation.post.response.ConnectedPlaceResponse
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
 import org.every.nook.api.presentation.post.response.PostResponse
 import org.every.nook.api.presentation.post.response.SavedPostDetailResponse
@@ -48,6 +51,7 @@ class PostController(
     private val getSavedPostDetailUseCase: GetSavedPostDetailUseCase,
     private val updatePostMemoUseCase: UpdatePostMemoUseCase,
     private val replaceSavedPostGroupsUseCase: ReplaceSavedPostGroupsUseCase,
+    private val connectPostPlaceUseCase: ConnectPostPlaceUseCase,
 ) {
     @Operation(summary = "URL로 게시물 저장 시작")
     @PostMapping
@@ -168,5 +172,25 @@ class PostController(
         )
 
         return ApiResponse.success(PostPlaceParsingResponse.from(result))
+    }
+
+    @Operation(summary = "저장 게시물에 장소 직접 연결")
+    @PostMapping("/{postId}/places")
+    fun connectPlace(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "장소를 연결할 저장 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
+        @Valid @RequestBody request: ConnectPostPlaceRequest,
+    ): ApiResponse<ConnectedPlaceResponse> {
+        val result = connectPostPlaceUseCase(
+            ConnectPostPlaceUseCase.Command(
+                userId = userContext.userId,
+                postId = postId,
+                selectionToken = request.selectionToken,
+            ),
+        )
+        return ApiResponse.success(ConnectedPlaceResponse.from(result))
     }
 }
