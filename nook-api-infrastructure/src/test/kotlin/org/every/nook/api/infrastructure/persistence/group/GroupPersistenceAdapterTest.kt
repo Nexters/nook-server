@@ -20,6 +20,39 @@ class GroupPersistenceAdapterTest {
     private val adapter = GroupPersistenceAdapter(groupRepository, groupPostRepository)
 
     @Test
+    fun `lists groups with recent thumbnail urls in repository order`() {
+        val groupSummary = mock(GroupSummaryProjection::class.java)
+        val firstThumbnail = mock(GroupThumbnailProjection::class.java)
+        val secondThumbnail = mock(GroupThumbnailProjection::class.java)
+        `when`(groupSummary.id).thenReturn(17)
+        `when`(groupSummary.name).thenReturn("카페")
+        `when`(groupSummary.color).thenReturn(GroupColor.YELLOW)
+        `when`(groupSummary.postCount).thenReturn(4)
+        `when`(firstThumbnail.groupId).thenReturn(17)
+        `when`(firstThumbnail.thumbnailUrl).thenReturn("https://example.com/latest.jpg")
+        `when`(secondThumbnail.groupId).thenReturn(17)
+        `when`(secondThumbnail.thumbnailUrl).thenReturn("https://example.com/second.jpg")
+        `when`(groupRepository.findAllSummaries(7)).thenReturn(listOf(groupSummary))
+        `when`(groupRepository.findRecentThumbnailUrls(7)).thenReturn(listOf(firstThumbnail, secondThumbnail))
+
+        val result = adapter.findAll(7)
+
+        assertEquals(
+            listOf("https://example.com/latest.jpg", "https://example.com/second.jpg"),
+            result.single().thumbnailUrls,
+        )
+        verify(groupRepository).findRecentThumbnailUrls(7)
+    }
+
+    @Test
+    fun `does not query thumbnails when user has no groups`() {
+        `when`(groupRepository.findAllSummaries(7)).thenReturn(emptyList())
+
+        assertTrue(adapter.findAll(7).isEmpty())
+        verify(groupRepository, never()).findRecentThumbnailUrls(7)
+    }
+
+    @Test
     fun `duplicate group name is saved as a distinct group`() {
         val firstSaved = mock(GroupEntity::class.java)
         val secondSaved = mock(GroupEntity::class.java)

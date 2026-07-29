@@ -14,8 +14,17 @@ class GroupPersistenceAdapter(
 ) : GroupPort,
     GroupOwnershipPort {
     @Transactional(readOnly = true)
-    override fun findAll(userId: Long): List<GroupView> =
-        groupRepository.findAllSummaries(userId).map { projection -> projection.toView() }
+    override fun findAll(userId: Long): List<GroupView> {
+        val summaries = groupRepository.findAllSummaries(userId)
+        if (summaries.isEmpty()) {
+            return emptyList()
+        }
+        val thumbnailUrlsByGroupId = groupRepository.findRecentThumbnailUrls(userId)
+            .groupBy(GroupThumbnailProjection::groupId, GroupThumbnailProjection::thumbnailUrl)
+        return summaries.map { projection ->
+            projection.toView(thumbnailUrlsByGroupId.getOrDefault(projection.id, emptyList()))
+        }
+    }
 
     override fun create(userId: Long, name: String, color: GroupColor): GroupView {
         val saved = groupRepository.saveAndFlush(GroupEntity(userId = userId, name = name, color = color))
@@ -60,6 +69,11 @@ class GroupPersistenceAdapter(
         return ownedGroupIds == groupIds
     }
 
-    private fun GroupSummaryProjection.toView(): GroupView =
-        GroupView(id = id, name = name, color = color.name, postCount = postCount)
+    private fun GroupSummaryProjection.toView(thumbnailUrls: List<String>): GroupView = GroupView(
+        id = id,
+        name = name,
+        color = color.name,
+        postCount = postCount,
+        thumbnailUrls = thumbnailUrls,
+    )
 }
