@@ -62,7 +62,7 @@ class PlaceSearchConfig {
         @Qualifier("kakaoPlaceRestClient") restClient: RestClient,
         properties: KakaoPlaceProperties,
         mapper: KakaoPlaceMapper,
-    ): PlaceSearchProvider = KakaoPlaceSearchProvider(
+    ): KakaoPlaceSearchProvider = KakaoPlaceSearchProvider(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,

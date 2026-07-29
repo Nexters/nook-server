@@ -23,12 +23,16 @@ import org.every.nook.api.presentation.place.response.PlaceDetailResponse
 import org.every.nook.api.presentation.place.response.PlacePostMediaResponse
 import org.every.nook.api.presentation.place.response.PlacePostPageResponse
 import org.every.nook.api.presentation.place.response.PlacePostResponse
+import org.every.nook.api.presentation.place.response.PlaceSearchResponse
+import org.every.nook.api.presentation.place.response.PlaceSearchSliceResponse
 import org.every.nook.api.presentation.place.response.RecentPlaceResponse
 import org.every.nook.api.presentation.place.response.RecentPlaceSliceResponse
 import org.every.nook.api.presentation.post.PostController
+import org.every.nook.api.presentation.post.request.ConnectPostPlaceRequest
 import org.every.nook.api.presentation.post.request.CreatePostRequest
 import org.every.nook.api.presentation.post.request.ReplaceSavedPostGroupsRequest
 import org.every.nook.api.presentation.post.request.UpdatePostMemoRequest
+import org.every.nook.api.presentation.post.response.ConnectedPlaceResponse
 import org.every.nook.api.presentation.post.response.PlaceResponse
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
 import org.every.nook.api.presentation.post.response.PostResponse
@@ -191,6 +195,10 @@ class OpenApiDocumentationPolicyTest {
             PlacePostPageResponse::class.java,
             PlacePostResponse::class.java,
             PlacePostMediaResponse::class.java,
+            PlaceSearchSliceResponse::class.java,
+            PlaceSearchResponse::class.java,
+            ConnectPostPlaceRequest::class.java,
+            ConnectedPlaceResponse::class.java,
             CreatePostRequest::class.java,
             ReplaceSavedPostGroupsRequest::class.java,
             UpdatePostMemoRequest::class.java,

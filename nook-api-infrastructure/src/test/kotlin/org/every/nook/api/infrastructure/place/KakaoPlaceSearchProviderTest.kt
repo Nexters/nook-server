@@ -56,6 +56,27 @@ class KakaoPlaceSearchProviderTest {
     }
 
     @Test
+    fun `returns provider pagination metadata and distance`() {
+        val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("page=2")))
+            .andExpect(requestTo(containsString("size=10")))
+            .andRespond(withSuccess(SUCCESS_RESPONSE, MediaType.APPLICATION_JSON))
+
+        val result = fixture.provider.searchPage(
+            PlaceSearchProvider.Request(
+                query = "Nook Cafe",
+                page = 2,
+                size = 10,
+            ),
+        )
+
+        assertEquals(2, result.page)
+        assertEquals(10, result.size)
+        assertEquals(true, result.hasNext)
+        assertEquals(418, result.items.single().distanceMeters)
+    }
+
+    @Test
     fun `provider error is converted to application exception`() {
         val fixture = providerFixture()
         fixture.server.expect(requestTo(containsString("/v2/local/search/keyword.json")))
@@ -100,6 +121,10 @@ class KakaoPlaceSearchProviderTest {
         val SUCCESS_RESPONSE =
             """
             {
+              "meta": {
+                "pageable_count": 14,
+                "is_end": false
+              },
               "documents": [{
                 "id": "26338954",
                 "place_name": "Nook Cafe",
@@ -109,7 +134,8 @@ class KakaoPlaceSearchProviderTest {
                 "road_address_name": "서울 성동구 아차산로 1",
                 "x": "127.0590297",
                 "y": "37.5120741",
-                "place_url": "https://place.map.kakao.com/26338954"
+                "place_url": "https://place.map.kakao.com/26338954",
+                "distance": "418"
               }]
             }
             """.trimIndent()

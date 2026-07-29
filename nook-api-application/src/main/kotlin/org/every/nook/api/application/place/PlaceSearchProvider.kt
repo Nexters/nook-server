@@ -10,5 +10,7 @@ fun interface PlaceSearchProvider {
         val longitude: BigDecimal? = null,
         val latitude: BigDecimal? = null,
         val radius: Int? = null,
+        val page: Int = 1,
+        val size: Int = 15,
     )
 }

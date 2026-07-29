@@ -15,6 +15,7 @@ class KakaoPlaceMapper {
             category = document.categoryName.toNullableValue(),
             phoneNumber = document.phone.toNullableValue(),
             providerUrl = document.placeUrl.toNullableValue(),
+            distanceMeters = document.distance.toNullableValue()?.toIntOrNull(),
         )
     }
 
