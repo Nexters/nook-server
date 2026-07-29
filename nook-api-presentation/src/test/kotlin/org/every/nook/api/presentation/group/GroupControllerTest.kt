@@ -68,12 +68,27 @@ class GroupControllerTest {
     @Test
     fun `lists current users groups with post counts`() {
         `when`(listGroupsUseCase(TEST_USER_ID))
-            .thenReturn(listOf(GroupView(17, "카페", "YELLOW", 3)))
+            .thenReturn(
+                listOf(
+                    GroupView(
+                        id = 17,
+                        name = "카페",
+                        color = "YELLOW",
+                        postCount = 3,
+                        thumbnailUrls = listOf(
+                            "https://example.com/latest.jpg",
+                            "https://example.com/second.jpg",
+                        ),
+                    ),
+                ),
+            )
 
         mockMvc.get("/api/v1/groups").andExpect {
             status { isOk() }
             jsonPath("$.success[0].id") { value(17) }
             jsonPath("$.success[0].postCount") { value(3) }
+            jsonPath("$.success[0].thumbnailUrls[0]") { value("https://example.com/latest.jpg") }
+            jsonPath("$.success[0].thumbnailUrls[1]") { value("https://example.com/second.jpg") }
         }
     }
 
