@@ -14,6 +14,7 @@ import org.every.nook.api.application.post.model.PlaceView
 import org.every.nook.api.application.post.model.PostProcessingStageView
 import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.model.SavedPostDetail
+import org.every.nook.api.application.post.model.SavedPostGroup
 import org.every.nook.api.application.post.model.SavedPostMedia
 import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.application.post.model.SavedPostPage
@@ -285,6 +286,10 @@ class PostControllerTest {
                 hashtags = listOf("성수"),
                 memo = "주말에 방문",
                 savedAt = Instant.parse("2026-07-27T00:00:00Z"),
+                groups = listOf(
+                    SavedPostGroup(id = 17, name = "맛집", color = "YELLOW"),
+                    SavedPostGroup(id = 18, name = "카페", color = "GREEN"),
+                ),
                 placeParsingStatus = PlaceParsingStatusView.COMPLETED,
                 placeParsingFailureReason = null,
                 places = emptyList(),
@@ -407,6 +412,10 @@ class PostControllerTest {
             jsonPath("$.success.body") { value("본문") }
             jsonPath("$.success.media[0].url") { value("https://example.com/1.jpg") }
             jsonPath("$.success.hashtags[0]") { value("성수") }
+            jsonPath("$.success.groups[0].id") { value(17) }
+            jsonPath("$.success.groups[0].name") { value("맛집") }
+            jsonPath("$.success.groups[0].color") { value("YELLOW") }
+            jsonPath("$.success.groups[1].id") { value(18) }
             jsonPath("$.success.places") { isEmpty() }
             jsonPath("$.success.publishedAt") { value("2026-07-20T09:00:00+09:00") }
             jsonPath("$.success.savedAt") { value("2026-07-27T09:00:00+09:00") }

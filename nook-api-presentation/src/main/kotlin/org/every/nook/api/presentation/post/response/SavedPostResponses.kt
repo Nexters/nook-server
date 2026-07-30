@@ -5,6 +5,7 @@ import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PostProcessingStageView
 import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.model.SavedPostDetail
+import org.every.nook.api.application.post.model.SavedPostGroup
 import org.every.nook.api.application.post.model.SavedPostMedia
 import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.application.post.model.SavedPostPage
@@ -93,6 +94,8 @@ data class SavedPostDetailResponse(
     val memo: String?,
     @field:Schema(description = "게시물 저장 시각")
     val savedAt: OffsetDateTime,
+    @field:Schema(description = "게시물이 속한 그룹 목록")
+    val groups: List<SavedPostGroupResponse>,
     @field:Schema(description = "게시물 장소 파싱 상태")
     val placeParsingStatus: PlaceParsingStatusView,
     @field:Schema(description = "장소 파싱 실패 사유", nullable = true)
@@ -116,11 +119,29 @@ data class SavedPostDetailResponse(
             hashtags = result.hashtags,
             memo = result.memo,
             savedAt = result.savedAt.toSeoulOffsetDateTime(),
+            groups = result.groups.map(SavedPostGroupResponse::from),
             placeParsingStatus = result.placeParsingStatus,
             placeParsingFailureReason = result.placeParsingFailureReason,
             places = result.places.map(SavedPostPlaceResponse::from),
             processingStatus = result.processingStatus,
             processingStage = result.processingStage,
+        )
+    }
+}
+
+data class SavedPostGroupResponse(
+    @field:Schema(description = "그룹 식별자")
+    val id: Long,
+    @field:Schema(description = "그룹명")
+    val name: String,
+    @field:Schema(description = "그룹 색상 코드")
+    val color: String,
+) {
+    companion object {
+        fun from(result: SavedPostGroup): SavedPostGroupResponse = SavedPostGroupResponse(
+            id = result.id,
+            name = result.name,
+            color = result.color,
         )
     }
 }

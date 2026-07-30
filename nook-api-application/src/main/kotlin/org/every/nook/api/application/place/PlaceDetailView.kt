@@ -33,7 +33,10 @@ data class PlacePostView(
     val representativeMedia: PlacePostMediaView?,
     val memo: String?,
     val savedAt: Instant,
+    val groups: List<PlacePostGroupView>,
 )
+
+data class PlacePostGroupView(val id: Long, val name: String, val color: String)
 
 data class PlacePostMediaView(val type: PlacePostMediaTypeView, val url: String)
 

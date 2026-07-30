@@ -34,12 +34,15 @@ data class SavedPostDetail(
     val hashtags: List<String>,
     val memo: String?,
     val savedAt: Instant,
+    val groups: List<SavedPostGroup>,
     val placeParsingStatus: PlaceParsingStatusView,
     val placeParsingFailureReason: String?,
     val places: List<SavedPostPlace>,
     val processingStatus: PostProcessingStatusView = PostProcessingStatusView.COMPLETED,
     val processingStage: PostProcessingStageView? = null,
 )
+
+data class SavedPostGroup(val id: Long, val name: String, val color: String)
 
 data class SavedPostMedia(val type: SavedPostMediaType, val url: String, val sequence: Int)
 

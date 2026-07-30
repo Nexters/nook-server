@@ -9,6 +9,8 @@ interface GroupPostJpaRepository : JpaRepository<GroupPostEntity, Long> {
 
     fun findAllByUserSavedPostId(userSavedPostId: Long): List<GroupPostEntity>
 
+    fun findAllByUserSavedPostIdIn(userSavedPostIds: Collection<Long>): List<GroupPostEntity>
+
     @Modifying
     @Query("DELETE FROM GroupPostEntity groupPost WHERE groupPost.groupId = :groupId")
     fun deleteAllByGroupId(groupId: Long): Int

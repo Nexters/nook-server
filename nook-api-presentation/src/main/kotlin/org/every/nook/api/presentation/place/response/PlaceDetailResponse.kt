@@ -2,6 +2,7 @@ package org.every.nook.api.presentation.place.response
 
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.place.PlaceDetailView
+import org.every.nook.api.application.place.PlacePostGroupView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
@@ -89,6 +90,8 @@ data class PlacePostResponse(
     val memo: String?,
     @field:Schema(description = "게시물 저장 시각")
     val savedAt: OffsetDateTime,
+    @field:Schema(description = "게시물이 속한 그룹 목록")
+    val groups: List<PlacePostGroupResponse>,
 ) {
     companion object {
         fun from(view: PlacePostView): PlacePostResponse = PlacePostResponse(
@@ -98,6 +101,24 @@ data class PlacePostResponse(
             representativeMedia = view.representativeMedia?.let(PlacePostMediaResponse::from),
             memo = view.memo,
             savedAt = view.savedAt.toSeoulOffsetDateTime(),
+            groups = view.groups.map(PlacePostGroupResponse::from),
+        )
+    }
+}
+
+data class PlacePostGroupResponse(
+    @field:Schema(description = "그룹 식별자")
+    val id: Long,
+    @field:Schema(description = "그룹명")
+    val name: String,
+    @field:Schema(description = "그룹 색상 코드")
+    val color: String,
+) {
+    companion object {
+        fun from(view: PlacePostGroupView): PlacePostGroupResponse = PlacePostGroupResponse(
+            id = view.id,
+            name = view.name,
+            color = view.color,
         )
     }
 }

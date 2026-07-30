@@ -1,11 +1,14 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceDetailView
+import org.every.nook.api.application.place.PlacePostGroupView
 import org.every.nook.api.application.place.PlacePostMediaTypeView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
 import org.every.nook.api.application.place.port.PlaceDetailQueryPort
+import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
+import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
@@ -24,6 +27,8 @@ class PlaceDetailQueryPersistenceAdapter(
     private val savedPostRepository: UserSavedPostJpaRepository,
     private val postRepository: PostJpaRepository,
     private val mediaRepository: PostMediaJpaRepository,
+    private val groupRepository: GroupJpaRepository,
+    private val groupPostRepository: GroupPostJpaRepository,
 ) : PlaceDetailQueryPort {
     @Transactional(readOnly = true)
     override fun find(userId: Long, placeId: Long, page: Int, size: Int): PlaceDetailView? {
@@ -53,6 +58,8 @@ class PlaceDetailQueryPersistenceAdapter(
                 .groupBy(PostMediaEntity::postId)
                 .mapValues { (_, media) -> media.first().toView() }
         }
+        val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
+        val groupsBySavedPostId = findGroups(userId, savedPostIds)
 
         return PlaceDetailView(
             id = requireNotNull(place.id),
@@ -70,6 +77,7 @@ class PlaceDetailQueryPersistenceAdapter(
                     postsById[savedPost.postId]?.toView(
                         savedPost = savedPost,
                         representativeMedia = representativeMediaByPostId[savedPost.postId],
+                        groups = groupsBySavedPostId[requireNotNull(savedPost.id)].orEmpty(),
                     )
                 },
                 page = savedPosts.number,
@@ -84,6 +92,7 @@ class PlaceDetailQueryPersistenceAdapter(
     private fun PostEntity.toView(
         savedPost: UserSavedPostEntity,
         representativeMedia: PlacePostMediaView?,
+        groups: List<PlacePostGroupView>,
     ): PlacePostView = PlacePostView(
         postId = requireNotNull(savedPost.id),
         title = title,
@@ -91,7 +100,37 @@ class PlaceDetailQueryPersistenceAdapter(
         representativeMedia = representativeMedia,
         memo = savedPost.memo,
         savedAt = savedPost.createdAt,
+        groups = groups,
     )
+
+    private fun findGroups(userId: Long, savedPostIds: List<Long>): Map<Long, List<PlacePostGroupView>> {
+        if (savedPostIds.isEmpty()) {
+            return emptyMap()
+        }
+        val groupPostsBySavedPostId = groupPostRepository
+            .findAllByUserSavedPostIdIn(savedPostIds)
+            .groupBy { it.userSavedPostId }
+        val groupIds = groupPostsBySavedPostId.values
+            .flatten()
+            .mapTo(mutableSetOf()) { it.groupId }
+        val groupsById = if (groupIds.isEmpty()) {
+            emptyMap()
+        } else {
+            groupRepository.findAllByUserIdAndIdIn(userId, groupIds).associateBy { requireNotNull(it.id) }
+        }
+
+        return savedPostIds.associateWith { savedPostId ->
+            groupPostsBySavedPostId[savedPostId].orEmpty().mapNotNull { groupPost ->
+                groupsById[groupPost.groupId]?.let { group ->
+                    PlacePostGroupView(
+                        id = requireNotNull(group.id),
+                        name = group.name,
+                        color = group.color.name,
+                    )
+                }
+            }
+        }
+    }
 
     private fun PostMediaEntity.toView(): PlacePostMediaView = PlacePostMediaView(
         type = PlacePostMediaTypeView.valueOf(mediaType.name),
