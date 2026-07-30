@@ -22,8 +22,10 @@ class PlaceMapQueryPersistenceAdapter(private val bookmarkRepository: UserPlaceB
         ).map { row ->
             MapPlaceView(
                 id = row.id,
+                name = row.name,
                 latitude = row.latitude,
                 longitude = row.longitude,
+                color = row.color,
             )
         }
 

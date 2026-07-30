@@ -24,8 +24,10 @@ class PlaceMapQueryPersistenceAdapterTest {
             eastLongitude = BigDecimal("127.2"),
         )
         `when`(row.id).thenReturn(17)
+        `when`(row.name).thenReturn("퍼머넌트해비탯")
         `when`(row.latitude).thenReturn(BigDecimal("37.5"))
         `when`(row.longitude).thenReturn(BigDecimal("127.0"))
+        `when`(row.color).thenReturn("BLUE")
         `when`(
             repository.findMapPlaces(
                 userId = 7,
@@ -39,7 +41,38 @@ class PlaceMapQueryPersistenceAdapterTest {
         val result = adapter.findInBounds(7, bounds)
 
         assertEquals(17, result.single().id)
+        assertEquals("퍼머넌트해비탯", result.single().name)
         assertEquals(BigDecimal("37.5"), result.single().latitude)
+        assertEquals("BLUE", result.single().color)
+    }
+
+    @Test
+    fun `maps the yellow marker fallback returned for a place without a group color`() {
+        val row = mock(MapPlaceProjection::class.java)
+        val bounds = GeoBounds(
+            northLatitude = BigDecimal("37.6"),
+            westLongitude = BigDecimal("126.8"),
+            southLatitude = BigDecimal("37.4"),
+            eastLongitude = BigDecimal("127.2"),
+        )
+        `when`(row.id).thenReturn(17)
+        `when`(row.name).thenReturn("퍼머넌트해비탯")
+        `when`(row.latitude).thenReturn(BigDecimal("37.5"))
+        `when`(row.longitude).thenReturn(BigDecimal("127.0"))
+        `when`(row.color).thenReturn("YELLOW")
+        `when`(
+            repository.findMapPlaces(
+                userId = 7,
+                northLatitude = bounds.northLatitude,
+                westLongitude = bounds.westLongitude,
+                southLatitude = bounds.southLatitude,
+                eastLongitude = bounds.eastLongitude,
+            ),
+        ).thenReturn(listOf(row))
+
+        val result = adapter.findInBounds(7, bounds)
+
+        assertEquals("YELLOW", result.single().color)
     }
 
     @Test
