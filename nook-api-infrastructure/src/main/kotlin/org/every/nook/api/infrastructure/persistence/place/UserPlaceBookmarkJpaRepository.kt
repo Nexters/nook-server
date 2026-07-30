@@ -42,8 +42,39 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
         value = """
             SELECT
                 p.id AS id,
+                p.name AS name,
                 p.latitude AS latitude,
-                p.longitude AS longitude
+                p.longitude AS longitude,
+                COALESCE(
+                    (
+                        SELECT user_group.color
+                        FROM user_saved_posts color_saved_post
+                        INNER JOIN post_places color_post_place
+                            ON color_post_place.post_id = color_saved_post.post_id
+                        INNER JOIN group_posts color_group_post
+                            ON color_group_post.user_saved_post_id = color_saved_post.id
+                        INNER JOIN user_groups user_group
+                            ON user_group.id = color_group_post.group_id
+                           AND user_group.user_id = color_saved_post.user_id
+                        WHERE color_saved_post.user_id = upb.user_id
+                          AND color_post_place.place_id = p.id
+                          AND color_saved_post.id = (
+                              SELECT latest_saved_post.id
+                              FROM user_saved_posts latest_saved_post
+                              INNER JOIN post_places latest_post_place
+                                  ON latest_post_place.post_id = latest_saved_post.post_id
+                              WHERE latest_saved_post.user_id = upb.user_id
+                                AND latest_post_place.place_id = p.id
+                              ORDER BY latest_saved_post.created_at DESC, latest_saved_post.id DESC
+                              LIMIT 1
+                          )
+                        ORDER BY
+                            color_group_post.created_at DESC,
+                            color_group_post.id DESC
+                        LIMIT 1
+                    ),
+                    'YELLOW'
+                ) AS color
             FROM user_place_bookmarks upb
             INNER JOIN places p ON p.id = upb.place_id
             WHERE upb.user_id = :userId
@@ -119,8 +150,10 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
 
 interface MapPlaceProjection {
     val id: Long
+    val name: String
     val latitude: BigDecimal
     val longitude: BigDecimal
+    val color: String
 }
 
 interface RecentPlaceProjection {

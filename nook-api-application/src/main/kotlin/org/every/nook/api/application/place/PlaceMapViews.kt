@@ -3,7 +3,13 @@ package org.every.nook.api.application.place
 import java.math.BigDecimal
 import java.time.Instant
 
-data class MapPlaceView(val id: Long, val latitude: BigDecimal, val longitude: BigDecimal)
+data class MapPlaceView(
+    val id: Long,
+    val name: String,
+    val latitude: BigDecimal,
+    val longitude: BigDecimal,
+    val color: String,
+)
 
 data class RecentPlaceView(
     val bookmarkId: Long,

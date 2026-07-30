@@ -10,16 +10,22 @@ import java.math.BigDecimal
 data class MapPlaceResponse(
     @field:Schema(description = "장소 식별자")
     val id: Long,
+    @field:Schema(description = "장소명")
+    val name: String,
     @field:Schema(description = "장소 위도")
     val latitude: BigDecimal,
     @field:Schema(description = "장소 경도")
     val longitude: BigDecimal,
+    @field:Schema(description = "대표 그룹 색상 코드", example = "YELLOW")
+    val color: String,
 ) {
     companion object {
         fun from(view: MapPlaceView): MapPlaceResponse = MapPlaceResponse(
             id = view.id,
+            name = view.name,
             latitude = view.latitude,
             longitude = view.longitude,
+            color = view.color,
         )
     }
 }
