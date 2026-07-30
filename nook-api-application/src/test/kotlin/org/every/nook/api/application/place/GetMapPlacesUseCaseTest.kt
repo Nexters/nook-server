@@ -13,7 +13,15 @@ class GetMapPlacesUseCaseTest {
     @Test
     fun `queries map places with validated bounds`() {
         var capturedBounds: GeoBounds? = null
-        val expected = listOf(MapPlaceView(17, BigDecimal("37.5"), BigDecimal("127.0")))
+        val expected = listOf(
+            MapPlaceView(
+                id = 17,
+                name = "퍼머넌트해비탯",
+                latitude = BigDecimal("37.5"),
+                longitude = BigDecimal("127.0"),
+                color = "BLUE",
+            ),
+        )
         val useCase = GetMapPlacesUseCase(
             object : PlaceMapQueryPort {
                 override fun findInBounds(userId: Long, bounds: GeoBounds): List<MapPlaceView> {

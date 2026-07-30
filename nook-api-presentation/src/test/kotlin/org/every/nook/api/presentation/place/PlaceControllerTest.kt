@@ -144,7 +144,15 @@ class PlaceControllerTest {
             eastLongitude = BigDecimal("127.2"),
         )
         `when`(getMapPlacesUseCase(query)).thenReturn(
-            listOf(MapPlaceView(17, BigDecimal("37.5"), BigDecimal("127.0"))),
+            listOf(
+                MapPlaceView(
+                    id = 17,
+                    name = "퍼머넌트해비탯",
+                    latitude = BigDecimal("37.5"),
+                    longitude = BigDecimal("127.0"),
+                    color = "BLUE",
+                ),
+            ),
         )
 
         mockMvc.get(
@@ -153,9 +161,10 @@ class PlaceControllerTest {
         ).andExpect {
             status { isOk() }
             jsonPath("$.success[0].id") { value(17) }
+            jsonPath("$.success[0].name") { value("퍼머넌트해비탯") }
             jsonPath("$.success[0].latitude") { value(37.5) }
             jsonPath("$.success[0].longitude") { value(127.0) }
-            jsonPath("$.success[0].name") { doesNotExist() }
+            jsonPath("$.success[0].color") { value("BLUE") }
         }
 
         verify(getMapPlacesUseCase)(query)
