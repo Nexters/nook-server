@@ -28,7 +28,13 @@ class ConnectPostPlaceUseCase(
             "Manual place thumbnail skipped: userId=${command.userId}, postId=${command.postId}, " +
                 "provider=${candidate.provider}, externalPlaceId=${candidate.externalPlaceId}"
         }
-    }.getOrNull()
+    }.getOrNull().also { thumbnailUrl ->
+        logger.info {
+            "Manual place thumbnail resolved: userId=${command.userId}, postId=${command.postId}, " +
+                "provider=${candidate.provider}, externalPlaceId=${candidate.externalPlaceId}, " +
+                "thumbnailUrlFound=${thumbnailUrl != null}"
+        }
+    }
 
     private fun mapResult(result: ConnectPostPlacePort.Result): Result = when (result) {
         is ConnectPostPlacePort.Result.Connected -> Result(result.placeId)
