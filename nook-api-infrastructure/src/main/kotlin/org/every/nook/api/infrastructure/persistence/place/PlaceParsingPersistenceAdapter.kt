@@ -69,7 +69,7 @@ class PlaceParsingPersistenceAdapter(
         }
 
     @Transactional
-    override fun complete(postId: Long, places: List<PlaceCandidate>) {
+    override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
         val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
@@ -78,6 +78,9 @@ class PlaceParsingPersistenceAdapter(
                 candidate.provider,
                 candidate.externalPlaceId,
             ) ?: placeRepository.save(candidate.toEntity())
+            if (sequence == 0) {
+                place.updateThumbnailUrlIfAbsent(thumbnailUrl)
+            }
             PostPlaceEntity(
                 postId = postId,
                 placeId = requireNotNull(place.id),

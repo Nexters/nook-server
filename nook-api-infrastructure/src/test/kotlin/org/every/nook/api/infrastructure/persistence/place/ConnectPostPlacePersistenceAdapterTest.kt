@@ -41,7 +41,7 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.PostNotFound,
-            adapter.connect(7, 11, candidate()),
+            adapter.connect(7, 11, candidate(), null),
         )
         verifyNoInteractions(postRepository, placeRepository, postPlaceRepository, bookmarkRepository)
     }
@@ -56,7 +56,7 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.ParsingInProgress,
-            adapter.connect(7, 11, candidate()),
+            adapter.connect(7, 11, candidate(), null),
         )
         verifyNoInteractions(placeRepository, postPlaceRepository, bookmarkRepository)
     }
@@ -77,9 +77,10 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.Connected(17),
-            adapter.connect(7, 11, candidate()),
+            adapter.connect(7, 11, candidate(), "https://cdn.example.com/google-place.jpg"),
         )
 
+        verify(place).updateThumbnailUrlIfAbsent("https://cdn.example.com/google-place.jpg")
         val captor = ArgumentCaptor.forClass(PostPlaceEntity::class.java)
         verify(postPlaceRepository).save(captor.capture())
         assertEquals(101, captor.value.postId)
@@ -104,7 +105,7 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.Connected(17),
-            adapter.connect(7, 11, candidate()),
+            adapter.connect(7, 11, candidate(), null),
         )
 
         verify(postPlaceRepository, never()).save(org.mockito.ArgumentMatchers.any())

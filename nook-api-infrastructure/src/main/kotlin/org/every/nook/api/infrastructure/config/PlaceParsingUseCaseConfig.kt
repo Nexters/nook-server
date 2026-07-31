@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCa
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceParsingJobPort
+import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -19,12 +20,14 @@ class PlaceParsingUseCaseConfig {
         clueExtractor: PlaceClueExtractor,
         searchPlaceCandidates: SearchPlaceCandidatesUseCase,
         candidateSelector: PlaceCandidateSelector,
+        thumbnailProvider: PlaceThumbnailProvider,
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = jobPort,
         clueExtractor = clueExtractor,
         searchPlaceCandidates = searchPlaceCandidates,
         candidateSelector = candidateSelector,
+        thumbnailProvider = thumbnailProvider,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
     )

@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.config
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.place.PagedPlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSelectionTokenPort
+import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.infrastructure.auth.JwtProperties
@@ -30,5 +31,6 @@ class ManualPlaceConnectionConfig {
     fun connectPostPlaceUseCase(
         selectionTokenPort: PlaceSelectionTokenPort,
         connectPostPlacePort: ConnectPostPlacePort,
-    ): ConnectPostPlaceUseCase = ConnectPostPlaceUseCase(selectionTokenPort, connectPostPlacePort)
+        thumbnailProvider: PlaceThumbnailProvider,
+    ): ConnectPostPlaceUseCase = ConnectPostPlaceUseCase(selectionTokenPort, connectPostPlacePort, thumbnailProvider)
 }

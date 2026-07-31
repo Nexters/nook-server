@@ -76,7 +76,9 @@ class PlaceDetailQueryPersistenceAdapter(
                 items = savedPosts.content.mapNotNull { savedPost ->
                     postsById[savedPost.postId]?.toView(
                         savedPost = savedPost,
-                        representativeMedia = representativeMediaByPostId[savedPost.postId],
+                        representativeMedia = place.thumbnailUrl
+                            ?.toPlacePostMedia()
+                            ?: representativeMediaByPostId[savedPost.postId],
                         groups = groupsBySavedPostId[requireNotNull(savedPost.id)].orEmpty(),
                     )
                 },
@@ -136,4 +138,6 @@ class PlaceDetailQueryPersistenceAdapter(
         type = PlacePostMediaTypeView.valueOf(mediaType.name),
         url = mediaUrl,
     )
+
+    private fun String.toPlacePostMedia(): PlacePostMediaView = PlacePostMediaView(PlacePostMediaTypeView.IMAGE, this)
 }
