@@ -8,7 +8,7 @@ interface PlaceParsingJobPort {
 
     fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob>
 
-    fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?)
+    fun complete(postId: Long, places: List<PlaceCandidateWithThumbnail>)
 
     fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
 
@@ -16,3 +16,5 @@ interface PlaceParsingJobPort {
 }
 
 data class OutstandingPlaceParsingJob(val postId: Long, val availableAt: Instant)
+
+data class PlaceCandidateWithThumbnail(val place: PlaceCandidate, val thumbnailUrl: String?)
