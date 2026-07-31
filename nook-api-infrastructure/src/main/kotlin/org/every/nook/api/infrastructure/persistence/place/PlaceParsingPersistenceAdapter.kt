@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.place
 import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceCandidateWithThumbnail
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
@@ -69,18 +70,17 @@ class PlaceParsingPersistenceAdapter(
         }
 
     @Transactional
-    override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
+    override fun complete(postId: Long, places: List<PlaceCandidateWithThumbnail>) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
-        val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
-        val postPlaces = distinctPlaces.mapIndexed { sequence, candidate ->
+        val distinctPlaces = places.distinctBy { it.place.provider to it.place.externalPlaceId }
+        val postPlaces = distinctPlaces.mapIndexed { sequence, placeWithThumbnail ->
+            val candidate = placeWithThumbnail.place
             val place = placeRepository.findByProviderAndExternalPlaceId(
                 candidate.provider,
                 candidate.externalPlaceId,
             ) ?: placeRepository.save(candidate.toEntity())
-            if (sequence == 0) {
-                place.updateThumbnailUrlIfAbsent(thumbnailUrl)
-            }
+            place.updateThumbnailUrlIfAbsent(placeWithThumbnail.thumbnailUrl)
             PostPlaceEntity(
                 postId = postId,
                 placeId = requireNotNull(place.id),
