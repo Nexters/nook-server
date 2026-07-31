@@ -26,6 +26,7 @@ class PlaceMapQueryPersistenceAdapter(private val bookmarkRepository: UserPlaceB
                 latitude = row.latitude,
                 longitude = row.longitude,
                 color = row.color,
+                thumbnailUrl = row.thumbnailUrl,
             )
         }
 

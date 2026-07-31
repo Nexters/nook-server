@@ -18,6 +18,7 @@ import org.every.nook.api.application.post.model.SavedPostGroup
 import org.every.nook.api.application.post.model.SavedPostMedia
 import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.application.post.model.SavedPostPage
+import org.every.nook.api.application.post.model.SavedPostPlace
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -217,6 +218,7 @@ class PostControllerTest {
                         longitude = BigDecimal("127.1"),
                         category = null,
                         phoneNumber = null,
+                        thumbnailUrl = "https://example.com/place-thumbnail.jpg",
                         bookmarked = true,
                     ),
                 ),
@@ -292,7 +294,22 @@ class PostControllerTest {
                 ),
                 placeParsingStatus = PlaceParsingStatusView.COMPLETED,
                 placeParsingFailureReason = null,
-                places = emptyList(),
+                places = listOf(
+                    SavedPostPlace(
+                        id = 17,
+                        provider = "KAKAO",
+                        externalPlaceId = "123",
+                        name = "Nook Cafe",
+                        address = "Seoul",
+                        latitude = BigDecimal("37.1"),
+                        longitude = BigDecimal("127.1"),
+                        category = null,
+                        phoneNumber = null,
+                        thumbnailUrl = "https://example.com/place-thumbnail.jpg",
+                        bookmarked = true,
+                        sequence = 0,
+                    ),
+                ),
             ),
         )
     }
@@ -386,6 +403,7 @@ class PostControllerTest {
             jsonPath("$.success.placeParsingStatus") { value("COMPLETED") }
             jsonPath("$.success.places[0].id") { value(17) }
             jsonPath("$.success.places[0].name") { value("Nook Cafe") }
+            jsonPath("$.success.places[0].thumbnailUrl") { value("https://example.com/place-thumbnail.jpg") }
             jsonPath("$.success.places[0].bookmarked") { value(true) }
         }
     }
@@ -416,7 +434,8 @@ class PostControllerTest {
             jsonPath("$.success.groups[0].name") { value("맛집") }
             jsonPath("$.success.groups[0].color") { value("YELLOW") }
             jsonPath("$.success.groups[1].id") { value(18) }
-            jsonPath("$.success.places") { isEmpty() }
+            jsonPath("$.success.places[0].id") { value(17) }
+            jsonPath("$.success.places[0].thumbnailUrl") { value("https://example.com/place-thumbnail.jpg") }
             jsonPath("$.success.publishedAt") { value("2026-07-20T09:00:00+09:00") }
             jsonPath("$.success.savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.processingStatus") { value("COMPLETED") }

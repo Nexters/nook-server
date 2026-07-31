@@ -182,6 +182,8 @@ data class SavedPostPlaceResponse(
     val category: String?,
     @field:Schema(description = "장소 전화번호", nullable = true)
     val phoneNumber: String?,
+    @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
+    val thumbnailUrl: String?,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
     @field:Schema(description = "게시물 내 장소 순서")
@@ -198,6 +200,7 @@ data class SavedPostPlaceResponse(
             longitude = result.longitude,
             category = result.category,
             phoneNumber = result.phoneNumber,
+            thumbnailUrl = result.thumbnailUrl,
             bookmarked = result.bookmarked,
             sequence = result.sequence,
         )

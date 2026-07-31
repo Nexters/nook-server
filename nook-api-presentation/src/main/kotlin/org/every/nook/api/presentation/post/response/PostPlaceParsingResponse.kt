@@ -49,6 +49,8 @@ data class PlaceResponse(
     val category: String?,
     @field:Schema(description = "장소 전화번호", nullable = true)
     val phoneNumber: String?,
+    @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
+    val thumbnailUrl: String?,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
 ) {
@@ -63,6 +65,7 @@ data class PlaceResponse(
             longitude = place.longitude,
             category = place.category,
             phoneNumber = place.phoneNumber,
+            thumbnailUrl = place.thumbnailUrl,
             bookmarked = place.bookmarked,
         )
     }

@@ -13,6 +13,7 @@ data class PlaceDetailView(
     val longitude: BigDecimal,
     val category: String?,
     val phoneNumber: String?,
+    val thumbnailUrl: String?,
     val bookmarked: Boolean,
     val posts: PlacePostPageView,
 )

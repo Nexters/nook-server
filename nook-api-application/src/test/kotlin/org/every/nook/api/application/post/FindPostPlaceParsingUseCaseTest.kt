@@ -31,7 +31,13 @@ class FindPostPlaceParsingUseCaseTest {
                 postId = postId,
                 placeParsingStatus = PlaceParsingStatus.COMPLETED,
                 failureReason = null,
-                places = listOf(PostPlaceParsingSnapshot.RelatedPlace(place, bookmarked = true)),
+                places = listOf(
+                    PostPlaceParsingSnapshot.RelatedPlace(
+                        place = place,
+                        bookmarked = true,
+                        thumbnailUrl = "https://example.com/place-thumbnail.jpg",
+                    ),
+                ),
             )
         }
         val useCase = FindPostPlaceParsingUseCase(port)
@@ -40,6 +46,7 @@ class FindPostPlaceParsingUseCaseTest {
 
         assertEquals(PlaceParsingStatusView.COMPLETED, result.placeParsingStatus)
         assertEquals("Nook Cafe", result.places.single().name)
+        assertEquals("https://example.com/place-thumbnail.jpg", result.places.single().thumbnailUrl)
         assertEquals(true, result.places.single().bookmarked)
     }
 
