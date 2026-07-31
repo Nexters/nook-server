@@ -52,6 +52,10 @@ class ProcessPlaceParsingJobUseCase(
                     }
                 }.getOrNull()
             }
+            logger.info {
+                "Place thumbnail resolved: postId=${job.postId}, attempt=${job.attempt}, " +
+                    "placeCount=${places.size}, thumbnailUrlFound=${thumbnailUrl != null}"
+            }
             jobPort.complete(job.postId, places, thumbnailUrl)
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
             logger.info {

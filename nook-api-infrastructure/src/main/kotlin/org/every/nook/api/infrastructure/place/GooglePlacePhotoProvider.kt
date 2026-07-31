@@ -18,16 +18,34 @@ class GooglePlacePhotoProvider(
         val shouldSkip = !properties.enabled ||
             properties.apiKey.isBlank()
         return if (shouldSkip) {
+            logger.warn {
+                "Google place photo skipped: reason=invalid_configuration, enabled=${properties.enabled}, " +
+                    "apiKeyConfigured=${properties.apiKey.isNotBlank()}"
+            }
             null
         } else {
             runCatching {
-                searchPhotoName(place)
-                    ?.let(::fetchPhotoUri)
-                    ?.let { photoUri ->
-                        mediaStorage.store(
-                            PostMedia(PostMedia.MediaType.IMAGE, photoUri, GOOGLE_THUMBNAIL_SEQUENCE),
-                        ).url
+                logger.info {
+                    "Google place photo search started: provider=${place.provider}, " +
+                        "externalPlaceId=${place.externalPlaceId}, name=${place.name}"
+                }
+                val photoName = searchPhotoName(place)
+                if (photoName == null) {
+                    logger.info {
+                        "Google place photo skipped: reason=photo_not_found, provider=${place.provider}, " +
+                            "externalPlaceId=${place.externalPlaceId}, name=${place.name}"
                     }
+                }
+                photoName?.let(::fetchPhotoUri)?.let { photoUri ->
+                    val stored = mediaStorage.store(
+                        PostMedia(PostMedia.MediaType.IMAGE, photoUri, GOOGLE_THUMBNAIL_SEQUENCE),
+                    )
+                    logger.info {
+                        "Google place photo stored: provider=${place.provider}, " +
+                            "externalPlaceId=${place.externalPlaceId}, storedUrl=${stored.url}"
+                    }
+                    stored.url
+                }
             }.onFailure { exception ->
                 logger.warn(exception) {
                     "Google place photo fetch failed: provider=${place.provider}, " +
@@ -46,25 +64,35 @@ class GooglePlacePhotoProvider(
             .body(TextSearchRequest(textQuery = "${place.name} ${place.address}".trim()))
             .retrieve()
             .body(TextSearchResponse::class.java)
-        return response?.places.orEmpty()
+        val photoName = response?.places.orEmpty()
             .asSequence()
             .flatMap { it.photos.orEmpty() }
             .mapNotNull { it.name }
             .firstOrNull()
+        logger.info {
+            "Google place photo search completed: provider=${place.provider}, " +
+                "externalPlaceId=${place.externalPlaceId}, googlePlaceCount=${response?.places.orEmpty().size}, " +
+                "photoFound=${photoName != null}"
+        }
+        return photoName
     }
 
-    private fun fetchPhotoUri(photoName: String): String? = restClient.get()
-        .uri { builder ->
-            builder
-                .path("/v1/$photoName/media")
-                .queryParam("maxWidthPx", properties.maxWidthPx)
-                .queryParam("skipHttpRedirect", true)
-                .build()
-        }
-        .header(API_KEY_HEADER, properties.apiKey)
-        .retrieve()
-        .body(PhotoMediaResponse::class.java)
-        ?.photoUri
+    private fun fetchPhotoUri(photoName: String): String? {
+        val photoUri = restClient.get()
+            .uri { builder ->
+                builder
+                    .path("/v1/$photoName/media")
+                    .queryParam("maxWidthPx", properties.maxWidthPx)
+                    .queryParam("skipHttpRedirect", true)
+                    .build()
+            }
+            .header(API_KEY_HEADER, properties.apiKey)
+            .retrieve()
+            .body(PhotoMediaResponse::class.java)
+            ?.photoUri
+        logger.info { "Google place photo media completed: photoUriFound=${photoUri != null}" }
+        return photoUri
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class TextSearchResponse(val places: List<GooglePlace>? = null)

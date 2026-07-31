@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import mu.KotlinLogging
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.infrastructure.persistence.BaseEntity
@@ -62,11 +63,28 @@ class PlaceEntity(
         const val COORDINATE_PRECISION = 10
         const val COORDINATE_SCALE = 7
         const val THUMBNAIL_URL_MAX_LENGTH = 2048
+        private val logger = KotlinLogging.logger {}
     }
 
     fun updateThumbnailUrlIfAbsent(thumbnailUrl: String?) {
-        if (this.thumbnailUrl == null && thumbnailUrl != null) {
-            this.thumbnailUrl = thumbnailUrl
+        when {
+            thumbnailUrl == null -> logger.info {
+                "Place thumbnail update skipped: reason=empty_thumbnail_url, placeId=$id, provider=$provider, " +
+                    "externalPlaceId=$externalPlaceId"
+            }
+
+            this.thumbnailUrl != null -> logger.info {
+                "Place thumbnail update skipped: reason=already_exists, placeId=$id, provider=$provider, " +
+                    "externalPlaceId=$externalPlaceId"
+            }
+
+            else -> {
+                this.thumbnailUrl = thumbnailUrl
+                logger.info {
+                    "Place thumbnail updated: placeId=$id, provider=$provider, externalPlaceId=$externalPlaceId, " +
+                        "thumbnailUrl=$thumbnailUrl"
+                }
+            }
         }
     }
 }
