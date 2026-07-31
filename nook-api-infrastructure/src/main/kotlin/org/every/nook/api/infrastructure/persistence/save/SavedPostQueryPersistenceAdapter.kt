@@ -222,6 +222,7 @@ class SavedPostQueryPersistenceAdapter(
                 longitude = place.longitude,
                 category = place.category,
                 phoneNumber = place.phoneNumber,
+                thumbnailUrl = place.thumbnailUrl,
                 bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                 sequence = postPlace.sequence,
             )

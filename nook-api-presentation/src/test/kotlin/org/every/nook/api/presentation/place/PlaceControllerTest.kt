@@ -92,6 +92,7 @@ class PlaceControllerTest {
                 longitude = BigDecimal("127.1"),
                 category = "음식점 > 한식",
                 phoneNumber = "02-123-4567",
+                thumbnailUrl = "https://example.com/place-thumbnail.jpg",
                 bookmarked = true,
                 posts = PlacePostPageView(
                     items = listOf(
@@ -122,6 +123,7 @@ class PlaceControllerTest {
                 status { isOk() }
                 jsonPath("$.success.id") { value(17) }
                 jsonPath("$.success.bookmarked") { value(true) }
+                jsonPath("$.success.thumbnailUrl") { value("https://example.com/place-thumbnail.jpg") }
                 jsonPath("$.success.posts.items[0].postId") { value(21) }
                 jsonPath("$.success.posts.items[0].representativeMedia.type") { value("IMAGE") }
                 jsonPath("$.success.posts.items[0].groups[0].id") { value(17) }
@@ -151,6 +153,7 @@ class PlaceControllerTest {
                     latitude = BigDecimal("37.5"),
                     longitude = BigDecimal("127.0"),
                     color = "BLUE",
+                    thumbnailUrl = "https://example.com/map-place.jpg",
                 ),
             ),
         )
@@ -165,6 +168,7 @@ class PlaceControllerTest {
             jsonPath("$.success[0].latitude") { value(37.5) }
             jsonPath("$.success[0].longitude") { value(127.0) }
             jsonPath("$.success[0].color") { value("BLUE") }
+            jsonPath("$.success[0].thumbnailUrl") { value("https://example.com/map-place.jpg") }
         }
 
         verify(getMapPlacesUseCase)(query)

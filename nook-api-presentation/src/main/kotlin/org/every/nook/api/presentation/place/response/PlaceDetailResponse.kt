@@ -29,6 +29,8 @@ data class PlaceDetailResponse(
     val category: String?,
     @field:Schema(description = "장소 전화번호", nullable = true)
     val phoneNumber: String?,
+    @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
+    val thumbnailUrl: String?,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
     @field:Schema(description = "이 장소와 연결된 저장 게시물 페이지")
@@ -45,6 +47,7 @@ data class PlaceDetailResponse(
             longitude = view.longitude,
             category = view.category,
             phoneNumber = view.phoneNumber,
+            thumbnailUrl = view.thumbnailUrl,
             bookmarked = view.bookmarked,
             posts = PlacePostPageResponse.from(view.posts),
         )

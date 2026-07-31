@@ -61,6 +61,7 @@ data class SavedPostPlace(
     val longitude: BigDecimal,
     val category: String?,
     val phoneNumber: String?,
+    val thumbnailUrl: String?,
     val bookmarked: Boolean,
     val sequence: Int,
 )

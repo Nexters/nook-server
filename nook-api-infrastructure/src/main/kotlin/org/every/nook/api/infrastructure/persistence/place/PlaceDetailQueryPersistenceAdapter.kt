@@ -71,6 +71,7 @@ class PlaceDetailQueryPersistenceAdapter(
             longitude = place.longitude,
             category = place.category,
             phoneNumber = place.phoneNumber,
+            thumbnailUrl = place.thumbnailUrl,
             bookmarked = bookmarked,
             posts = PlacePostPageView(
                 items = savedPosts.content.mapNotNull { savedPost ->
