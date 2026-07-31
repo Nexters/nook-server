@@ -26,6 +26,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.data.domain.PageImpl
@@ -190,7 +191,7 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf(2L, 0L), result.items.map { it.placeCount })
         assertEquals(2, result.totalElements)
         verify(memberRepository).findById(9)
-        verify(postPlaceRepository).findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L))
+        verify(postPlaceRepository, times(2)).findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L))
         verify(savedPostRepository).findAllByUserIdAndGroupId(7, 17, requestedPage)
     }
 

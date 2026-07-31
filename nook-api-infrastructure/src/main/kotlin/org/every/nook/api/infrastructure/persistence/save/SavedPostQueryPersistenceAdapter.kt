@@ -119,6 +119,7 @@ class SavedPostQueryPersistenceAdapter(
                 .groupBy(PostMediaEntity::postId)
                 .mapValues { (_, media) -> media.first().toView() }
         }
+        val firstPlaceThumbnailByPostId = findFirstPlaceThumbnailByPostId(sourcePostIds)
         val contentStatusByPostId = if (sourcePostIds.isEmpty()) {
             emptyMap()
         } else {
@@ -143,7 +144,9 @@ class SavedPostQueryPersistenceAdapter(
                 )
                 postsById[savedPost.postId]?.toSummary(
                     savedPost = savedPost,
-                    representativeMedia = firstMediaByPostId[savedPost.postId],
+                    representativeMedia = firstPlaceThumbnailByPostId[savedPost.postId]
+                        ?.toSavedPostMedia()
+                        ?: firstMediaByPostId[savedPost.postId],
                     processing = processing,
                 )
             },
@@ -274,4 +277,33 @@ class SavedPostQueryPersistenceAdapter(
         url = mediaUrl,
         sequence = sequence,
     )
+
+    private fun String.toSavedPostMedia(): SavedPostMedia =
+        SavedPostMedia(SavedPostMediaType.IMAGE, this, THUMBNAIL_SEQUENCE)
+
+    private fun findFirstPlaceThumbnailByPostId(sourcePostIds: List<Long>): Map<Long, String> {
+        if (sourcePostIds.isEmpty()) {
+            return emptyMap()
+        }
+        val postPlaces = postPlaceRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(sourcePostIds)
+        val placeIds = postPlaces.mapTo(mutableSetOf()) { it.placeId }
+        if (placeIds.isEmpty()) {
+            return emptyMap()
+        }
+        val thumbnailByPlaceId = placeRepository.findAllById(placeIds)
+            .mapNotNull { place -> place.thumbnailUrl?.let { requireNotNull(place.id) to it } }
+            .toMap()
+
+        return postPlaces
+            .asSequence()
+            .mapNotNull { postPlace ->
+                thumbnailByPlaceId[postPlace.placeId]?.let { postPlace.postId to it }
+            }
+            .distinctBy { (postId) -> postId }
+            .toMap()
+    }
+
+    private companion object {
+        const val THUMBNAIL_SEQUENCE = 0
+    }
 }

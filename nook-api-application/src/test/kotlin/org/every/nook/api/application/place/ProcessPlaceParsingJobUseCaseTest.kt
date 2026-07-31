@@ -31,10 +31,14 @@ class ProcessPlaceParsingJobUseCaseTest {
             extractor,
             SearchPlaceCandidatesUseCase(provider),
             PlaceCandidateSelector { error("fallback selector must not be called") },
+            thumbnailProvider = PlaceThumbnailProvider { place ->
+                "https://cdn.example.com/google-${place.externalPlaceId}.jpg"
+            },
         )
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertEquals(listOf("1", "2"), port.completed.map { it.externalPlaceId })
+        assertEquals("https://cdn.example.com/google-1.jpg", port.thumbnailUrl)
         assertNull(port.failedReason)
     }
 
@@ -313,11 +317,13 @@ class ProcessPlaceParsingJobUseCaseTest {
         extractor: PlaceClueExtractor,
         search: SearchPlaceCandidatesUseCase,
         selector: PlaceCandidateSelector = PlaceCandidateSelector { null },
+        thumbnailProvider: PlaceThumbnailProvider = NoOpPlaceThumbnailProvider,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = port,
         clueExtractor = extractor,
         searchPlaceCandidates = search,
         candidateSelector = selector,
+        thumbnailProvider = thumbnailProvider,
         retryBackoffs = RETRY_BACKOFFS,
         processingTimeout = Duration.ofMinutes(1),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
@@ -326,6 +332,7 @@ class ProcessPlaceParsingJobUseCaseTest {
     private class FakeJobPort(private val attempt: Int = 1, private val imageUrls: List<String> = emptyList()) :
         PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
+        var thumbnailUrl: String? = null
         var failedReason: String? = null
         var nextAttemptAt: Instant? = null
         var retryReason: String? = null
@@ -335,8 +342,9 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>) {
+        override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
             completed = places
+            this.thumbnailUrl = thumbnailUrl
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {

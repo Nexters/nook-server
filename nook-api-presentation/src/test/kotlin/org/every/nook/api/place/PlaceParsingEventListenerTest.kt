@@ -85,7 +85,7 @@ class PlaceParsingEventListenerTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = outstanding
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>) {
+        override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
             completed = true
         }
 
