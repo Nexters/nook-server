@@ -45,6 +45,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.name AS name,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
+                p.thumbnail_url AS thumbnailUrl,
                 COALESCE(
                     (
                         SELECT user_group.color
@@ -157,6 +158,7 @@ interface MapPlaceProjection {
     val latitude: BigDecimal
     val longitude: BigDecimal
     val color: String
+    val thumbnailUrl: String?
 }
 
 interface RecentPlaceProjection {

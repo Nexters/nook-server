@@ -19,7 +19,7 @@ class FindPostPlaceParsingUseCase(private val findPostPlaceParsingPort: FindPost
             failureReason = snapshot.failureReason
                 .takeIf { snapshot.placeParsingStatus == PlaceParsingStatus.FAILED },
             places = snapshot.places.map { relatedPlace ->
-                PlaceView.from(relatedPlace.place, relatedPlace.bookmarked)
+                PlaceView.from(relatedPlace.place, relatedPlace.bookmarked, relatedPlace.thumbnailUrl)
             },
         )
     }

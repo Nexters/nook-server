@@ -150,6 +150,7 @@ class PostPersistenceAdapter(
                     PostPlaceParsingSnapshot.RelatedPlace(
                         place = place,
                         bookmarked = postPlace.placeId in bookmarkedPlaceIds,
+                        thumbnailUrl = placesById[postPlace.placeId]?.thumbnailUrl,
                     )
                 }
             },

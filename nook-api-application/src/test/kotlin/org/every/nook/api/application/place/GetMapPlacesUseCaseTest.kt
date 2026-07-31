@@ -20,6 +20,7 @@ class GetMapPlacesUseCaseTest {
                 latitude = BigDecimal("37.5"),
                 longitude = BigDecimal("127.0"),
                 color = "BLUE",
+                thumbnailUrl = "https://example.com/map-place.jpg",
             ),
         )
         val useCase = GetMapPlacesUseCase(
