@@ -5,6 +5,7 @@ import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCa
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceCandidateSelector
+import org.every.nook.api.application.place.PlaceCandidateWithThumbnail
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
@@ -85,7 +86,7 @@ class PlaceParsingEventListenerTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = outstanding
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
+        override fun complete(postId: Long, places: List<PlaceCandidateWithThumbnail>) {
             completed = true
         }
 
