@@ -109,7 +109,9 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.category AS category,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
-                (
+                COALESCE(
+                    p.thumbnail_url,
+                    (
                     SELECT pm.media_url
                     FROM user_saved_posts usp_image
                     INNER JOIN post_places pp_image ON pp_image.post_id = usp_image.post_id
@@ -119,6 +121,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                       AND pm.media_type = 'IMAGE'
                     ORDER BY usp_image.created_at DESC, usp_image.id DESC, pm.display_order ASC
                     LIMIT 1
+                    )
                 ) AS thumbnailUrl
             FROM user_place_bookmarks upb
             INNER JOIN places p ON p.id = upb.place_id

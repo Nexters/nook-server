@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.place
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
@@ -126,10 +127,12 @@ class PlaceParsingPersistenceAdapterTest {
                     providerUrl = null,
                 ),
             ),
+            thumbnailUrl = "https://cdn.example.com/google-place.jpg",
         )
 
         verify(bookmarkRepository).insertIgnore(7, 17)
         verify(bookmarkRepository).insertIgnore(8, 17)
+        verify(place).updateThumbnailUrlIfAbsent("https://cdn.example.com/google-place.jpg")
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
     }
 

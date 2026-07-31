@@ -20,10 +20,14 @@ class ConnectPostPlacePersistenceAdapter(
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
 ) : ConnectPostPlacePort {
     @Transactional
-    override fun connect(userId: Long, savedPostId: Long, candidate: PlaceCandidate): ConnectPostPlacePort.Result {
-        val savedPost = savedPostRepository.findByIdAndUserId(savedPostId, userId)
+    override fun connect(
+        userId: Long,
+        savedPostId: Long,
+        candidate: PlaceCandidate,
+        thumbnailUrl: String?,
+    ): ConnectPostPlacePort.Result {
+        val savedPost = findSavedPostForConnection(savedPostId, userId)
             ?: return ConnectPostPlacePort.Result.PostNotFound
-        requireNotNull(postRepository.findByIdForUpdate(savedPost.postId))
         val parsingJob = parsingJobRepository.findByPostId(savedPost.postId)
         if (parsingJob == null || parsingJob.status in IN_PROGRESS_STATUSES) {
             return ConnectPostPlacePort.Result.ParsingInProgress
@@ -42,6 +46,7 @@ class ConnectPostPlacePersistenceAdapter(
         val place = requireNotNull(
             placeRepository.findByProviderAndExternalPlaceId(candidate.provider, candidate.externalPlaceId),
         )
+        place.updateThumbnailUrlIfAbsent(thumbnailUrl)
         val placeId = requireNotNull(place.id)
         val existingPostPlace = postPlaceRepository.findByPostIdAndPlaceId(savedPost.postId, placeId)
         if (existingPostPlace == null) {
@@ -58,6 +63,10 @@ class ConnectPostPlacePersistenceAdapter(
         }
         return ConnectPostPlacePort.Result.Connected(placeId)
     }
+
+    private fun findSavedPostForConnection(savedPostId: Long, userId: Long) =
+        savedPostRepository.findByIdAndUserId(savedPostId, userId)
+            ?.takeIf { postRepository.findByIdForUpdate(it.postId) != null }
 
     private companion object {
         val IN_PROGRESS_STATUSES = setOf(PlaceParsingStatus.PENDING, PlaceParsingStatus.PROCESSING)

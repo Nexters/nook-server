@@ -1,6 +1,8 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.place.NoOpPlaceThumbnailProvider
 import org.every.nook.api.application.place.PagedPlaceSearchProvider
+import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.infrastructure.auth.JwtProperties
@@ -30,6 +32,7 @@ class ManualPlaceConnectionConfigTest {
             ConnectPostPlacePort::class.java,
             Supplier { mock(ConnectPostPlacePort::class.java) },
         )
+        .withBean(PlaceThumbnailProvider::class.java, Supplier { NoOpPlaceThumbnailProvider })
 
     @Test
     fun `starts with a single paged place search provider`() {

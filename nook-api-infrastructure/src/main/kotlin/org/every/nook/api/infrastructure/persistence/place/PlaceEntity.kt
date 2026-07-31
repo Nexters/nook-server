@@ -49,6 +49,8 @@ class PlaceEntity(
     val category: String? = null,
     @Column(name = "phone_number", nullable = true, length = Place.MAX_PHONE_NUMBER_LENGTH)
     val phoneNumber: String? = null,
+    @Column(name = "thumbnail_url", nullable = true, length = THUMBNAIL_URL_MAX_LENGTH)
+    var thumbnailUrl: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -59,5 +61,12 @@ class PlaceEntity(
     companion object {
         const val COORDINATE_PRECISION = 10
         const val COORDINATE_SCALE = 7
+        const val THUMBNAIL_URL_MAX_LENGTH = 2048
+    }
+
+    fun updateThumbnailUrlIfAbsent(thumbnailUrl: String?) {
+        if (this.thumbnailUrl == null && thumbnailUrl != null) {
+            this.thumbnailUrl = thumbnailUrl
+        }
     }
 }

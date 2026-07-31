@@ -33,7 +33,18 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
             FROM (
                 SELECT
                     group_post.group_id,
-                    post_media.media_url,
+                    COALESCE(
+                        (
+                            SELECT place.thumbnail_url
+                            FROM post_places post_place
+                            INNER JOIN places place ON place.id = post_place.place_id
+                            WHERE post_place.post_id = saved_post.post_id
+                              AND place.thumbnail_url IS NOT NULL
+                            ORDER BY post_place.display_order ASC
+                            LIMIT 1
+                        ),
+                        post_media.media_url
+                    ) AS media_url,
                     ROW_NUMBER() OVER (
                         PARTITION BY group_post.group_id
                         ORDER BY saved_post.created_at DESC, saved_post.id DESC
@@ -41,7 +52,8 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 FROM user_groups user_group
                 INNER JOIN group_posts group_post ON group_post.group_id = user_group.id
                 INNER JOIN user_saved_posts saved_post ON saved_post.id = group_post.user_saved_post_id
-                INNER JOIN post_media post_media
+                INNER JOIN posts post ON post.id = saved_post.post_id
+                LEFT JOIN post_media post_media
                     ON post_media.post_id = saved_post.post_id
                     AND post_media.media_type = 'IMAGE'
                 LEFT JOIN post_media earlier_image
@@ -51,6 +63,18 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 WHERE user_group.user_id = :userId
                   AND saved_post.user_id = :userId
                   AND earlier_image.id IS NULL
+                  AND COALESCE(
+                      (
+                          SELECT place.thumbnail_url
+                          FROM post_places post_place
+                          INNER JOIN places place ON place.id = post_place.place_id
+                          WHERE post_place.post_id = saved_post.post_id
+                            AND place.thumbnail_url IS NOT NULL
+                          ORDER BY post_place.display_order ASC
+                          LIMIT 1
+                      ),
+                      post_media.media_url
+                  ) IS NOT NULL
             ) ranked_thumbnail
             WHERE ranked_thumbnail.thumbnail_order <= 3
             ORDER BY ranked_thumbnail.group_id, ranked_thumbnail.thumbnail_order

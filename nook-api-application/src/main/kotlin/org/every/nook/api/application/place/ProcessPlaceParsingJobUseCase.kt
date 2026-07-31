@@ -10,6 +10,7 @@ class ProcessPlaceParsingJobUseCase(
     private val clueExtractor: PlaceClueExtractor,
     private val searchPlaceCandidates: SearchPlaceCandidatesUseCase,
     private val candidateSelector: PlaceCandidateSelector,
+    private val thumbnailProvider: PlaceThumbnailProvider = NoOpPlaceThumbnailProvider,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
     private val clock: Clock = Clock.systemUTC(),
@@ -41,7 +42,17 @@ class ProcessPlaceParsingJobUseCase(
                     )
                 }
             }
-            jobPort.complete(job.postId, places)
+            val thumbnailUrl = places.firstOrNull()?.let { place ->
+                runCatching {
+                    thumbnailProvider.fetchThumbnailUrl(place)
+                }.onFailure { exception ->
+                    logger.warn(exception) {
+                        "Place thumbnail skipped: postId=${job.postId}, provider=${place.provider}, " +
+                            "externalPlaceId=${place.externalPlaceId}"
+                    }
+                }.getOrNull()
+            }
+            jobPort.complete(job.postId, places, thumbnailUrl)
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
             logger.info {
                 "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
