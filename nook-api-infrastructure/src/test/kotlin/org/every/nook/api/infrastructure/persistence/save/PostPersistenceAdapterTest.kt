@@ -20,6 +20,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobE
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
@@ -40,6 +41,8 @@ class PostPersistenceAdapterTest {
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
+    private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
+    private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val eventPublisher = mock(org.springframework.context.ApplicationEventPublisher::class.java)
@@ -48,9 +51,9 @@ class PostPersistenceAdapterTest {
         postContentParsingJobJpaRepository = contentParsingJobRepository,
         userSavedPostJpaRepository = userSavedPostRepository,
         placeParsingJobJpaRepository = parsingJobRepository,
-        postPlaceJpaRepository = mock(PostPlaceJpaRepository::class.java),
+        postPlaceJpaRepository = postPlaceRepository,
         placeJpaRepository = mock(PlaceJpaRepository::class.java),
-        userPlaceBookmarkJpaRepository = mock(UserPlaceBookmarkJpaRepository::class.java),
+        userPlaceBookmarkJpaRepository = bookmarkRepository,
         groupJpaRepository = groupRepository,
         groupPostJpaRepository = groupPostRepository,
         eventPublisher = eventPublisher,
@@ -211,6 +214,52 @@ class PostPersistenceAdapterTest {
         val eventCaptor = ArgumentCaptor.forClass(PlaceParsingJobRequestedEvent::class.java)
         verify(eventPublisher).publishEvent(eventCaptor.capture())
         assertEquals(101, eventCaptor.value.postId)
+        verifyNoInteractions(postPlaceRepository, bookmarkRepository)
+    }
+
+    @Test
+    fun `bookmarks existing places when a new user reuses a completed post`() {
+        val group = mock(GroupEntity::class.java)
+        val postEntity = mock(PostEntity::class.java)
+        val savedPost = mock(UserSavedPostEntity::class.java)
+        val contentParsingJob = PostContentParsingJobEntity(
+            postId = 101,
+            status = PostContentParsingStatus.COMPLETED,
+        )
+        val placeParsingJob = PlaceParsingJobEntity(
+            postId = 101,
+            status = PlaceParsingStatus.COMPLETED,
+        )
+        `when`(group.id).thenReturn(17)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17))).thenReturn(listOf(group))
+        `when`(postEntity.id).thenReturn(101)
+        `when`(postRepository.findBySourceForUpdate("INSTAGRAM", "ABC123")).thenReturn(postEntity)
+        `when`(contentParsingJobRepository.findByPostId(101)).thenReturn(contentParsingJob)
+        `when`(parsingJobRepository.findByPostId(101)).thenReturn(placeParsingJob)
+        `when`(savedPost.id).thenReturn(11)
+        `when`(
+            userSavedPostRepository.save(
+                org.mockito.ArgumentMatchers.any(UserSavedPostEntity::class.java),
+            ),
+        ).thenReturn(savedPost)
+        `when`(postPlaceRepository.findAllByPostIdOrderBySequenceAsc(101)).thenReturn(
+            listOf(
+                PostPlaceEntity(postId = 101, placeId = 201, sequence = 0),
+                PostPlaceEntity(postId = 101, placeId = 202, sequence = 1),
+            ),
+        )
+
+        val result = adapter.reuse(
+            userId = 7,
+            source = PostSource(type = "INSTAGRAM", externalPostId = "ABC123"),
+            memo = null,
+            groupIds = setOf(17),
+        )
+
+        assertEquals(11, result.postId)
+        assertEquals(PlaceParsingStatus.COMPLETED, result.placeParsingStatus)
+        verify(bookmarkRepository).insertIgnore(7, 201)
+        verify(bookmarkRepository).insertIgnore(7, 202)
     }
 
     @Test

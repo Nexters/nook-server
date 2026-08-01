@@ -85,7 +85,7 @@ class PostPersistenceAdapter(
                     nextAttemptAt = clock.instant(),
                 ),
             )
-        val userPost = findOrCreateUserPost(userId, sourcePostId, memo)
+        val userPost = findOrCreateUserPost(userId, sourcePostId, memo).entity
         addToGroups(requireNotNull(userPost.id), groupIds)
         if (existingContentJob == null) {
             eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(sourcePostId, clock.instant()))
@@ -108,7 +108,13 @@ class PostPersistenceAdapter(
         )
         val sourcePostId = requireNotNull(post.id)
         val contentJob = requireNotNull(postContentParsingJobJpaRepository.findByPostId(sourcePostId))
-        val userPost = findOrCreateUserPost(userId, sourcePostId, memo)
+        val userPostCreation = findOrCreateUserPost(userId, sourcePostId, memo)
+        val userPost = userPostCreation.entity
+        if (userPostCreation.created) {
+            postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(sourcePostId).forEach { postPlace ->
+                userPlaceBookmarkJpaRepository.insertIgnore(userId, postPlace.placeId)
+            }
+        }
         addToGroups(requireNotNull(userPost.id), groupIds)
         restartFailedJob(sourcePostId, contentJob)
         val placeParsingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
@@ -173,15 +179,19 @@ class PostPersistenceAdapter(
         return postEntity
     }
 
-    private fun findOrCreateUserPost(userId: Long, postId: Long, memo: String?): UserSavedPostEntity {
+    private fun findOrCreateUserPost(userId: Long, postId: Long, memo: String?): UserPostCreation {
         userSavedPostJpaRepository.restoreByUserIdAndPostId(userId, postId)
         return userSavedPostJpaRepository.findByUserIdAndPostId(userId, postId)
-            ?: userSavedPostJpaRepository.save(
-                UserSavedPostEntity(
-                    userId = userId,
-                    postId = postId,
-                    memo = memo,
+            ?.let { UserPostCreation(it, created = false) }
+            ?: UserPostCreation(
+                entity = userSavedPostJpaRepository.save(
+                    UserSavedPostEntity(
+                        userId = userId,
+                        postId = postId,
+                        memo = memo,
+                    ),
                 ),
+                created = true,
             )
     }
 
@@ -200,6 +210,8 @@ class PostPersistenceAdapter(
             },
         )
     }
+
+    private data class UserPostCreation(val entity: UserSavedPostEntity, val created: Boolean)
 
     private fun restartFailedJob(postId: Long, contentJob: PostContentParsingJobEntity) {
         if (contentJob.status == PostContentParsingStatus.FAILED) {
