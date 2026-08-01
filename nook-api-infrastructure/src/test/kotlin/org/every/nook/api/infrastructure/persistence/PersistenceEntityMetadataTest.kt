@@ -8,6 +8,8 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.Table
 import org.every.nook.api.domain.group.Group
 import org.every.nook.api.infrastructure.persistence.auth.RefreshTokenEntity
+import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseEntity
+import org.every.nook.api.infrastructure.persistence.config.RuntimeConfigurationEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
 import org.every.nook.api.infrastructure.persistence.member.SocialAccountEntity
@@ -135,6 +137,8 @@ class PersistenceEntityMetadataTest {
             UserSavedPostEntity::class,
             GroupEntity::class,
             GroupPostEntity::class,
+            ScrapingProviderResponseEntity::class,
+            RuntimeConfigurationEntity::class,
         )
     }
 }

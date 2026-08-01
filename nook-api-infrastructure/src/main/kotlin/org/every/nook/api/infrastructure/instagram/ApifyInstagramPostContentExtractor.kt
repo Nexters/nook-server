@@ -15,11 +15,11 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
 import java.net.SocketTimeoutException
 
-class BrightDataInstagramPostContentExtractor(
+class ApifyInstagramPostContentExtractor(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
-    private val properties: BrightDataProperties,
-    private val mapper: BrightDataInstagramMapper,
+    private val properties: ApifyProperties,
+    private val mapper: ApifyInstagramMapper,
     private val responseCache: ScrapingProviderResponseCache,
 ) : PostContentExtractor {
     override fun supports(url: String): Boolean = InstagramContentUrl.supports(url)
@@ -35,67 +35,70 @@ class BrightDataInstagramPostContentExtractor(
         val responseBody = try {
             restClient.post()
                 .uri { builder ->
-                    builder.path(SCRAPE_PATH)
-                        .queryParam(DATASET_ID, datasetId(instagramUrl))
+                    builder.path(RUN_SYNC_PATH)
                         .queryParam(FORMAT, JSON_FORMAT)
-                        .build()
+                        .queryParam(CLEAN, true)
+                        .build(properties.actorId)
                 }
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
-                .body(listOf(mapOf(URL to instagramUrl.canonicalUrl)))
+                .body(
+                    mapOf(
+                        DIRECT_URLS to listOf(instagramUrl.canonicalUrl),
+                        RESULTS_TYPE to resultsType(instagramUrl),
+                        RESULTS_LIMIT to 1,
+                    ),
+                )
                 .retrieve()
                 .body(String::class.java)
         } catch (exception: RestClientResponseException) {
-            handleResponseException(exception)
+            if (exception.statusCode.value() in TIMEOUT_STATUSES) {
+                providerTimeout(exception)
+            }
+            providerFailure(exception)
         } catch (exception: ResourceAccessException) {
             handleResourceAccessException(exception)
         }
 
         val extracted = mapResponse(instagramUrl, parseResponse(responseBody))
-        responseBody?.let { body ->
-            responseCache.save(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode, body)
-        }
+        responseBody?.let { body -> responseCache.save(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode, body) }
         return extracted
     }
 
     private fun parseResponse(responseBody: String?): JsonNode? = responseBody?.let { body ->
-        runCatching { objectMapper.readTree(body) }
-            .getOrElse(::providerFailure)
+        runCatching { objectMapper.readTree(body) }.getOrElse(::providerFailure)
     }
 
     private fun mapResponse(url: InstagramContentUrl, root: JsonNode?): ExtractedPostContent {
-        if (root == null || root.isNull) {
-            contentNotFound()
-        }
-        if (root.isObject && root.has(SNAPSHOT_ID)) {
-            providerTimeout()
-        }
-        if (!root.isArray) {
+        if (root == null || root.isNull || !root.isArray) {
+            if (root == null || root.isNull) contentNotFound()
             providerFailure()
         }
         val first = root.firstOrNull() ?: contentNotFound()
-        return runCatching {
-            mapper.map(url, objectMapper.treeToValue(first, BrightDataInstagramRecord::class.java))
-        }.getOrElse {
-            logger.warn("Failed to map Bright Data Instagram response", it)
-            providerFailure(it)
+        val record = runCatching { objectMapper.treeToValue(first, ApifyInstagramRecord::class.java) }
+            .getOrElse {
+                logger.warn("Failed to map Apify Instagram response", it)
+                providerFailure(it)
+            }
+        if (!record.error.isNullOrBlank()) {
+            if (record.isContentUnavailable()) contentNotFound()
+            providerFailure()
         }
+        return mapper.map(url, record)
     }
 
-    private fun datasetId(url: InstagramContentUrl): String = when (url.kind) {
-        InstagramContentUrl.Kind.POST -> properties.postsDatasetId
-        InstagramContentUrl.Kind.REEL -> properties.reelsDatasetId
+    private fun ApifyInstagramRecord.isContentUnavailable(): Boolean {
+        val text = listOfNotNull(error, errorDescription).joinToString(" ").lowercase()
+        return CONTENT_UNAVAILABLE_MARKERS.any(text::contains)
+    }
+
+    private fun resultsType(url: InstagramContentUrl): String = when (url.kind) {
+        InstagramContentUrl.Kind.POST -> POSTS
+        InstagramContentUrl.Kind.REEL -> REELS
     }
 
     private fun Throwable.hasSocketTimeoutCause(): Boolean =
         generateSequence(this) { it.cause }.any { it is SocketTimeoutException }
-
-    private fun handleResponseException(exception: RestClientResponseException): Nothing {
-        if (exception.statusCode.value() == NOT_FOUND_STATUS) {
-            contentNotFound()
-        }
-        providerFailure(exception)
-    }
 
     private fun handleResourceAccessException(exception: ResourceAccessException): Nothing {
         if (exception.hasSocketTimeoutCause()) {
@@ -111,17 +114,29 @@ class BrightDataInstagramPostContentExtractor(
     private fun providerFailure(cause: Throwable? = null): Nothing = throw PostContentProviderException(cause)
 
     private companion object {
-        val logger = LoggerFactory.getLogger(BrightDataInstagramPostContentExtractor::class.java)
+        val logger = LoggerFactory.getLogger(ApifyInstagramPostContentExtractor::class.java)
 
-        const val SCRAPE_PATH = "/datasets/v3/scrape"
-        const val DATASET_ID = "dataset_id"
+        const val RUN_SYNC_PATH = "/v2/acts/{actorId}/run-sync-get-dataset-items"
+        const val AUTHORIZATION = "Authorization"
         const val FORMAT = "format"
         const val JSON_FORMAT = "json"
-        const val AUTHORIZATION = "Authorization"
-        const val URL = "url"
-        const val SNAPSHOT_ID = "snapshot_id"
-        const val NOT_FOUND_STATUS = 404
-        const val PROVIDER = "BRIGHT_DATA"
+        const val CLEAN = "clean"
+        const val DIRECT_URLS = "directUrls"
+        const val RESULTS_TYPE = "resultsType"
+        const val RESULTS_LIMIT = "resultsLimit"
+        const val POSTS = "posts"
+        const val REELS = "reels"
+        const val PROVIDER = "APIFY"
         const val SOURCE_TYPE = "INSTAGRAM"
+        val TIMEOUT_STATUSES = setOf(408, 504)
+        val CONTENT_UNAVAILABLE_MARKERS = listOf(
+            "no_items",
+            "not_found",
+            "not found",
+            "does not exist",
+            "private",
+            "restricted",
+            "empty",
+        )
     }
 }
