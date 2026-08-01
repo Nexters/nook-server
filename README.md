@@ -37,6 +37,9 @@ cp .env.example .env
 
 Instagram 게시물·릴스 수집 dataset ID는 Bright Data 공식 기본값을 사용합니다. 계정에서 별도 dataset을
 사용하는 경우 `BRIGHT_DATA_POSTS_DATASET_ID`, `BRIGHT_DATA_REELS_DATASET_ID`로 재정의합니다.
+Bright Data 장애 시 Apify fallback을 사용하려면 `APIFY_API_TOKEN`을 설정합니다. provider routing은
+MySQL의 `runtime_configurations`에서 `instagram.scraping.provider-mode` 값으로 제어합니다. 지원 값과
+운영 SQL은 `docs/tasks/NOOK-110/README.md`를 참고합니다.
 
 API 애플리케이션을 실행합니다.
 
