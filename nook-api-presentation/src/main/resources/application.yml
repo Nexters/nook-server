@@ -26,10 +26,12 @@ server:
   forward-headers-strategy: framework
 
 management:
+  server:
+    port: ${MANAGEMENT_PORT:${server.port:8080}}
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
