@@ -5,6 +5,7 @@ import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
+import org.every.nook.api.application.post.DeleteSavedPostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
@@ -30,6 +31,7 @@ import org.springframework.http.MediaType
 import org.springframework.security.authentication.TestingAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
@@ -49,6 +51,7 @@ class PostControllerTest {
     private lateinit var updateMemoUseCase: UpdatePostMemoUseCase
     private lateinit var replaceGroupsUseCase: ReplaceSavedPostGroupsUseCase
     private lateinit var connectPostPlaceUseCase: ConnectPostPlaceUseCase
+    private lateinit var deleteSavedPostUseCase: DeleteSavedPostUseCase
 
     @BeforeTest
     fun setUp() {
@@ -61,6 +64,7 @@ class PostControllerTest {
         updateMemoUseCase = mock(UpdatePostMemoUseCase::class.java)
         replaceGroupsUseCase = mock(ReplaceSavedPostGroupsUseCase::class.java)
         connectPostPlaceUseCase = mock(ConnectPostPlaceUseCase::class.java)
+        deleteSavedPostUseCase = mock(DeleteSavedPostUseCase::class.java)
         stubCreate()
         stubPlaceParsing(findUseCase)
         stubSavedPostList()
@@ -75,11 +79,22 @@ class PostControllerTest {
                     updateMemoUseCase,
                     replaceGroupsUseCase,
                     connectPostPlaceUseCase,
+                    deleteSavedPostUseCase,
                 ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
             .setControllerAdvice(GlobalExceptionHandler())
             .build()
+    }
+
+    @Test
+    fun `deletes my saved post`() {
+        mockMvc.delete("/api/v1/posts/11").andExpect {
+            status { isOk() }
+            jsonPath("$.resultType") { value("SUCCESS") }
+        }
+
+        verify(deleteSavedPostUseCase)(DeleteSavedPostUseCase.Command(TEST_USER_ID, 11))
     }
 
     @AfterTest

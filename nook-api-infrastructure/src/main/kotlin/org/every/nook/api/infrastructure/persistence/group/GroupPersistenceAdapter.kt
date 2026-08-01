@@ -6,11 +6,13 @@ import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.GroupColor
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 
 @Component
 class GroupPersistenceAdapter(
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
+    private val clock: Clock = Clock.systemUTC(),
 ) : GroupPort,
     GroupOwnershipPort {
     @Transactional(readOnly = true)
@@ -52,11 +54,11 @@ class GroupPersistenceAdapter(
 
     @Transactional
     override fun delete(userId: Long, groupId: Long): Boolean {
-        if (!groupRepository.existsByIdAndUserId(groupId, userId)) {
-            return false
-        }
-        groupPostRepository.deleteAllByGroupId(groupId)
-        return groupRepository.deleteByIdAndUserId(groupId, userId) > 0
+        val group = groupRepository.findByIdAndUserId(groupId, userId) ?: return false
+        val now = clock.instant()
+        groupPostRepository.softDeleteAllByGroupId(groupId, now)
+        group.softDelete(now)
+        return true
     }
 
     @Transactional(readOnly = true)

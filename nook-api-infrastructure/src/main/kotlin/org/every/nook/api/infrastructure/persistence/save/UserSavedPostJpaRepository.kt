@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -51,4 +52,15 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
 
     @Query("SELECT DISTINCT savedPost.userId FROM UserSavedPostEntity savedPost WHERE savedPost.postId = :postId")
     fun findDistinctUserIdsByPostId(@Param("postId") postId: Long): List<Long>
+
+    @Modifying
+    @Query(
+        value = """
+            UPDATE user_saved_posts
+            SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP(6)
+            WHERE user_id = :userId AND post_id = :postId
+        """,
+        nativeQuery = true,
+    )
+    fun restoreByUserIdAndPostId(userId: Long, postId: Long): Int
 }

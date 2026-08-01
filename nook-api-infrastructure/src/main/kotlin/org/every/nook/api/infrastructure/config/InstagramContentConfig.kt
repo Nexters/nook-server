@@ -7,6 +7,7 @@ import org.every.nook.api.infrastructure.instagram.BrightDataInstagramMapper
 import org.every.nook.api.infrastructure.instagram.BrightDataInstagramPostContentExtractor
 import org.every.nook.api.infrastructure.instagram.BrightDataProperties
 import org.every.nook.api.infrastructure.instagram.InstagramPostSourceResolver
+import org.every.nook.api.infrastructure.persistence.cache.BrightDataResponseJpaRepository
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -39,10 +40,12 @@ class InstagramContentConfig {
         brightDataRestClient: RestClient,
         properties: BrightDataProperties,
         mapper: BrightDataInstagramMapper,
+        responseRepository: BrightDataResponseJpaRepository,
     ): PostContentExtractor = BrightDataInstagramPostContentExtractor(
         restClient = brightDataRestClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
         mapper = mapper,
+        responseRepository = responseRepository,
     )
 }
