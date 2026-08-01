@@ -79,6 +79,39 @@ class InstagramPostContentExtractorTest {
         assertEquals(0, apify.calls)
     }
 
+    @Test
+    fun `Apify provider failure falls back to Bright Data once`() {
+        val brightData = extractor(result = CONTENT)
+        val apify = extractor(failure = PostContentProviderException())
+        val router = router("APIFY_BRIGHT_WITH_DATA_FALLBACK", brightData, apify)
+
+        assertEquals(CONTENT, router.extract(URL))
+        assertEquals(1, brightData.calls)
+        assertEquals(1, apify.calls)
+    }
+
+    @Test
+    fun `Apify timeout falls back to Bright Data once`() {
+        val brightData = extractor(result = CONTENT)
+        val apify = extractor(failure = PostContentProviderTimeoutException())
+        val router = router("APIFY_BRIGHT_WITH_DATA_FALLBACK", brightData, apify)
+
+        assertEquals(CONTENT, router.extract(URL))
+        assertEquals(1, brightData.calls)
+        assertEquals(1, apify.calls)
+    }
+
+    @Test
+    fun `Apify content not found does not fall back`() {
+        val brightData = extractor(result = CONTENT)
+        val apify = extractor(failure = PostContentNotFoundException())
+        val router = router("APIFY_BRIGHT_WITH_DATA_FALLBACK", brightData, apify)
+
+        assertFailsWith<PostContentNotFoundException> { router.extract(URL) }
+        assertEquals(0, brightData.calls)
+        assertEquals(1, apify.calls)
+    }
+
     private fun router(
         mode: String?,
         brightData: RecordingExtractor,

@@ -27,11 +27,12 @@ class InstagramPostContentExtractor(
         return when (mode) {
             InstagramScrapingProviderMode.BRIGHT_DATA_ONLY -> brightDataExtractor.extract(url)
             InstagramScrapingProviderMode.APIFY_ONLY -> apifyExtractor.extract(url)
-            InstagramScrapingProviderMode.BRIGHT_DATA_WITH_APIFY_FALLBACK -> extractWithFallback(url)
+            InstagramScrapingProviderMode.BRIGHT_DATA_WITH_APIFY_FALLBACK -> extractBrightDataWithFallback(url)
+            InstagramScrapingProviderMode.APIFY_BRIGHT_WITH_DATA_FALLBACK -> extractApifyWithFallback(url)
         }
     }
 
-    private fun extractWithFallback(url: String): ExtractedPostContent = try {
+    private fun extractBrightDataWithFallback(url: String): ExtractedPostContent = try {
         brightDataExtractor.extract(url)
     } catch (exception: PostContentProviderTimeoutException) {
         logger.warn("Bright Data timed out; falling back to Apify", exception)
@@ -39,6 +40,16 @@ class InstagramPostContentExtractor(
     } catch (exception: PostContentProviderException) {
         logger.warn("Bright Data failed; falling back to Apify", exception)
         apifyExtractor.extract(url)
+    }
+
+    private fun extractApifyWithFallback(url: String): ExtractedPostContent = try {
+        apifyExtractor.extract(url)
+    } catch (exception: PostContentProviderTimeoutException) {
+        logger.warn("Apify timed out; falling back to Bright Data", exception)
+        brightDataExtractor.extract(url)
+    } catch (exception: PostContentProviderException) {
+        logger.warn("Apify failed; falling back to Bright Data", exception)
+        brightDataExtractor.extract(url)
     }
 
     private companion object {

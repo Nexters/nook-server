@@ -23,9 +23,10 @@ provider를 강제 전환한다. provider별 성공 응답 원문은 캐시에 �
 | `BRIGHT_DATA_ONLY` | Bright Data만 호출한다. |
 | `APIFY_ONLY` | Apify만 호출한다. |
 | `BRIGHT_DATA_WITH_APIFY_FALLBACK` | Bright Data를 우선 호출하고 timeout 또는 provider 오류에만 Apify를 한 번 호출한다. |
+| `APIFY_BRIGHT_WITH_DATA_FALLBACK` | Apify를 우선 호출하고 timeout 또는 provider 오류에만 Bright Data를 한 번 호출한다. |
 
 설정 행이 없거나 값이 올바르지 않으면 `BRIGHT_DATA_WITH_APIFY_FALLBACK`을 안전한 기본값으로 사용한다.
-잘못된 URL과 콘텐츠 없음·비공개 오류에는 fallback하지 않는다.
+잘못된 URL과 콘텐츠 없음·비공개 오류에는 어느 방향에서도 fallback하지 않는다.
 
 운영 전환은 다음 SQL로 수행한다.
 
