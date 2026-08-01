@@ -173,8 +173,9 @@ class PostPersistenceAdapter(
         return postEntity
     }
 
-    private fun findOrCreateUserPost(userId: Long, postId: Long, memo: String?): UserSavedPostEntity =
-        userSavedPostJpaRepository.findByUserIdAndPostId(userId, postId)
+    private fun findOrCreateUserPost(userId: Long, postId: Long, memo: String?): UserSavedPostEntity {
+        userSavedPostJpaRepository.restoreByUserIdAndPostId(userId, postId)
+        return userSavedPostJpaRepository.findByUserIdAndPostId(userId, postId)
             ?: userSavedPostJpaRepository.save(
                 UserSavedPostEntity(
                     userId = userId,
@@ -182,12 +183,16 @@ class PostPersistenceAdapter(
                     memo = memo,
                 ),
             )
+    }
 
     private fun addToGroups(userSavedPostId: Long, groupIds: Set<Long>) {
-        val existingGroupIds = groupPostJpaRepository.findAllByUserSavedPostId(userSavedPostId)
+        val activeGroupIds = groupPostJpaRepository.findAllByUserSavedPostId(userSavedPostId)
             .mapTo(mutableSetOf(), GroupPostEntity::groupId)
+        val missingGroupIds = (groupIds - activeGroupIds).filter { groupId ->
+            groupPostJpaRepository.restore(groupId, userSavedPostId) == 0
+        }
         groupPostJpaRepository.saveAll(
-            (groupIds - existingGroupIds).map { groupId ->
+            missingGroupIds.map { groupId ->
                 GroupPostEntity(
                     groupId = groupId,
                     userSavedPostId = userSavedPostId,

@@ -19,6 +19,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 FROM user_saved_posts usp
                 INNER JOIN post_places pp ON pp.post_id = usp.post_id
                 WHERE usp.user_id = :userId
+                  AND usp.deleted_at IS NULL
                   AND pp.place_id = :placeId
             )
         """,
@@ -58,6 +59,9 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                             ON user_group.id = color_group_post.group_id
                            AND user_group.user_id = color_saved_post.user_id
                         WHERE color_saved_post.user_id = upb.user_id
+                          AND color_saved_post.deleted_at IS NULL
+                          AND color_group_post.deleted_at IS NULL
+                          AND user_group.deleted_at IS NULL
                           AND color_post_place.place_id = p.id
                           AND color_saved_post.id = (
                               SELECT latest_saved_post.id
@@ -65,6 +69,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                               INNER JOIN post_places latest_post_place
                                   ON latest_post_place.post_id = latest_saved_post.post_id
                               WHERE latest_saved_post.user_id = upb.user_id
+                                AND latest_saved_post.deleted_at IS NULL
                                 AND latest_post_place.place_id = p.id
                               ORDER BY latest_saved_post.created_at DESC, latest_saved_post.id DESC
                               LIMIT 1
@@ -86,6 +91,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   FROM user_saved_posts usp
                   INNER JOIN post_places pp ON pp.post_id = usp.post_id
                   WHERE usp.user_id = upb.user_id
+                    AND usp.deleted_at IS NULL
                     AND pp.place_id = p.id
               )
         """,
@@ -118,6 +124,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                     INNER JOIN post_places pp_image ON pp_image.post_id = usp_image.post_id
                     INNER JOIN post_media pm ON pm.post_id = usp_image.post_id
                     WHERE usp_image.user_id = upb.user_id
+                      AND usp_image.deleted_at IS NULL
                       AND pp_image.place_id = p.id
                       AND pm.media_type = 'IMAGE'
                     ORDER BY usp_image.created_at DESC, usp_image.id DESC, pm.display_order ASC
@@ -132,6 +139,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   FROM user_saved_posts usp
                   INNER JOIN post_places pp ON pp.post_id = usp.post_id
                   WHERE usp.user_id = upb.user_id
+                    AND usp.deleted_at IS NULL
                     AND pp.place_id = p.id
               )
               AND (

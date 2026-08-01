@@ -7,6 +7,8 @@ import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
+import org.every.nook.api.infrastructure.persistence.cache.BrightDataResponseEntity
+import org.every.nook.api.infrastructure.persistence.cache.BrightDataResponseJpaRepository
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.web.client.ResourceAccessException
@@ -19,11 +21,15 @@ class BrightDataInstagramPostContentExtractor(
     private val objectMapper: ObjectMapper,
     private val properties: BrightDataProperties,
     private val mapper: BrightDataInstagramMapper,
+    private val responseRepository: BrightDataResponseJpaRepository,
 ) : PostContentExtractor {
     override fun supports(url: String): Boolean = InstagramContentUrl.supports(url)
 
     override fun extract(url: String): ExtractedPostContent {
         val instagramUrl = InstagramContentUrl.parse(url)
+        responseRepository.findBySourceTypeAndExternalPostId(SOURCE_TYPE, instagramUrl.shortcode)?.let { cached ->
+            return mapResponse(instagramUrl, parseResponse(cached.responseBody))
+        }
         if (properties.apiToken.isBlank()) {
             providerFailure()
         }
@@ -46,7 +52,19 @@ class BrightDataInstagramPostContentExtractor(
             handleResourceAccessException(exception)
         }
 
-        return mapResponse(instagramUrl, parseResponse(responseBody))
+        val extracted = mapResponse(instagramUrl, parseResponse(responseBody))
+        responseBody?.let { body ->
+            runCatching {
+                responseRepository.saveAndFlush(
+                    BrightDataResponseEntity(SOURCE_TYPE, instagramUrl.shortcode, body),
+                )
+            }.onFailure { exception ->
+                if (responseRepository.findBySourceTypeAndExternalPostId(SOURCE_TYPE, instagramUrl.shortcode) == null) {
+                    throw exception
+                }
+            }
+        }
+        return extracted
     }
 
     private fun parseResponse(responseBody: String?): JsonNode? = responseBody?.let { body ->
@@ -112,5 +130,6 @@ class BrightDataInstagramPostContentExtractor(
         const val URL = "url"
         const val SNAPSHOT_ID = "snapshot_id"
         const val NOT_FOUND_STATUS = 404
+        const val SOURCE_TYPE = "INSTAGRAM"
     }
 }

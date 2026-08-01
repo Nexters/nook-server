@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Positive
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
+import org.every.nook.api.application.post.DeleteSavedPostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
@@ -28,6 +29,7 @@ import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -52,7 +54,21 @@ class PostController(
     private val updatePostMemoUseCase: UpdatePostMemoUseCase,
     private val replaceSavedPostGroupsUseCase: ReplaceSavedPostGroupsUseCase,
     private val connectPostPlaceUseCase: ConnectPostPlaceUseCase,
+    private val deleteSavedPostUseCase: DeleteSavedPostUseCase,
 ) {
+    @Operation(summary = "내 저장 게시물 삭제")
+    @DeleteMapping("/{postId}")
+    fun deleteSavedPost(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "삭제할 저장 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
+    ): ApiResponse<Unit> {
+        deleteSavedPostUseCase(DeleteSavedPostUseCase.Command(userContext.userId, postId))
+        return ApiResponse.success(Unit)
+    }
+
     @Operation(summary = "URL로 게시물 저장 시작")
     @PostMapping
     fun createPost(

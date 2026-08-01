@@ -8,6 +8,9 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -19,6 +22,7 @@ class GroupPostManagementAdapterTest {
         groupRepository = groupRepository,
         groupPostRepository = groupPostRepository,
         savedPostRepository = savedPostRepository,
+        clock = FIXED_CLOCK,
     )
 
     @Test
@@ -33,7 +37,7 @@ class GroupPostManagementAdapterTest {
         val result = adapter.replace(userId = 7, savedPostId = 11, groupIds = setOf(17, 18))
 
         assertEquals(GroupPostManagementPort.ReplaceResult.Updated, result)
-        verify(groupPostRepository).deleteAllByUserSavedPostId(11)
+        verify(groupPostRepository).softDeleteAllByUserSavedPostId(11, FIXED_NOW)
         @Suppress("UNCHECKED_CAST")
         val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<GroupPostEntity>>
         verify(groupPostRepository).saveAll(captor.capture())
@@ -47,7 +51,7 @@ class GroupPostManagementAdapterTest {
         val result = adapter.replace(userId = 7, savedPostId = 11, groupIds = emptySet())
 
         assertEquals(GroupPostManagementPort.ReplaceResult.Updated, result)
-        verify(groupPostRepository).deleteAllByUserSavedPostId(11)
+        verify(groupPostRepository).softDeleteAllByUserSavedPostId(11, FIXED_NOW)
         verify(groupPostRepository).saveAll(emptyList<GroupPostEntity>())
     }
 
@@ -75,5 +79,10 @@ class GroupPostManagementAdapterTest {
         val group = mock(GroupEntity::class.java)
         `when`(group.id).thenReturn(id)
         return group
+    }
+
+    private companion object {
+        val FIXED_NOW: Instant = Instant.parse("2026-08-01T00:00:00Z")
+        val FIXED_CLOCK: Clock = Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
     }
 }

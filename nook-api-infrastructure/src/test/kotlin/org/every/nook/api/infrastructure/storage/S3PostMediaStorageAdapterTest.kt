@@ -1,6 +1,10 @@
 package org.every.nook.api.infrastructure.storage
 
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.cache.MediaUrlCacheEntity
+import org.every.nook.api.infrastructure.persistence.cache.MediaUrlCacheJpaRepository
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -37,7 +41,25 @@ class S3PostMediaStorageAdapterTest {
         assertTrue(objectStorage.uploads.isEmpty())
     }
 
-    private fun adapter(objectStorage: RecordingObjectStorage): S3PostMediaStorageAdapter {
+    @Test
+    fun `returns cached URL without downloading or accessing object storage`() {
+        val objectStorage = RecordingObjectStorage()
+        val cacheRepository = mock(MediaUrlCacheJpaRepository::class.java)
+        `when`(cacheRepository.findBySourceUrlHash(SOURCE_URL_HASH)).thenReturn(
+            MediaUrlCacheEntity(SOURCE_URL_HASH, SOURCE_MEDIA.url, "https://media.example/cached.jpg"),
+        )
+
+        val result = adapter(objectStorage, cacheRepository).store(SOURCE_MEDIA)
+
+        assertEquals("https://media.example/cached.jpg", result.url)
+        assertTrue(objectStorage.existenceChecks.isEmpty())
+        assertTrue(objectStorage.uploads.isEmpty())
+    }
+
+    private fun adapter(
+        objectStorage: RecordingObjectStorage,
+        cacheRepository: MediaUrlCacheJpaRepository = mock(MediaUrlCacheJpaRepository::class.java),
+    ): S3PostMediaStorageAdapter {
         val writer = DownloadedMediaFileWriter()
         val downloader = RemoteMediaDownloader { _, _ ->
             writer.persist(
@@ -52,7 +74,9 @@ class S3PostMediaStorageAdapterTest {
             bucket = "nook-media",
             cloudFrontBaseUrl = "https://media.example/",
         )
-        return S3PostMediaStorageAdapter(downloader, objectStorage, properties)
+        `when`(cacheRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(MediaUrlCacheEntity::class.java)))
+            .thenAnswer { it.arguments[0] }
+        return S3PostMediaStorageAdapter(downloader, objectStorage, properties, cacheRepository)
     }
 
     private class RecordingObjectStorage(private val objectExists: Boolean = false) : MediaObjectStorage {
@@ -78,5 +102,6 @@ class S3PostMediaStorageAdapterTest {
 
     private companion object {
         val SOURCE_MEDIA = PostMedia(PostMedia.MediaType.IMAGE, "https://1.1.1.1/image.jpg", 0)
+        const val SOURCE_URL_HASH = "525f5dbf32b7f6a901b6e41e4c2d394928ad20a184d50f4a3e8f56b901d7950e"
     }
 }
