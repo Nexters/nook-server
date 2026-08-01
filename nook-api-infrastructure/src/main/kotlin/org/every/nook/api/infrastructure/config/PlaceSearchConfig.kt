@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
-import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @Configuration
@@ -90,7 +90,7 @@ class PlaceSearchConfig {
     fun placeSearchProvider(
         @Qualifier("kakaoPlaceSearchProvider") kakaoProvider: PlaceSearchProvider,
         @Qualifier("naverPlaceSearchProvider") naverProvider: PlaceSearchProvider,
-        @Qualifier("placeSearchExecutor") placeSearchExecutor: Executor,
+        @Qualifier("placeSearchExecutor") placeSearchExecutor: ExecutorService,
     ): PlaceSearchProvider = CompositePlaceSearchProvider(
         providers = listOf(
             CompositePlaceSearchProvider.NamedPlaceSearchProvider("KAKAO", kakaoProvider),

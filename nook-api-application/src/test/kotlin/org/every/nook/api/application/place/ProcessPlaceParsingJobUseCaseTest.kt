@@ -31,14 +31,10 @@ class ProcessPlaceParsingJobUseCaseTest {
             extractor,
             SearchPlaceCandidatesUseCase(provider),
             PlaceCandidateSelector { error("fallback selector must not be called") },
-            thumbnailProvider = PlaceThumbnailProvider { place ->
-                "https://cdn.example.com/google-${place.externalPlaceId}.jpg"
-            },
         )
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertEquals(listOf("1", "2"), port.completed.map { it.externalPlaceId })
-        assertEquals("https://cdn.example.com/google-1.jpg", port.thumbnailUrl)
         assertNull(port.failedReason)
     }
 
@@ -120,7 +116,7 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
-    fun `resolves a place clue with four search queries`() {
+    fun `stops searching after the first query resolves one strict match`() {
         val port = FakeJobPort()
         val queries = listOf("Lodge190", "롯지190", "롯지 190", "연희동 Lodge")
         val extractor = PlaceClueExtractor {
@@ -138,7 +134,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
-        assertEquals(queries, searchedQueries)
+        assertEquals(listOf("Lodge190"), searchedQueries)
         assertEquals(listOf("1"), port.completed.map { it.externalPlaceId })
     }
 
@@ -317,13 +313,11 @@ class ProcessPlaceParsingJobUseCaseTest {
         extractor: PlaceClueExtractor,
         search: SearchPlaceCandidatesUseCase,
         selector: PlaceCandidateSelector = PlaceCandidateSelector { null },
-        thumbnailProvider: PlaceThumbnailProvider = NoOpPlaceThumbnailProvider,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = port,
         clueExtractor = extractor,
         searchPlaceCandidates = search,
         candidateSelector = selector,
-        thumbnailProvider = thumbnailProvider,
         retryBackoffs = RETRY_BACKOFFS,
         processingTimeout = Duration.ofMinutes(1),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
@@ -332,7 +326,6 @@ class ProcessPlaceParsingJobUseCaseTest {
     private class FakeJobPort(private val attempt: Int = 1, private val imageUrls: List<String> = emptyList()) :
         PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
-        var thumbnailUrl: String? = null
         var failedReason: String? = null
         var nextAttemptAt: Instant? = null
         var retryReason: String? = null
@@ -342,9 +335,8 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
+        override fun complete(postId: Long, places: List<PlaceCandidate>) {
             completed = places
-            this.thumbnailUrl = thumbnailUrl
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {

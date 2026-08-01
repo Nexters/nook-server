@@ -10,10 +10,12 @@ import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
+import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.scheduling.TaskScheduler
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -25,7 +27,9 @@ import kotlin.test.assertTrue
 
 class PlaceParsingEventListenerTest {
     private val jobPort = FakeJobPort()
+    private val storePlaceThumbnail = mock(StorePlaceThumbnailUseCase::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
+    private val retryTaskScheduler = mock(TaskScheduler::class.java)
     private val listener = PlaceParsingEventListener(
         processPlaceParsingJob = ProcessPlaceParsingJobUseCase(
             jobPort = jobPort,
@@ -53,7 +57,9 @@ class PlaceParsingEventListenerTest {
             clock = Clock.fixed(NOW, ZoneOffset.UTC),
         ),
         findOutstandingJobs = FindOutstandingPlaceParsingJobsUseCase(jobPort, PROCESSING_TIMEOUT),
+        storePlaceThumbnail = storePlaceThumbnail,
         eventPublisher = eventPublisher,
+        retryTaskScheduler = retryTaskScheduler,
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 
@@ -76,6 +82,18 @@ class PlaceParsingEventListenerTest {
         assertEquals(NOW.plus(PROCESSING_TIMEOUT), captor.value.availableAt)
     }
 
+    @Test
+    fun `schedules a future job without waiting on the parsing worker`() {
+        listener.process(PlaceParsingJobRequestedEvent(postId = 11, availableAt = NOW.plusSeconds(3)))
+
+        val instantCaptor = ArgumentCaptor.forClass(Instant::class.java)
+        verify(retryTaskScheduler).schedule(
+            org.mockito.ArgumentMatchers.any(Runnable::class.java),
+            instantCaptor.capture(),
+        )
+        assertEquals(NOW.plusSeconds(3), instantCaptor.value)
+    }
+
     private class FakeJobPort : PlaceParsingJobPort {
         var completed = false
         var outstanding = emptyList<OutstandingPlaceParsingJob>()
@@ -85,7 +103,7 @@ class PlaceParsingEventListenerTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = outstanding
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
+        override fun complete(postId: Long, places: List<PlaceCandidate>) {
             completed = true
         }
 

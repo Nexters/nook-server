@@ -4,6 +4,8 @@ import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceParsingJobPort
+import org.every.nook.api.application.place.PlaceThumbnailRequestedEvent
+import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
@@ -12,6 +14,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -28,8 +31,10 @@ class PlaceParsingPersistenceAdapter(
     private val postPlaceRepository: PostPlaceJpaRepository,
     private val userSavedPostRepository: UserSavedPostJpaRepository,
     private val userPlaceBookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock = Clock.systemUTC(),
-) : PlaceParsingJobPort {
+) : PlaceParsingJobPort,
+    PlaceThumbnailUpdatePort {
     @Transactional
     override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob? {
         val job = jobRepository.findByPostIdForUpdate(postId) ?: return null
@@ -69,7 +74,7 @@ class PlaceParsingPersistenceAdapter(
         }
 
     @Transactional
-    override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
+    override fun complete(postId: Long, places: List<PlaceCandidate>) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
         val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
@@ -78,9 +83,6 @@ class PlaceParsingPersistenceAdapter(
                 candidate.provider,
                 candidate.externalPlaceId,
             ) ?: placeRepository.save(candidate.toEntity())
-            if (sequence == 0) {
-                place.updateThumbnailUrlIfAbsent(thumbnailUrl)
-            }
             PostPlaceEntity(
                 postId = postId,
                 placeId = requireNotNull(place.id),
@@ -95,6 +97,15 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
+        distinctPlaces.forEach { place ->
+            eventPublisher.publishEvent(PlaceThumbnailRequestedEvent(postId, place, clock.instant()))
+        }
+    }
+
+    @Transactional
+    override fun update(provider: String, externalPlaceId: String, thumbnailUrl: String) {
+        placeRepository.findByProviderAndExternalPlaceId(provider, externalPlaceId)
+            ?.updateThumbnailUrlIfAbsent(thumbnailUrl)
     }
 
     @Transactional
