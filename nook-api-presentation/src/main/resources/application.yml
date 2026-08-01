@@ -81,6 +81,12 @@ external:
     reels-dataset-id: ${BRIGHT_DATA_REELS_DATASET_ID:gd_lyclm20il4r5helnj}
     connect-timeout: ${BRIGHT_DATA_CONNECT_TIMEOUT:3s}
     read-timeout: ${BRIGHT_DATA_READ_TIMEOUT:60s}
+  apify:
+    base-url: ${APIFY_BASE_URL:https://api.apify.com}
+    api-token: ${APIFY_API_TOKEN:}
+    actor-id: ${APIFY_ACTOR_ID:shu8hvrXbJbY3Eb9W}
+    connect-timeout: ${APIFY_CONNECT_TIMEOUT:3s}
+    read-timeout: ${APIFY_READ_TIMEOUT:120s}
   media-storage:
     enabled: ${MEDIA_STORAGE_ENABLED:false}
     bucket: ${AWS_S3_BUCKET:}

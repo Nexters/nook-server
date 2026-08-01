@@ -11,15 +11,17 @@ import org.every.nook.api.infrastructure.persistence.BaseEntity
 
 @Entity
 @Table(
-    name = "bright_data_responses",
+    name = "scraping_provider_responses",
     uniqueConstraints = [
         UniqueConstraint(
-            name = "idx_u_source_type_external_post_id",
-            columnNames = ["source_type", "external_post_id"],
+            name = "idx_u_provider_source_type_external_post_id",
+            columnNames = ["provider", "source_type", "external_post_id"],
         ),
     ],
 )
-class BrightDataResponseEntity(
+class ScrapingProviderResponseEntity(
+    @Column(name = "provider", nullable = false, length = 50)
+    val provider: String,
     @Column(name = "source_type", nullable = false, length = 50)
     val sourceType: String,
     @Column(name = "external_post_id", nullable = false, length = 255)
