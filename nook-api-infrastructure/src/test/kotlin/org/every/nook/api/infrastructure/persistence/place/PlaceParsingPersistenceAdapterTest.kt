@@ -1,7 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
-import org.every.nook.api.application.place.PlaceCandidateWithThumbnail
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
@@ -14,6 +13,7 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaReposi
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.springframework.context.ApplicationEventPublisher
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -32,6 +32,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
+    private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = PlaceParsingPersistenceAdapter(
         jobRepository = jobRepository,
         postRepository = postRepository,
@@ -41,6 +42,7 @@ class PlaceParsingPersistenceAdapterTest {
         postPlaceRepository = postPlaceRepository,
         userSavedPostRepository = userSavedPostRepository,
         userPlaceBookmarkRepository = bookmarkRepository,
+        eventPublisher = eventPublisher,
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 
@@ -116,27 +118,33 @@ class PlaceParsingPersistenceAdapterTest {
         adapter.complete(
             postId = 11,
             places = listOf(
-                PlaceCandidateWithThumbnail(
-                    place = PlaceCandidate(
-                        provider = "KAKAO",
-                        externalPlaceId = "123",
-                        name = "Nook Cafe",
-                        address = "Seoul",
-                        latitude = BigDecimal("37.1"),
-                        longitude = BigDecimal("127.1"),
-                        category = null,
-                        phoneNumber = null,
-                        providerUrl = null,
-                    ),
-                    thumbnailUrl = "https://cdn.example.com/google-place.jpg",
+                PlaceCandidate(
+                    provider = "KAKAO",
+                    externalPlaceId = "123",
+                    name = "Nook Cafe",
+                    address = "Seoul",
+                    latitude = BigDecimal("37.1"),
+                    longitude = BigDecimal("127.1"),
+                    category = null,
+                    phoneNumber = null,
+                    providerUrl = null,
                 ),
             ),
         )
 
         verify(bookmarkRepository).insertIgnore(7, 17)
         verify(bookmarkRepository).insertIgnore(8, 17)
-        verify(place).updateThumbnailUrlIfAbsent("https://cdn.example.com/google-place.jpg")
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
+    }
+
+    @Test
+    fun `updates a place thumbnail independently after parsing completes`() {
+        val place = mock(PlaceEntity::class.java)
+        `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(place)
+
+        adapter.update("KAKAO", "123", "https://cdn.example.com/google-place.jpg")
+
+        verify(place).updateThumbnailUrlIfAbsent("https://cdn.example.com/google-place.jpg")
     }
 
     private companion object {

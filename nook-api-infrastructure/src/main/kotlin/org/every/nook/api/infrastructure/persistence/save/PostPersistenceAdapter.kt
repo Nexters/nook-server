@@ -88,7 +88,7 @@ class PostPersistenceAdapter(
         val userPost = findOrCreateUserPost(userId, sourcePostId, memo)
         addToGroups(requireNotNull(userPost.id), groupIds)
         if (existingContentJob == null) {
-            eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(sourcePostId))
+            eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(sourcePostId, clock.instant()))
         } else {
             restartFailedJob(sourcePostId, contentJob)
         }
@@ -202,7 +202,7 @@ class PostPersistenceAdapter(
             contentJob.failureReason = null
             contentJob.attemptCount = 0
             contentJob.nextAttemptAt = clock.instant()
-            eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(postId))
+            eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(postId, clock.instant()))
             return
         }
         if (contentJob.status != PostContentParsingStatus.COMPLETED) {
@@ -216,14 +216,14 @@ class PostPersistenceAdapter(
                     nextAttemptAt = clock.instant(),
                 ),
             ).also {
-                eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId))
+                eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId, clock.instant()))
             }
         if (placeJob.status == PlaceParsingStatus.FAILED) {
             placeJob.status = PlaceParsingStatus.PENDING
             placeJob.failureReason = null
             placeJob.attemptCount = 0
             placeJob.nextAttemptAt = clock.instant()
-            eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(placeJob.postId))
+            eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(placeJob.postId, clock.instant()))
         }
     }
 
