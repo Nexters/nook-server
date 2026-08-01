@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: nook-ops
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+        labels:
+          env: ops
+          service: prometheus
+
+  - job_name: nook-api
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - 192.168.0.102:8080
+        labels:
+          env: dev
+          service: nook-api
+
