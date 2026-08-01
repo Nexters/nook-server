@@ -12,7 +12,7 @@ class KakaoPlaceMapper {
             address = document.roadAddressName.orFallback(document.addressName).requireValue(),
             latitude = document.y.toCoordinate(),
             longitude = document.x.toCoordinate(),
-            category = document.categoryName.toNullableValue(),
+            category = document.categoryName.toTopLevelCategory(),
             phoneNumber = document.phone.toNullableValue(),
             providerUrl = document.placeUrl.toNullableValue(),
             distanceMeters = document.distance.toNullableValue()?.toIntOrNull(),
@@ -27,7 +27,12 @@ class KakaoPlaceMapper {
 
     private fun String?.toNullableValue(): String? = this?.trim()?.takeIf(String::isNotEmpty)
 
+    private fun String?.toTopLevelCategory(): String? = toNullableValue()
+        ?.substringBefore(CATEGORY_DELIMITER)
+        ?.toNullableValue()
+
     private companion object {
         const val PROVIDER = "KAKAO"
+        const val CATEGORY_DELIMITER = ">"
     }
 }

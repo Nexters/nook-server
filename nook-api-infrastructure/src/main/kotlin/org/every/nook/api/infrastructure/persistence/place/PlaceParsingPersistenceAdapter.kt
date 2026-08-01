@@ -97,8 +97,8 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
-        distinctPlaces.forEach { place ->
-            eventPublisher.publishEvent(PlaceThumbnailRequestedEvent(postId, place, clock.instant()))
+        distinctPlaces.forEach { candidate ->
+            eventPublisher.publishEvent(PlaceThumbnailRequestedEvent(postId, candidate, clock.instant()))
         }
     }
 

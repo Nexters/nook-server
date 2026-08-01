@@ -23,6 +23,24 @@ class KakaoPlaceMapperTest {
         assertEquals("서울 성동구 아차산로 1", result.address)
         assertEquals("37.5120741", result.latitude.toPlainString())
         assertEquals("127.0590297", result.longitude.toPlainString())
+        assertEquals("음식점", result.category)
+    }
+
+    @Test
+    fun `maps only top level Kakao category`() {
+        val result = KakaoPlaceMapper().map(
+            KakaoPlaceResponse(
+                documents = listOf(
+                    document(
+                        roadAddress = "서울 성동구 아차산로 1",
+                        address = "서울 성동구 성수동 1",
+                        category = "음식점 > 간식 > 제과,베이커리",
+                    ),
+                ),
+            ),
+        ).single()
+
+        assertEquals("음식점", result.category)
     }
 
     @Test
