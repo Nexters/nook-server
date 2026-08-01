@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.post.ClaimedPostContentParsingJob
 import org.every.nook.api.application.post.OutstandingPostContentParsingJob
 import org.every.nook.api.application.post.PostContentParsingJobPort
+import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
@@ -95,7 +96,18 @@ class PostContentParsingPersistenceAdapter(
                     nextAttemptAt = clock.instant(),
                 ),
             )
-            eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId))
+            eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId, clock.instant()))
+        }
+        post.media.forEach { media ->
+            eventPublisher.publishEvent(
+                PostMediaStorageRequestedEvent(
+                    postId = postId,
+                    mediaType = media.type.name,
+                    sourceUrl = media.url,
+                    sequence = media.sequence,
+                    availableAt = clock.instant(),
+                ),
+            )
         }
     }
 

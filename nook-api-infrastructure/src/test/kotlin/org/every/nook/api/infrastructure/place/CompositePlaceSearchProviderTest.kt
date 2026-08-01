@@ -5,12 +5,24 @@ import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
 import java.math.BigDecimal
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class CompositePlaceSearchProviderTest {
+    private val executors = mutableListOf<ExecutorService>()
+
+    @AfterTest
+    fun shutdownExecutors() {
+        executors.forEach(ExecutorService::shutdownNow)
+    }
+
     @Test
     fun `returns first non-empty success result`() {
         val provider = compositeProvider(
@@ -59,12 +71,38 @@ class CompositePlaceSearchProviderTest {
         }
     }
 
+    @Test
+    fun `interrupts the remaining provider after a non-empty result`() {
+        val slowStarted = CountDownLatch(1)
+        val slowInterrupted = CountDownLatch(1)
+        val provider = compositeProvider(
+            namedProvider("SLOW") {
+                slowStarted.countDown()
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(10))
+                } catch (_: InterruptedException) {
+                    slowInterrupted.countDown()
+                }
+                emptyList()
+            },
+            namedProvider("FAST") {
+                slowStarted.await()
+                listOf(candidate("FAST"))
+            },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request(query = "Nook Cafe"))
+
+        assertEquals("FAST", result.single().provider)
+        assertTrue(slowInterrupted.await(1, TimeUnit.SECONDS))
+    }
+
     private fun compositeProvider(
         vararg providers: CompositePlaceSearchProvider.NamedPlaceSearchProvider,
-    ): CompositePlaceSearchProvider = CompositePlaceSearchProvider(
-        providers = providers.toList(),
-        executor = Executors.newFixedThreadPool(providers.size),
-    )
+    ): CompositePlaceSearchProvider {
+        val executor = Executors.newFixedThreadPool(providers.size).also(executors::add)
+        return CompositePlaceSearchProvider(providers.toList(), executor)
+    }
 
     private fun namedProvider(
         name: String,

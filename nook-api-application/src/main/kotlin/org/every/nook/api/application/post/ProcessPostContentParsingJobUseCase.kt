@@ -3,7 +3,11 @@ package org.every.nook.api.application.post
 import mu.KotlinLogging
 import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.ExtractedPostContent
-import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.content.PostContentNotFoundException
+import org.every.nook.api.application.content.UnsupportedPostUrlException
+import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.measure
 import org.every.nook.api.domain.post.Post
 import java.time.Clock
 import java.time.Duration
@@ -13,9 +17,9 @@ class ProcessPostContentParsingJobUseCase(
     private val jobPort: PostContentParsingJobPort,
     private val extractPostContent: ExtractPostContentUseCase,
     private val titleGenerator: PostTitleGenerator,
-    private val mediaStorage: PostMediaStoragePort,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
+    private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     operator fun invoke(postId: Long): Result {
@@ -24,26 +28,31 @@ class ProcessPostContentParsingJobUseCase(
         logger.info { "Post content parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
-            val extracted = extractPostContent(job.canonicalUrl)
+            val extracted = measure(job, EXTRACT_STAGE) {
+                extractPostContent(job.canonicalUrl)
+            }
             val providedPost = extracted.post.copy(
                 sourceLocationTag = extracted.toSourceLocationTag(),
                 hashtags = extracted.hashtags.toPersistentHashtags(),
             )
-            val storedPost = providedPost.copy(
-                title = titleGenerator.generate(
-                    PostTitleGenerator.Request(
-                        body = providedPost.body,
-                        hashtags = providedPost.hashtags,
-                        sourceLocationTag = providedPost.sourceLocationTag,
-                    ),
-                ),
-                media = providedPost.media.map(mediaStorage::store),
+            val completedPost = providedPost.copy(
+                title = measure(job, TITLE_STAGE) {
+                    titleGenerator.generate(
+                        PostTitleGenerator.Request(
+                            body = providedPost.body,
+                            hashtags = providedPost.hashtags,
+                            sourceLocationTag = providedPost.sourceLocationTag,
+                        ),
+                    )
+                },
             )
-            jobPort.complete(job.postId, storedPost)
+            measure(job, COMPLETE_STAGE) {
+                jobPort.complete(job.postId, completedPost)
+            }
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
             logger.info {
                 "Post content parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "mediaCount=${storedPost.media.size}, durationMs=$duration"
+                    "mediaCount=${completedPost.media.size}, durationMs=$duration"
             }
             Result.Completed
         }.getOrElse { exception ->
@@ -51,11 +60,28 @@ class ProcessPostContentParsingJobUseCase(
         }
     }
 
+    private fun <T> measure(job: ClaimedPostContentParsingJob, stage: String, action: () -> T): T = metrics.measure(
+        flow = CONTENT_FLOW,
+        stage = stage,
+        postId = job.postId,
+        attempt = job.attempt,
+        clock = clock,
+        action = action,
+    )
+
     private fun handleFailure(job: ClaimedPostContentParsingJob, exception: Throwable, startedAt: Instant): Result {
         val reason = exception.message.orEmpty()
             .ifBlank { DEFAULT_FAILURE_REASON }
             .take(MAX_FAILURE_REASON_LENGTH)
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
+        if (exception is PostContentNotFoundException || exception is UnsupportedPostUrlException) {
+            jobPort.fail(job.postId, reason)
+            logger.warn {
+                "Post content parsing failed without retry: postId=${job.postId}, attempt=${job.attempt}, " +
+                    "durationMs=$duration, reason=$reason"
+            }
+            return Result.Failed
+        }
         val backoff = retryBackoffs.getOrNull(job.attempt - 1)
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(backoff)
@@ -101,5 +127,9 @@ class ProcessPostContentParsingJobUseCase(
         val logger = KotlinLogging.logger {}
         const val MAX_FAILURE_REASON_LENGTH = 500
         const val DEFAULT_FAILURE_REASON = "Post content parsing failed"
+        const val CONTENT_FLOW = "post-content"
+        const val EXTRACT_STAGE = "extract"
+        const val TITLE_STAGE = "title"
+        const val COMPLETE_STAGE = "complete"
     }
 }

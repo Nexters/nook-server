@@ -8,7 +8,7 @@ interface PlaceParsingJobPort {
 
     fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob>
 
-    fun complete(postId: Long, places: List<PlaceCandidateWithThumbnail>)
+    fun complete(postId: Long, places: List<PlaceCandidate>)
 
     fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
 

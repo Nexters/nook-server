@@ -5,8 +5,13 @@ import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceThumbnailProvider
+import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
+import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
+import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingMetrics
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -20,16 +25,27 @@ class PlaceParsingUseCaseConfig {
         clueExtractor: PlaceClueExtractor,
         searchPlaceCandidates: SearchPlaceCandidatesUseCase,
         candidateSelector: PlaceCandidateSelector,
-        thumbnailProvider: PlaceThumbnailProvider,
+        processingMetrics: ObjectProvider<ProcessingMetrics>,
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = jobPort,
         clueExtractor = clueExtractor,
         searchPlaceCandidates = searchPlaceCandidates,
         candidateSelector = candidateSelector,
-        thumbnailProvider = thumbnailProvider,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
+        metrics = processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
+    )
+
+    @Bean
+    fun storePlaceThumbnailUseCase(
+        thumbnailProvider: PlaceThumbnailProvider,
+        thumbnailUpdatePort: PlaceThumbnailUpdatePort,
+        processingMetrics: ObjectProvider<ProcessingMetrics>,
+    ): StorePlaceThumbnailUseCase = StorePlaceThumbnailUseCase(
+        thumbnailProvider = thumbnailProvider,
+        updatePort = thumbnailUpdatePort,
+        metrics = processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
     )
 
     @Bean

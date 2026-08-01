@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface PostMediaJpaRepository : JpaRepository<PostMediaEntity, Long> {
     fun deleteAllByPostId(postId: Long)
 
+    fun findByPostIdAndSequence(postId: Long, sequence: Int): PostMediaEntity?
+
     fun findAllByPostIdInOrderByPostIdAscSequenceAsc(postIds: Collection<Long>): List<PostMediaEntity>
 
     fun findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(

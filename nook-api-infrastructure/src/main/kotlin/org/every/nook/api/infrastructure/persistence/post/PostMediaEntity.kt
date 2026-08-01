@@ -26,7 +26,7 @@ class PostMediaEntity(
     @Column(name = "media_type", nullable = false, length = MEDIA_TYPE_LENGTH)
     val mediaType: PostMedia.MediaType,
     @Column(name = "media_url", nullable = false, length = PostMedia.MAX_MEDIA_URL_LENGTH)
-    val mediaUrl: String,
+    var mediaUrl: String,
     @Column(name = "display_order", nullable = false)
     val sequence: Int,
 ) : BaseEntity() {
@@ -35,6 +35,12 @@ class PostMediaEntity(
     @Column(name = "id", nullable = false)
     var id: Long? = null
         protected set
+
+    fun updateUrlIfCurrent(sourceUrl: String, storedUrl: String) {
+        if (mediaUrl == sourceUrl) {
+            mediaUrl = storedUrl
+        }
+    }
 
     companion object {
         const val MEDIA_TYPE_LENGTH = 20
