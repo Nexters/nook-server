@@ -5,30 +5,29 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorCompletionService
+import java.util.concurrent.ExecutorService
 
 class CompositePlaceSearchProvider(
     private val providers: List<NamedPlaceSearchProvider>,
-    private val executor: Executor,
+    private val executor: ExecutorService,
 ) : PlaceSearchProvider {
     override fun search(request: PlaceSearchProvider.Request): List<PlaceCandidate> {
+        val completionService = ExecutorCompletionService<ProviderResult>(executor)
         val pending = providers.map { provider ->
-            CompletableFuture.supplyAsync({ provider.searchSafely(request) }, executor)
-        }.toMutableList()
+            completionService.submit { provider.searchSafely(request) }
+        }
         val results = mutableListOf<ProviderResult>()
 
-        while (pending.isNotEmpty()) {
-            CompletableFuture.anyOf(*pending.toTypedArray()).join()
-            val completed = pending.filter(CompletableFuture<ProviderResult>::isDone)
-            completed.forEach { future ->
-                val result = future.join()
-                results += result
-                if (result is ProviderResult.Success && result.candidates.isNotEmpty()) {
-                    return result.candidates
-                }
+        repeat(pending.size) {
+            val result = completionService.take().get()
+            results += result
+            if (result is ProviderResult.Success && result.candidates.isNotEmpty()) {
+                pending.asSequence()
+                    .filterNot { future -> future.isDone }
+                    .forEach { future -> future.cancel(true) }
+                return result.candidates
             }
-            pending.removeAll(completed)
         }
 
         val firstNonEmptySuccess = results

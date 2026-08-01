@@ -43,6 +43,7 @@ place-parsing:
 post-content-parsing:
   worker:
     retry-backoffs: ${POST_CONTENT_PARSING_RETRY_BACKOFFS:3s,3s,3s}
+    media-retry-backoff: ${POST_MEDIA_RETRY_BACKOFF:3s}
     processing-timeout: ${POST_CONTENT_PARSING_PROCESSING_TIMEOUT:15m}
 
 parsing:

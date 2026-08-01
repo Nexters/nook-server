@@ -3,12 +3,16 @@ package org.every.nook.api.post
 import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobsUseCase
 import org.every.nook.api.application.post.OutstandingPostContentParsingJob
 import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
+import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
 import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
+import org.every.nook.api.application.post.StorePostMediaUseCase
 import org.mockito.ArgumentCaptor
+import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.scheduling.TaskScheduler
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -19,11 +23,15 @@ import kotlin.test.assertEquals
 class PostContentParsingEventListenerTest {
     private val processUseCase = mock(ProcessPostContentParsingJobUseCase::class.java)
     private val findOutstandingUseCase = mock(FindOutstandingPostContentParsingJobsUseCase::class.java)
+    private val storePostMedia = mock(StorePostMediaUseCase::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
+    private val retryTaskScheduler = mock(TaskScheduler::class.java)
     private val listener = PostContentParsingEventListener(
         processPostContentParsingJob = processUseCase,
         findOutstandingJobs = findOutstandingUseCase,
+        storePostMedia = storePostMedia,
         eventPublisher = eventPublisher,
+        retryTaskScheduler = retryTaskScheduler,
         clock = CLOCK,
     )
 
@@ -48,6 +56,47 @@ class PostContentParsingEventListenerTest {
         verify(eventPublisher).publishEvent(captor.capture())
         assertEquals(11, captor.value.postId)
         assertEquals(NOW.plus(PROCESSING_TIMEOUT), captor.value.availableAt)
+    }
+
+    @Test
+    fun `schedules a retry without waiting on the parsing worker`() {
+        `when`(processUseCase(11)).thenReturn(
+            ProcessPostContentParsingJobUseCase.Result.Retry(NOW.plusSeconds(3)),
+        )
+
+        listener.process(PostContentParsingJobRequestedEvent(postId = 11))
+
+        val instantCaptor = ArgumentCaptor.forClass(Instant::class.java)
+        verify(retryTaskScheduler).schedule(
+            org.mockito.ArgumentMatchers.any(Runnable::class.java),
+            instantCaptor.capture(),
+        )
+        assertEquals(NOW.plusSeconds(3), instantCaptor.value)
+    }
+
+    @Test
+    fun `schedules media storage retry without blocking its worker`() {
+        val event = PostMediaStorageRequestedEvent(
+            postId = 11,
+            mediaType = "IMAGE",
+            sourceUrl = "https://source.example.com/image.jpg",
+            sequence = 0,
+        )
+        doThrow(IllegalStateException("temporary storage failure"))
+            .`when`(storePostMedia)
+            .invoke(
+                11,
+                StorePostMediaUseCase.Command("IMAGE", "https://source.example.com/image.jpg", 0),
+            )
+
+        listener.storeMedia(event)
+
+        val instantCaptor = ArgumentCaptor.forClass(Instant::class.java)
+        verify(retryTaskScheduler).schedule(
+            org.mockito.ArgumentMatchers.any(Runnable::class.java),
+            instantCaptor.capture(),
+        )
+        assertEquals(NOW.plusSeconds(3), instantCaptor.value)
     }
 
     private companion object {

@@ -1,6 +1,9 @@
 package org.every.nook.api.application.place
 
 import mu.KotlinLogging
+import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.measure
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -10,9 +13,9 @@ class ProcessPlaceParsingJobUseCase(
     private val clueExtractor: PlaceClueExtractor,
     private val searchPlaceCandidates: SearchPlaceCandidatesUseCase,
     private val candidateSelector: PlaceCandidateSelector,
-    private val thumbnailProvider: PlaceThumbnailProvider = NoOpPlaceThumbnailProvider,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
+    private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     operator fun invoke(postId: Long): Result {
@@ -42,27 +45,9 @@ class ProcessPlaceParsingJobUseCase(
                     )
                 }
             }
-            val placesWithThumbnails = places.map { place ->
-                PlaceCandidateWithThumbnail(
-                    place = place,
-                    thumbnailUrl = runCatching {
-                        thumbnailProvider.fetchThumbnailUrl(place)
-                    }.onFailure { exception ->
-                        logger.warn(exception) {
-                            "Place thumbnail skipped: postId=${job.postId}, provider=${place.provider}, " +
-                                "externalPlaceId=${place.externalPlaceId}"
-                        }
-                    }.getOrNull(),
-                )
+            measure(job, COMPLETE_STAGE) {
+                jobPort.complete(job.postId, places)
             }
-            val thumbnailUrlCount = placesWithThumbnails.count {
-                it.thumbnailUrl != null
-            }
-            logger.info {
-                "Place thumbnail resolved: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "placeCount=${places.size}, thumbnailUrlCount=$thumbnailUrlCount"
-            }
-            jobPort.complete(job.postId, placesWithThumbnails)
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
             logger.info {
                 "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -75,14 +60,16 @@ class ProcessPlaceParsingJobUseCase(
     }
 
     private fun extractClues(job: ClaimedPlaceParsingJob, imageUrls: List<String> = emptyList()): List<PlaceClue> =
-        clueExtractor.extract(
-            PlaceClueExtractor.Request(
-                body = job.body,
-                hashtags = job.hashtags,
-                sourceLocationTag = job.sourceLocationTag,
-                imageUrls = imageUrls,
-            ),
-        ).also { clues ->
+        measure(job, if (imageUrls.isEmpty()) TEXT_CLUE_STAGE else IMAGE_CLUE_STAGE) {
+            clueExtractor.extract(
+                PlaceClueExtractor.Request(
+                    body = job.body,
+                    hashtags = job.hashtags,
+                    sourceLocationTag = job.sourceLocationTag,
+                    imageUrls = imageUrls,
+                ),
+            )
+        }.also { clues ->
             require(clues.size <= MAX_PLACE_COUNT) { "Too many place clues" }
             logger.info {
                 "OpenAI place clues received: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -94,7 +81,7 @@ class ProcessPlaceParsingJobUseCase(
         var lastFailure: PlaceResolutionException? = null
         val places = clues.mapNotNull { clue ->
             try {
-                resolve(clue)
+                resolve(job, clue)
             } catch (exception: PlaceResolutionException) {
                 lastFailure = exception
                 logger.warn {
@@ -107,19 +94,14 @@ class ProcessPlaceParsingJobUseCase(
         return ClueResolution(places, lastFailure)
     }
 
-    private fun resolve(clue: PlaceClue): PlaceCandidate {
+    private fun resolve(job: ClaimedPlaceParsingJob, clue: PlaceClue): PlaceCandidate {
         validate(clue)
-        val candidates = searchCandidates(clue.queries)
+        val candidates = searchCandidates(job, clue)
         logger.info {
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
                 "queries=${clue.queries}, candidateCount=${candidates.size}"
         }
-        val normalizedName = clue.name.normalize()
-        val normalizedRegion = clue.region?.normalize()?.takeIf(String::isNotEmpty)
-        val matches = candidates.filter { candidate ->
-            candidate.place.name.normalize() == normalizedName &&
-                (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion))
-        }
+        val matches = strictMatches(clue, candidates)
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
                 "candidateCount=${candidates.size}, matchCount=${matches.size}, " +
@@ -132,12 +114,14 @@ class ProcessPlaceParsingJobUseCase(
             if (candidates.isEmpty()) {
                 failResolution("No place candidate found: ${clue.name}")
             }
-            candidateSelector.select(
-                PlaceCandidateSelector.Request(
-                    clue = clue,
-                    candidates = candidates,
-                ),
-            ) ?: failResolution(
+            measure(job, SELECT_STAGE) {
+                candidateSelector.select(
+                    PlaceCandidateSelector.Request(
+                        clue = clue,
+                        candidates = candidates,
+                    ),
+                )
+            } ?: failResolution(
                 "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
             )
         }
@@ -148,14 +132,19 @@ class ProcessPlaceParsingJobUseCase(
         return resolved
     }
 
-    private fun searchCandidates(queries: List<String>): List<PlaceCandidateSelector.Candidate> {
+    private fun searchCandidates(
+        job: ClaimedPlaceParsingJob,
+        clue: PlaceClue,
+    ): List<PlaceCandidateSelector.Candidate> {
         val candidatesById = linkedMapOf<Pair<String, String>, PlaceCandidateSelector.Candidate>()
-        queries.asSequence()
+        clue.queries.asSequence()
             .map(String::trim)
             .filter(String::isNotEmpty)
             .distinct()
             .forEach { query ->
-                searchPlaceCandidates(SearchPlaceCandidatesUseCase.Command(queries = listOf(query)))
+                measure(job, SEARCH_STAGE) {
+                    searchPlaceCandidates(SearchPlaceCandidatesUseCase.Command(queries = listOf(query)))
+                }
                     .forEach { candidate ->
                         val key = candidate.provider to candidate.externalPlaceId
                         val existing = candidatesById[key]
@@ -164,9 +153,21 @@ class ProcessPlaceParsingJobUseCase(
                             matchedQueries = existing?.matchedQueries.orEmpty() + query,
                         )
                     }
+                if (strictMatches(clue, candidatesById.values).size == 1) {
+                    return candidatesById.values.toList()
+                }
             }
         return candidatesById.values.toList()
     }
+
+    private fun <T> measure(job: ClaimedPlaceParsingJob, stage: String, action: () -> T): T = metrics.measure(
+        flow = PLACE_FLOW,
+        stage = stage,
+        postId = job.postId,
+        attempt = job.attempt,
+        clock = clock,
+        action = action,
+    )
 
     private fun validate(clue: PlaceClue) {
         if (clue.name.isBlank() || clue.queries.isEmpty() || clue.queries.size > MAX_QUERY_COUNT) {
@@ -213,8 +214,6 @@ class ProcessPlaceParsingJobUseCase(
 
     private fun terminalFailure(message: String): Nothing = throw TerminalPlaceParsingException(message)
 
-    private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)
-
     sealed interface Result {
         data object Completed : Result
 
@@ -236,6 +235,12 @@ class ProcessPlaceParsingJobUseCase(
         const val DEFAULT_FAILURE_REASON = "Place parsing failed"
         const val NO_PLACE_RESOLVED_REASON = "No place could be resolved from text"
         const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
+        const val PLACE_FLOW = "place"
+        const val TEXT_CLUE_STAGE = "clue-text"
+        const val IMAGE_CLUE_STAGE = "clue-image"
+        const val SEARCH_STAGE = "search"
+        const val SELECT_STAGE = "select"
+        const val COMPLETE_STAGE = "complete"
     }
 
     private class PlaceResolutionException(message: String) : IllegalStateException(message)
@@ -244,3 +249,17 @@ class ProcessPlaceParsingJobUseCase(
 
     private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
 }
+
+private fun strictMatches(
+    clue: PlaceClue,
+    candidates: Collection<PlaceCandidateSelector.Candidate>,
+): List<PlaceCandidateSelector.Candidate> {
+    val normalizedName = clue.name.normalize()
+    val normalizedRegion = clue.region?.normalize()?.takeIf(String::isNotEmpty)
+    return candidates.filter { candidate ->
+        candidate.place.name.normalize() == normalizedName &&
+            (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion))
+    }
+}
+
+private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)

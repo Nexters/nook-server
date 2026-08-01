@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.post
 
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
+import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
@@ -11,6 +12,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRep
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.context.ApplicationEventPublisher
@@ -72,7 +74,7 @@ class PostContentParsingPersistenceAdapterTest {
             body = "본문",
             hashtags = listOf("맛집"),
             media = listOf(
-                PostMedia(PostMedia.MediaType.IMAGE, "https://cdn/image.jpg", 0),
+                PostMedia(PostMedia.MediaType.IMAGE, "https://source/image.jpg", 0),
             ),
         )
         `when`(jobRepository.findByPostId(101)).thenReturn(job)
@@ -89,9 +91,12 @@ class PostContentParsingPersistenceAdapterTest {
         val placeJobCaptor = ArgumentCaptor.forClass(PlaceParsingJobEntity::class.java)
         verify(placeJobRepository).save(placeJobCaptor.capture())
         assertEquals(PlaceParsingStatus.PENDING, placeJobCaptor.value.status)
-        val eventCaptor = ArgumentCaptor.forClass(PlaceParsingJobRequestedEvent::class.java)
-        verify(eventPublisher).publishEvent(eventCaptor.capture())
-        assertEquals(101, eventCaptor.value.postId)
+        val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
+        verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture())
+        val placeEvent = eventCaptor.allValues.filterIsInstance<PlaceParsingJobRequestedEvent>().single()
+        val mediaEvent = eventCaptor.allValues.filterIsInstance<PostMediaStorageRequestedEvent>().single()
+        assertEquals(101, placeEvent.postId)
+        assertEquals("https://source/image.jpg", mediaEvent.sourceUrl)
     }
 
     private companion object {
