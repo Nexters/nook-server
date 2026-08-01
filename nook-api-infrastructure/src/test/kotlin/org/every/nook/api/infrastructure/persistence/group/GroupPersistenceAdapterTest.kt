@@ -2,10 +2,14 @@ package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.GroupColor
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import java.time.Clock
 import java.time.Instant
@@ -19,7 +23,13 @@ import kotlin.test.assertTrue
 class GroupPersistenceAdapterTest {
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
-    private val adapter = GroupPersistenceAdapter(groupRepository, groupPostRepository, FIXED_CLOCK)
+    private val savedPostRepository = mock(UserSavedPostJpaRepository::class.java)
+    private val adapter = GroupPersistenceAdapter(
+        groupRepository,
+        groupPostRepository,
+        savedPostRepository,
+        FIXED_CLOCK,
+    )
 
     @Test
     fun `lists groups with recent thumbnail urls in repository order`() {
@@ -86,12 +96,38 @@ class GroupPersistenceAdapterTest {
     }
 
     @Test
-    fun `deleting an owned group deletes links before the group`() {
+    fun `deleting an owned group soft deletes posts without another active group`() {
         val group = mock(GroupEntity::class.java)
+        val orphanedSavedPost = mock(UserSavedPostEntity::class.java)
         `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
+        `when`(groupPostRepository.findActiveSavedPostIdsByGroupId(17)).thenReturn(listOf(11, 12))
+        `when`(groupPostRepository.findActiveSavedPostIdsWithActiveGroup(setOf(11, 12))).thenReturn(listOf(12))
+        `when`(savedPostRepository.findAllByUserIdAndIdIn(7, setOf(11))).thenReturn(listOf(orphanedSavedPost))
 
         assertTrue(adapter.delete(7, 17))
+
+        inOrder(groupPostRepository, orphanedSavedPost, group).run {
+            verify(groupPostRepository).findActiveSavedPostIdsByGroupId(17)
+            verify(groupPostRepository).softDeleteAllByGroupId(17, FIXED_NOW)
+            verify(groupPostRepository).findActiveSavedPostIdsWithActiveGroup(setOf(11, 12))
+            verify(groupPostRepository).softDeleteAllByUserSavedPostIdIn(setOf(11), FIXED_NOW)
+            verify(orphanedSavedPost).softDelete(FIXED_NOW)
+            verify(group).softDelete(FIXED_NOW)
+        }
+        verify(savedPostRepository).findAllByUserIdAndIdIn(7, setOf(11))
+    }
+
+    @Test
+    fun `deleting an empty group does not query saved posts`() {
+        val group = mock(GroupEntity::class.java)
+        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
+        `when`(groupPostRepository.findActiveSavedPostIdsByGroupId(17)).thenReturn(emptyList())
+
+        assertTrue(adapter.delete(7, 17))
+
         verify(groupPostRepository).softDeleteAllByGroupId(17, FIXED_NOW)
+        verify(groupPostRepository, never()).findActiveSavedPostIdsWithActiveGroup(emptySet())
+        verifyNoInteractions(savedPostRepository)
         verify(group).softDelete(FIXED_NOW)
     }
 
@@ -100,7 +136,9 @@ class GroupPersistenceAdapterTest {
         `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(null)
 
         assertFalse(adapter.delete(7, 17))
+        verify(groupPostRepository, never()).findActiveSavedPostIdsByGroupId(17)
         verify(groupPostRepository, never()).softDeleteAllByGroupId(17, FIXED_NOW)
+        verifyNoInteractions(savedPostRepository)
     }
 
     private companion object {

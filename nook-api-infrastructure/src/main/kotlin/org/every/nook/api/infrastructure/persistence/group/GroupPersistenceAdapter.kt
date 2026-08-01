@@ -4,14 +4,17 @@ import org.every.nook.api.application.group.GroupView
 import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.GroupColor
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.Instant
 
 @Component
 class GroupPersistenceAdapter(
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
+    private val savedPostRepository: UserSavedPostJpaRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) : GroupPort,
     GroupOwnershipPort {
@@ -56,7 +59,9 @@ class GroupPersistenceAdapter(
     override fun delete(userId: Long, groupId: Long): Boolean {
         val group = groupRepository.findByIdAndUserId(groupId, userId) ?: return false
         val now = clock.instant()
+        val affectedSavedPostIds = groupPostRepository.findActiveSavedPostIdsByGroupId(groupId).toSet()
         groupPostRepository.softDeleteAllByGroupId(groupId, now)
+        softDeleteOrphanedSavedPosts(userId, affectedSavedPostIds, now)
         group.softDelete(now)
         return true
     }
@@ -78,4 +83,20 @@ class GroupPersistenceAdapter(
         postCount = postCount,
         thumbnailUrls = thumbnailUrls,
     )
+
+    private fun softDeleteOrphanedSavedPosts(userId: Long, affectedSavedPostIds: Set<Long>, now: Instant) {
+        if (affectedSavedPostIds.isEmpty()) {
+            return
+        }
+        val retainedSavedPostIds = groupPostRepository
+            .findActiveSavedPostIdsWithActiveGroup(affectedSavedPostIds)
+            .toSet()
+        val orphanedSavedPostIds = affectedSavedPostIds - retainedSavedPostIds
+        if (orphanedSavedPostIds.isEmpty()) {
+            return
+        }
+        groupPostRepository.softDeleteAllByUserSavedPostIdIn(orphanedSavedPostIds, now)
+        savedPostRepository.findAllByUserIdAndIdIn(userId, orphanedSavedPostIds)
+            .forEach { savedPost -> savedPost.softDelete(now) }
+    }
 }

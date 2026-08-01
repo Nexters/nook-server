@@ -14,6 +14,8 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
 
     fun findAllByUserId(userId: Long, pageable: Pageable): Page<UserSavedPostEntity>
 
+    fun findAllByUserIdAndIdIn(userId: Long, ids: Collection<Long>): List<UserSavedPostEntity>
+
     @Query(
         """
             SELECT savedPost

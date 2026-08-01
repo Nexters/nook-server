@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.group
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface GroupPostJpaRepository : JpaRepository<GroupPostEntity, Long> {
@@ -12,8 +13,35 @@ interface GroupPostJpaRepository : JpaRepository<GroupPostEntity, Long> {
 
     fun findAllByUserSavedPostIdIn(userSavedPostIds: Collection<Long>): List<GroupPostEntity>
 
+    @Query(
+        value = """
+            SELECT group_post.user_saved_post_id
+            FROM group_posts group_post
+            WHERE group_post.group_id = :groupId
+              AND group_post.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun findActiveSavedPostIdsByGroupId(@Param("groupId") groupId: Long): List<Long>
+
+    @Query(
+        value = """
+            SELECT DISTINCT group_post.user_saved_post_id
+            FROM group_posts group_post
+            INNER JOIN user_groups user_group ON user_group.id = group_post.group_id
+            WHERE group_post.user_saved_post_id IN (:savedPostIds)
+              AND group_post.deleted_at IS NULL
+              AND user_group.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun findActiveSavedPostIdsWithActiveGroup(@Param("savedPostIds") savedPostIds: Collection<Long>): List<Long>
+
     @Modifying
-    @Query("UPDATE GroupPostEntity groupPost SET groupPost.deletedAt = :now WHERE groupPost.groupId = :groupId")
+    @Query(
+        "UPDATE GroupPostEntity groupPost SET groupPost.deletedAt = :now " +
+            "WHERE groupPost.groupId = :groupId AND groupPost.deletedAt IS NULL",
+    )
     fun softDeleteAllByGroupId(groupId: Long, now: Instant): Int
 
     @Modifying
@@ -22,6 +50,13 @@ interface GroupPostJpaRepository : JpaRepository<GroupPostEntity, Long> {
             "WHERE groupPost.userSavedPostId = :userSavedPostId",
     )
     fun softDeleteAllByUserSavedPostId(userSavedPostId: Long, now: Instant): Int
+
+    @Modifying
+    @Query(
+        "UPDATE GroupPostEntity groupPost SET groupPost.deletedAt = :now " +
+            "WHERE groupPost.userSavedPostId IN (:userSavedPostIds) AND groupPost.deletedAt IS NULL",
+    )
+    fun softDeleteAllByUserSavedPostIdIn(userSavedPostIds: Collection<Long>, now: Instant): Int
 
     @Modifying
     @Query(
