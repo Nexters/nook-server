@@ -58,6 +58,13 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `prometheus actuator endpoint is allowed without authentication`() {
+        mockMvc.get("/actuator/prometheus").andExpect {
+            status { isOk() }
+        }
+    }
+
+    @Test
     fun `local frontend preflight request is allowed without authentication`() {
         mockMvc.perform(
             options("/test/protected")
@@ -111,6 +118,13 @@ private class SecurityTestController {
     @GetMapping("/test/protected")
     fun protected(@Parameter(hidden = true) userContext: UserContext): ApiResponse<SecurityTestUserResponse> =
         ApiResponse.success(SecurityTestUserResponse(userContext.userId))
+
+    @GetMapping("/actuator/prometheus")
+    fun prometheus(): String = PROMETHEUS_RESPONSE
+
+    private companion object {
+        const val PROMETHEUS_RESPONSE = "jvm_memory_used_bytes 1.0"
+    }
 }
 
 private data class SecurityTestUserResponse(val userId: Long)
