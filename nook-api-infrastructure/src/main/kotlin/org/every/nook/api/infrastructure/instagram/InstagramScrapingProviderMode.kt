@@ -4,6 +4,7 @@ enum class InstagramScrapingProviderMode {
     BRIGHT_DATA_ONLY,
     APIFY_ONLY,
     BRIGHT_DATA_WITH_APIFY_FALLBACK,
+    APIFY_BRIGHT_WITH_DATA_FALLBACK,
     ;
 
     companion object {
