@@ -42,21 +42,27 @@ class ProcessPlaceParsingJobUseCase(
                     )
                 }
             }
-            val thumbnailUrl = places.firstOrNull()?.let { place ->
-                runCatching {
-                    thumbnailProvider.fetchThumbnailUrl(place)
-                }.onFailure { exception ->
-                    logger.warn(exception) {
-                        "Place thumbnail skipped: postId=${job.postId}, provider=${place.provider}, " +
-                            "externalPlaceId=${place.externalPlaceId}"
-                    }
-                }.getOrNull()
+            val placesWithThumbnails = places.map { place ->
+                PlaceCandidateWithThumbnail(
+                    place = place,
+                    thumbnailUrl = runCatching {
+                        thumbnailProvider.fetchThumbnailUrl(place)
+                    }.onFailure { exception ->
+                        logger.warn(exception) {
+                            "Place thumbnail skipped: postId=${job.postId}, provider=${place.provider}, " +
+                                "externalPlaceId=${place.externalPlaceId}"
+                        }
+                    }.getOrNull(),
+                )
+            }
+            val thumbnailUrlCount = placesWithThumbnails.count {
+                it.thumbnailUrl != null
             }
             logger.info {
                 "Place thumbnail resolved: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "placeCount=${places.size}, thumbnailUrlFound=${thumbnailUrl != null}"
+                    "placeCount=${places.size}, thumbnailUrlCount=$thumbnailUrlCount"
             }
-            jobPort.complete(job.postId, places, thumbnailUrl)
+            jobPort.complete(job.postId, placesWithThumbnails)
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
             logger.info {
                 "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +

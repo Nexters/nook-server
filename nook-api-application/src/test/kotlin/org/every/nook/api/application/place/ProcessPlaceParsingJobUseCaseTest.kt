@@ -38,7 +38,13 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertEquals(listOf("1", "2"), port.completed.map { it.externalPlaceId })
-        assertEquals("https://cdn.example.com/google-1.jpg", port.thumbnailUrl)
+        assertEquals(
+            listOf(
+                "https://cdn.example.com/google-1.jpg",
+                "https://cdn.example.com/google-2.jpg",
+            ),
+            port.completedWithThumbnails.map { it.thumbnailUrl },
+        )
         assertNull(port.failedReason)
     }
 
@@ -332,7 +338,7 @@ class ProcessPlaceParsingJobUseCaseTest {
     private class FakeJobPort(private val attempt: Int = 1, private val imageUrls: List<String> = emptyList()) :
         PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
-        var thumbnailUrl: String? = null
+        var completedWithThumbnails = emptyList<PlaceCandidateWithThumbnail>()
         var failedReason: String? = null
         var nextAttemptAt: Instant? = null
         var retryReason: String? = null
@@ -342,9 +348,9 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, thumbnailUrl: String?) {
-            completed = places
-            this.thumbnailUrl = thumbnailUrl
+        override fun complete(postId: Long, places: List<PlaceCandidateWithThumbnail>) {
+            completedWithThumbnails = places
+            completed = places.map(PlaceCandidateWithThumbnail::place)
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
