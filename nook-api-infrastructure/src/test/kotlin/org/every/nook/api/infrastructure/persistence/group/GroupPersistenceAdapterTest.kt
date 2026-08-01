@@ -3,11 +3,13 @@ package org.every.nook.api.infrastructure.persistence.group
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.domain.group.GroupColor
 import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,7 +19,7 @@ import kotlin.test.assertTrue
 class GroupPersistenceAdapterTest {
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
-    private val adapter = GroupPersistenceAdapter(groupRepository, groupPostRepository)
+    private val adapter = GroupPersistenceAdapter(groupRepository, groupPostRepository, FIXED_CLOCK)
 
     @Test
     fun `lists groups with recent thumbnail urls in repository order`() {
@@ -85,22 +87,25 @@ class GroupPersistenceAdapterTest {
 
     @Test
     fun `deleting an owned group deletes links before the group`() {
-        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(true)
-        `when`(groupRepository.deleteByIdAndUserId(17, 7)).thenReturn(1)
+        val group = mock(GroupEntity::class.java)
+        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
 
         assertTrue(adapter.delete(7, 17))
-        val ordered = inOrder(groupPostRepository, groupRepository)
-        ordered.verify(groupPostRepository).deleteAllByGroupId(17)
-        ordered.verify(groupRepository).deleteByIdAndUserId(17, 7)
+        verify(groupPostRepository).softDeleteAllByGroupId(17, FIXED_NOW)
+        verify(group).softDelete(FIXED_NOW)
     }
 
     @Test
     fun `deleting another users group changes nothing`() {
-        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(false)
+        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(null)
 
         assertFalse(adapter.delete(7, 17))
-        verify(groupPostRepository, never()).deleteAllByGroupId(17)
-        verify(groupRepository, never()).deleteByIdAndUserId(17, 7)
+        verify(groupPostRepository, never()).softDeleteAllByGroupId(17, FIXED_NOW)
+    }
+
+    private companion object {
+        val FIXED_NOW: Instant = Instant.parse("2026-08-01T00:00:00Z")
+        val FIXED_CLOCK: Clock = Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
     }
 
     @Test

@@ -4,7 +4,11 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
+import org.every.nook.api.infrastructure.persistence.cache.BrightDataResponseEntity
+import org.every.nook.api.infrastructure.persistence.cache.BrightDataResponseJpaRepository
 import org.hamcrest.Matchers.containsString
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
@@ -19,6 +23,30 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class BrightDataInstagramPostContentExtractorTest {
+    @Test
+    fun `cached response skips Bright Data request`() {
+        val repository = mock(BrightDataResponseJpaRepository::class.java)
+        `when`(repository.findBySourceTypeAndExternalPostId("INSTAGRAM", "Post123")).thenReturn(
+            BrightDataResponseEntity(
+                sourceType = "INSTAGRAM",
+                externalPostId = "Post123",
+                responseBody = """[{"url":"https://www.instagram.com/p/Post123/","content_type":"Image"}]""",
+            ),
+        )
+        val builder = RestClient.builder().baseUrl("https://api.brightdata.test")
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val extractor = BrightDataInstagramPostContentExtractor(
+            builder.build(),
+            jacksonObjectMapper(),
+            BrightDataProperties(apiToken = ""),
+            BrightDataInstagramMapper(),
+            repository,
+        )
+
+        assertEquals("Post123", extractor.extract("https://www.instagram.com/p/Post123/").post.source.externalPostId)
+        server.verify()
+    }
+
     @Test
     fun `post uses posts dataset and bearer token`() {
         val fixture = providerFixture()
@@ -106,6 +134,7 @@ class BrightDataInstagramPostContentExtractorTest {
             objectMapper = jacksonObjectMapper(),
             properties = BrightDataProperties(apiToken = ""),
             mapper = BrightDataInstagramMapper(),
+            responseRepository = mock(BrightDataResponseJpaRepository::class.java),
         )
 
         assertFailsWith<PostContentProviderException> {
@@ -126,6 +155,7 @@ class BrightDataInstagramPostContentExtractorTest {
                     reelsDatasetId = "reels-dataset",
                 ),
                 mapper = BrightDataInstagramMapper(),
+                responseRepository = mock(BrightDataResponseJpaRepository::class.java),
             ),
             server = server,
         )

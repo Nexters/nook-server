@@ -17,7 +17,9 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 COUNT(group_post.id) AS postCount
             FROM user_groups user_group
             LEFT JOIN group_posts group_post ON group_post.group_id = user_group.id
+                AND group_post.deleted_at IS NULL
             WHERE user_group.user_id = :userId
+              AND user_group.deleted_at IS NULL
             GROUP BY user_group.id, user_group.name, user_group.color
             ORDER BY user_group.id
         """,
@@ -61,6 +63,9 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                     AND earlier_image.media_type = 'IMAGE'
                     AND earlier_image.display_order < post_media.display_order
                 WHERE user_group.user_id = :userId
+                  AND user_group.deleted_at IS NULL
+                  AND group_post.deleted_at IS NULL
+                  AND saved_post.deleted_at IS NULL
                   AND saved_post.user_id = :userId
                   AND earlier_image.id IS NULL
                   AND COALESCE(

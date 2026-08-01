@@ -5,6 +5,7 @@ import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.post.CreatePostUseCase
+import org.every.nook.api.application.post.DeleteSavedPostUseCase
 import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobsUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
@@ -15,6 +16,7 @@ import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
 import org.every.nook.api.application.post.StorePostMediaUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
 import org.every.nook.api.application.post.port.CreatePostPort
+import org.every.nook.api.application.post.port.DeleteSavedPostPort
 import org.every.nook.api.application.post.port.FindExistingPostPort
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostMediaStoragePort
@@ -102,4 +104,8 @@ class PostUseCaseConfig {
     @Bean
     fun updatePostMemoUseCase(updatePostMemoPort: UpdatePostMemoPort): UpdatePostMemoUseCase =
         UpdatePostMemoUseCase(updatePostMemoPort)
+
+    @Bean
+    fun deleteSavedPostUseCase(deleteSavedPostPort: DeleteSavedPostPort): DeleteSavedPostUseCase =
+        DeleteSavedPostUseCase(deleteSavedPostPort)
 }

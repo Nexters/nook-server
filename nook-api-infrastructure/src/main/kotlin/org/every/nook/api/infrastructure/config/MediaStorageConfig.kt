@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.infrastructure.persistence.cache.MediaUrlCacheJpaRepository
 import org.every.nook.api.infrastructure.storage.JdkRemoteMediaDownloader
 import org.every.nook.api.infrastructure.storage.JdkRemoteMediaHttpClient
 import org.every.nook.api.infrastructure.storage.MediaObjectStorage
@@ -60,5 +61,6 @@ class MediaStorageConfig {
         downloader: RemoteMediaDownloader,
         objectStorage: MediaObjectStorage,
         properties: MediaStorageProperties,
-    ): PostMediaStoragePort = S3PostMediaStorageAdapter(downloader, objectStorage, properties)
+        cacheRepository: MediaUrlCacheJpaRepository,
+    ): PostMediaStoragePort = S3PostMediaStorageAdapter(downloader, objectStorage, properties, cacheRepository)
 }
