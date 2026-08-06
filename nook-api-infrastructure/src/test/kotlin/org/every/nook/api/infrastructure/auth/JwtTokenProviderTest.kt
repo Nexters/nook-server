@@ -1,7 +1,6 @@
 package org.every.nook.api.infrastructure.auth
 
 import org.every.nook.api.application.auth.InvalidRefreshTokenException
-import org.every.nook.api.domain.member.SocialProvider
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -22,19 +21,6 @@ class JwtTokenProviderTest {
         refreshTtl = Duration.ofDays(30),
         signupTtl = Duration.ofMinutes(10),
     )
-
-    @Test
-    fun `signup token preserves provider and subject`() {
-        val provider = JwtTokenProvider(properties, Clock.fixed(instant, ZoneOffset.UTC))
-
-        val token = provider.issueSignupToken(SocialProvider.KAKAO, "kakao-subject")
-
-        assertEquals(
-            SocialProvider.KAKAO,
-            provider.parseSignupToken(token).provider,
-        )
-        assertEquals("kakao-subject", provider.parseSignupToken(token).subject)
-    }
 
     @Test
     fun `refresh token cannot be parsed after expiration`() {

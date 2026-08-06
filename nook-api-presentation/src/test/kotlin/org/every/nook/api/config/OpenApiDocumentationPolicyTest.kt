@@ -4,13 +4,16 @@ import io.swagger.v3.core.converter.ModelConverters
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.every.nook.api.auth.AuthActionResponse
 import org.every.nook.api.auth.AuthController
 import org.every.nook.api.auth.RefreshTokenRequest
 import org.every.nook.api.auth.SocialAuthRequest
 import org.every.nook.api.auth.SocialAuthResponse
 import org.every.nook.api.auth.TokenResponse
+import org.every.nook.api.member.MemberActionResponse
 import org.every.nook.api.member.MemberController
-import org.every.nook.api.member.SignupMemberRequest
+import org.every.nook.api.member.MemberProfileResponse
+import org.every.nook.api.member.UpdateMemberProfileRequest
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.GroupController
 import org.every.nook.api.presentation.group.request.CreateGroupRequest
@@ -171,9 +174,9 @@ class OpenApiDocumentationPolicyTest {
 
     @Test
     fun `authentication entry points do not require an access token in OpenAPI`() {
-        listOf(AuthController::class.java, MemberController::class.java)
-            .flatMap { it.declaredMethods.toList() }
+        AuthController::class.java.declaredMethods.toList()
             .filter { it.isApiHandler() }
+            .filter { it.name in setOf("authenticateSocial", "refresh") }
             .forEach { method ->
                 assertTrue(method.getAnnotation(Operation::class.java).security.isEmpty(), method.toString())
             }
@@ -240,7 +243,10 @@ class OpenApiDocumentationPolicyTest {
             RefreshTokenRequest::class.java,
             SocialAuthResponse::class.java,
             TokenResponse::class.java,
-            SignupMemberRequest::class.java,
+            AuthActionResponse::class.java,
+            UpdateMemberProfileRequest::class.java,
+            MemberProfileResponse::class.java,
+            MemberActionResponse::class.java,
         )
     }
 }

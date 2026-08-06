@@ -16,3 +16,5 @@ interface PlaceParsingJobPort {
 }
 
 data class OutstandingPlaceParsingJob(val postId: Long, val availableAt: Instant)
+
+data class PlaceCandidateWithThumbnail(val place: PlaceCandidate, val thumbnailUrl: String?)
