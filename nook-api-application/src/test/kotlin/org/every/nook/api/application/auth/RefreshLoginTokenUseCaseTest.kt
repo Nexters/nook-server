@@ -75,11 +75,7 @@ private class RefreshFakeTokenProvider(private val now: Instant) : TokenProvider
         expiresAt = now.plusSeconds(3600),
     )
 
-    override fun issueSignupToken(provider: SocialProvider, subject: String): String = error("Not used")
-
     override fun parseRefreshToken(token: String): RefreshClaims = RefreshClaims(1, "old-id")
-
-    override fun parseSignupToken(token: String): SignupClaims = error("Not used")
 
     override fun hash(token: String): String = "hash-$token"
 }
@@ -106,13 +102,21 @@ private class InMemoryRefreshTokenRepository(private val existing: StoredRefresh
 private class ExistingMemberRepository : MemberRepository {
     override fun findMemberId(provider: SocialProvider, subject: String): Long? = 1
 
+    override fun findById(memberId: Long): Member? = Member(id = memberId, nickname = "누커", profileImageUrl = null)
+
     override fun existsByNickname(nickname: String): Boolean = false
 
     override fun existsSocialAccount(provider: SocialProvider, subject: String): Boolean = true
 
     override fun save(member: Member): Member = error("Not used")
 
+    override fun update(member: Member): Member? = error("Not used")
+
+    override fun withdraw(memberId: Long): Boolean = error("Not used")
+
     override fun saveSocialAccount(account: SocialAccount): SocialAccount = error("Not used")
+
+    override fun deleteSocialAccounts(memberId: Long) = error("Not used")
 
     override fun existsMember(memberId: Long): Boolean = memberId == 1L
 }

@@ -7,6 +7,7 @@ import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
 import org.every.nook.api.application.auth.SocialAuthenticationResult
 import org.every.nook.api.application.auth.SocialCredential
 import org.every.nook.api.application.auth.SocialLoginProvider
+import org.every.nook.api.application.member.LogoutMemberUseCase
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
@@ -27,14 +28,17 @@ class AuthControllerTest {
     @MockitoBean
     private lateinit var refreshLoginTokenUseCase: RefreshLoginTokenUseCase
 
+    @MockitoBean
+    private lateinit var logoutMemberUseCase: LogoutMemberUseCase
+
     @Test
-    fun `new social user receives signup required response`() {
+    fun `social user receives login tokens`() {
         val credential = SocialCredential(
             provider = SocialLoginProvider.KAKAO,
             accessToken = "provider-token",
         )
         `when`(authenticateSocialUserUseCase(credential)).thenReturn(
-            SocialAuthenticationResult.SignupRequired("signup-token"),
+            SocialAuthenticationResult(LoginTokens("access-token", "refresh-token")),
         )
 
         mockMvc.post("/api/v1/auth/social") {
@@ -43,28 +47,6 @@ class AuthControllerTest {
         }.andExpect {
             status { isOk() }
             jsonPath("$.resultType") { value("SUCCESS") }
-            jsonPath("$.success.status") { value("SIGNUP_REQUIRED") }
-            jsonPath("$.success.signupToken") { value("signup-token") }
-        }
-    }
-
-    @Test
-    fun `existing social user receives login tokens`() {
-        val credential = SocialCredential(
-            provider = SocialLoginProvider.KAKAO,
-            accessToken = "provider-token",
-        )
-        `when`(authenticateSocialUserUseCase(credential)).thenReturn(
-            SocialAuthenticationResult.SignedIn(LoginTokens("access-token", "refresh-token")),
-        )
-
-        mockMvc.post("/api/v1/auth/social") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"provider":"KAKAO","accessToken":"provider-token"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.resultType") { value("SUCCESS") }
-            jsonPath("$.success.status") { value("SIGNED_IN") }
             jsonPath("$.success.accessToken") { value("access-token") }
             jsonPath("$.success.refreshToken") { value("refresh-token") }
         }

@@ -27,8 +27,8 @@ class SecurityConfig {
         http.sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
         http.authorizeHttpRequests {
             it.requestMatchers(
-                "/api/v1/auth/**",
-                "/api/v1/members",
+                "/api/v1/auth/social",
+                "/api/v1/auth/token/refresh",
                 "/actuator/health/**",
                 "/actuator/info",
                 "/v3/api-docs/**",

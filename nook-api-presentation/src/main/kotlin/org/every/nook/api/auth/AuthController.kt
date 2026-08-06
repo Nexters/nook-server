@@ -1,6 +1,7 @@
 package org.every.nook.api.auth
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -9,9 +10,10 @@ import jakarta.validation.constraints.NotNull
 import org.every.nook.api.application.auth.AuthenticateSocialUserUseCase
 import org.every.nook.api.application.auth.LoginTokens
 import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
-import org.every.nook.api.application.auth.SocialAuthenticationResult
 import org.every.nook.api.application.auth.SocialCredential
 import org.every.nook.api.application.auth.SocialLoginProvider
+import org.every.nook.api.application.member.LogoutMemberUseCase
+import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController
 class AuthController(
     private val authenticateSocialUserUseCase: AuthenticateSocialUserUseCase,
     private val refreshLoginTokenUseCase: RefreshLoginTokenUseCase,
+    private val logoutMemberUseCase: LogoutMemberUseCase,
 ) {
     @Operation(summary = "소셜 로그인", security = [])
     @PostMapping("/social")
@@ -32,7 +35,7 @@ class AuthController(
         @Valid @RequestBody request: SocialAuthRequest,
     ): ResponseEntity<ApiResponse<SocialAuthResponse>> {
         val result = authenticateSocialUserUseCase(request.toCredential())
-        return ResponseEntity.ok(ApiResponse.success(SocialAuthResponse.from(result)))
+        return ResponseEntity.ok(ApiResponse.success(SocialAuthResponse.from(result.tokens)))
     }
 
     @Operation(summary = "로그인 토큰 재발급", security = [])
@@ -41,6 +44,13 @@ class AuthController(
         ResponseEntity.ok(
             ApiResponse.success(TokenResponse.from(refreshLoginTokenUseCase(request.refreshToken))),
         )
+
+    @Operation(summary = "로그아웃")
+    @PostMapping("/logout")
+    fun logout(@Parameter(hidden = true) userContext: UserContext): ResponseEntity<ApiResponse<AuthActionResponse>> {
+        logoutMemberUseCase(userContext.userId)
+        return ResponseEntity.ok(ApiResponse.success(AuthActionResponse()))
+    }
 }
 
 data class SocialAuthRequest(
@@ -68,34 +78,14 @@ data class RefreshTokenRequest(
     val refreshToken: String,
 )
 
-enum class SocialAuthStatus {
-    SIGNED_IN,
-    SIGNUP_REQUIRED,
-}
-
 data class SocialAuthResponse(
-    @field:Schema(description = "소셜 인증 결과 상태")
-    val status: SocialAuthStatus,
-    @field:Schema(description = "서비스 access token. 로그인 완료 상태에서만 내려갑니다.", nullable = true)
-    val accessToken: String? = null,
-    @field:Schema(description = "서비스 refresh token. 로그인 완료 상태에서만 내려갑니다.", nullable = true)
-    val refreshToken: String? = null,
-    @field:Schema(description = "회원가입에 사용할 임시 token. 회원가입 필요 상태에서만 내려갑니다.", nullable = true)
-    val signupToken: String? = null,
+    @field:Schema(description = "서비스 access token")
+    val accessToken: String,
+    @field:Schema(description = "서비스 refresh token")
+    val refreshToken: String,
 ) {
     companion object {
-        fun from(result: SocialAuthenticationResult): SocialAuthResponse = when (result) {
-            is SocialAuthenticationResult.SignedIn -> SocialAuthResponse(
-                status = SocialAuthStatus.SIGNED_IN,
-                accessToken = result.tokens.accessToken,
-                refreshToken = result.tokens.refreshToken,
-            )
-
-            is SocialAuthenticationResult.SignupRequired -> SocialAuthResponse(
-                status = SocialAuthStatus.SIGNUP_REQUIRED,
-                signupToken = result.signupToken,
-            )
-        }
+        fun from(tokens: LoginTokens): SocialAuthResponse = SocialAuthResponse(tokens.accessToken, tokens.refreshToken)
     }
 }
 
@@ -109,3 +99,8 @@ data class TokenResponse(
         fun from(tokens: LoginTokens): TokenResponse = TokenResponse(tokens.accessToken, tokens.refreshToken)
     }
 }
+
+data class AuthActionResponse(
+    @field:Schema(description = "처리 완료 여부")
+    val completed: Boolean = true,
+)
