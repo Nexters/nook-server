@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
@@ -24,7 +25,7 @@ class ConnectPostPlacePersistenceAdapter(
         userId: Long,
         savedPostId: Long,
         candidate: PlaceCandidate,
-        thumbnailUrl: String?,
+        supplement: PlaceSupplement?,
     ): ConnectPostPlacePort.Result {
         val savedPost = findSavedPostForConnection(savedPostId, userId)
             ?: return ConnectPostPlacePort.Result.PostNotFound
@@ -46,7 +47,7 @@ class ConnectPostPlacePersistenceAdapter(
         val place = requireNotNull(
             placeRepository.findByProviderAndExternalPlaceId(candidate.provider, candidate.externalPlaceId),
         )
-        place.updateThumbnailUrlIfAbsent(thumbnailUrl)
+        supplement?.let(place::updateSupplement)
         val placeId = requireNotNull(place.id)
         val existingPostPlace = postPlaceRepository.findByPostIdAndPlaceId(savedPost.postId, placeId)
         if (existingPostPlace == null) {

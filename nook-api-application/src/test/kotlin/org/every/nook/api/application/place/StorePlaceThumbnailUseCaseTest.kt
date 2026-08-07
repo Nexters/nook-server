@@ -20,9 +20,11 @@ class StorePlaceThumbnailUseCaseTest {
             providerUrl = null,
         )
         val useCase = StorePlaceThumbnailUseCase(
-            thumbnailProvider = PlaceThumbnailProvider { "https://cdn.example.com/place.jpg" },
-            updatePort = PlaceThumbnailUpdatePort { provider, externalPlaceId, thumbnailUrl ->
-                updates += "$provider:$externalPlaceId:$thumbnailUrl"
+            thumbnailProvider = PlaceThumbnailProvider {
+                PlaceSupplement(null, listOf("https://cdn.example.com/place.jpg"))
+            },
+            updatePort = PlaceThumbnailUpdatePort { provider, externalPlaceId, supplement ->
+                updates += "$provider:$externalPlaceId:${supplement.photoUrls.first()}"
             },
         )
 

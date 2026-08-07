@@ -11,28 +11,28 @@ class ConnectPostPlaceUseCase(
     operator fun invoke(command: Command): Result {
         val candidate = selectionTokenPort.verify(command.userId, command.selectionToken)
             ?: throw InvalidPlaceSelectionException()
-        val thumbnailUrl = fetchThumbnail(command, candidate)
+        val supplement = fetchSupplement(command, candidate)
         val result = connectPostPlacePort.connect(
             userId = command.userId,
             savedPostId = command.postId,
             candidate = candidate,
-            thumbnailUrl = thumbnailUrl,
+            supplement = supplement,
         )
         return mapResult(result)
     }
 
-    private fun fetchThumbnail(command: Command, candidate: PlaceCandidate): String? = runCatching {
-        thumbnailProvider.fetchThumbnailUrl(candidate)
+    private fun fetchSupplement(command: Command, candidate: PlaceCandidate): PlaceSupplement? = runCatching {
+        thumbnailProvider.fetch(candidate)
     }.onFailure { exception ->
         logger.warn(exception) {
             "Manual place thumbnail skipped: userId=${command.userId}, postId=${command.postId}, " +
                 "provider=${candidate.provider}, externalPlaceId=${candidate.externalPlaceId}"
         }
-    }.getOrNull().also { thumbnailUrl ->
+    }.getOrNull().also { supplement ->
         logger.info {
             "Manual place thumbnail resolved: userId=${command.userId}, postId=${command.postId}, " +
                 "provider=${candidate.provider}, externalPlaceId=${candidate.externalPlaceId}, " +
-                "thumbnailUrlFound=${thumbnailUrl != null}"
+                "supplementFound=${supplement != null}"
         }
     }
 
