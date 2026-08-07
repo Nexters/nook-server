@@ -68,6 +68,7 @@ class PlaceDetailQueryPersistenceAdapter(
             photoUrls = place.photoUrls,
             openingHours = place.openingHours,
             openNow = place.openingHours?.isOpenAt(clock.instant()),
+            tags = place.representativeTags.map { it.displayName },
             bookmarked = bookmarked,
             posts = PlacePostPageView(
                 items = savedPosts.content.mapNotNull { savedPost ->

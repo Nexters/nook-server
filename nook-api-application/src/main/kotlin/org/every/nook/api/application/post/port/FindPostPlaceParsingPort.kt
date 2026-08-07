@@ -13,5 +13,10 @@ data class PostPlaceParsingSnapshot(
     val failureReason: String?,
     val places: List<RelatedPlace>,
 ) {
-    data class RelatedPlace(val place: Place, val bookmarked: Boolean, val thumbnailUrl: String?)
+    data class RelatedPlace(
+        val place: Place,
+        val bookmarked: Boolean,
+        val thumbnailUrl: String?,
+        val tags: List<String> = emptyList(),
+    )
 }

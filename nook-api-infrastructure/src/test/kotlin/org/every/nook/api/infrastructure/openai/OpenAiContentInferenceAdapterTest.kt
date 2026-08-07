@@ -6,7 +6,9 @@ import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceClueEvidence
 import org.every.nook.api.application.place.PlaceClueExtractor
+import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.PostTitleGenerator
+import org.every.nook.api.domain.place.PlaceTag
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import org.springframework.http.MediaType
@@ -22,6 +24,42 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class OpenAiContentInferenceAdapterTest {
+    @Test
+    fun `extracts grounded place tags from the controlled vocabulary`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("place_tags")))
+            .andExpect(content().string(containsString("SOLO_DINING")))
+            .andExpect(content().string(containsString("IMAGE_VISUAL")))
+            .andExpect(content().string(containsString("혼자 먹기 좋고 조용해요")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {"tags":[
+                          {"tag":"QUIET","confidence":0.92,"evidenceSource":"BODY","evidenceText":"조용해요"},
+                          {"tag":"SOLO_DINING","confidence":0.88,"evidenceSource":"BODY","evidenceText":"혼자 먹기 좋아요"}
+                        ]}
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val tags = fixture.adapter.extract(
+            PlaceTagExtractor.Request(
+                place = candidate(),
+                body = "혼자 먹기 좋고 조용해요",
+                hashtags = listOf("혼밥"),
+                imageUrls = emptyList(),
+            ),
+        )
+
+        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING), tags.map { it.tag })
+        assertEquals(0.92, tags.first().confidence)
+        fixture.server.verify()
+    }
+
     @Test
     fun `generates a title with structured output`() {
         val fixture = adapterFixture()
@@ -270,6 +308,18 @@ class OpenAiContentInferenceAdapterTest {
             server = server,
         )
     }
+
+    private fun candidate(): PlaceCandidate = PlaceCandidate(
+        provider = "KAKAO",
+        externalPlaceId = "1",
+        name = "누크 식당",
+        address = "서울",
+        latitude = BigDecimal("37.0"),
+        longitude = BigDecimal("127.0"),
+        category = "음식점",
+        phoneNumber = null,
+        providerUrl = null,
+    )
 
     private data class AdapterFixture(val adapter: OpenAiContentInferenceAdapter, val server: MockRestServiceServer)
 

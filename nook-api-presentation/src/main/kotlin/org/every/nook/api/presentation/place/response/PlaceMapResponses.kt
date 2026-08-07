@@ -20,6 +20,8 @@ data class MapPlaceResponse(
     val color: String,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
+    @field:Schema(description = "장소 대표 태그 목록(최대 4개)")
+    val tags: List<String>,
 ) {
     companion object {
         fun from(view: MapPlaceView): MapPlaceResponse = MapPlaceResponse(
@@ -29,6 +31,7 @@ data class MapPlaceResponse(
             longitude = view.longitude,
             color = view.color,
             thumbnailUrl = view.thumbnailUrl,
+            tags = view.tags,
         )
     }
 }
@@ -65,6 +68,8 @@ data class RecentPlaceResponse(
     val longitude: BigDecimal,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
+    @field:Schema(description = "장소 대표 태그 목록(최대 4개)")
+    val tags: List<String>,
 ) {
     companion object {
         fun from(view: RecentPlaceView): RecentPlaceResponse = RecentPlaceResponse(
@@ -75,6 +80,7 @@ data class RecentPlaceResponse(
             latitude = view.latitude,
             longitude = view.longitude,
             thumbnailUrl = view.thumbnailUrl,
+            tags = view.tags,
         )
     }
 }
