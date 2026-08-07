@@ -3,11 +3,15 @@ package org.every.nook.api.infrastructure.openai
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
+import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceClueEvidence
 import org.every.nook.api.application.place.PlaceClueExtractor
+import org.every.nook.api.application.place.PlaceTagEvidenceSource
+import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.PostTitleGenerator
+import org.every.nook.api.domain.place.PlaceTag
 import org.springframework.web.client.RestClient
 
 class OpenAiContentInferenceAdapter(
@@ -16,7 +20,8 @@ class OpenAiContentInferenceAdapter(
     private val properties: OpenAiProperties,
 ) : PostTitleGenerator,
     PlaceClueExtractor,
-    PlaceCandidateSelector {
+    PlaceCandidateSelector,
+    PlaceTagExtractor {
     override fun generate(request: PostTitleGenerator.Request): String {
         val result = requestStructured(
             name = "post_title",
@@ -72,6 +77,24 @@ class OpenAiContentInferenceAdapter(
             ?: error("OpenAI selected an unknown place candidate")
     }
 
+    override fun extract(request: PlaceTagExtractor.Request): List<InferredPlaceTag> {
+        val result = requestStructured(
+            name = "place_tags",
+            instructions = PLACE_TAG_INSTRUCTIONS,
+            input = request.toInput(objectMapper),
+            schema = placeTagSchema(),
+            maxOutputTokens = PLACE_TAG_MAX_OUTPUT_TOKENS,
+        )
+        return result.path("tags").map { tag ->
+            InferredPlaceTag(
+                tag = PlaceTag.valueOf(tag.path("tag").asText()),
+                confidence = tag.path("confidence").asDouble(),
+                evidenceSource = PlaceTagEvidenceSource.valueOf(tag.path("evidenceSource").asText()),
+                evidenceText = tag.path("evidenceText").asText().trim(),
+            )
+        }
+    }
+
     private fun requestStructured(
         name: String,
         instructions: String,
@@ -117,10 +140,11 @@ class OpenAiContentInferenceAdapter(
         }
     }
 
-    private fun PostTitleGenerator.Request.toInput(): String = contentInput(body, hashtags, sourceLocationTag)
+    private fun PostTitleGenerator.Request.toInput(): String =
+        contentInput(objectMapper, body, hashtags, sourceLocationTag)
 
     private fun PlaceClueExtractor.Request.toInput(): Any {
-        val context = contentInput(body, hashtags, sourceLocationTag)
+        val context = contentInput(objectMapper, body, hashtags, sourceLocationTag)
         if (imageUrls.isEmpty()) {
             return context
         }
@@ -168,15 +192,6 @@ class OpenAiContentInferenceAdapter(
             },
         ),
     )
-
-    private fun contentInput(body: String?, hashtags: List<String>, sourceLocationTag: String?): String =
-        objectMapper.writeValueAsString(
-            mapOf(
-                "body" to body,
-                "hashtags" to hashtags,
-                "sourceLocationTag" to sourceLocationTag,
-            ),
-        )
 
     private fun titleSchema(): Map<String, Any> = mapOf(
         "type" to "object",
@@ -250,12 +265,11 @@ class OpenAiContentInferenceAdapter(
         const val MAX_TITLE_LENGTH = 25
         const val MAX_PLACE_COUNT = 10
         const val MAX_QUERY_COUNT = 4
-        const val MAX_IMAGE_COUNT = 20
         const val TITLE_MAX_OUTPUT_TOKENS = 200
         const val PLACE_MAX_OUTPUT_TOKENS = 800
         const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 1600
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
-        const val IMAGE_DETAIL = "high"
+        const val PLACE_TAG_MAX_OUTPUT_TOKENS = 600
         const val DEFAULT_TITLE = "Instagram 게시물"
         const val TITLE_INSTRUCTIONS =
             "입력된 Instagram 본문, 해시태그, 장소 태그에 명시된 사실만 사용해 검색과 보관에 적합한 한국어 제목을 작성한다. " +
@@ -294,5 +308,76 @@ class OpenAiContentInferenceAdapter(
                 "게시물이 가리키는 장소와 가장 일치하는 candidateIndex 하나를 선택한다. " +
                 "후보에 없는 장소를 만들거나 후보 정보를 수정하지 않는다. " +
                 "명확한 근거가 없거나 서로 다른 후보를 하나로 확정할 수 없으면 candidateIndex를 null로 반환한다."
+        const val PLACE_TAG_INSTRUCTIONS =
+            "입력된 장소와 Instagram 게시물 본문, 원본 해시태그, 이미지에 명시되거나 명확히 관찰되는 사실만 사용해 " +
+                "장소 특성 태그를 최대 4개 선택한다. 허용 태그는 QUIET(조용한), LIVELY(활기찬), COZY(아늑한), " +
+                "AESTHETIC(감성적인), SOLO_DINING(혼밥), DATE(데이트), GROUP(모임), FAMILY(가족), " +
+                "NEAT(정갈한), GENEROUS(푸짐한), GOOD_VALUE(가성비), UNIQUE(특별한), FRIENDLY(친절한), " +
+                "FAST(빠른), COMFORTABLE(편안한)뿐이다. 장소명, 주소, 카테고리만으로 특성을 추측하지 않는다. " +
+                "FRIENDLY처럼 경험이 필요한 서비스 태그는 본문이나 원본 해시태그에 직접 근거가 있을 때만 선택한다. " +
+                "근거 우선순위는 본문, 해시태그, 이미지 텍스트, 이미지 시각 정보 순이다. 각 태그에 0부터 1 사이 confidence, " +
+                "BODY·HASHTAG·IMAGE_TEXT·IMAGE_VISUAL 중 evidenceSource, 실제 근거 문구를 evidenceText로 반환한다. " +
+                "같은 의미나 서로 모순되는 태그를 함께 선택하지 않고, 근거가 부족하면 tags를 비워 두며 4개를 강제로 채우지 않는다."
     }
 }
+
+private fun contentInput(
+    objectMapper: ObjectMapper,
+    body: String?,
+    hashtags: List<String>,
+    sourceLocationTag: String?,
+): String = objectMapper.writeValueAsString(
+    mapOf("body" to body, "hashtags" to hashtags, "sourceLocationTag" to sourceLocationTag),
+)
+
+private fun PlaceTagExtractor.Request.toInput(objectMapper: ObjectMapper): Any {
+    val context = objectMapper.writeValueAsString(
+        mapOf(
+            "place" to mapOf("name" to place.name, "address" to place.address, "category" to place.category),
+            "body" to body,
+            "hashtags" to hashtags,
+        ),
+    )
+    if (imageUrls.isEmpty()) return context
+    return listOf(
+        mapOf(
+            "role" to "user",
+            "content" to buildList {
+                add(mapOf("type" to "input_text", "text" to context))
+                imageUrls.take(MAX_IMAGE_COUNT).forEach { imageUrl ->
+                    add(mapOf("type" to "input_image", "image_url" to imageUrl, "detail" to IMAGE_DETAIL))
+                }
+            },
+        ),
+    )
+}
+
+private fun placeTagSchema(): Map<String, Any> = mapOf(
+    "type" to "object",
+    "properties" to mapOf(
+        "tags" to mapOf(
+            "type" to "array",
+            "maxItems" to MAX_PLACE_TAG_COUNT,
+            "items" to mapOf(
+                "type" to "object",
+                "properties" to mapOf(
+                    "tag" to mapOf("type" to "string", "enum" to PlaceTag.entries.map(PlaceTag::name)),
+                    "confidence" to mapOf("type" to "number", "minimum" to 0, "maximum" to 1),
+                    "evidenceSource" to mapOf(
+                        "type" to "string",
+                        "enum" to PlaceTagEvidenceSource.entries.map(PlaceTagEvidenceSource::name),
+                    ),
+                    "evidenceText" to mapOf("type" to "string"),
+                ),
+                "required" to listOf("tag", "confidence", "evidenceSource", "evidenceText"),
+                "additionalProperties" to false,
+            ),
+        ),
+    ),
+    "required" to listOf("tags"),
+    "additionalProperties" to false,
+)
+
+private const val MAX_PLACE_TAG_COUNT = 4
+private const val MAX_IMAGE_COUNT = 20
+private const val IMAGE_DETAIL = "high"

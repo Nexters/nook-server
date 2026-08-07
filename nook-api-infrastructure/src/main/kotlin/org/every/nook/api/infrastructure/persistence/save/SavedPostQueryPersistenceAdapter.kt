@@ -223,6 +223,7 @@ class SavedPostQueryPersistenceAdapter(
                 category = place.category,
                 phoneNumber = place.phoneNumber,
                 thumbnailUrl = place.thumbnailUrl,
+                tags = place.representativeTags.map { it.displayName },
                 bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                 sequence = postPlace.sequence,
             )

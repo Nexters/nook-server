@@ -15,6 +15,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/posts?page=0&size=20
 
 ### 저장 게시물 상세 조회
+# 장소 응답에 tags(최대 4개)가 포함됩니다.
 GET {{baseUrl}}/api/v1/posts/{{postId}}
 
 ### 내 저장 게시물 삭제

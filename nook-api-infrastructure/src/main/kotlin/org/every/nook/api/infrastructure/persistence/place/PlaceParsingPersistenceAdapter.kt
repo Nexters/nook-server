@@ -1,10 +1,15 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.ClaimedPlaceParsingJob
+import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceSupplement
+import org.every.nook.api.application.place.PlaceTagSource
+import org.every.nook.api.application.place.PlaceTagSourcePort
+import org.every.nook.api.application.place.PlaceTagUpdatePort
+import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -32,10 +37,13 @@ class PlaceParsingPersistenceAdapter(
     private val postPlaceRepository: PostPlaceJpaRepository,
     private val userSavedPostRepository: UserSavedPostJpaRepository,
     private val userPlaceBookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val postPlaceTagRepository: PostPlaceTagJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock = Clock.systemUTC(),
 ) : PlaceParsingJobPort,
-    PlaceThumbnailUpdatePort {
+    PlaceThumbnailUpdatePort,
+    PlaceTagSourcePort,
+    PlaceTagUpdatePort {
     @Transactional
     override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob? {
         val job = jobRepository.findByPostIdForUpdate(postId) ?: return null
@@ -98,8 +106,9 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
-        distinctPlaces.forEach { candidate ->
-            eventPublisher.publishEvent(PlaceThumbnailRequestedEvent(postId, candidate, clock.instant()))
+        distinctPlaces.zip(postPlaces).forEach { (place, postPlace) ->
+            eventPublisher.publishEvent(PlaceThumbnailRequestedEvent(postId, place, clock.instant()))
+            eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, postPlace.placeId, place))
         }
     }
 
@@ -107,6 +116,31 @@ class PlaceParsingPersistenceAdapter(
     override fun update(provider: String, externalPlaceId: String, supplement: PlaceSupplement) {
         placeRepository.findByProviderAndExternalPlaceId(provider, externalPlaceId)
             ?.updateSupplement(supplement)
+    }
+
+    @Transactional(readOnly = true)
+    override fun find(postId: Long): PlaceTagSource? {
+        val post = postRepository.findById(postId).orElse(null) ?: return null
+        return PlaceTagSource(
+            body = post.body,
+            hashtags = hashtagRepository.findAllByPostIdOrderBySequenceAsc(postId).map { it.hashtag },
+            imageUrls = mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(
+                postId,
+                PostMedia.MediaType.IMAGE,
+            ).map { it.mediaUrl },
+        )
+    }
+
+    @Transactional
+    override fun replace(postId: Long, placeId: Long, tags: List<InferredPlaceTag>) {
+        check(postPlaceRepository.findByPostIdAndPlaceId(postId, placeId) != null) {
+            "Post place relation does not exist"
+        }
+        postPlaceTagRepository.deleteAllByPostIdAndPlaceId(postId, placeId)
+        postPlaceTagRepository.saveAll(tags.map { it.toEntity(postId, placeId) })
+        placeRepository.findById(placeId).orElseThrow().updateRepresentativeTags(
+            postPlaceTagRepository.findRepresentativeTags(placeId).take(MAX_REPRESENTATIVE_TAG_COUNT),
+        )
     }
 
     @Transactional
@@ -149,5 +183,6 @@ class PlaceParsingPersistenceAdapter(
     private companion object {
         val OUTSTANDING_STATUSES = listOf(PlaceParsingStatus.PENDING, PlaceParsingStatus.PROCESSING)
         const val FAILURE_REASON_MAX_LENGTH = 500
+        const val MAX_REPRESENTATIVE_TAG_COUNT = 4
     }
 }

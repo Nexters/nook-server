@@ -10,6 +10,7 @@ import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
+import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
@@ -28,6 +29,7 @@ import kotlin.test.assertTrue
 class PlaceParsingEventListenerTest {
     private val jobPort = FakeJobPort()
     private val storePlaceThumbnail = mock(StorePlaceThumbnailUseCase::class.java)
+    private val storePlaceTags = mock(StorePlaceTagsUseCase::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val retryTaskScheduler = mock(TaskScheduler::class.java)
     private val listener = PlaceParsingEventListener(
@@ -58,6 +60,7 @@ class PlaceParsingEventListenerTest {
         ),
         findOutstandingJobs = FindOutstandingPlaceParsingJobsUseCase(jobPort, PROCESSING_TIMEOUT),
         storePlaceThumbnail = storePlaceThumbnail,
+        storePlaceTags = storePlaceTags,
         eventPublisher = eventPublisher,
         retryTaskScheduler = retryTaskScheduler,
         clock = Clock.fixed(NOW, ZoneOffset.UTC),

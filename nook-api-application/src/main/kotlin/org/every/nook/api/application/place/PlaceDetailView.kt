@@ -17,6 +17,7 @@ data class PlaceDetailView(
     val photoUrls: List<String> = emptyList(),
     val openingHours: PlaceOpeningHours? = null,
     val openNow: Boolean? = null,
+    val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
     val posts: PlacePostPageView,
 )
