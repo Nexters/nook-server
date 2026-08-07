@@ -16,37 +16,67 @@ import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class GooglePlacePhotoProviderTest {
     @Test
-    fun `fetches one Google place photo and stores it through media storage`() {
+    fun `fetches opening hours and stores up to six Google place photos`() {
         val fixture = providerFixture()
         fixture.server.expect(requestTo(containsString("/v1/places:searchText")))
             .andExpect(method(HttpMethod.POST))
             .andExpect(header("X-Goog-Api-Key", "google-key"))
-            .andExpect(header("X-Goog-FieldMask", "places.photos.name"))
+            .andExpect(header("X-Goog-FieldMask", containsString("places.regularOpeningHours")))
             .andRespond(
                 withSuccess(
-                    """{"places":[{"photos":[{"name":"places/google-place/photos/photo-1"}]}]}""",
+                    """
+                    {
+                      "places": [{
+                        "displayName": {"text": "원동미나리삼겹살"},
+                        "formattedAddress": "서울 용산구 한강대로77길 4-1",
+                        "location": {"latitude": 37.1, "longitude": 127.1},
+                        "timeZone": {"id": "Asia/Seoul"},
+                        "regularOpeningHours": {
+                          "periods": [{
+                            "open": {"day": 1, "hour": 10, "minute": 0},
+                            "close": {"day": 1, "hour": 22, "minute": 0}
+                          }],
+                          "weekdayDescriptions": ["월요일: 오전 10:00~오후 10:00"]
+                        },
+                        "photos": [
+                          {"name":"places/google-place/photos/photo-1"},
+                          {"name":"places/google-place/photos/photo-2"},
+                          {"name":"places/google-place/photos/photo-3"},
+                          {"name":"places/google-place/photos/photo-4"},
+                          {"name":"places/google-place/photos/photo-5"},
+                          {"name":"places/google-place/photos/photo-6"},
+                          {"name":"places/google-place/photos/photo-7"}
+                        ]
+                      }]
+                    }
+                    """.trimIndent(),
                     MediaType.APPLICATION_JSON,
                 ),
             )
-        fixture.server.expect(requestTo(containsString("/v1/places/google-place/photos/photo-1/media")))
-            .andExpect(requestTo(containsString("maxWidthPx=640")))
-            .andExpect(requestTo(containsString("skipHttpRedirect=true")))
-            .andExpect(method(HttpMethod.GET))
-            .andExpect(header("X-Goog-Api-Key", "google-key"))
-            .andRespond(
-                withSuccess(
-                    """{"photoUri":"https://lh3.googleusercontent.com/photo"}""",
-                    MediaType.APPLICATION_JSON,
-                ),
-            )
+        (1..6).forEach { index ->
+            fixture.server.expect(requestTo(containsString("/v1/places/google-place/photos/photo-$index/media")))
+                .andExpect(requestTo(containsString("maxWidthPx=640")))
+                .andExpect(requestTo(containsString("skipHttpRedirect=true")))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Goog-Api-Key", "google-key"))
+                .andRespond(
+                    withSuccess(
+                        """{"photoUri":"https://lh3.googleusercontent.com/photo-$index"}""",
+                        MediaType.APPLICATION_JSON,
+                    ),
+                )
+        }
 
-        val result = fixture.provider.fetchThumbnailUrl(candidate())
+        val result = fixture.provider.fetch(candidate())
 
-        assertEquals("https://cdn.example.com/google-place.jpg", result)
-        assertEquals("https://lh3.googleusercontent.com/photo", fixture.storage.captured?.url)
+        assertEquals(6, result?.photoUrls?.size)
+        assertEquals("Asia/Seoul", result?.openingHours?.timeZone)
+        assertEquals(1, result?.openingHours?.periods?.single()?.open?.day)
+        assertEquals((0..5).toList(), fixture.storage.captured.map(PostMedia::sequence))
         fixture.server.verify()
     }
 
@@ -56,14 +86,36 @@ class GooglePlacePhotoProviderTest {
         fixture.server.expect(requestTo(containsString("/v1/places:searchText")))
             .andRespond(withServerError())
 
-        assertNull(fixture.provider.fetchThumbnailUrl(candidate()))
+        assertNull(fixture.provider.fetch(candidate()))
     }
 
     @Test
     fun `disabled provider does not call Google`() {
         val fixture = providerFixture(properties = GooglePlacePhotoProperties(enabled = false, apiKey = "google-key"))
 
-        assertNull(fixture.provider.fetchThumbnailUrl(candidate()))
+        assertNull(fixture.provider.fetch(candidate()))
+    }
+
+    @Test
+    fun `does not store supplement when Google result does not match candidate`() {
+        val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchText")))
+            .andRespond(
+                withSuccess(
+                    """
+                    {"places":[{
+                      "displayName":{"text":"다른 장소"},
+                      "location":{"latitude":35.0,"longitude":129.0},
+                      "photos":[{"name":"places/other/photos/photo-1"}]
+                    }]}
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        assertNull(fixture.provider.fetch(candidate()))
+        assertTrue(fixture.storage.captured.isEmpty())
+        fixture.server.verify()
     }
 
     private fun providerFixture(
@@ -97,11 +149,11 @@ class GooglePlacePhotoProviderTest {
     )
 
     private class FakeStorage : PostMediaStoragePort {
-        var captured: PostMedia? = null
+        val captured = mutableListOf<PostMedia>()
 
         override fun store(media: PostMedia): PostMedia {
-            captured = media
-            return media.copy(url = "https://cdn.example.com/google-place.jpg")
+            captured += media
+            return media.copy(url = "https://cdn.example.com/google-place-${media.sequence}.jpg")
         }
     }
 

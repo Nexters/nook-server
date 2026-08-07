@@ -64,14 +64,16 @@ class SearchPlacesUseCaseTest {
         val candidate = candidate()
         val useCase = ConnectPostPlaceUseCase(
             selectionTokenPort = tokenPort(candidate),
-            connectPostPlacePort = ConnectPostPlacePort { userId, postId, selected, thumbnailUrl ->
+            connectPostPlacePort = ConnectPostPlacePort { userId, postId, selected, supplement ->
                 assertEquals(7, userId)
                 assertEquals(11, postId)
                 assertEquals(candidate, selected)
-                assertEquals("https://cdn.example.com/google-place.jpg", thumbnailUrl)
+                assertEquals("https://cdn.example.com/google-place.jpg", supplement?.photoUrls?.first())
                 ConnectPostPlacePort.Result.Connected(17)
             },
-            thumbnailProvider = PlaceThumbnailProvider { "https://cdn.example.com/google-place.jpg" },
+            thumbnailProvider = PlaceThumbnailProvider {
+                PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg"))
+            },
         )
 
         val result = useCase(ConnectPostPlaceUseCase.Command(7, 11, "valid"))

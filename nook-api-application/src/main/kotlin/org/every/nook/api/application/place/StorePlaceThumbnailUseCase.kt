@@ -12,11 +12,11 @@ class StorePlaceThumbnailUseCase(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     operator fun invoke(postId: Long, place: PlaceCandidate) {
-        val thumbnailUrl = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
-            thumbnailProvider.fetchThumbnailUrl(place)
+        val supplement = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
+            thumbnailProvider.fetch(place)
         } ?: return
         metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
-            updatePort.update(place.provider, place.externalPlaceId, thumbnailUrl)
+            updatePort.update(place.provider, place.externalPlaceId, supplement)
         }
     }
 

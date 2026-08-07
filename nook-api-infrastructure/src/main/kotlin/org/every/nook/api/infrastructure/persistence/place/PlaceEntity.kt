@@ -8,9 +8,13 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import mu.KotlinLogging
+import org.every.nook.api.application.place.PlaceOpeningHours
+import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.infrastructure.persistence.BaseEntity
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 
 @Entity
@@ -52,6 +56,12 @@ class PlaceEntity(
     val phoneNumber: String? = null,
     @Column(name = "thumbnail_url", nullable = true, length = THUMBNAIL_URL_MAX_LENGTH)
     var thumbnailUrl: String? = null,
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "opening_hours", nullable = true, columnDefinition = "JSON")
+    var openingHours: PlaceOpeningHours? = null,
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "photo_urls", nullable = false, columnDefinition = "JSON")
+    var photoUrls: List<String> = emptyList(),
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -85,6 +95,14 @@ class PlaceEntity(
                         "thumbnailUrl=$thumbnailUrl"
                 }
             }
+        }
+    }
+
+    fun updateSupplement(supplement: PlaceSupplement) {
+        supplement.openingHours?.let { openingHours = it }
+        if (supplement.photoUrls.isNotEmpty()) {
+            photoUrls = supplement.photoUrls
+            updateThumbnailUrlIfAbsent(supplement.photoUrls.first())
         }
     }
 }
