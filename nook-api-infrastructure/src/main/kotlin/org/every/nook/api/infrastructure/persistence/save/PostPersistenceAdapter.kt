@@ -157,6 +157,7 @@ class PostPersistenceAdapter(
                         place = place,
                         bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                         thumbnailUrl = placesById[postPlace.placeId]?.thumbnailUrl,
+                        tags = placesById[postPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },
                     )
                 }
             },

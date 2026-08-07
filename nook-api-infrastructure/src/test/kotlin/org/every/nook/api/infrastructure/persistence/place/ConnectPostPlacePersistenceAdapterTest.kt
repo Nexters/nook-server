@@ -16,6 +16,7 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import org.springframework.context.ApplicationEventPublisher
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,6 +28,7 @@ class ConnectPostPlacePersistenceAdapterTest {
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
+    private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = ConnectPostPlacePersistenceAdapter(
         savedPostRepository,
         postRepository,
@@ -34,6 +36,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         postPlaceRepository,
         bookmarkRepository,
         parsingJobRepository,
+        eventPublisher,
     )
 
     @Test

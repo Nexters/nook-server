@@ -1,16 +1,21 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.MapPlaceView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceView
 import org.every.nook.api.application.place.port.PlaceMapQueryPort
 import org.every.nook.api.domain.place.GeoBounds
+import org.every.nook.api.domain.place.PlaceTag
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class PlaceMapQueryPersistenceAdapter(private val bookmarkRepository: UserPlaceBookmarkJpaRepository) :
-    PlaceMapQueryPort {
+class PlaceMapQueryPersistenceAdapter(
+    private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+) : PlaceMapQueryPort {
     @Transactional(readOnly = true)
     override fun findInBounds(userId: Long, bounds: GeoBounds): List<MapPlaceView> = bookmarkRepository
         .findMapPlaces(
@@ -27,6 +32,7 @@ class PlaceMapQueryPersistenceAdapter(private val bookmarkRepository: UserPlaceB
                 longitude = row.longitude,
                 color = row.color,
                 thumbnailUrl = row.thumbnailUrl,
+                tags = row.representativeTags.toDisplayTags(),
             )
         }
 
@@ -48,6 +54,13 @@ class PlaceMapQueryPersistenceAdapter(private val bookmarkRepository: UserPlaceB
                 latitude = row.latitude,
                 longitude = row.longitude,
                 thumbnailUrl = row.thumbnailUrl,
+                tags = row.representativeTags.toDisplayTags(),
             )
         }
+
+    private fun String?.toDisplayTags(): List<String> = if (this.isNullOrBlank()) {
+        emptyList()
+    } else {
+        objectMapper.readValue(this, Array<String>::class.java).map { PlaceTag.valueOf(it).displayName }
+    }
 }
