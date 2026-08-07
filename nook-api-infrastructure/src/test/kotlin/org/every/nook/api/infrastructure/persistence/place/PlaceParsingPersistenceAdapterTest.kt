@@ -1,16 +1,21 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSupplement
+import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
@@ -33,6 +38,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
+    private val postPlaceTagRepository = mock(PostPlaceTagJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = PlaceParsingPersistenceAdapter(
         jobRepository = jobRepository,
@@ -43,6 +49,7 @@ class PlaceParsingPersistenceAdapterTest {
         postPlaceRepository = postPlaceRepository,
         userSavedPostRepository = userSavedPostRepository,
         userPlaceBookmarkRepository = bookmarkRepository,
+        postPlaceTagRepository = postPlaceTagRepository,
         eventPublisher = eventPublisher,
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
@@ -147,6 +154,22 @@ class PlaceParsingPersistenceAdapterTest {
         adapter.update("KAKAO", "123", supplement)
 
         verify(place).updateSupplement(supplement)
+    }
+
+    @Test
+    fun `replaces post place tags and updates representative tags`() {
+        val place = mock(PlaceEntity::class.java)
+        val inferred = InferredPlaceTag(PlaceTag.QUIET, 0.9, PlaceTagEvidenceSource.BODY, "조용해요")
+        `when`(postPlaceRepository.findByPostIdAndPlaceId(11, 17)).thenReturn(PostPlaceEntity(11, 17, 0))
+        `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
+        `when`(postPlaceTagRepository.findRepresentativeTags(17))
+            .thenReturn(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING))
+
+        adapter.replace(11, 17, listOf(inferred))
+
+        verify(postPlaceTagRepository).deleteAllByPostIdAndPlaceId(11, 17)
+        verify(postPlaceTagRepository).saveAll(anyList<PostPlaceTagEntity>())
+        verify(place).updateRepresentativeTags(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING))
     }
 
     private companion object {

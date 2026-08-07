@@ -47,6 +47,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 p.thumbnail_url AS thumbnailUrl,
+                CAST(p.representative_tags AS CHAR) AS representativeTags,
                 COALESCE(
                     (
                         SELECT user_group.color
@@ -116,6 +117,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.category AS category,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
+                CAST(p.representative_tags AS CHAR) AS representativeTags,
                 COALESCE(
                     p.thumbnail_url,
                     (
@@ -167,6 +169,7 @@ interface MapPlaceProjection {
     val longitude: BigDecimal
     val color: String
     val thumbnailUrl: String?
+    val representativeTags: String?
 }
 
 interface RecentPlaceProjection {
@@ -179,4 +182,5 @@ interface RecentPlaceProjection {
     val latitude: BigDecimal
     val longitude: BigDecimal
     val thumbnailUrl: String?
+    val representativeTags: String?
 }

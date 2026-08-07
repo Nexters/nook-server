@@ -40,6 +40,8 @@ data class PlaceDetailResponse(
     val openingHours: PlaceOpeningHoursResponse?,
     @field:Schema(description = "현재 영업 여부", nullable = true)
     val openNow: Boolean?,
+    @field:Schema(description = "장소 대표 태그 목록(최대 4개)")
+    val tags: List<String>,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
     @field:Schema(description = "이 장소와 연결된 저장 게시물 페이지")
@@ -60,6 +62,7 @@ data class PlaceDetailResponse(
             photoUrls = view.photoUrls,
             openingHours = view.openingHours?.let(PlaceOpeningHoursResponse::from),
             openNow = view.openNow,
+            tags = view.tags,
             bookmarked = view.bookmarked,
             posts = PlacePostPageResponse.from(view.posts),
         )

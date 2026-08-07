@@ -10,6 +10,7 @@ data class MapPlaceView(
     val longitude: BigDecimal,
     val color: String,
     val thumbnailUrl: String?,
+    val tags: List<String> = emptyList(),
 )
 
 data class RecentPlaceView(
@@ -22,6 +23,7 @@ data class RecentPlaceView(
     val latitude: BigDecimal,
     val longitude: BigDecimal,
     val thumbnailUrl: String?,
+    val tags: List<String> = emptyList(),
 )
 
 data class RecentPlaceSliceView(
