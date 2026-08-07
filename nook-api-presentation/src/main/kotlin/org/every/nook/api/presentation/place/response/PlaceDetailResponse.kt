@@ -2,6 +2,9 @@ package org.every.nook.api.presentation.place.response
 
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.place.PlaceDetailView
+import org.every.nook.api.application.place.PlaceOpeningHours
+import org.every.nook.api.application.place.PlaceOpeningPeriod
+import org.every.nook.api.application.place.PlaceOpeningPoint
 import org.every.nook.api.application.place.PlacePostGroupView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
@@ -31,6 +34,12 @@ data class PlaceDetailResponse(
     val phoneNumber: String?,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
+    @field:Schema(description = "장소 사진 URL 목록(최대 6장)")
+    val photoUrls: List<String>,
+    @field:Schema(description = "장소 정규 영업시간", nullable = true)
+    val openingHours: PlaceOpeningHoursResponse?,
+    @field:Schema(description = "현재 영업 여부", nullable = true)
+    val openNow: Boolean?,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
     @field:Schema(description = "이 장소와 연결된 저장 게시물 페이지")
@@ -48,8 +57,47 @@ data class PlaceDetailResponse(
             category = view.category,
             phoneNumber = view.phoneNumber,
             thumbnailUrl = view.thumbnailUrl,
+            photoUrls = view.photoUrls,
+            openingHours = view.openingHours?.let(PlaceOpeningHoursResponse::from),
+            openNow = view.openNow,
             bookmarked = view.bookmarked,
             posts = PlacePostPageResponse.from(view.posts),
+        )
+    }
+}
+
+data class PlaceOpeningHoursResponse(
+    @field:Schema(description = "IANA 시간대")
+    val timeZone: String,
+    @field:Schema(description = "구조화된 주간 영업 구간")
+    val periods: List<PlaceOpeningPeriodResponse>,
+    @field:Schema(description = "Google이 제공한 현지화된 요일별 영업시간")
+    val weekdayDescriptions: List<String>,
+) {
+    companion object {
+        fun from(hours: PlaceOpeningHours): PlaceOpeningHoursResponse = PlaceOpeningHoursResponse(
+            timeZone = hours.timeZone,
+            periods = hours.periods.map(PlaceOpeningPeriodResponse::from),
+            weekdayDescriptions = hours.weekdayDescriptions,
+        )
+    }
+}
+
+data class PlaceOpeningPeriodResponse(val open: PlaceOpeningPointResponse, val close: PlaceOpeningPointResponse?) {
+    companion object {
+        fun from(period: PlaceOpeningPeriod): PlaceOpeningPeriodResponse = PlaceOpeningPeriodResponse(
+            open = PlaceOpeningPointResponse.from(period.open),
+            close = period.close?.let(PlaceOpeningPointResponse::from),
+        )
+    }
+}
+
+data class PlaceOpeningPointResponse(val day: Int, val hour: Int, val minute: Int) {
+    companion object {
+        fun from(point: PlaceOpeningPoint): PlaceOpeningPointResponse = PlaceOpeningPointResponse(
+            day = point.day,
+            hour = point.hour,
+            minute = point.minute,
         )
     }
 }

@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
@@ -142,9 +143,10 @@ class PlaceParsingPersistenceAdapterTest {
         val place = mock(PlaceEntity::class.java)
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(place)
 
-        adapter.update("KAKAO", "123", "https://cdn.example.com/google-place.jpg")
+        val supplement = PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg"))
+        adapter.update("KAKAO", "123", supplement)
 
-        verify(place).updateThumbnailUrlIfAbsent("https://cdn.example.com/google-place.jpg")
+        verify(place).updateSupplement(supplement)
     }
 
     private companion object {

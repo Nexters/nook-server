@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
@@ -77,10 +78,15 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.Connected(17),
-            adapter.connect(7, 11, candidate(), "https://cdn.example.com/google-place.jpg"),
+            adapter.connect(
+                7,
+                11,
+                candidate(),
+                PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")),
+            ),
         )
 
-        verify(place).updateThumbnailUrlIfAbsent("https://cdn.example.com/google-place.jpg")
+        verify(place).updateSupplement(PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")))
         val captor = ArgumentCaptor.forClass(PostPlaceEntity::class.java)
         verify(postPlaceRepository).save(captor.capture())
         assertEquals(101, captor.value.postId)

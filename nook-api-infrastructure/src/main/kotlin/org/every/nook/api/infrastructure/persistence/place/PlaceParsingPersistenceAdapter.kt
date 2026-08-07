@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceParsingJobPort
+import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceThumbnailRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -103,9 +104,9 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun update(provider: String, externalPlaceId: String, thumbnailUrl: String) {
+    override fun update(provider: String, externalPlaceId: String, supplement: PlaceSupplement) {
         placeRepository.findByProviderAndExternalPlaceId(provider, externalPlaceId)
-            ?.updateThumbnailUrlIfAbsent(thumbnailUrl)
+            ?.updateSupplement(supplement)
     }
 
     @Transactional
