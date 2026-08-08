@@ -33,3 +33,7 @@ Content-Type: application/json
 {
   "refreshToken": "replace-with-nook-refresh-token"
 }
+
+### 로그아웃
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer replace-with-access-token

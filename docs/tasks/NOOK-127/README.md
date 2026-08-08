@@ -6,7 +6,7 @@
 
 ## 범위
 
-- `GET /api/v1/members/me` API 추가
+- `GET /api/v1/members/me` 응답에 `provider` 추가
 - 회원 기본 정보와 소셜 provider를 application 모델로 조회
 - `social_accounts.provider` 기반 persistence adapter 조회 연결
 - controller, use case, persistence adapter 테스트 추가

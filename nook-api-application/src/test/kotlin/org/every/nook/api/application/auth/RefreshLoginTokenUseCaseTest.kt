@@ -3,7 +3,6 @@ package org.every.nook.api.application.auth
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.StoredRefreshToken
 import org.every.nook.api.application.auth.port.TokenProvider
-import org.every.nook.api.application.member.port.MemberProfile
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
 import org.every.nook.api.domain.member.Member
@@ -76,11 +75,7 @@ private class RefreshFakeTokenProvider(private val now: Instant) : TokenProvider
         expiresAt = now.plusSeconds(3600),
     )
 
-    override fun issueSignupToken(provider: SocialProvider, subject: String): String = error("Not used")
-
     override fun parseRefreshToken(token: String): RefreshClaims = RefreshClaims(1, "old-id")
-
-    override fun parseSignupToken(token: String): SignupClaims = error("Not used")
 
     override fun hash(token: String): String = "hash-$token"
 }
@@ -107,7 +102,9 @@ private class InMemoryRefreshTokenRepository(private val existing: StoredRefresh
 private class ExistingMemberRepository : MemberRepository {
     override fun findMemberId(provider: SocialProvider, subject: String): Long? = 1
 
-    override fun findMemberProfile(memberId: Long): MemberProfile? = null
+    override fun findById(memberId: Long): Member? = Member(id = memberId, nickname = "누커", profileImageUrl = null)
+
+    override fun findSocialProvider(memberId: Long): SocialProvider? = SocialProvider.KAKAO
 
     override fun existsByNickname(nickname: String): Boolean = false
 
@@ -115,7 +112,13 @@ private class ExistingMemberRepository : MemberRepository {
 
     override fun save(member: Member): Member = error("Not used")
 
+    override fun update(member: Member): Member? = error("Not used")
+
+    override fun withdraw(memberId: Long): Boolean = error("Not used")
+
     override fun saveSocialAccount(account: SocialAccount): SocialAccount = error("Not used")
+
+    override fun deleteSocialAccounts(memberId: Long) = error("Not used")
 
     override fun existsMember(memberId: Long): Boolean = memberId == 1L
 }

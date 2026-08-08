@@ -1,4 +1,4 @@
-### 카카오 로그인
+### 로그인
 POST {{baseUrl}}/api/v1/auth/social
 Content-Type: application/json
 
@@ -7,9 +7,13 @@ Content-Type: application/json
   "accessToken": "replace-with-kakao-access-token"
 }
 
-### 회원가입 완료
-POST {{baseUrl}}/api/v1/members
-Authorization: Bearer replace-with-signup-token
+### 내 정보 조회
+GET {{baseUrl}}/api/v1/members/me
+Authorization: Bearer replace-with-access-token
+
+### 내 정보 수정
+PATCH {{baseUrl}}/api/v1/members/me
+Authorization: Bearer replace-with-access-token
 Content-Type: application/json
 
 {
@@ -17,6 +21,6 @@ Content-Type: application/json
   "profileImageUrl": "https://example.com/profile.png"
 }
 
-### 내 정보 조회
-GET {{baseUrl}}/api/v1/members/me
+### 회원 탈퇴
+DELETE {{baseUrl}}/api/v1/members/me
 Authorization: Bearer replace-with-access-token

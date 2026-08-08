@@ -3,10 +3,8 @@ package org.every.nook.api.infrastructure.persistence.member
 import org.every.nook.api.domain.member.MemberStatus
 import org.every.nook.api.domain.member.SocialProvider
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.test.util.ReflectionTestUtils
-import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -17,50 +15,44 @@ class MemberRepositoryAdapterTest {
     private val adapter = MemberRepositoryAdapter(memberJpaRepository, socialAccountJpaRepository)
 
     @Test
-    fun `finds member profile with social provider`() {
-        val member = memberEntity(
-            id = 7,
-            nickname = "누커",
-            profileImageUrl = "https://example.com/profile.png",
-        )
+    fun `finds active member social provider`() {
+        val member = memberEntity(id = 7, status = MemberStatus.ACTIVE)
         val account = socialAccountEntity(
             id = 11,
             member = member,
             provider = SocialProvider.KAKAO,
             providerSubject = "kakao-subject",
         )
-        `when`(memberJpaRepository.findById(7)).thenReturn(Optional.of(member))
         `when`(socialAccountJpaRepository.findFirstByMemberId(7)).thenReturn(account)
 
-        val profile = adapter.findMemberProfile(7)
-
-        assertEquals(7, profile?.member?.id)
-        assertEquals("누커", profile?.member?.nickname)
-        assertEquals("https://example.com/profile.png", profile?.member?.profileImageUrl)
-        assertEquals(SocialProvider.KAKAO, profile?.provider)
-    }
-
-    @Test
-    fun `returns null when member does not exist`() {
-        `when`(memberJpaRepository.findById(404)).thenReturn(Optional.empty())
-
-        assertNull(adapter.findMemberProfile(404))
-        verify(memberJpaRepository).findById(404)
+        assertEquals(SocialProvider.KAKAO, adapter.findSocialProvider(7))
     }
 
     @Test
     fun `returns null when social account does not exist`() {
-        val member = memberEntity(id = 7, nickname = "누커", profileImageUrl = null)
-        `when`(memberJpaRepository.findById(7)).thenReturn(Optional.of(member))
         `when`(socialAccountJpaRepository.findFirstByMemberId(7)).thenReturn(null)
 
-        assertNull(adapter.findMemberProfile(7))
+        assertNull(adapter.findSocialProvider(7))
     }
 
-    private fun memberEntity(id: Long, nickname: String, profileImageUrl: String?): MemberEntity = MemberEntity(
-        nickname = nickname,
-        profileImageUrl = profileImageUrl,
-        status = MemberStatus.ACTIVE,
+    @Test
+    fun `returns null when member is withdrawn`() {
+        val member = memberEntity(id = 7, status = MemberStatus.WITHDRAWN)
+        val account = socialAccountEntity(
+            id = 11,
+            member = member,
+            provider = SocialProvider.KAKAO,
+            providerSubject = "kakao-subject",
+        )
+        `when`(socialAccountJpaRepository.findFirstByMemberId(7)).thenReturn(account)
+
+        assertNull(adapter.findSocialProvider(7))
+    }
+
+    private fun memberEntity(id: Long, status: MemberStatus): MemberEntity = MemberEntity(
+        nickname = "누커",
+        profileImageUrl = null,
+        status = status,
     ).also {
         ReflectionTestUtils.setField(it, "id", id)
     }
