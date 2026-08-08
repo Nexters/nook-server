@@ -20,6 +20,12 @@ GET {{baseUrl}}/api/v1/places/recent?size=20
 ### 직접 연결할 장소 검색
 GET {{baseUrl}}/api/v1/places/search?query=퍼머넌트해비탯&page=0&size=15&latitude=37.5665&longitude=126.9780
 
+### DB 전체 장소 검색
+GET {{baseUrl}}/api/v1/places/database/search?query=용산&page=0&size=20
+
+### 내가 저장한 장소 검색
+GET {{baseUrl}}/api/v1/places/my/search?query=용산&page=0&size=20
+
 ### 장소 상세 및 연관 게시물 조회
 # 응답에 openingHours, openNow, photoUrls(최대 6장), tags(최대 4개)가 포함됩니다.
 GET {{baseUrl}}/api/v1/places/{{placeId}}?page=0&size=20
