@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.instagram
 
+import org.every.nook.api.application.content.PrivatePostException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,6 +30,22 @@ class InstagramContentUrlTest {
         val url = InstagramContentUrl.parse("https://www.instagram.com/reel/Reel123/")
 
         assertEquals(InstagramContentUrl.Kind.REEL, url.kind)
+    }
+
+    @Test
+    fun `public shortcode with eleven characters is accepted`() {
+        val url = InstagramContentUrl.parse("https://www.instagram.com/p/DaU9TrPE4Rl/")
+
+        assertEquals("DaU9TrPE4Rl", url.shortcode)
+    }
+
+    @Test
+    fun `identifier longer than a public shortcode is rejected as a private post`() {
+        assertFailsWith<PrivatePostException> {
+            InstagramContentUrl.parse(
+                "https://www.instagram.com/p/Dbw1jDTBv7du60ZhDSqNH9kSJCYlKc6TzHaACA0/",
+            )
+        }
     }
 
     @Test

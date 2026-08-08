@@ -39,6 +39,15 @@ Content-Type: application/json
   "url": "https://www.instagram.com/p/ABC123/"
 }
 
+### URL로 게시물 생성 실패 - 비공개 게시물
+POST {{baseUrl}}/api/v1/posts
+Content-Type: application/json
+
+{
+  "url": "https://www.instagram.com/p/Dbw1jDTBv7du60ZhDSqNH9kSJCYlKc6TzHaACA0/",
+  "groupIds": [1]
+}
+
 ### 내 저장 게시물 메모 변경
 PATCH {{baseUrl}}/api/v1/posts/{{postId}}/memo
 Content-Type: application/json
