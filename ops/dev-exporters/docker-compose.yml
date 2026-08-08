@@ -1,0 +1,23 @@
+services:
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: nook-dev-node-exporter
+    command:
+      - --path.rootfs=/host
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+
+  mysqld-exporter:
+    image: quay.io/prometheus/mysqld-exporter:latest
+    container_name: nook-dev-mysqld-exporter
+    user: "0"
+    command:
+      - --config.my-cnf=/etc/mysql-exporter/.my.cnf
+      - --web.listen-address=:9104
+    network_mode: host
+    volumes:
+      - ./mysql-exporter.my.cnf:/etc/mysql-exporter/.my.cnf:ro
+    restart: unless-stopped
