@@ -8,9 +8,14 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import mu.KotlinLogging
+import org.every.nook.api.application.place.PlaceOpeningHours
+import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceProviderReference
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.infrastructure.persistence.BaseEntity
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 
 @Entity
@@ -52,6 +57,15 @@ class PlaceEntity(
     val phoneNumber: String? = null,
     @Column(name = "thumbnail_url", nullable = true, length = THUMBNAIL_URL_MAX_LENGTH)
     var thumbnailUrl: String? = null,
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "opening_hours", nullable = true, columnDefinition = "JSON")
+    var openingHours: PlaceOpeningHours? = null,
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "photo_urls", nullable = false, columnDefinition = "JSON")
+    var photoUrls: List<String> = emptyList(),
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "representative_tags", nullable = false, columnDefinition = "JSON")
+    var representativeTags: List<PlaceTag> = emptyList(),
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -63,6 +77,7 @@ class PlaceEntity(
         const val COORDINATE_PRECISION = 10
         const val COORDINATE_SCALE = 7
         const val THUMBNAIL_URL_MAX_LENGTH = 2048
+        private const val MAX_REPRESENTATIVE_TAG_COUNT = 4
         private val logger = KotlinLogging.logger {}
     }
 
@@ -86,5 +101,17 @@ class PlaceEntity(
                 }
             }
         }
+    }
+
+    fun updateSupplement(supplement: PlaceSupplement) {
+        supplement.openingHours?.let { openingHours = it }
+        if (supplement.photoUrls.isNotEmpty()) {
+            photoUrls = supplement.photoUrls
+            updateThumbnailUrlIfAbsent(supplement.photoUrls.first())
+        }
+    }
+
+    fun updateRepresentativeTags(tags: List<PlaceTag>) {
+        representativeTags = tags.take(MAX_REPRESENTATIVE_TAG_COUNT)
     }
 }

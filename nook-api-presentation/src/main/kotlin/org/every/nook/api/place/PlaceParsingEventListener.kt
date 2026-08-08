@@ -3,8 +3,10 @@ package org.every.nook.api.place
 import mu.KotlinLogging
 import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
+import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailRequestedEvent
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
+import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
@@ -27,6 +29,7 @@ class PlaceParsingEventListener(
     private val processPlaceParsingJob: ProcessPlaceParsingJobUseCase,
     private val findOutstandingJobs: FindOutstandingPlaceParsingJobsUseCase,
     private val storePlaceThumbnail: StorePlaceThumbnailUseCase,
+    private val storePlaceTags: StorePlaceTagsUseCase,
     private val eventPublisher: ApplicationEventPublisher,
     @Qualifier("parsingRetryTaskScheduler") private val retryTaskScheduler: TaskScheduler,
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
@@ -94,6 +97,19 @@ class PlaceParsingEventListener(
             logger.warn(exception) {
                 "Place thumbnail storage failed: postId=${event.postId}, provider=${event.place.provider}, " +
                     "externalPlaceId=${event.place.externalPlaceId}"
+            }
+        }
+    }
+
+    @Async("placeParsingTaskExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    fun storeTags(event: PlaceTagsRequestedEvent) {
+        runCatching {
+            storePlaceTags(event)
+        }.onFailure { exception ->
+            logger.warn(exception) {
+                "Place tag storage failed: postId=${event.postId}, placeId=${event.placeId}, " +
+                    "provider=${event.place.provider}, externalPlaceId=${event.place.externalPlaceId}"
             }
         }
     }

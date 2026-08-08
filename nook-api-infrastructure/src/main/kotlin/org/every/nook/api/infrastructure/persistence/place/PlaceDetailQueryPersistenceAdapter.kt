@@ -19,6 +19,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 
 @Component
 class PlaceDetailQueryPersistenceAdapter(
@@ -29,6 +30,7 @@ class PlaceDetailQueryPersistenceAdapter(
     private val mediaRepository: PostMediaJpaRepository,
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
+    private val clock: Clock = Clock.systemUTC(),
 ) : PlaceDetailQueryPort {
     @Transactional(readOnly = true)
     override fun find(userId: Long, placeId: Long, page: Int, size: Int): PlaceDetailView? {
@@ -43,24 +45,15 @@ class PlaceDetailQueryPersistenceAdapter(
         if (!bookmarked && savedPosts.totalElements == 0L) {
             return null
         }
-
         val sourcePostIds = savedPosts.content.map(UserSavedPostEntity::postId)
         val postsById = if (sourcePostIds.isEmpty()) {
             emptyMap()
         } else {
             postRepository.findAllById(sourcePostIds).associateBy { requireNotNull(it.id) }
         }
-        val representativeMediaByPostId = if (sourcePostIds.isEmpty()) {
-            emptyMap()
-        } else {
-            mediaRepository
-                .findAllByPostIdInOrderByPostIdAscSequenceAsc(sourcePostIds)
-                .groupBy(PostMediaEntity::postId)
-                .mapValues { (_, media) -> media.first().toView() }
-        }
+        val representativeMediaByPostId = findRepresentativeMedia(sourcePostIds)
         val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
         val groupsBySavedPostId = findGroups(userId, savedPostIds)
-
         return PlaceDetailView(
             id = requireNotNull(place.id),
             provider = place.provider,
@@ -72,6 +65,10 @@ class PlaceDetailQueryPersistenceAdapter(
             category = place.category,
             phoneNumber = place.phoneNumber,
             thumbnailUrl = place.thumbnailUrl,
+            photoUrls = place.photoUrls,
+            openingHours = place.openingHours,
+            openNow = place.openingHours?.isOpenAt(clock.instant()),
+            tags = place.representativeTags.map { it.displayName },
             bookmarked = bookmarked,
             posts = PlacePostPageView(
                 items = savedPosts.content.mapNotNull { savedPost ->
@@ -90,6 +87,15 @@ class PlaceDetailQueryPersistenceAdapter(
                 hasNext = savedPosts.hasNext(),
             ),
         )
+    }
+
+    private fun findRepresentativeMedia(postIds: List<Long>): Map<Long, PlacePostMediaView> = if (postIds.isEmpty()) {
+        emptyMap()
+    } else {
+        mediaRepository
+            .findAllByPostIdInOrderByPostIdAscSequenceAsc(postIds)
+            .groupBy(PostMediaEntity::postId)
+            .mapValues { (_, media) -> media.first().toView() }
     }
 
     private fun PostEntity.toView(

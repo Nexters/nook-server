@@ -62,6 +62,7 @@ data class SavedPostPlace(
     val category: String?,
     val phoneNumber: String?,
     val thumbnailUrl: String?,
+    val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
     val sequence: Int,
 )

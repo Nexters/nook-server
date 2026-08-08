@@ -1,12 +1,15 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceSupplement
+import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,13 +21,14 @@ class ConnectPostPlacePersistenceAdapter(
     private val postPlaceRepository: PostPlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) : ConnectPostPlacePort {
     @Transactional
     override fun connect(
         userId: Long,
         savedPostId: Long,
         candidate: PlaceCandidate,
-        thumbnailUrl: String?,
+        supplement: PlaceSupplement?,
     ): ConnectPostPlacePort.Result {
         val savedPost = findSavedPostForConnection(savedPostId, userId)
             ?: return ConnectPostPlacePort.Result.PostNotFound
@@ -46,7 +50,7 @@ class ConnectPostPlacePersistenceAdapter(
         val place = requireNotNull(
             placeRepository.findByProviderAndExternalPlaceId(candidate.provider, candidate.externalPlaceId),
         )
-        place.updateThumbnailUrlIfAbsent(thumbnailUrl)
+        supplement?.let(place::updateSupplement)
         val placeId = requireNotNull(place.id)
         val existingPostPlace = postPlaceRepository.findByPostIdAndPlaceId(savedPost.postId, placeId)
         if (existingPostPlace == null) {
@@ -61,6 +65,7 @@ class ConnectPostPlacePersistenceAdapter(
             parsingJob.status = PlaceParsingStatus.COMPLETED
             parsingJob.failureReason = null
         }
+        eventPublisher.publishEvent(PlaceTagsRequestedEvent(savedPost.postId, placeId, candidate))
         return ConnectPostPlacePort.Result.Connected(placeId)
     }
 

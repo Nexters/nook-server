@@ -14,6 +14,10 @@ data class PlaceDetailView(
     val category: String?,
     val phoneNumber: String?,
     val thumbnailUrl: String?,
+    val photoUrls: List<String> = emptyList(),
+    val openingHours: PlaceOpeningHours? = null,
+    val openNow: Boolean? = null,
+    val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
     val posts: PlacePostPageView,
 )
