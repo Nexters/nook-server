@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.instagram
 
+import org.every.nook.api.application.content.PrivatePostException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import java.net.URI
 
@@ -15,7 +16,13 @@ class InstagramContentUrl private constructor(val canonicalUrl: String, val shor
 
         fun supports(value: String): Boolean = parseOrNull(value) != null
 
-        fun parse(value: String): InstagramContentUrl = parseOrNull(value) ?: throw UnsupportedPostUrlException()
+        fun parse(value: String): InstagramContentUrl {
+            val contentUrl = parseOrNull(value) ?: throw UnsupportedPostUrlException()
+            if (contentUrl.shortcode.length > PUBLIC_SHORTCODE_LENGTH) {
+                throw PrivatePostException()
+            }
+            return contentUrl
+        }
 
         private fun parseOrNull(value: String): InstagramContentUrl? = runCatching {
             val uri = URI(value.trim())
@@ -45,5 +52,7 @@ class InstagramContentUrl private constructor(val canonicalUrl: String, val shor
                 uri.userInfo == null &&
                 uri.port == -1
         }
+
+        private const val PUBLIC_SHORTCODE_LENGTH = 11
     }
 }
