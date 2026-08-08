@@ -7,12 +7,9 @@ import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import org.every.nook.api.application.auth.InvalidRefreshTokenException
-import org.every.nook.api.application.auth.InvalidSignupTokenException
 import org.every.nook.api.application.auth.IssuedToken
 import org.every.nook.api.application.auth.RefreshClaims
-import org.every.nook.api.application.auth.SignupClaims
 import org.every.nook.api.application.auth.port.TokenProvider
-import org.every.nook.api.domain.member.SocialProvider
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Clock
@@ -25,7 +22,6 @@ private const val MIN_SECRET_BYTES = 32
 private const val TOKEN_TYPE = "token_type"
 private const val ACCESS_TYPE = "access"
 private const val REFRESH_TYPE = "refresh"
-private const val SIGNUP_TYPE = "signup"
 
 class JwtTokenProvider(private val properties: JwtProperties, private val clock: Clock) : TokenProvider {
     init {
@@ -60,14 +56,6 @@ class JwtTokenProvider(private val properties: JwtProperties, private val clock:
         )
     }
 
-    override fun issueSignupToken(provider: SocialProvider, subject: String): String = issue(
-        subject = subject,
-        type = SIGNUP_TYPE,
-        expiresAt = Instant.now(clock).plus(properties.signupTtl),
-        secret = properties.accessSecret,
-        claims = mapOf("provider" to provider.name),
-    )
-
     override fun parseRefreshToken(token: String): RefreshClaims {
         val claims = parse(token, properties.refreshSecret, REFRESH_TYPE) { InvalidRefreshTokenException() }
         return runCatching {
@@ -76,16 +64,6 @@ class JwtTokenProvider(private val properties: JwtProperties, private val clock:
                 tokenIdentifier = requireNotNull(claims.jwtid),
             )
         }.getOrElse { throw InvalidRefreshTokenException() }
-    }
-
-    override fun parseSignupToken(token: String): SignupClaims {
-        val claims = parse(token, properties.accessSecret, SIGNUP_TYPE) { InvalidSignupTokenException() }
-        return runCatching {
-            SignupClaims(
-                provider = SocialProvider.valueOf(claims.getStringClaim("provider")),
-                subject = claims.subject,
-            )
-        }.getOrElse { throw InvalidSignupTokenException() }
     }
 
     override fun hash(token: String): String = HexFormat.of().formatHex(
