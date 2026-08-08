@@ -9,6 +9,8 @@ interface MemberRepository {
 
     fun findById(memberId: Long): Member?
 
+    fun findSocialProvider(memberId: Long): SocialProvider?
+
     fun existsByNickname(nickname: String): Boolean
 
     fun existsSocialAccount(provider: SocialProvider, subject: String): Boolean

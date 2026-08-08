@@ -104,6 +104,8 @@ private class ExistingMemberRepository : MemberRepository {
 
     override fun findById(memberId: Long): Member? = Member(id = memberId, nickname = "누커", profileImageUrl = null)
 
+    override fun findSocialProvider(memberId: Long): SocialProvider? = SocialProvider.KAKAO
+
     override fun existsByNickname(nickname: String): Boolean = false
 
     override fun existsSocialAccount(provider: SocialProvider, subject: String): Boolean = true

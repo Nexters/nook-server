@@ -26,6 +26,11 @@ class MemberRepositoryAdapter(
         .map(MemberEntity::toDomain)
         .orElse(null)
 
+    override fun findSocialProvider(memberId: Long): SocialProvider? =
+        socialAccountJpaRepository.findFirstByMemberId(memberId)
+            ?.takeIf { it.member.status == MemberStatus.ACTIVE }
+            ?.provider
+
     override fun existsByNickname(nickname: String): Boolean = memberJpaRepository.existsByNickname(nickname)
 
     override fun existsSocialAccount(provider: SocialProvider, subject: String): Boolean =

@@ -3,6 +3,7 @@ package org.every.nook.api.member
 import org.every.nook.api.application.member.DuplicateNicknameException
 import org.every.nook.api.application.member.GetMemberProfileUseCase
 import org.every.nook.api.application.member.MemberProfile
+import org.every.nook.api.application.member.MemberProvider
 import org.every.nook.api.application.member.UpdateMemberProfileCommand
 import org.every.nook.api.application.member.UpdateMemberProfileUseCase
 import org.every.nook.api.application.member.WithdrawMemberUseCase
@@ -57,15 +58,23 @@ class MemberControllerTest {
     }
 
     @Test
-    fun `gets current member profile`() {
+    fun `gets current member profile with provider`() {
         `when`(getMemberProfileUseCase(TEST_USER_ID))
-            .thenReturn(MemberProfile(id = TEST_USER_ID, nickname = "누커", profileImageUrl = null))
+            .thenReturn(
+                MemberProfile(
+                    id = TEST_USER_ID,
+                    nickname = "누커",
+                    profileImageUrl = null,
+                    provider = MemberProvider.KAKAO,
+                ),
+            )
 
         mockMvc.get("/api/v1/members/me").andExpect {
             status { isOk() }
             jsonPath("$.resultType") { value("SUCCESS") }
             jsonPath("$.success.id") { value(TEST_USER_ID) }
             jsonPath("$.success.nickname") { value("누커") }
+            jsonPath("$.success.provider") { value("KAKAO") }
         }
     }
 
@@ -77,7 +86,14 @@ class MemberControllerTest {
             profileImageUrl = "https://example.com/profile.jpg",
         )
         `when`(updateMemberProfileUseCase(command))
-            .thenReturn(MemberProfile(TEST_USER_ID, "도현", "https://example.com/profile.jpg"))
+            .thenReturn(
+                MemberProfile(
+                    TEST_USER_ID,
+                    "도현",
+                    "https://example.com/profile.jpg",
+                    MemberProvider.KAKAO,
+                ),
+            )
 
         mockMvc.patch("/api/v1/members/me") {
             contentType = MediaType.APPLICATION_JSON
@@ -92,6 +108,7 @@ class MemberControllerTest {
             jsonPath("$.resultType") { value("SUCCESS") }
             jsonPath("$.success.nickname") { value("도현") }
             jsonPath("$.success.profileImageUrl") { value("https://example.com/profile.jpg") }
+            jsonPath("$.success.provider") { value("KAKAO") }
         }
         verify(updateMemberProfileUseCase)(command)
     }

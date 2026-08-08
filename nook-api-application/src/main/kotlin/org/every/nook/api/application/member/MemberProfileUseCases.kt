@@ -4,17 +4,35 @@ import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
 import org.every.nook.api.domain.member.Member
+import org.every.nook.api.domain.member.SocialProvider
 import java.time.Clock
 import java.time.Instant
 
-data class MemberProfile(val id: Long, val nickname: String, val profileImageUrl: String?)
+enum class MemberProvider {
+    KAKAO,
+    GOOGLE,
+    APPLE,
+    ;
+
+    companion object {
+        fun from(provider: SocialProvider): MemberProvider = valueOf(provider.name)
+    }
+}
+
+data class MemberProfile(
+    val id: Long,
+    val nickname: String,
+    val profileImageUrl: String?,
+    val provider: MemberProvider,
+)
 
 data class UpdateMemberProfileCommand(val memberId: Long, val nickname: String, val profileImageUrl: String?)
 
 class GetMemberProfileUseCase(private val memberRepository: MemberRepository) {
     operator fun invoke(memberId: Long): MemberProfile {
         val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
-        return member.toProfile()
+        val provider = memberRepository.findSocialProvider(memberId) ?: throw MemberNotFoundException()
+        return member.toProfile(provider)
     }
 }
 
@@ -25,14 +43,15 @@ class UpdateMemberProfileUseCase(
     operator fun invoke(command: UpdateMemberProfileCommand): MemberProfile {
         val nickname = Member.normalizeNickname(command.nickname)
         return transactionRunner.required {
-            val current = memberRepository.findById(command.memberId) ?: throw MemberNotFoundException()
+            val current = memberRepository.findById(command.memberId) ?: memberNotFound()
+            val provider = memberRepository.findSocialProvider(command.memberId) ?: memberNotFound()
             val updated = memberRepository.update(
                 current.copy(
                     nickname = nickname,
                     profileImageUrl = command.profileImageUrl,
                 ),
-            ) ?: throw MemberNotFoundException()
-            updated.toProfile()
+            ) ?: memberNotFound()
+            updated.toProfile(provider)
         }
     }
 }
@@ -66,8 +85,11 @@ class WithdrawMemberUseCase(
     }
 }
 
-private fun Member.toProfile(): MemberProfile = MemberProfile(
+private fun Member.toProfile(provider: SocialProvider): MemberProfile = MemberProfile(
     id = requireNotNull(id),
     nickname = nickname,
     profileImageUrl = profileImageUrl,
+    provider = MemberProvider.from(provider),
 )
+
+private fun memberNotFound(): Nothing = throw MemberNotFoundException()

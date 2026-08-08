@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import org.every.nook.api.application.member.GetMemberProfileUseCase
 import org.every.nook.api.application.member.MemberProfile
+import org.every.nook.api.application.member.MemberProvider
 import org.every.nook.api.application.member.UpdateMemberProfileCommand
 import org.every.nook.api.application.member.UpdateMemberProfileUseCase
 import org.every.nook.api.application.member.WithdrawMemberUseCase
@@ -91,12 +92,15 @@ data class MemberProfileResponse(
     val nickname: String,
     @field:Schema(description = "프로필 이미지 URL", nullable = true)
     val profileImageUrl: String?,
+    @field:Schema(description = "가입한 소셜 로그인 provider")
+    val provider: MemberProviderResponse,
 ) {
     companion object {
         fun from(profile: MemberProfile): MemberProfileResponse = MemberProfileResponse(
             id = profile.id,
             nickname = profile.nickname,
             profileImageUrl = profile.profileImageUrl,
+            provider = MemberProviderResponse.from(profile.provider),
         )
     }
 }
@@ -105,3 +109,14 @@ data class MemberActionResponse(
     @field:Schema(description = "처리 완료 여부")
     val completed: Boolean = true,
 )
+
+enum class MemberProviderResponse {
+    KAKAO,
+    GOOGLE,
+    APPLE,
+    ;
+
+    companion object {
+        fun from(provider: MemberProvider): MemberProviderResponse = valueOf(provider.name)
+    }
+}
