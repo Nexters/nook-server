@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.StoredPlaceSearchView
 import org.every.nook.api.application.place.port.SearchAllStoredPlacesPort
 import org.every.nook.api.application.place.port.SearchMyStoredPlacesPort
@@ -11,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class StoredPlaceSearchPersistenceAdapter(
     private val repository: StoredPlaceSearchJpaRepository,
-    private val objectMapper: ObjectMapper,
+    private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) : SearchAllStoredPlacesPort,
     SearchMyStoredPlacesPort {
     @Transactional(readOnly = true)
