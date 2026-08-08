@@ -22,3 +22,19 @@ scrape_configs:
           env: dev
           service: nook-api
 
+  - job_name: node
+    static_configs:
+      - targets:
+          - 192.168.0.102:9100
+        labels:
+          env: dev
+          service: nook-dev
+
+  - job_name: mysql
+    static_configs:
+      - targets:
+          - 192.168.0.102:9104
+        labels:
+          env: dev
+          service: nook-mysql
+

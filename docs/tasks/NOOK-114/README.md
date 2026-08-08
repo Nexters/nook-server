@@ -9,7 +9,10 @@ dev/live 애플리케이션과 인프라 상태를 관찰하기 위한 ops VM �
 - 로컬 SSH config에 `nook-dev`, `nook-ops` host alias를 구성합니다.
 - ops VM용 Docker Compose 기반 Prometheus, Grafana, Loki, Promtail 구성 파일을 준비합니다.
 - Prometheus dev API scrape target을 구성합니다.
+- dev VM용 Node Exporter와 MySQL Exporter 구성 파일을 준비합니다.
+- Prometheus dev VM/MySQL scrape target을 구성합니다.
 - Grafana datasource provisioning으로 Prometheus와 Loki를 자동 등록합니다.
+- Grafana dashboard provisioning으로 `Nook Dev Overview` 대시보드를 자동 등록합니다.
 - 기본 retention을 Prometheus 15일, Loki 7일로 설정합니다.
 
 ## 제외 범위
@@ -17,9 +20,8 @@ dev/live 애플리케이션과 인프라 상태를 관찰하기 위한 ops VM �
 - 공인 IP 부여
 - 도메인, TLS, reverse proxy 구성
 - Alertmanager 및 alert rule 구성
-- Grafana dashboard 상세 튜닝
 - live target 연결
-- MySQL exporter, node exporter 구성
+- Alertmanager 및 알림 규칙 구성
 
 ## 접속 구조
 
@@ -87,3 +89,23 @@ http://localhost:9090
 ```
 
 Prometheus target은 `Status > Target health`에서 `nook-api` job의 `dev` target을 확인합니다.
+
+## dev exporter 배포
+
+dev VM에는 Node Exporter와 MySQL Exporter를 별도 compose로 실행합니다.
+
+```shell
+ssh nook-dev 'sudo mkdir -p /opt/nook/exporters && sudo chown -R ubuntu:ubuntu /opt/nook/exporters'
+rsync -av ops/dev-exporters/ nook-dev:/opt/nook/exporters/
+ssh nook-dev 'cd /opt/nook/exporters && ./scripts/deploy.sh'
+```
+
+MySQL Exporter는 `mysql-exporter.my.cnf`에 exporter 계정 접속 정보를 둡니다. 이 파일은 Git에 포함하지 않습니다.
+
+Prometheus는 다음 dev target을 scrape합니다.
+
+```text
+192.168.0.102:8080  nook-api
+192.168.0.102:9100  node exporter
+192.168.0.102:9104  mysql exporter
+```
