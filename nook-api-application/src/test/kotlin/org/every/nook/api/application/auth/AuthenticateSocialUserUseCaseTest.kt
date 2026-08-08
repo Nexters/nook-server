@@ -75,6 +75,9 @@ private class AuthFakeMemberRepository : MemberRepository {
 
     override fun findById(memberId: Long): Member? = members.firstOrNull { it.id == memberId }
 
+    override fun findSocialProvider(memberId: Long): SocialProvider? =
+        accounts.firstOrNull { it.memberId == memberId }?.provider
+
     override fun existsByNickname(nickname: String): Boolean = members.any { it.nickname == nickname }
 
     override fun existsSocialAccount(provider: SocialProvider, subject: String): Boolean =
