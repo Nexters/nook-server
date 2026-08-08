@@ -7,6 +7,8 @@ import org.every.nook.api.domain.member.SocialProvider
 interface MemberRepository {
     fun findMemberId(provider: SocialProvider, subject: String): Long?
 
+    fun findMemberProfile(memberId: Long): MemberProfile?
+
     fun existsByNickname(nickname: String): Boolean
 
     fun existsSocialAccount(provider: SocialProvider, subject: String): Boolean
@@ -17,3 +19,5 @@ interface MemberRepository {
 
     fun existsMember(memberId: Long): Boolean
 }
+
+data class MemberProfile(val member: Member, val provider: SocialProvider)

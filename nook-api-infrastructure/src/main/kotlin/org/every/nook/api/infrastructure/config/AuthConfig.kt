@@ -6,6 +6,7 @@ import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.SocialIdentityProvider
 import org.every.nook.api.application.auth.port.TokenProvider
+import org.every.nook.api.application.member.GetMyMemberUseCase
 import org.every.nook.api.application.member.SignupMemberUseCase
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
@@ -147,6 +148,9 @@ class AuthConfig {
         issueLoginTokens: IssueLoginTokens,
         transactionRunner: TransactionRunner,
     ) = SignupMemberUseCase(tokenProvider, memberRepository, issueLoginTokens, transactionRunner)
+
+    @Bean
+    fun getMyMemberUseCase(memberRepository: MemberRepository) = GetMyMemberUseCase(memberRepository)
 
     @Bean
     fun refreshLoginTokenUseCase(

@@ -19,6 +19,11 @@ enum class MemberErrorCode(
         defaultReason = "이미 가입된 소셜 계정입니다.",
         type = ErrorType.CONFLICT,
     ),
+    MEMBER_NOT_FOUND(
+        code = "MEMBER_NOT_FOUND",
+        defaultReason = "회원을 찾을 수 없습니다.",
+        type = ErrorType.NOT_FOUND,
+    ),
 }
 
 class DuplicateNicknameException(cause: Throwable? = null) :
@@ -26,3 +31,5 @@ class DuplicateNicknameException(cause: Throwable? = null) :
 
 class DuplicateSocialAccountException(cause: Throwable? = null) :
     NookException(MemberErrorCode.DUPLICATE_SOCIAL_ACCOUNT, cause = cause)
+
+class MemberNotFoundException : NookException(MemberErrorCode.MEMBER_NOT_FOUND)

@@ -16,3 +16,7 @@ Content-Type: application/json
   "nickname": "누커",
   "profileImageUrl": "https://example.com/profile.png"
 }
+
+### 내 정보 조회
+GET {{baseUrl}}/api/v1/members/me
+Authorization: Bearer replace-with-access-token

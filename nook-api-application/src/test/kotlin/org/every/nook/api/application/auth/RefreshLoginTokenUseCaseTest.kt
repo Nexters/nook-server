@@ -3,6 +3,7 @@ package org.every.nook.api.application.auth
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.StoredRefreshToken
 import org.every.nook.api.application.auth.port.TokenProvider
+import org.every.nook.api.application.member.port.MemberProfile
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
 import org.every.nook.api.domain.member.Member
@@ -105,6 +106,8 @@ private class InMemoryRefreshTokenRepository(private val existing: StoredRefresh
 
 private class ExistingMemberRepository : MemberRepository {
     override fun findMemberId(provider: SocialProvider, subject: String): Long? = 1
+
+    override fun findMemberProfile(memberId: Long): MemberProfile? = null
 
     override fun existsByNickname(nickname: String): Boolean = false
 

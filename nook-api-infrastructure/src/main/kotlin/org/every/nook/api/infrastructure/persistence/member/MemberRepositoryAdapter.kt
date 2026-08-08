@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.member
 
 import org.every.nook.api.application.member.DuplicateNicknameException
 import org.every.nook.api.application.member.DuplicateSocialAccountException
+import org.every.nook.api.application.member.port.MemberProfile
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.domain.member.Member
 import org.every.nook.api.domain.member.SocialAccount
@@ -16,6 +17,15 @@ class MemberRepositoryAdapter(
 ) : MemberRepository {
     override fun findMemberId(provider: SocialProvider, subject: String): Long? =
         socialAccountJpaRepository.findByProviderAndProviderSubject(provider, subject)?.member?.id
+
+    override fun findMemberProfile(memberId: Long): MemberProfile? {
+        val member = memberJpaRepository.findById(memberId).orElse(null) ?: return null
+        val account = socialAccountJpaRepository.findFirstByMemberId(memberId) ?: return null
+        return MemberProfile(
+            member = member.toDomain(),
+            provider = account.provider,
+        )
+    }
 
     override fun existsByNickname(nickname: String): Boolean = memberJpaRepository.existsByNickname(nickname)
 
