@@ -20,8 +20,10 @@ import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepositor
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
@@ -35,6 +37,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 
 @Component
 class SavedPostQueryPersistenceAdapter(
@@ -50,6 +53,7 @@ class SavedPostQueryPersistenceAdapter(
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
     private val memberRepository: MemberJpaRepository,
+    private val clock: Clock = Clock.systemUTC(),
 ) : SavedPostQueryPort,
     GroupPostQueryPort {
     @Transactional(readOnly = true)
@@ -120,27 +124,32 @@ class SavedPostQueryPersistenceAdapter(
                 .mapValues { (_, media) -> media.first().toView() }
         }
         val firstPlaceThumbnailByPostId = findFirstPlaceThumbnailByPostId(sourcePostIds)
-        val contentStatusByPostId = if (sourcePostIds.isEmpty()) {
+        val contentJobByPostId = if (sourcePostIds.isEmpty()) {
             emptyMap()
         } else {
             contentParsingJobRepository.findAllByPostIdIn(sourcePostIds).associate {
-                it.postId to it.status
+                it.postId to it
             }
         }
-        val placeStatusByPostId = if (sourcePostIds.isEmpty()) {
+        val placeJobByPostId = if (sourcePostIds.isEmpty()) {
             emptyMap()
         } else {
             parsingJobRepository.findAllByPostIdIn(sourcePostIds).associate {
-                it.postId to it.status
+                it.postId to it
             }
         }
+        val now = clock.instant()
 
         return SavedPostPage(
             items = savedPosts.content.mapNotNull { savedPost ->
+                val contentJob = contentJobByPostId[savedPost.postId]
+                val placeJob = placeJobByPostId[savedPost.postId]
                 val processing = PostProcessingView.from(
-                    contentStatus = contentStatusByPostId[savedPost.postId]
-                        ?: PostContentParsingStatus.COMPLETED,
-                    placeStatus = placeStatusByPostId[savedPost.postId],
+                    contentStatus = contentJob?.status ?: PostContentParsingStatus.COMPLETED,
+                    placeStatus = placeJob?.status,
+                    contentStartedAt = contentJob?.processingStartedAt(),
+                    placeStartedAt = placeJob?.processingStartedAt(),
+                    now = now,
                 )
                 postsById[savedPost.postId]?.toSummary(
                     savedPost = savedPost,
@@ -183,6 +192,9 @@ class SavedPostQueryPersistenceAdapter(
         val processing = PostProcessingView.from(
             contentStatus = contentParsingJob?.status ?: PostContentParsingStatus.COMPLETED,
             placeStatus = parsingJob?.status,
+            contentStartedAt = contentParsingJob?.processingStartedAt(),
+            placeStartedAt = parsingJob?.processingStartedAt(),
+            now = clock.instant(),
         )
         val groups = findGroups(userId, listOf(postId)).getValue(postId)
 
@@ -204,6 +216,7 @@ class SavedPostQueryPersistenceAdapter(
             places = postPlaces.toSavedPostPlaces(placesById, bookmarkedPlaceIds),
             processingStatus = processing.status,
             processingStage = processing.stage,
+            processingPercent = processing.processingPercent,
         )
     }
 
@@ -243,6 +256,7 @@ class SavedPostQueryPersistenceAdapter(
         savedAt = savedPost.createdAt,
         processingStatus = processing.status,
         processingStage = processing.stage,
+        processingPercent = processing.processingPercent,
     )
 
     private fun findGroups(userId: Long, savedPostIds: List<Long>): Map<Long, List<SavedPostGroup>> {
@@ -309,3 +323,9 @@ class SavedPostQueryPersistenceAdapter(
         const val THUMBNAIL_SEQUENCE = 0
     }
 }
+
+private fun PostContentParsingJobEntity.processingStartedAt() =
+    if (status == PostContentParsingStatus.PROCESSING) updatedAt else null
+
+private fun PlaceParsingJobEntity.processingStartedAt() =
+    if (status == PlaceParsingStatus.PROCESSING) updatedAt else null

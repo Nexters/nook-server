@@ -74,6 +74,7 @@ class CreatePostUseCaseTest {
         assertEquals(PlaceParsingStatusView.PENDING, result.placeParsingStatus)
         assertEquals(PostProcessingStatusView.PENDING, result.processingStatus)
         assertEquals(PostProcessingStageView.CONTENT, result.processingStage)
+        assertEquals(5, result.processingPercent)
     }
 
     @Test
@@ -201,6 +202,7 @@ class CreatePostUseCaseTest {
         assertEquals(11, result.postId)
         assertEquals(PostProcessingStatusView.COMPLETED, result.processingStatus)
         assertEquals(null, result.processingStage)
+        assertEquals(100, result.processingPercent)
     }
 
     private fun useCase(

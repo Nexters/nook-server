@@ -15,6 +15,8 @@ data class PostResponse(
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
     val processingStage: PostProcessingStageView?,
+    @field:Schema(description = "게시물 처리 진행률. 0부터 100 사이의 정수입니다.")
+    val processingPercent: Int,
 ) {
     companion object {
         fun from(result: CreatePostUseCase.Result): PostResponse = PostResponse(
@@ -22,6 +24,7 @@ data class PostResponse(
             placeParsingStatus = result.placeParsingStatus,
             processingStatus = result.processingStatus,
             processingStage = result.processingStage,
+            processingPercent = result.processingPercent,
         )
     }
 }

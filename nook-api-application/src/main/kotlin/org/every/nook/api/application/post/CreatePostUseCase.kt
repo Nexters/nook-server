@@ -57,6 +57,7 @@ class CreatePostUseCase(
                 ?: PlaceParsingStatusView.PENDING,
             processingStatus = processing.status,
             processingStage = processing.stage,
+            processingPercent = processing.processingPercent,
         )
     }
 
@@ -78,5 +79,6 @@ class CreatePostUseCase(
         val placeParsingStatus: PlaceParsingStatusView,
         val processingStatus: PostProcessingStatusView = PostProcessingStatusView.PENDING,
         val processingStage: PostProcessingStageView? = PostProcessingStageView.CONTENT,
+        val processingPercent: Int = 5,
     )
 }

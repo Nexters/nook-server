@@ -58,6 +58,8 @@ data class SavedPostSummaryResponse(
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
     val processingStage: PostProcessingStageView?,
+    @field:Schema(description = "게시물 처리 진행률. 0부터 100 사이의 정수입니다.")
+    val processingPercent: Int,
 ) {
     companion object {
         fun from(result: SavedPostSummary): SavedPostSummaryResponse = SavedPostSummaryResponse(
@@ -69,6 +71,7 @@ data class SavedPostSummaryResponse(
             savedAt = result.savedAt.toSeoulOffsetDateTime(),
             processingStatus = result.processingStatus,
             processingStage = result.processingStage,
+            processingPercent = result.processingPercent,
         )
     }
 }
@@ -106,6 +109,8 @@ data class SavedPostDetailResponse(
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
     val processingStage: PostProcessingStageView?,
+    @field:Schema(description = "게시물 처리 진행률. 0부터 100 사이의 정수입니다.")
+    val processingPercent: Int,
 ) {
     companion object {
         fun from(result: SavedPostDetail): SavedPostDetailResponse = SavedPostDetailResponse(
@@ -125,6 +130,7 @@ data class SavedPostDetailResponse(
             places = result.places.map(SavedPostPlaceResponse::from),
             processingStatus = result.processingStatus,
             processingStage = result.processingStage,
+            processingPercent = result.processingPercent,
         )
     }
 }
