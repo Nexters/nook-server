@@ -42,6 +42,7 @@ class ConnectPostPlacePersistenceAdapter(
             externalPlaceId = candidate.externalPlaceId,
             name = candidate.name,
             address = candidate.address,
+            city = candidate.city,
             latitude = candidate.latitude,
             longitude = candidate.longitude,
             category = candidate.category,
