@@ -1,6 +1,7 @@
 package org.every.nook.api.application.post
 
 import org.every.nook.api.application.content.PostSourceResolver
+import org.every.nook.api.application.content.PrivatePostException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
@@ -85,6 +86,25 @@ class CreatePostUseCaseTest {
 
         assertFailsWith<UnsupportedPostUrlException> {
             useCase(CreatePostUseCase.Command(7, "https://example.com/p/ABC123/", groupIds = listOf(1)))
+        }
+    }
+
+    @Test
+    fun `rejects a private post before querying existing posts`() {
+        val useCase = useCase(
+            sourceResolver = PostSourceResolver { throw PrivatePostException() },
+            findExisting = FindExistingPostPort { error("existing post must not be queried") },
+            create = CreatePostPort { _, _, _, _ -> error("persistence must not be called") },
+        )
+
+        assertFailsWith<PrivatePostException> {
+            useCase(
+                CreatePostUseCase.Command(
+                    7,
+                    "https://www.instagram.com/p/Dbw1jDTBv7du60ZhDSqNH9kSJCYlKc6TzHaACA0/",
+                    groupIds = listOf(1),
+                ),
+            )
         }
     }
 
