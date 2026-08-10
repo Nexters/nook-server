@@ -6,6 +6,7 @@ import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.SocialIdentityProvider
 import org.every.nook.api.application.auth.port.TokenProvider
+import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
 import org.every.nook.api.infrastructure.auth.AppleAuthProperties
@@ -128,11 +129,13 @@ class AuthConfig {
     fun authenticateSocialUserUseCase(
         socialIdentityProvider: SocialIdentityProvider,
         memberRepository: MemberRepository,
+        groupPort: GroupPort,
         issueLoginTokens: IssueLoginTokens,
         transactionRunner: TransactionRunner,
     ) = AuthenticateSocialUserUseCase(
         socialIdentityProvider,
         memberRepository,
+        groupPort,
         issueLoginTokens,
         transactionRunner,
     )

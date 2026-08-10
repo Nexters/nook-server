@@ -1,9 +1,11 @@
 package org.every.nook.api.application.auth
 
 import org.every.nook.api.application.auth.port.SocialIdentityProvider
+import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.application.member.DuplicateSocialAccountException
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
+import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.member.Member
 import org.every.nook.api.domain.member.SocialAccount
 import java.util.UUID
@@ -11,6 +13,7 @@ import java.util.UUID
 class AuthenticateSocialUserUseCase(
     private val socialIdentityProvider: SocialIdentityProvider,
     private val memberRepository: MemberRepository,
+    private val groupPort: GroupPort,
     private val issueLoginTokens: IssueLoginTokens,
     private val transactionRunner: TransactionRunner,
 ) {
@@ -41,6 +44,7 @@ class AuthenticateSocialUserUseCase(
                 providerSubject = identity.subject,
             ),
         )
+        groupPort.create(memberId, DEFAULT_GROUP_NAME, DEFAULT_GROUP_COLOR)
         return memberId
     }
 
@@ -51,5 +55,7 @@ class AuthenticateSocialUserUseCase(
 
     private companion object {
         const val DEFAULT_NICKNAME_SUFFIX_LENGTH = 8
+        const val DEFAULT_GROUP_NAME = "내 아카이브"
+        val DEFAULT_GROUP_COLOR = GroupColor.BLUE
     }
 }
