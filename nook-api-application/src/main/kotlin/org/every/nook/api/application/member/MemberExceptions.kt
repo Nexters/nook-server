@@ -24,6 +24,11 @@ enum class MemberErrorCode(
         defaultReason = "회원을 찾을 수 없습니다.",
         type = ErrorType.NOT_FOUND,
     ),
+    PROFILE_IMAGE_UPLOAD_UNAVAILABLE(
+        code = "PROFILE_IMAGE_UPLOAD_UNAVAILABLE",
+        defaultReason = "프로필 이미지 업로드 URL을 발급할 수 없습니다.",
+        type = ErrorType.BAD_GATEWAY,
+    ),
 }
 
 class DuplicateNicknameException(cause: Throwable? = null) :
@@ -33,3 +38,6 @@ class DuplicateSocialAccountException(cause: Throwable? = null) :
     NookException(MemberErrorCode.DUPLICATE_SOCIAL_ACCOUNT, cause = cause)
 
 class MemberNotFoundException : NookException(MemberErrorCode.MEMBER_NOT_FOUND)
+
+class ProfileImageUploadUnavailableException(cause: Throwable? = null) :
+    NookException(MemberErrorCode.PROFILE_IMAGE_UPLOAD_UNAVAILABLE, cause = cause)

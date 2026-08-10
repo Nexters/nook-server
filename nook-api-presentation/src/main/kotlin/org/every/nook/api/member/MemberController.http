@@ -17,8 +17,31 @@ Authorization: Bearer replace-with-access-token
 Content-Type: application/json
 
 {
-  "nickname": "누커",
-  "profileImageUrl": "https://example.com/profile.png"
+  "nickname": "누커"
+}
+
+### 프로필 이미지 업로드 URL 발급
+POST {{baseUrl}}/api/v1/members/me/profile-image-upload
+Authorization: Bearer replace-with-access-token
+Content-Type: application/json
+
+{
+  "contentType": "image/jpeg"
+}
+
+### 프로필 이미지 업로드
+PUT replace-with-upload-url
+Content-Type: image/jpeg
+
+< ./profile.jpg
+
+### 프로필 이미지 수정
+PATCH {{baseUrl}}/api/v1/members/me
+Authorization: Bearer replace-with-access-token
+Content-Type: application/json
+
+{
+  "profileImageUrl": "https://cdn.example.com/profile-images/7/replace-with-object.jpg"
 }
 
 ### 회원 탈퇴

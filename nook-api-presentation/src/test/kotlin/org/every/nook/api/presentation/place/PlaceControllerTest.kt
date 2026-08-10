@@ -160,6 +160,7 @@ class PlaceControllerTest {
                 MapPlaceView(
                     id = 17,
                     name = "퍼머넌트해비탯",
+                    city = "서울",
                     latitude = BigDecimal("37.5"),
                     longitude = BigDecimal("127.0"),
                     color = "BLUE",
@@ -175,6 +176,7 @@ class PlaceControllerTest {
             status { isOk() }
             jsonPath("$.success[0].id") { value(17) }
             jsonPath("$.success[0].name") { value("퍼머넌트해비탯") }
+            jsonPath("$.success[0].city") { value("서울") }
             jsonPath("$.success[0].latitude") { value(37.5) }
             jsonPath("$.success[0].longitude") { value(127.0) }
             jsonPath("$.success[0].color") { value("BLUE") }
@@ -203,6 +205,7 @@ class PlaceControllerTest {
                         bookmarkedAt = bookmarkedAt,
                         id = 17,
                         name = "퍼머넌트해비탯",
+                        city = "용인",
                         address = "경기 용인시",
                         category = "카페",
                         latitude = BigDecimal("37.5"),
@@ -220,6 +223,7 @@ class PlaceControllerTest {
                 status { isOk() }
                 jsonPath("$.success.items[0].id") { value(17) }
                 jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
+                jsonPath("$.success.items[0].city") { value("용인") }
                 jsonPath("$.success.items[0].thumbnailUrl") { value("https://example.com/place.jpg") }
                 jsonPath("$.success.nextCursor") { isNotEmpty() }
                 jsonPath("$.success.hasNext") { value(true) }

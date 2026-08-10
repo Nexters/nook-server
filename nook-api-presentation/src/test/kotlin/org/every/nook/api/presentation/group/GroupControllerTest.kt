@@ -2,9 +2,12 @@ package org.every.nook.api.presentation.group
 
 import org.every.nook.api.application.group.CreateGroupUseCase
 import org.every.nook.api.application.group.DeleteGroupUseCase
+import org.every.nook.api.application.group.GroupPlacePage
+import org.every.nook.api.application.group.GroupPlaceSummary
 import org.every.nook.api.application.group.GroupPostPage
 import org.every.nook.api.application.group.GroupPostSummary
 import org.every.nook.api.application.group.GroupView
+import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
@@ -23,6 +26,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import java.math.BigDecimal
 import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -35,6 +39,7 @@ class GroupControllerTest {
     private lateinit var updateGroupUseCase: UpdateGroupUseCase
     private lateinit var deleteGroupUseCase: DeleteGroupUseCase
     private lateinit var listGroupPostsUseCase: ListGroupPostsUseCase
+    private lateinit var listGroupPlacesUseCase: ListGroupPlacesUseCase
 
     @BeforeTest
     fun setUp() {
@@ -45,6 +50,7 @@ class GroupControllerTest {
         updateGroupUseCase = mock(UpdateGroupUseCase::class.java)
         deleteGroupUseCase = mock(DeleteGroupUseCase::class.java)
         listGroupPostsUseCase = mock(ListGroupPostsUseCase::class.java)
+        listGroupPlacesUseCase = mock(ListGroupPlacesUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 GroupController(
@@ -53,6 +59,7 @@ class GroupControllerTest {
                     updateGroupUseCase,
                     deleteGroupUseCase,
                     listGroupPostsUseCase,
+                    listGroupPlacesUseCase,
                 ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
@@ -133,6 +140,51 @@ class GroupControllerTest {
             jsonPath("$.success.totalElements") { value(1) }
         }
         verify(listGroupPostsUseCase)(query)
+    }
+
+    @Test
+    fun `lists distinct places in an owned group`() {
+        val query = ListGroupPlacesUseCase.Query(
+            userId = TEST_USER_ID,
+            groupId = 17,
+            page = 0,
+            size = 20,
+        )
+        `when`(listGroupPlacesUseCase(query)).thenReturn(
+            GroupPlacePage(
+                ownerNickname = "Purr",
+                items = listOf(
+                    GroupPlaceSummary(
+                        id = 31,
+                        name = "퍼머넌트해비탯",
+                        city = "서울",
+                        address = "서울 마포구 연희로1길 55",
+                        category = "카페",
+                        latitude = BigDecimal("37.5"),
+                        longitude = BigDecimal("127.0"),
+                        thumbnailUrl = "https://example.com/place.jpg",
+                        tags = listOf("작업하기 좋은"),
+                    ),
+                ),
+                page = 0,
+                size = 20,
+                totalElements = 1,
+                totalPages = 1,
+                hasNext = false,
+            ),
+        )
+
+        mockMvc.get("/api/v1/groups/17/places?page=0&size=20").andExpect {
+            status { isOk() }
+            jsonPath("$.success.ownerNickname") { value("Purr") }
+            jsonPath("$.success.items[0].id") { value(31) }
+            jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
+            jsonPath("$.success.items[0].city") { value("서울") }
+            jsonPath("$.success.items[0].thumbnailUrl") { value("https://example.com/place.jpg") }
+            jsonPath("$.success.items[0].tags[0]") { value("작업하기 좋은") }
+            jsonPath("$.success.totalElements") { value(1) }
+        }
+        verify(listGroupPlacesUseCase)(query)
     }
 
     @Test

@@ -15,11 +15,15 @@ data class MediaStorageProperties(
     val maxImageBytes: Long = DEFAULT_MAX_IMAGE_BYTES,
     val maxVideoBytes: Long = DEFAULT_MAX_VIDEO_BYTES,
     val maxRedirects: Int = DEFAULT_MAX_REDIRECTS,
+    val profileImageUploadExpires: Duration = Duration.ofMinutes(DEFAULT_PROFILE_IMAGE_UPLOAD_EXPIRES_MINUTES),
 ) {
     init {
         require(maxImageBytes > 0) { "Media storage max image bytes must be positive" }
         require(maxVideoBytes > 0) { "Media storage max video bytes must be positive" }
         require(maxRedirects >= 0) { "Media storage max redirects must not be negative" }
+        require(!profileImageUploadExpires.isNegative && !profileImageUploadExpires.isZero) {
+            "Profile image upload expiration must be positive"
+        }
         if (enabled) {
             require(bucket.isNotBlank()) { "Media storage bucket must not be blank when enabled" }
             require(region.isNotBlank()) { "Media storage region must not be blank when enabled" }
@@ -42,5 +46,6 @@ data class MediaStorageProperties(
         const val DEFAULT_MAX_IMAGE_BYTES = 20L * 1024 * 1024
         const val DEFAULT_MAX_VIDEO_BYTES = 100L * 1024 * 1024
         const val DEFAULT_MAX_REDIRECTS = 3
+        const val DEFAULT_PROFILE_IMAGE_UPLOAD_EXPIRES_MINUTES = 10L
     }
 }

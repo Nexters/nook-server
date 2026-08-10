@@ -17,6 +17,7 @@ class GetMapPlacesUseCaseTest {
             MapPlaceView(
                 id = 17,
                 name = "퍼머넌트해비탯",
+                city = "서울",
                 latitude = BigDecimal("37.5"),
                 longitude = BigDecimal("127.0"),
                 color = "BLUE",
@@ -94,6 +95,7 @@ class GetMapPlacesUseCaseTest {
         bookmarkedAt = bookmarkedAt,
         id = bookmarkId,
         name = "장소",
+        city = "서울",
         address = "서울",
         category = null,
         latitude = BigDecimal("37.5"),

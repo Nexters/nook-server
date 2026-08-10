@@ -31,4 +31,10 @@ replay_pid*
 **/build/
 *.iml
 .env
+mysql-exporter.my.cnf
+*.pem
+*.key
+id_rsa
+id_ed25519
+nook-ops-tunnel
 .DS_Store

@@ -28,6 +28,7 @@ class PlaceMapQueryPersistenceAdapter(
             MapPlaceView(
                 id = row.id,
                 name = row.name,
+                city = row.city,
                 latitude = row.latitude,
                 longitude = row.longitude,
                 color = row.color,
@@ -49,6 +50,7 @@ class PlaceMapQueryPersistenceAdapter(
                 bookmarkedAt = row.bookmarkedAt,
                 id = row.placeId,
                 name = row.name,
+                city = row.city,
                 address = row.address,
                 category = row.category,
                 latitude = row.latitude,

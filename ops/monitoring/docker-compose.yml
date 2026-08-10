@@ -20,7 +20,7 @@ services:
     command:
       - -config.file=/etc/loki/loki.yml
     ports:
-      - "127.0.0.1:3100:3100"
+      - "${LOKI_HTTP_BIND:-192.168.0.21}:3100:3100"
     volumes:
       - ./loki/loki.yml:/etc/loki/loki.yml:ro
       - loki-data:/loki
@@ -36,6 +36,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      SLACK_ALERT_WEBHOOK_URL: ${SLACK_ALERT_WEBHOOK_URL:-}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

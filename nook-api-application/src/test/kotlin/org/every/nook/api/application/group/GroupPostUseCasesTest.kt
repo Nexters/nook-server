@@ -1,6 +1,7 @@
 package org.every.nook.api.application.group
 
 import org.every.nook.api.application.group.error.GroupNotFoundException
+import org.every.nook.api.application.group.port.GroupPlaceQueryPort
 import org.every.nook.api.application.group.port.GroupPostManagementPort
 import org.every.nook.api.application.group.port.GroupPostQueryPort
 import org.every.nook.api.application.post.error.PostNotFoundException
@@ -29,6 +30,30 @@ class GroupPostUseCasesTest {
         assertFailsWith<GroupNotFoundException> {
             ListGroupPostsUseCase(FakeGroupPostQueryPort(groupPage = null))(
                 ListGroupPostsUseCase.Query(userId = 7, groupId = 17, page = 0, size = 20),
+            )
+        }
+    }
+
+    @Test
+    fun `lists places only from a group owned by the user`() {
+        val port = FakeGroupPlaceQueryPort(
+            groupPage = GroupPlacePage("Purr", emptyList(), page = 1, size = 10, 0, 0, false),
+        )
+
+        val result = ListGroupPlacesUseCase(port)(
+            ListGroupPlacesUseCase.Query(userId = 7, groupId = 17, page = 1, size = 10),
+        )
+
+        assertEquals(listOf(7L, 17L, 1L, 10L), port.captured)
+        assertEquals("Purr", result.ownerNickname)
+        assertEquals(1, result.page)
+    }
+
+    @Test
+    fun `inaccessible group place list is exposed as not found`() {
+        assertFailsWith<GroupNotFoundException> {
+            ListGroupPlacesUseCase(FakeGroupPlaceQueryPort(groupPage = null))(
+                ListGroupPlacesUseCase.Query(userId = 7, groupId = 17, page = 0, size = 20),
             )
         }
     }
@@ -80,6 +105,15 @@ class GroupPostUseCasesTest {
         var captured: List<Long>? = null
 
         override fun findAll(userId: Long, groupId: Long, page: Int, size: Int): GroupPostPage? {
+            captured = listOf(userId, groupId, page.toLong(), size.toLong())
+            return groupPage
+        }
+    }
+
+    private class FakeGroupPlaceQueryPort(private val groupPage: GroupPlacePage?) : GroupPlaceQueryPort {
+        var captured: List<Long>? = null
+
+        override fun findPlaces(userId: Long, groupId: Long, page: Int, size: Int): GroupPlacePage? {
             captured = listOf(userId, groupId, page.toLong(), size.toLong())
             return groupPage
         }
