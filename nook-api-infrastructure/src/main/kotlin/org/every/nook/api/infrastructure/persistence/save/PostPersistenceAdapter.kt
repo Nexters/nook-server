@@ -264,6 +264,7 @@ class PostPersistenceAdapter(
         name = name,
         address = address,
         location = GeoPoint(latitude = latitude, longitude = longitude),
+        city = city,
         category = category,
         phoneNumber = phoneNumber,
         id = id,

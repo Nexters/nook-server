@@ -15,6 +15,8 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
@@ -143,6 +145,38 @@ class PlaceParsingPersistenceAdapterTest {
         verify(bookmarkRepository).insertIgnore(7, 17)
         verify(bookmarkRepository).insertIgnore(8, 17)
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
+    }
+
+    @Test
+    fun `stores an extracted city when a parsed place is new`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        val savedPlace = mock(PlaceEntity::class.java)
+        `when`(savedPlace.id).thenReturn(17)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+        `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(null)
+        `when`(placeRepository.save(any(PlaceEntity::class.java))).thenReturn(savedPlace)
+        `when`(userSavedPostRepository.findDistinctUserIdsByPostId(11)).thenReturn(emptyList())
+
+        adapter.complete(
+            postId = 11,
+            places = listOf(
+                PlaceCandidate(
+                    provider = "KAKAO",
+                    externalPlaceId = "123",
+                    name = "누크 카페",
+                    address = "경기도 성남시 분당구 판교역로 1",
+                    latitude = BigDecimal("37.1"),
+                    longitude = BigDecimal("127.1"),
+                    category = "카페",
+                    phoneNumber = null,
+                    providerUrl = null,
+                ),
+            ),
+        )
+
+        val captor = ArgumentCaptor.forClass(PlaceEntity::class.java)
+        verify(placeRepository).save(captor.capture())
+        assertEquals("성남", captor.value.city)
     }
 
     @Test
