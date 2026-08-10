@@ -16,10 +16,7 @@ class MemberRepositoryAdapter(
     private val socialAccountJpaRepository: SocialAccountJpaRepository,
 ) : MemberRepository {
     override fun findMemberId(provider: SocialProvider, subject: String): Long? =
-        socialAccountJpaRepository.findByProviderAndProviderSubject(provider, subject)
-            ?.member
-            ?.takeIf { it.status == MemberStatus.ACTIVE }
-            ?.id
+        socialAccountJpaRepository.findActiveMemberId(provider, subject, MemberStatus.ACTIVE)
 
     override fun findById(memberId: Long): Member? = memberJpaRepository.findById(memberId)
         .filter { it.status == MemberStatus.ACTIVE }
@@ -27,9 +24,7 @@ class MemberRepositoryAdapter(
         .orElse(null)
 
     override fun findSocialProvider(memberId: Long): SocialProvider? =
-        socialAccountJpaRepository.findFirstByMemberId(memberId)
-            ?.takeIf { it.member.status == MemberStatus.ACTIVE }
-            ?.provider
+        socialAccountJpaRepository.findActiveProviders(memberId, MemberStatus.ACTIVE).firstOrNull()
 
     override fun existsByNickname(nickname: String): Boolean = memberJpaRepository.existsByNickname(nickname)
 
