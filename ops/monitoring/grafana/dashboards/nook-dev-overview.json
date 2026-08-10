@@ -106,75 +106,6 @@
       "targets": [ { "expr": "mysql_global_status_slow_queries{job=\"mysql\", env=\"dev\"}", "legendFormat": "slow queries", "refId": "A" } ],
       "title": "MySQL Slow Queries",
       "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "datasource": null,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
-      "id": 10,
-      "panels": [],
-      "title": "Logs",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki" },
-      "fieldConfig": {
-        "defaults": { "unit": "logs/sec" },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "ERROR" }, "properties": [ { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } } ] },
-          { "matcher": { "id": "byName", "options": "WARN" }, "properties": [ { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } } ] },
-          { "matcher": { "id": "byName", "options": "INFO" }, "properties": [ { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } } ] }
-        ]
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
-      "id": 11,
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "editorMode": "code",
-          "expr": "sum by (level) (rate({env=\"dev\", job=\"nook-api\", level=~\"TRACE|DEBUG|INFO|WARN|ERROR\"}[$__rate_interval]))",
-          "legendFormat": "{{level}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "API Log Rate by Level",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
-      "id": 12,
-      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=\"ERROR\"}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Recent ERROR Logs",
-      "type": "logs"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 30 },
-      "id": 13,
-      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\"}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Recent API Logs",
-      "type": "logs"
     }
   ],
   "refresh": "30s",
@@ -189,3 +120,4 @@
   "version": 1,
   "weekStart": ""
 }
+

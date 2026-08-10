@@ -129,8 +129,10 @@ sum by (level) (rate({env="dev", job="nook-api", level=~"TRACE|DEBUG|INFO|WARN|E
 sum(count_over_time({env="dev", job="nook-api"} |~ "(?i)(ERROR|Unexpected API exception)" [5m]))
 ```
 
-`Nook Dev Overview` 대시보드는 dev API 로그 섹션을 포함합니다.
+`Nook Dev Logs` 대시보드는 dev API 로그를 독립적으로 조회합니다.
 
+- `Level` 변수: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR` 로그 레벨 필터
+- Grafana time picker: 조회 시간 범위 필터
 - `API Log Rate by Level`: 로그 레벨별 초당 로그 수
-- `Recent ERROR Logs`: 최근 ERROR 로그
-- `Recent API Logs`: 최근 dev API 전체 로그
+- `ERROR Logs`, `WARN Logs`: 조회 시간 범위의 레벨별 로그 수
+- `API Logs`: 선택한 레벨과 시간 범위의 dev API 로그
