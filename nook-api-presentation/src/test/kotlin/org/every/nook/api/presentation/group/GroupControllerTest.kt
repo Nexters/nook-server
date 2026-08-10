@@ -136,6 +136,7 @@ class GroupControllerTest {
             jsonPath("$.success.ownerNickname") { value("Purr") }
             jsonPath("$.success.items[0].postId") { value(11) }
             jsonPath("$.success.items[0].placeCount") { value(3) }
+            jsonPath("$.success.items[0].processingPercent") { value(100) }
             jsonPath("$.success.items[0].savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.totalElements") { value(1) }
         }

@@ -13,6 +13,7 @@ import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
@@ -113,9 +114,14 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun update(provider: String, externalPlaceId: String, supplement: PlaceSupplement) {
+    override fun update(
+        provider: String,
+        externalPlaceId: String,
+        status: PlaceThumbnailParsingStatus,
+        supplement: PlaceSupplement?,
+    ) {
         placeRepository.findByProviderAndExternalPlaceId(provider, externalPlaceId)
-            ?.updateSupplement(supplement)
+            ?.updateThumbnailParsing(status, supplement)
     }
 
     @Transactional(readOnly = true)

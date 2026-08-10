@@ -4,8 +4,11 @@ import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.SocialIdentityProvider
 import org.every.nook.api.application.auth.port.StoredRefreshToken
 import org.every.nook.api.application.auth.port.TokenProvider
+import org.every.nook.api.application.group.GroupView
+import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
+import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.member.Member
 import org.every.nook.api.domain.member.SocialAccount
 import org.every.nook.api.domain.member.SocialProvider
@@ -17,11 +20,13 @@ import kotlin.test.assertTrue
 class AuthenticateSocialUserUseCaseTest {
     private val socialIdentityProvider = FixedSocialIdentityProvider()
     private val memberRepository = AuthFakeMemberRepository()
+    private val groupPort = AuthFakeGroupPort()
     private val tokenProvider = AuthFakeTokenProvider()
     private val refreshTokenRepository = AuthFakeRefreshTokenRepository()
     private val useCase = AuthenticateSocialUserUseCase(
         socialIdentityProvider = socialIdentityProvider,
         memberRepository = memberRepository,
+        groupPort = groupPort,
         issueLoginTokens = IssueLoginTokens(tokenProvider, refreshTokenRepository),
         transactionRunner = AuthDirectTransactionRunner,
     )
@@ -35,6 +40,7 @@ class AuthenticateSocialUserUseCaseTest {
         assertTrue(memberRepository.members.single().nickname.startsWith("nook"))
         assertEquals(SocialProvider.KAKAO, memberRepository.accounts.single().provider)
         assertEquals("subject", memberRepository.accounts.single().providerSubject)
+        assertEquals(AuthFakeGroup(1, "내 아카이브", GroupColor.BLUE), groupPort.groups.single())
     }
 
     @Test
@@ -52,8 +58,11 @@ class AuthenticateSocialUserUseCaseTest {
         assertEquals("access-7", result.tokens.accessToken)
         assertEquals("refresh-7", result.tokens.refreshToken)
         assertEquals(1, memberRepository.members.size)
+        assertTrue(groupPort.groups.isEmpty())
     }
 }
+
+private data class AuthFakeGroup(val userId: Long, val name: String, val color: GroupColor)
 
 private object AuthDirectTransactionRunner : TransactionRunner {
     override fun <T> required(block: () -> T): T = block()
@@ -94,6 +103,22 @@ private class AuthFakeMemberRepository : MemberRepository {
     override fun deleteSocialAccounts(memberId: Long) = Unit
 
     override fun existsMember(memberId: Long): Boolean = members.any { it.id == memberId }
+}
+
+private class AuthFakeGroupPort : GroupPort {
+    val groups = mutableListOf<AuthFakeGroup>()
+
+    override fun findAll(userId: Long): List<GroupView> = error("Not used")
+
+    override fun create(userId: Long, name: String, color: GroupColor): GroupView {
+        groups += AuthFakeGroup(userId, name, color)
+        return GroupView(id = groups.size.toLong(), name = name, color = color.name, postCount = 0)
+    }
+
+    override fun update(userId: Long, groupId: Long, name: String, color: GroupColor): GroupPort.UpdateResult =
+        error("Not used")
+
+    override fun delete(userId: Long, groupId: Long): Boolean = error("Not used")
 }
 
 private class AuthFakeRefreshTokenRepository : RefreshTokenRepository {

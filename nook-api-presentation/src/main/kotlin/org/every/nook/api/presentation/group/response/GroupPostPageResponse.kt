@@ -57,6 +57,8 @@ data class GroupPostSummaryResponse(
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
     val processingStage: PostProcessingStageView?,
+    @field:Schema(description = "게시물 처리 진행률. 0부터 100 사이의 정수입니다.")
+    val processingPercent: Int,
 ) {
     companion object {
         fun from(result: GroupPostSummary): GroupPostSummaryResponse = GroupPostSummaryResponse(
@@ -69,6 +71,7 @@ data class GroupPostSummaryResponse(
             savedAt = result.post.savedAt.toSeoulOffsetDateTime(),
             processingStatus = result.post.processingStatus,
             processingStage = result.post.processingStage,
+            processingPercent = result.post.processingPercent,
         )
     }
 }

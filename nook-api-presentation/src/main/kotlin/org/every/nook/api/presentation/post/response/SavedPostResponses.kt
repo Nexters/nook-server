@@ -1,6 +1,7 @@
 package org.every.nook.api.presentation.post.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PostProcessingStageView
 import org.every.nook.api.application.post.model.PostProcessingStatusView
@@ -58,6 +59,8 @@ data class SavedPostSummaryResponse(
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
     val processingStage: PostProcessingStageView?,
+    @field:Schema(description = "게시물 처리 진행률. 0부터 100 사이의 정수입니다.")
+    val processingPercent: Int,
 ) {
     companion object {
         fun from(result: SavedPostSummary): SavedPostSummaryResponse = SavedPostSummaryResponse(
@@ -69,6 +72,7 @@ data class SavedPostSummaryResponse(
             savedAt = result.savedAt.toSeoulOffsetDateTime(),
             processingStatus = result.processingStatus,
             processingStage = result.processingStage,
+            processingPercent = result.processingPercent,
         )
     }
 }
@@ -106,6 +110,8 @@ data class SavedPostDetailResponse(
     val processingStatus: PostProcessingStatusView,
     @field:Schema(description = "현재 처리 단계. 모든 처리가 완료되면 null입니다.", nullable = true)
     val processingStage: PostProcessingStageView?,
+    @field:Schema(description = "게시물 처리 진행률. 0부터 100 사이의 정수입니다.")
+    val processingPercent: Int,
 ) {
     companion object {
         fun from(result: SavedPostDetail): SavedPostDetailResponse = SavedPostDetailResponse(
@@ -125,6 +131,7 @@ data class SavedPostDetailResponse(
             places = result.places.map(SavedPostPlaceResponse::from),
             processingStatus = result.processingStatus,
             processingStage = result.processingStage,
+            processingPercent = result.processingPercent,
         )
     }
 }
@@ -184,6 +191,8 @@ data class SavedPostPlaceResponse(
     val phoneNumber: String?,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
+    @field:Schema(description = "장소 썸네일 파싱 상태")
+    val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     @field:Schema(description = "장소 대표 태그 목록(최대 4개)")
     val tags: List<String>,
     @field:Schema(description = "사용자의 장소 북마크 여부")
@@ -203,6 +212,7 @@ data class SavedPostPlaceResponse(
             category = result.category,
             phoneNumber = result.phoneNumber,
             thumbnailUrl = result.thumbnailUrl,
+            thumbnailParsingStatus = result.thumbnailParsingStatus,
             tags = result.tags,
             bookmarked = result.bookmarked,
             sequence = result.sequence,
