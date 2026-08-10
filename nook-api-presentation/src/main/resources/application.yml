@@ -99,6 +99,7 @@ external:
     max-image-bytes: ${MEDIA_MAX_IMAGE_BYTES:20971520}
     max-video-bytes: ${MEDIA_MAX_VIDEO_BYTES:104857600}
     max-redirects: ${MEDIA_MAX_REDIRECTS:3}
+    profile-image-upload-expires: ${PROFILE_IMAGE_UPLOAD_EXPIRES:10m}
 
 auth:
   kakao:

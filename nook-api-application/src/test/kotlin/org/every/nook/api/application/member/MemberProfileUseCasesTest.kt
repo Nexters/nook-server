@@ -1,10 +1,13 @@
 package org.every.nook.api.application.member
 
 import org.every.nook.api.application.member.port.MemberRepository
+import org.every.nook.api.application.member.port.ProfileImageUpload
+import org.every.nook.api.application.member.port.ProfileImageUploadCommand
 import org.every.nook.api.application.port.TransactionRunner
 import org.every.nook.api.domain.member.Member
 import org.every.nook.api.domain.member.SocialAccount
 import org.every.nook.api.domain.member.SocialProvider
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -52,13 +55,52 @@ class MemberProfileUseCasesTest {
             UpdateMemberProfileCommand(
                 memberId = 7,
                 nickname = "도현",
-                profileImageUrl = "https://example.com/profile.jpg",
+                profileImageUrl = ProfileImageUrlUpdate.Replace("https://example.com/profile.jpg"),
             ),
         )
 
         assertEquals("도현", profile.nickname)
         assertEquals("https://example.com/profile.jpg", profile.profileImageUrl)
         assertEquals(MemberProvider.KAKAO, profile.provider)
+    }
+
+    @Test
+    fun `keeps current profile image when only nickname changes`() {
+        memberRepository.members += Member(id = 7, nickname = "누커", profileImageUrl = "https://example.com/old.jpg")
+        memberRepository.accounts += SocialAccount(1, 7, SocialProvider.KAKAO, "subject")
+
+        val profile = UpdateMemberProfileUseCase(memberRepository, ProfileDirectTransactionRunner)(
+            UpdateMemberProfileCommand(
+                memberId = 7,
+                nickname = "도현",
+            ),
+        )
+
+        assertEquals("도현", profile.nickname)
+        assertEquals("https://example.com/old.jpg", profile.profileImageUrl)
+    }
+
+    @Test
+    fun `creates profile image upload for existing member`() {
+        memberRepository.members += Member(id = 7, nickname = "누커", profileImageUrl = null)
+        val expected = ProfileImageUpload(
+            uploadUrl = "https://s3.example.com/upload",
+            profileImageUrl = "https://cdn.example.com/profile.jpg",
+            contentType = "image/jpeg",
+            expiresAt = Instant.parse("2026-08-10T00:00:00Z"),
+            maxBytes = 1024,
+        )
+        val useCase = CreateProfileImageUploadUseCase(
+            memberRepository = memberRepository,
+            profileImageUploadPort = { command: ProfileImageUploadCommand ->
+                assertEquals(ProfileImageUploadCommand(7, "image/jpeg"), command)
+                expected
+            },
+        )
+
+        val upload = useCase(CreateProfileImageUploadCommand(7, "image/jpeg"))
+
+        assertEquals(expected, upload)
     }
 }
 

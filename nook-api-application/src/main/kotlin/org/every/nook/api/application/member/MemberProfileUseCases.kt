@@ -2,6 +2,9 @@ package org.every.nook.api.application.member
 
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.member.port.MemberRepository
+import org.every.nook.api.application.member.port.ProfileImageUpload
+import org.every.nook.api.application.member.port.ProfileImageUploadCommand
+import org.every.nook.api.application.member.port.ProfileImageUploadPort
 import org.every.nook.api.application.port.TransactionRunner
 import org.every.nook.api.domain.member.Member
 import org.every.nook.api.domain.member.SocialProvider
@@ -26,7 +29,18 @@ data class MemberProfile(
     val provider: MemberProvider,
 )
 
-data class UpdateMemberProfileCommand(val memberId: Long, val nickname: String, val profileImageUrl: String?)
+data class UpdateMemberProfileCommand(
+    val memberId: Long,
+    val nickname: String?,
+    val profileImageUrl: ProfileImageUrlUpdate = ProfileImageUrlUpdate.Unchanged,
+)
+
+sealed interface ProfileImageUrlUpdate {
+    data object Unchanged : ProfileImageUrlUpdate
+    data class Replace(val value: String?) : ProfileImageUrlUpdate
+}
+
+data class CreateProfileImageUploadCommand(val memberId: Long, val contentType: String)
 
 class GetMemberProfileUseCase(private val memberRepository: MemberRepository) {
     operator fun invoke(memberId: Long): MemberProfile {
@@ -40,19 +54,31 @@ class UpdateMemberProfileUseCase(
     private val memberRepository: MemberRepository,
     private val transactionRunner: TransactionRunner,
 ) {
-    operator fun invoke(command: UpdateMemberProfileCommand): MemberProfile {
-        val nickname = Member.normalizeNickname(command.nickname)
-        return transactionRunner.required {
-            val current = memberRepository.findById(command.memberId) ?: memberNotFound()
-            val provider = memberRepository.findSocialProvider(command.memberId) ?: memberNotFound()
-            val updated = memberRepository.update(
-                current.copy(
-                    nickname = nickname,
-                    profileImageUrl = command.profileImageUrl,
-                ),
-            ) ?: memberNotFound()
-            updated.toProfile(provider)
-        }
+    operator fun invoke(command: UpdateMemberProfileCommand): MemberProfile = transactionRunner.required {
+        val current = memberRepository.findById(command.memberId) ?: memberNotFound()
+        val provider = memberRepository.findSocialProvider(command.memberId) ?: memberNotFound()
+        val updated = memberRepository.update(
+            current.copy(
+                nickname = command.nickname?.let(Member::normalizeNickname) ?: current.nickname,
+                profileImageUrl = command.profileImageUrl.updatedValue(current.profileImageUrl),
+            ),
+        ) ?: memberNotFound()
+        updated.toProfile(provider)
+    }
+}
+
+class CreateProfileImageUploadUseCase(
+    private val memberRepository: MemberRepository,
+    private val profileImageUploadPort: ProfileImageUploadPort,
+) {
+    operator fun invoke(command: CreateProfileImageUploadCommand): ProfileImageUpload {
+        if (!memberRepository.existsMember(command.memberId)) throw MemberNotFoundException()
+        return profileImageUploadPort.create(
+            ProfileImageUploadCommand(
+                memberId = command.memberId,
+                contentType = command.contentType,
+            ),
+        )
     }
 }
 
@@ -91,5 +117,10 @@ private fun Member.toProfile(provider: SocialProvider): MemberProfile = MemberPr
     profileImageUrl = profileImageUrl,
     provider = MemberProvider.from(provider),
 )
+
+private fun ProfileImageUrlUpdate.updatedValue(current: String?): String? = when (this) {
+    ProfileImageUrlUpdate.Unchanged -> current
+    is ProfileImageUrlUpdate.Replace -> value
+}
 
 private fun memberNotFound(): Nothing = throw MemberNotFoundException()

@@ -1,12 +1,16 @@
 package org.every.nook.api.member
 
+import org.every.nook.api.application.member.CreateProfileImageUploadCommand
+import org.every.nook.api.application.member.CreateProfileImageUploadUseCase
 import org.every.nook.api.application.member.DuplicateNicknameException
 import org.every.nook.api.application.member.GetMemberProfileUseCase
 import org.every.nook.api.application.member.MemberProfile
 import org.every.nook.api.application.member.MemberProvider
+import org.every.nook.api.application.member.ProfileImageUrlUpdate
 import org.every.nook.api.application.member.UpdateMemberProfileCommand
 import org.every.nook.api.application.member.UpdateMemberProfileUseCase
 import org.every.nook.api.application.member.WithdrawMemberUseCase
+import org.every.nook.api.application.member.port.ProfileImageUpload
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
@@ -19,7 +23,9 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
+import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -30,6 +36,7 @@ class MemberControllerTest {
     private lateinit var mockMvc: MockMvc
     private lateinit var getMemberProfileUseCase: GetMemberProfileUseCase
     private lateinit var updateMemberProfileUseCase: UpdateMemberProfileUseCase
+    private lateinit var createProfileImageUploadUseCase: CreateProfileImageUploadUseCase
     private lateinit var withdrawMemberUseCase: WithdrawMemberUseCase
 
     @BeforeTest
@@ -38,12 +45,14 @@ class MemberControllerTest {
             TestingAuthenticationToken(TEST_USER_ID.toString(), "credentials", "ROLE_USER")
         getMemberProfileUseCase = mock(GetMemberProfileUseCase::class.java)
         updateMemberProfileUseCase = mock(UpdateMemberProfileUseCase::class.java)
+        createProfileImageUploadUseCase = mock(CreateProfileImageUploadUseCase::class.java)
         withdrawMemberUseCase = mock(WithdrawMemberUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 MemberController(
                     getMemberProfileUseCase,
                     updateMemberProfileUseCase,
+                    createProfileImageUploadUseCase,
                     withdrawMemberUseCase,
                 ),
             )
@@ -83,7 +92,7 @@ class MemberControllerTest {
         val command = UpdateMemberProfileCommand(
             memberId = TEST_USER_ID,
             nickname = "도현",
-            profileImageUrl = "https://example.com/profile.jpg",
+            profileImageUrl = ProfileImageUrlUpdate.Replace("https://example.com/profile.jpg"),
         )
         `when`(updateMemberProfileUseCase(command))
             .thenReturn(
@@ -114,8 +123,65 @@ class MemberControllerTest {
     }
 
     @Test
+    fun `updates current member profile image only`() {
+        val command = UpdateMemberProfileCommand(
+            memberId = TEST_USER_ID,
+            nickname = null,
+            profileImageUrl = ProfileImageUrlUpdate.Replace("https://example.com/profile.jpg"),
+        )
+        `when`(updateMemberProfileUseCase(command))
+            .thenReturn(
+                MemberProfile(
+                    TEST_USER_ID,
+                    "누커",
+                    "https://example.com/profile.jpg",
+                    MemberProvider.KAKAO,
+                ),
+            )
+
+        mockMvc.patch("/api/v1/members/me") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"profileImageUrl":"https://example.com/profile.jpg"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.success.nickname") { value("누커") }
+            jsonPath("$.success.profileImageUrl") { value("https://example.com/profile.jpg") }
+        }
+        verify(updateMemberProfileUseCase)(command)
+    }
+
+    @Test
+    fun `creates profile image upload url`() {
+        val command = CreateProfileImageUploadCommand(TEST_USER_ID, "image/jpeg")
+        `when`(createProfileImageUploadUseCase(command))
+            .thenReturn(
+                ProfileImageUpload(
+                    uploadUrl = "https://s3.example.com/upload",
+                    profileImageUrl = "https://cdn.example.com/profile.jpg",
+                    contentType = "image/jpeg",
+                    expiresAt = Instant.parse("2026-08-10T00:00:00Z"),
+                    maxBytes = 20_971_520,
+                ),
+            )
+
+        mockMvc.post("/api/v1/members/me/profile-image-upload") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"contentType":"image/jpeg"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.success.uploadUrl") { value("https://s3.example.com/upload") }
+            jsonPath("$.success.profileImageUrl") { value("https://cdn.example.com/profile.jpg") }
+            jsonPath("$.success.method") { value("PUT") }
+            jsonPath("$.success.contentType") { value("image/jpeg") }
+            jsonPath("$.success.expiresAt") { value("2026-08-10T00:00:00Z") }
+            jsonPath("$.success.maxBytes") { value(20_971_520) }
+        }
+        verify(createProfileImageUploadUseCase)(command)
+    }
+
+    @Test
     fun `duplicate nickname uses common conflict response`() {
-        val command = UpdateMemberProfileCommand(TEST_USER_ID, "도현", null)
+        val command = UpdateMemberProfileCommand(TEST_USER_ID, "도현")
         `when`(updateMemberProfileUseCase(command)).thenThrow(DuplicateNicknameException())
 
         mockMvc.patch("/api/v1/members/me") {
