@@ -25,6 +25,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         )
         `when`(row.id).thenReturn(17)
         `when`(row.name).thenReturn("퍼머넌트해비탯")
+        `when`(row.city).thenReturn("서울")
         `when`(row.latitude).thenReturn(BigDecimal("37.5"))
         `when`(row.longitude).thenReturn(BigDecimal("127.0"))
         `when`(row.color).thenReturn("BLUE")
@@ -42,6 +43,7 @@ class PlaceMapQueryPersistenceAdapterTest {
 
         assertEquals(17, result.single().id)
         assertEquals("퍼머넌트해비탯", result.single().name)
+        assertEquals("서울", result.single().city)
         assertEquals(BigDecimal("37.5"), result.single().latitude)
         assertEquals("BLUE", result.single().color)
     }
@@ -84,6 +86,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         `when`(row.bookmarkedAt).thenReturn(bookmarkedAt.minusSeconds(1))
         `when`(row.placeId).thenReturn(17)
         `when`(row.name).thenReturn("퍼머넌트해비탯")
+        `when`(row.city).thenReturn("용인")
         `when`(row.address).thenReturn("경기 용인시")
         `when`(row.category).thenReturn("카페")
         `when`(row.latitude).thenReturn(BigDecimal("37.5"))
@@ -101,6 +104,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         val result = adapter.findRecent(7, cursor, 21)
 
         assertEquals(17, result.single().id)
+        assertEquals("용인", result.single().city)
         assertEquals("https://example.com/place.jpg", result.single().thumbnailUrl)
         verify(repository).findRecentPlaces(7, cursor.bookmarkedAt, cursor.bookmarkId, 21)
     }

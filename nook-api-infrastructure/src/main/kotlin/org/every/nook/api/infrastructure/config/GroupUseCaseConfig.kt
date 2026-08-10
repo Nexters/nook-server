@@ -2,10 +2,12 @@ package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.group.CreateGroupUseCase
 import org.every.nook.api.application.group.DeleteGroupUseCase
+import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
+import org.every.nook.api.application.group.port.GroupPlaceQueryPort
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.application.group.port.GroupPostManagementPort
 import org.every.nook.api.application.group.port.GroupPostQueryPort
@@ -29,6 +31,10 @@ class GroupUseCaseConfig {
     @Bean
     fun listGroupPostsUseCase(groupPostQueryPort: GroupPostQueryPort): ListGroupPostsUseCase =
         ListGroupPostsUseCase(groupPostQueryPort)
+
+    @Bean
+    fun listGroupPlacesUseCase(groupPlaceQueryPort: GroupPlaceQueryPort): ListGroupPlacesUseCase =
+        ListGroupPlacesUseCase(groupPlaceQueryPort)
 
     @Bean
     fun replaceSavedPostGroupsUseCase(
