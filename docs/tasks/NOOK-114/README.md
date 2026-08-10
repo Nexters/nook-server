@@ -13,15 +13,16 @@ dev/live 애플리케이션과 인프라 상태를 관찰하기 위한 ops VM �
 - Prometheus dev VM/MySQL scrape target을 구성합니다.
 - Grafana datasource provisioning으로 Prometheus와 Loki를 자동 등록합니다.
 - Grafana dashboard provisioning으로 `Nook Dev Overview` 대시보드를 자동 등록합니다.
+- dev API Docker 로그를 Loki로 수집하기 위한 dev VM Promtail을 구성합니다.
+- Grafana alerting provisioning으로 dev API ERROR 로그 Slack 알림을 구성합니다.
 - 기본 retention을 Prometheus 15일, Loki 7일로 설정합니다.
 
 ## 제외 범위
 
 - 공인 IP 부여
 - 도메인, TLS, reverse proxy 구성
-- Alertmanager 및 alert rule 구성
 - live target 연결
-- Alertmanager 및 알림 규칙 구성
+- live 알림 규칙 구성
 
 ## 접속 구조
 
@@ -72,6 +73,8 @@ ssh nook-ops 'cd /opt/nook/monitoring && ./scripts/deploy.sh'
 ```
 
 `.env`의 `GRAFANA_ADMIN_PASSWORD`는 배포 전에 운영용 값으로 바꿉니다.
+Slack 알림을 사용하려면 `.env`의 `SLACK_ALERT_WEBHOOK_URL`에 Slack Incoming Webhook URL을 설정합니다.
+dev VM Promtail이 Loki로 로그를 push할 수 있도록 Loki는 기본적으로 ops private IP인 `192.168.0.21:3100`에 바인드됩니다.
 
 ## 검증
 
@@ -93,14 +96,20 @@ Prometheus target은 `Status > Target health`에서 `nook-api` job의 `dev` targ
 ## dev exporter 배포
 
 dev VM에는 Node Exporter와 MySQL Exporter를 별도 compose로 실행합니다.
+같은 compose에서 Promtail도 실행해 `nook-dev-api` 컨테이너의 Docker 로그를 Loki로 전송합니다.
+dev VM에서 ops VM의 Loki 포트로 직접 접근할 수 없는 환경에서는 systemd SSH 터널을 먼저 설치합니다.
 
 ```shell
 ssh nook-dev 'sudo mkdir -p /opt/nook/exporters && sudo chown -R ubuntu:ubuntu /opt/nook/exporters'
 rsync -av ops/dev-exporters/ nook-dev:/opt/nook/exporters/
+ssh nook-dev 'sudo cp /opt/nook/exporters/systemd/nook-dev-loki-tunnel.service /etc/systemd/system/'
+ssh nook-dev 'sudo systemctl daemon-reload && sudo systemctl enable --now nook-dev-loki-tunnel'
 ssh nook-dev 'cd /opt/nook/exporters && ./scripts/deploy.sh'
 ```
 
 MySQL Exporter는 `mysql-exporter.my.cnf`에 exporter 계정 접속 정보를 둡니다. 이 파일은 Git에 포함하지 않습니다.
+Promtail의 Loki push URL은 `ops/dev-exporters/.env`의 `LOKI_PUSH_URL`로 조정할 수 있습니다. 기본값은
+dev VM의 SSH 터널을 통해 `http://127.0.0.1:3100/loki/api/v1/push`로 전송합니다.
 
 Prometheus는 다음 dev target을 scrape합니다.
 
@@ -108,4 +117,11 @@ Prometheus는 다음 dev target을 scrape합니다.
 192.168.0.102:8080  nook-api
 192.168.0.102:9100  node exporter
 192.168.0.102:9104  mysql exporter
+```
+
+Loki 로그 수집과 Slack 알림은 Grafana에서 다음 기준으로 확인합니다.
+
+```logql
+{env="dev", job="nook-api"}
+sum(count_over_time({env="dev", job="nook-api"} |~ "(?i)(ERROR|Unexpected API exception)" [5m]))
 ```
