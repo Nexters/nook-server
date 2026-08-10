@@ -91,7 +91,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (level) (rate({env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"}[$__rate_interval]))",
+          "expr": "sum by (level) (rate({env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"}[$__interval]))",
           "legendFormat": "{{level}}",
           "queryType": "range",
           "refId": "A"
