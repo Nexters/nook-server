@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
@@ -185,9 +186,9 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(place)
 
         val supplement = PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg"))
-        adapter.update("KAKAO", "123", supplement)
+        adapter.update("KAKAO", "123", PlaceThumbnailParsingStatus.COMPLETED, supplement)
 
-        verify(place).updateSupplement(supplement)
+        verify(place).updateThumbnailParsing(PlaceThumbnailParsingStatus.COMPLETED, supplement)
     }
 
     @Test

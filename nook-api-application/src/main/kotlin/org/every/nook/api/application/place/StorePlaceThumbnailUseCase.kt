@@ -3,6 +3,7 @@ package org.every.nook.api.application.place
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.measure
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import java.time.Clock
 
 class StorePlaceThumbnailUseCase(
@@ -12,11 +13,17 @@ class StorePlaceThumbnailUseCase(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     operator fun invoke(postId: Long, place: PlaceCandidate) {
-        val supplement = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
-            thumbnailProvider.fetch(place)
-        } ?: return
+        updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.PROCESSING)
+        val supplement = runCatching {
+            metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
+                thumbnailProvider.fetch(place)
+            }
+        }.getOrElse { exception ->
+            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.FAILED)
+            throw exception
+        }
         metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
-            updatePort.update(place.provider, place.externalPlaceId, supplement)
+            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.COMPLETED, supplement)
         }
     }
 

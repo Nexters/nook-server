@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.error.PostNotFoundException
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
@@ -36,6 +37,7 @@ class FindPostPlaceParsingUseCaseTest {
                         place = place,
                         bookmarked = true,
                         thumbnailUrl = "https://example.com/place-thumbnail.jpg",
+                        thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
                     ),
                 ),
             )
@@ -47,6 +49,7 @@ class FindPostPlaceParsingUseCaseTest {
         assertEquals(PlaceParsingStatusView.COMPLETED, result.placeParsingStatus)
         assertEquals("Nook Cafe", result.places.single().name)
         assertEquals("https://example.com/place-thumbnail.jpg", result.places.single().thumbnailUrl)
+        assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.places.single().thumbnailParsingStatus)
         assertEquals(true, result.places.single().bookmarked)
     }
 

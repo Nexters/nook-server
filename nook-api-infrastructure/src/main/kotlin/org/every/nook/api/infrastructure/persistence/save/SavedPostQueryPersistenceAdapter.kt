@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.group.GroupPostPage
 import org.every.nook.api.application.group.GroupPostSummary
 import org.every.nook.api.application.group.port.GroupPostQueryPort
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PostProcessingView
 import org.every.nook.api.application.post.model.SavedPostDetail
@@ -225,6 +226,7 @@ class SavedPostQueryPersistenceAdapter(
                 thumbnailUrl = place.thumbnailUrl,
                 tags = place.representativeTags.map { it.displayName },
                 bookmarked = postPlace.placeId in bookmarkedPlaceIds,
+                thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.thumbnailParsingStatus),
                 sequence = postPlace.sequence,
             )
         }

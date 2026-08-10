@@ -5,6 +5,7 @@ import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.DeleteSavedPostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
@@ -235,6 +236,7 @@ class PostControllerTest {
                         category = null,
                         phoneNumber = null,
                         thumbnailUrl = "https://example.com/place-thumbnail.jpg",
+                        thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
                         bookmarked = true,
                     ),
                 ),
@@ -322,6 +324,7 @@ class PostControllerTest {
                         category = null,
                         phoneNumber = null,
                         thumbnailUrl = "https://example.com/place-thumbnail.jpg",
+                        thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
                         bookmarked = true,
                         sequence = 0,
                     ),
@@ -420,6 +423,7 @@ class PostControllerTest {
             jsonPath("$.success.places[0].id") { value(17) }
             jsonPath("$.success.places[0].name") { value("Nook Cafe") }
             jsonPath("$.success.places[0].thumbnailUrl") { value("https://example.com/place-thumbnail.jpg") }
+            jsonPath("$.success.places[0].thumbnailParsingStatus") { value("COMPLETED") }
             jsonPath("$.success.places[0].bookmarked") { value(true) }
         }
     }
@@ -452,6 +456,7 @@ class PostControllerTest {
             jsonPath("$.success.groups[1].id") { value(18) }
             jsonPath("$.success.places[0].id") { value(17) }
             jsonPath("$.success.places[0].thumbnailUrl") { value("https://example.com/place-thumbnail.jpg") }
+            jsonPath("$.success.places[0].thumbnailParsingStatus") { value("COMPLETED") }
             jsonPath("$.success.publishedAt") { value("2026-07-20T09:00:00+09:00") }
             jsonPath("$.success.savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.processingStatus") { value("COMPLETED") }

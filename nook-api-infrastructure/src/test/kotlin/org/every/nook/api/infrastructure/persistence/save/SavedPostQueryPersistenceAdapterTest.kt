@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
@@ -226,6 +227,7 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(place.address).thenReturn("서울")
         `when`(place.latitude).thenReturn(BigDecimal("37.1"))
         `when`(place.longitude).thenReturn(BigDecimal("127.1"))
+        `when`(place.thumbnailParsingStatus).thenReturn(PlaceThumbnailParsingStatus.COMPLETED)
         return place
     }
 }

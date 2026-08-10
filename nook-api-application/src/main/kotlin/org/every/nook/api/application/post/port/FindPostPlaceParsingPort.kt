@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post.port
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
 
@@ -17,6 +18,7 @@ data class PostPlaceParsingSnapshot(
         val place: Place,
         val bookmarked: Boolean,
         val thumbnailUrl: String?,
+        val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
         val tags: List<String> = emptyList(),
     )
 }
