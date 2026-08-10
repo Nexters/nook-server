@@ -110,6 +110,7 @@ ssh nook-dev 'cd /opt/nook/exporters && ./scripts/deploy.sh'
 MySQL Exporter는 `mysql-exporter.my.cnf`에 exporter 계정 접속 정보를 둡니다. 이 파일은 Git에 포함하지 않습니다.
 Promtail의 Loki push URL은 `ops/dev-exporters/.env`의 `LOKI_PUSH_URL`로 조정할 수 있습니다. 기본값은
 dev VM의 SSH 터널을 통해 `http://127.0.0.1:3100/loki/api/v1/push`로 전송합니다.
+애플리케이션 로그 라인에서 `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`를 추출해 Loki `level` 라벨로 저장합니다.
 
 Prometheus는 다음 dev target을 scrape합니다.
 
@@ -123,5 +124,13 @@ Loki 로그 수집과 Slack 알림은 Grafana에서 다음 기준으로 확인�
 
 ```logql
 {env="dev", job="nook-api"}
+{env="dev", job="nook-api", level="ERROR"}
+sum by (level) (rate({env="dev", job="nook-api", level=~"TRACE|DEBUG|INFO|WARN|ERROR"}[5m]))
 sum(count_over_time({env="dev", job="nook-api"} |~ "(?i)(ERROR|Unexpected API exception)" [5m]))
 ```
+
+`Nook Dev Overview` 대시보드는 dev API 로그 섹션을 포함합니다.
+
+- `API Log Rate by Level`: 로그 레벨별 초당 로그 수
+- `Recent ERROR Logs`: 최근 ERROR 로그
+- `Recent API Logs`: 최근 dev API 전체 로그
