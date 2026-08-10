@@ -2,6 +2,7 @@ package org.every.nook.api.application.post.model
 
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -31,6 +32,53 @@ class PostProcessingViewTest {
         assertEquals(
             PostProcessingView(PostProcessingStatusView.COMPLETED, null),
             PostProcessingView.from(PostContentParsingStatus.COMPLETED, PlaceParsingStatus.COMPLETED),
+        )
+    }
+
+    @Test
+    fun `processing percent grows within the current stage estimate`() {
+        val startedAt = Instant.parse("2026-08-10T00:00:00Z")
+
+        assertEquals(
+            35,
+            PostProcessingView.from(
+                contentStatus = PostContentParsingStatus.PROCESSING,
+                placeStatus = null,
+                contentStartedAt = startedAt,
+                now = startedAt.plusSeconds(30),
+            ).processingPercent,
+        )
+        assertEquals(
+            83,
+            PostProcessingView.from(
+                contentStatus = PostContentParsingStatus.COMPLETED,
+                placeStatus = PlaceParsingStatus.PROCESSING,
+                placeStartedAt = startedAt,
+                now = startedAt.plusSeconds(60),
+            ).processingPercent,
+        )
+    }
+
+    @Test
+    fun `processing percent is capped until terminal completion returns 100`() {
+        val startedAt = Instant.parse("2026-08-10T00:00:00Z")
+
+        assertEquals(
+            45,
+            PostProcessingView.from(
+                contentStatus = PostContentParsingStatus.PROCESSING,
+                placeStatus = null,
+                contentStartedAt = startedAt,
+                now = startedAt.plusSeconds(300),
+            ).processingPercent,
+        )
+        assertEquals(
+            100,
+            PostProcessingView.from(
+                contentStatus = PostContentParsingStatus.COMPLETED,
+                placeStatus = PlaceParsingStatus.COMPLETED,
+                now = startedAt,
+            ).processingPercent,
         )
     }
 }

@@ -206,6 +206,7 @@ class PostControllerTest {
                 placeParsingStatus = PlaceParsingStatusView.PENDING,
                 processingStatus = PostProcessingStatusView.PENDING,
                 processingStage = PostProcessingStageView.CONTENT,
+                processingPercent = 5,
             ),
         )
     }
@@ -267,6 +268,7 @@ class PostControllerTest {
                         savedAt = Instant.parse("2026-07-27T00:00:00Z"),
                         processingStatus = PostProcessingStatusView.PROCESSING,
                         processingStage = PostProcessingStageView.CONTENT,
+                        processingPercent = 35,
                     ),
                 ),
                 page = 0,
@@ -349,6 +351,7 @@ class PostControllerTest {
             jsonPath("$.success.placeParsingStatus") { value("PENDING") }
             jsonPath("$.success.processingStatus") { value("PENDING") }
             jsonPath("$.success.processingStage") { value("CONTENT") }
+            jsonPath("$.success.processingPercent") { value(5) }
         }
     }
 
@@ -432,6 +435,7 @@ class PostControllerTest {
             jsonPath("$.success.items[0].representativeMedia.sequence") { value(0) }
             jsonPath("$.success.items[0].processingStatus") { value("PROCESSING") }
             jsonPath("$.success.items[0].processingStage") { value("CONTENT") }
+            jsonPath("$.success.items[0].processingPercent") { value(35) }
             jsonPath("$.success.items[0].savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.totalElements") { value(1) }
             jsonPath("$.success.hasNext") { value(false) }
@@ -456,6 +460,7 @@ class PostControllerTest {
             jsonPath("$.success.savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.processingStatus") { value("COMPLETED") }
             jsonPath("$.success.processingStage") { doesNotExist() }
+            jsonPath("$.success.processingPercent") { value(100) }
         }
     }
 

@@ -21,6 +21,7 @@ data class SavedPostSummary(
     val savedAt: Instant,
     val processingStatus: PostProcessingStatusView = PostProcessingStatusView.COMPLETED,
     val processingStage: PostProcessingStageView? = null,
+    val processingPercent: Int = 100,
 )
 
 data class SavedPostDetail(
@@ -40,6 +41,7 @@ data class SavedPostDetail(
     val places: List<SavedPostPlace>,
     val processingStatus: PostProcessingStatusView = PostProcessingStatusView.COMPLETED,
     val processingStage: PostProcessingStageView? = null,
+    val processingPercent: Int = 100,
 )
 
 data class SavedPostGroup(val id: Long, val name: String, val color: String)
