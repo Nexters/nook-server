@@ -44,6 +44,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
             SELECT
                 p.id AS id,
                 p.name AS name,
+                p.city AS city,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 p.thumbnail_url AS thumbnailUrl,
@@ -113,6 +114,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 upb.created_at AS bookmarkedAt,
                 p.id AS placeId,
                 p.name AS name,
+                p.city AS city,
                 p.address AS address,
                 p.category AS category,
                 p.latitude AS latitude,
@@ -165,6 +167,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
 interface MapPlaceProjection {
     val id: Long
     val name: String
+    val city: String?
     val latitude: BigDecimal
     val longitude: BigDecimal
     val color: String
@@ -177,6 +180,7 @@ interface RecentPlaceProjection {
     val bookmarkedAt: Instant
     val placeId: Long
     val name: String
+    val city: String?
     val address: String
     val category: String?
     val latitude: BigDecimal
