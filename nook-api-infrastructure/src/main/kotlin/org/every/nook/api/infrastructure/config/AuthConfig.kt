@@ -6,10 +6,6 @@ import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.SocialIdentityProvider
 import org.every.nook.api.application.auth.port.TokenProvider
-import org.every.nook.api.application.member.GetMemberProfileUseCase
-import org.every.nook.api.application.member.LogoutMemberUseCase
-import org.every.nook.api.application.member.UpdateMemberProfileUseCase
-import org.every.nook.api.application.member.WithdrawMemberUseCase
 import org.every.nook.api.application.member.port.MemberRepository
 import org.every.nook.api.application.port.TransactionRunner
 import org.every.nook.api.infrastructure.auth.AppleAuthProperties
@@ -140,28 +136,6 @@ class AuthConfig {
         issueLoginTokens,
         transactionRunner,
     )
-
-    @Bean
-    fun getMemberProfileUseCase(memberRepository: MemberRepository) = GetMemberProfileUseCase(memberRepository)
-
-    @Bean
-    fun updateMemberProfileUseCase(memberRepository: MemberRepository, transactionRunner: TransactionRunner) =
-        UpdateMemberProfileUseCase(memberRepository, transactionRunner)
-
-    @Bean
-    fun logoutMemberUseCase(
-        refreshTokenRepository: RefreshTokenRepository,
-        transactionRunner: TransactionRunner,
-        clock: Clock,
-    ) = LogoutMemberUseCase(refreshTokenRepository, transactionRunner, clock)
-
-    @Bean
-    fun withdrawMemberUseCase(
-        memberRepository: MemberRepository,
-        refreshTokenRepository: RefreshTokenRepository,
-        transactionRunner: TransactionRunner,
-        clock: Clock,
-    ) = WithdrawMemberUseCase(memberRepository, refreshTokenRepository, transactionRunner, clock)
 
     @Bean
     fun refreshLoginTokenUseCase(
