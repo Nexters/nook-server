@@ -1,5 +1,6 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.domain.place.KoreanCityNameExtractor
 import java.math.BigDecimal
 
 data class PlaceCandidate(
@@ -13,4 +14,5 @@ data class PlaceCandidate(
     val phoneNumber: String?,
     val providerUrl: String?,
     val distanceMeters: Int? = null,
+    val city: String? = KoreanCityNameExtractor.extract(address),
 )

@@ -1,5 +1,6 @@
 package org.every.nook.api.presentation.post
 
+import org.every.nook.api.application.content.PrivatePostException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.group.error.GroupNotFoundException
@@ -512,6 +513,31 @@ class PostControllerTest {
             jsonPath("$.error.errorCode") { value("UNSUPPORTED_POST_URL") }
         }
     }
+
+    @Test
+    fun `rejects a private post with a dedicated error`() {
+        val privatePostUrl =
+            "https://www.instagram.com/p/Dbw1jDTBv7du60ZhDSqNH9kSJCYlKc6TzHaACA0/"
+        `when`(
+            createUseCase(
+                CreatePostUseCase.Command(
+                    userId = TEST_USER_ID,
+                    url = privatePostUrl,
+                    groupIds = listOf(17),
+                ),
+            ),
+        ).thenThrow(PrivatePostException())
+
+        mockMvc.post("/api/v1/posts") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"url":"$privatePostUrl","groupIds":[17]}"""
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("PRIVATE_POST") }
+            jsonPath("$.error.reason") { value("비공개 게시물은 저장할 수 없습니다.") }
+        }
+    }
+
     private companion object {
         const val TEST_USER_ID = 1L
     }

@@ -6,6 +6,7 @@ import java.time.Instant
 data class MapPlaceView(
     val id: Long,
     val name: String,
+    val city: String?,
     val latitude: BigDecimal,
     val longitude: BigDecimal,
     val color: String,
@@ -18,6 +19,7 @@ data class RecentPlaceView(
     val bookmarkedAt: Instant,
     val id: Long,
     val name: String,
+    val city: String?,
     val address: String,
     val category: String?,
     val latitude: BigDecimal,

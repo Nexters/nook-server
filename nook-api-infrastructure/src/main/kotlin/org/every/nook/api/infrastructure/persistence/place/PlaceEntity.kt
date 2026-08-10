@@ -47,6 +47,8 @@ class PlaceEntity(
     val name: String,
     @Column(name = "address", nullable = false, length = Place.MAX_ADDRESS_LENGTH)
     val address: String,
+    @Column(name = "city", nullable = true, length = Place.MAX_CITY_LENGTH)
+    val city: String? = null,
     @Column(name = "latitude", nullable = false, precision = COORDINATE_PRECISION, scale = COORDINATE_SCALE)
     val latitude: BigDecimal,
     @Column(name = "longitude", nullable = false, precision = COORDINATE_PRECISION, scale = COORDINATE_SCALE)
