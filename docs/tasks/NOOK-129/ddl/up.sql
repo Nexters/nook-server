@@ -1,3 +1,5 @@
+SET NAMES utf8mb4;
+
 ALTER TABLE places
     ADD COLUMN city VARCHAR(50) NULL COMMENT '주소에서 추출한 대표 도시명' AFTER address;
 
@@ -35,7 +37,7 @@ SET city = CASE
             ' ',
             -1
         ),
-        '^[가-힣]+(시|군)$'
+        '.+(시|군)$'
     ) THEN REGEXP_REPLACE(
         SUBSTRING_INDEX(
             SUBSTRING_INDEX(REGEXP_REPLACE(TRIM(address), '[[:space:]]+', ' '), ' ', 2),
@@ -47,7 +49,7 @@ SET city = CASE
     )
     WHEN REGEXP_LIKE(
         SUBSTRING_INDEX(REGEXP_REPLACE(TRIM(address), '[[:space:]]+', ' '), ' ', 1),
-        '^[가-힣]+(시|군)$'
+        '.+(시|군)$'
     ) THEN REGEXP_REPLACE(
         SUBSTRING_INDEX(REGEXP_REPLACE(TRIM(address), '[[:space:]]+', ' '), ' ', 1),
         '(시|군)$',
