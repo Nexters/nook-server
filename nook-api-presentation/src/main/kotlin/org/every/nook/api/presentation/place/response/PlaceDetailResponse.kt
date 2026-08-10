@@ -9,6 +9,7 @@ import org.every.nook.api.application.place.PlacePostGroupView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.presentation.response.toSeoulOffsetDateTime
 import java.math.BigDecimal
 import java.time.OffsetDateTime
@@ -34,6 +35,8 @@ data class PlaceDetailResponse(
     val phoneNumber: String?,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
+    @field:Schema(description = "장소 썸네일 파싱 상태")
+    val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     @field:Schema(description = "장소 사진 URL 목록(최대 6장)")
     val photoUrls: List<String>,
     @field:Schema(description = "장소 정규 영업시간", nullable = true)
@@ -59,6 +62,7 @@ data class PlaceDetailResponse(
             category = view.category,
             phoneNumber = view.phoneNumber,
             thumbnailUrl = view.thumbnailUrl,
+            thumbnailParsingStatus = view.thumbnailParsingStatus,
             photoUrls = view.photoUrls,
             openingHours = view.openingHours?.let(PlaceOpeningHoursResponse::from),
             openNow = view.openNow,

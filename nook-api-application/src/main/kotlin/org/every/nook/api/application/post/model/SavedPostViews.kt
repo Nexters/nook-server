@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post.model
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import java.math.BigDecimal
 import java.time.Instant
 
@@ -64,6 +65,7 @@ data class SavedPostPlace(
     val category: String?,
     val phoneNumber: String?,
     val thumbnailUrl: String?,
+    val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
     val sequence: Int,

@@ -23,6 +23,7 @@ class FindPostPlaceParsingUseCase(private val findPostPlaceParsingPort: FindPost
                     relatedPlace.place,
                     relatedPlace.bookmarked,
                     relatedPlace.thumbnailUrl,
+                    relatedPlace.thumbnailParsingStatus,
                     relatedPlace.tags,
                 )
             },

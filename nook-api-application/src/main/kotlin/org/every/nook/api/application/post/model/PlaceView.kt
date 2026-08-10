@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post.model
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.domain.place.Place
 import java.math.BigDecimal
 
@@ -14,6 +15,7 @@ data class PlaceView(
     val category: String?,
     val phoneNumber: String?,
     val thumbnailUrl: String?,
+    val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
 ) {
@@ -22,6 +24,7 @@ data class PlaceView(
             place: Place,
             bookmarked: Boolean,
             thumbnailUrl: String?,
+            thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
             tags: List<String> = emptyList(),
         ): PlaceView = PlaceView(
             id = requireNotNull(place.id),
@@ -34,6 +37,7 @@ data class PlaceView(
             category = place.category,
             phoneNumber = place.phoneNumber,
             thumbnailUrl = thumbnailUrl,
+            thumbnailParsingStatus = thumbnailParsingStatus,
             tags = tags,
             bookmarked = bookmarked,
         )

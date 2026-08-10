@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
@@ -157,6 +158,10 @@ class PostPersistenceAdapter(
                         place = place,
                         bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                         thumbnailUrl = placesById[postPlace.placeId]?.thumbnailUrl,
+                        thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
+                            placesById[postPlace.placeId]?.thumbnailParsingStatus
+                                ?: error("Place must exist for postPlace"),
+                        ),
                         tags = placesById[postPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },
                     )
                 }

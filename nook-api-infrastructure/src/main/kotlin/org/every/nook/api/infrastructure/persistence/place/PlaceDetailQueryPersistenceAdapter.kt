@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.PlacePostMediaTypeView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.port.PlaceDetailQueryPort
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
@@ -65,6 +66,7 @@ class PlaceDetailQueryPersistenceAdapter(
             category = place.category,
             phoneNumber = place.phoneNumber,
             thumbnailUrl = place.thumbnailUrl,
+            thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.thumbnailParsingStatus),
             photoUrls = place.photoUrls,
             openingHours = place.openingHours,
             openNow = place.openingHours?.isOpenAt(clock.instant()),

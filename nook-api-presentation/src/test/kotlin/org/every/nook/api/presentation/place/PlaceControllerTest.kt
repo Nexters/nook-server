@@ -13,6 +13,7 @@ import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
 import org.every.nook.api.application.place.PlaceSearchResultView
 import org.every.nook.api.application.place.PlaceSearchSliceView
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
@@ -93,6 +94,7 @@ class PlaceControllerTest {
                 category = "음식점 > 한식",
                 phoneNumber = "02-123-4567",
                 thumbnailUrl = "https://example.com/place-thumbnail.jpg",
+                thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
                 bookmarked = true,
                 posts = PlacePostPageView(
                     items = listOf(

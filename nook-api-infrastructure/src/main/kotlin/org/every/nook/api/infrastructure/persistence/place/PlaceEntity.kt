@@ -2,6 +2,8 @@ package org.every.nook.api.infrastructure.persistence.place
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -13,6 +15,7 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
@@ -59,6 +62,14 @@ class PlaceEntity(
     val phoneNumber: String? = null,
     @Column(name = "thumbnail_url", nullable = true, length = THUMBNAIL_URL_MAX_LENGTH)
     var thumbnailUrl: String? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(
+        name = "thumbnail_parsing_status",
+        nullable = false,
+        length = THUMBNAIL_PARSING_STATUS_LENGTH,
+        columnDefinition = "VARCHAR(20) COLLATE utf8mb4_bin",
+    )
+    var thumbnailParsingStatus: PlaceThumbnailParsingStatus = PlaceThumbnailParsingStatus.PENDING,
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "opening_hours", nullable = true, columnDefinition = "JSON")
     var openingHours: PlaceOpeningHours? = null,
@@ -79,6 +90,7 @@ class PlaceEntity(
         const val COORDINATE_PRECISION = 10
         const val COORDINATE_SCALE = 7
         const val THUMBNAIL_URL_MAX_LENGTH = 2048
+        const val THUMBNAIL_PARSING_STATUS_LENGTH = 20
         private const val MAX_REPRESENTATIVE_TAG_COUNT = 4
         private val logger = KotlinLogging.logger {}
     }
@@ -111,6 +123,13 @@ class PlaceEntity(
             photoUrls = supplement.photoUrls
             updateThumbnailUrlIfAbsent(supplement.photoUrls.first())
         }
+    }
+
+    fun updateThumbnailParsing(status: PlaceThumbnailParsingStatus, supplement: PlaceSupplement?) {
+        if (status == PlaceThumbnailParsingStatus.COMPLETED) {
+            supplement?.let(::updateSupplement)
+        }
+        thumbnailParsingStatus = status
     }
 
     fun updateRepresentativeTags(tags: List<PlaceTag>) {
