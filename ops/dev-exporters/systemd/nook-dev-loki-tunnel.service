@@ -1,0 +1,13 @@
+[Unit]
+Description=Nook dev Loki SSH tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new -i /home/ubuntu/.ssh/nook-ops-tunnel -L 127.0.0.1:3100:192.168.0.21:3100 ubuntu@192.168.0.21
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
