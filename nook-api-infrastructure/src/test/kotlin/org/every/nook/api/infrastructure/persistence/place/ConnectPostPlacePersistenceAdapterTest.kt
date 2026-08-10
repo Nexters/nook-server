@@ -90,6 +90,17 @@ class ConnectPostPlacePersistenceAdapterTest {
         )
 
         verify(place).updateSupplement(PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")))
+        verify(placeRepository).insertIgnore(
+            provider = "KAKAO",
+            externalPlaceId = "1234",
+            name = "퍼머넌트해비탯",
+            address = "경기 용인시",
+            city = "용인",
+            latitude = BigDecimal("37.5"),
+            longitude = BigDecimal("127.0"),
+            category = "카페",
+            phoneNumber = null,
+        )
         val captor = ArgumentCaptor.forClass(PostPlaceEntity::class.java)
         verify(postPlaceRepository).save(captor.capture())
         assertEquals(101, captor.value.postId)

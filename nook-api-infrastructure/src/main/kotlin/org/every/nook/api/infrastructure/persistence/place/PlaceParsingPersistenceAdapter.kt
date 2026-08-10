@@ -174,6 +174,7 @@ class PlaceParsingPersistenceAdapter(
         externalPlaceId = externalPlaceId,
         name = name,
         address = address,
+        city = city,
         latitude = latitude,
         longitude = longitude,
         category = category,

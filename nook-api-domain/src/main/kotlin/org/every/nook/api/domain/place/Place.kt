@@ -5,6 +5,7 @@ data class Place(
     val name: String,
     val address: String,
     val location: GeoPoint,
+    val city: String? = KoreanCityNameExtractor.extract(address),
     val category: String? = null,
     val phoneNumber: String? = null,
     val id: Long? = null,
@@ -17,6 +18,9 @@ data class Place(
         require(address.length <= MAX_ADDRESS_LENGTH) {
             "Place address must not exceed $MAX_ADDRESS_LENGTH characters"
         }
+        require(city == null || city.length <= MAX_CITY_LENGTH) {
+            "Place city must not exceed $MAX_CITY_LENGTH characters"
+        }
         require(category == null || category.length <= MAX_CATEGORY_LENGTH) {
             "Place category must not exceed $MAX_CATEGORY_LENGTH characters"
         }
@@ -28,6 +32,7 @@ data class Place(
     companion object {
         const val MAX_NAME_LENGTH = 255
         const val MAX_ADDRESS_LENGTH = 500
+        const val MAX_CITY_LENGTH = 50
         const val MAX_CATEGORY_LENGTH = 100
         const val MAX_PHONE_NUMBER_LENGTH = 30
     }
