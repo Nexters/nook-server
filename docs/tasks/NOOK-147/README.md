@@ -11,6 +11,7 @@ Grafana의 API 요청 요약과 서버 원문 로그를 시간, 서비스, 레�
 - API 요청 로그와 애플리케이션 서버 로그를 같은 Grafana Logs 패널에 표시합니다.
 - 각 로그에는 timestamp, `nook-dev-api` 서비스, 레벨과 메시지를 기본 노출합니다.
 - 로그는 최신순으로 표시하고 메시지의 줄바꿈을 유지합니다.
+- `Level` 다음에 `Log Type` 필터를 배치해 `All`, `API`, `Server` 로그를 선택할 수 있게 합니다.
 - 기존 level, request id, user id, route/path, status, keyword 필터를 유지합니다.
 - 중복되는 `Raw API Logs` 패널은 제거합니다.
 
@@ -27,7 +28,6 @@ Grafana의 API 요청 요약과 서버 원문 로그를 시간, 서비스, 레�
 - 애플리케이션 로그 포맷 변경
 - Loki와 Promtail 수집 구조 변경
 - Elasticsearch, OpenSearch 또는 Kibana 도입
-- 로그 검색 변수 신규 추가
 - API Alert 규칙 변경
 
 ## 성공 기준
@@ -37,6 +37,7 @@ Grafana의 API 요청 요약과 서버 원문 로그를 시간, 서비스, 레�
 - 각 로그에 시간, `nook-dev-api` 서비스, 로그 레벨과 메시지가 표시됩니다.
 - 긴 request id나 transaction 컬럼으로 인한 가로 스크롤이 발생하지 않습니다.
 - 기존 검색 필터가 계속 동작합니다.
+- `Log Type`의 `All`, `API`, `Server` 선택에 맞는 로그만 표시됩니다.
 - 로그는 최신순으로 표시됩니다.
 - dev Grafana에서 실제 로그를 기준으로 레이아웃을 시각 검증합니다.
 - `./gradlew check`가 성공합니다.
@@ -48,7 +49,8 @@ jq empty ops/monitoring/grafana/dashboards/nook-dev-logs.json
 ./gradlew check
 ```
 
-Loki API에서 패널 LogQL을 직접 실행해 API 요청 로그와 일반 서버 로그가 모두 다음 형태로 반환되는지 확인합니다.
+Loki API에서 패널 LogQL을 직접 실행해 `log_type`이 `API`와 `Server`로 분류되고 각 선택에 맞는 로그가
+반환되는지 확인합니다.
 
 ```text
 [nook-dev-api] [INFO]  req: GET /favicon.ico
@@ -56,4 +58,5 @@ Loki API에서 패널 LogQL을 직접 실행해 API 요청 로그와 일반 서�
 [nook-dev-api] [ERROR]  Application run failed
 ```
 
-배포 후 Grafana dashboard API와 실제 화면에서 패널 type, query, options, 필터 동작과 레이아웃을 확인합니다.
+배포 후 Grafana dashboard API와 실제 화면에서 패널 type, query, options, `Log Type`의 세 선택지와 레이아웃을
+확인합니다.
