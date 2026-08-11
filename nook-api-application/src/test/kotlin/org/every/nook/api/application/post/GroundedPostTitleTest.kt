@@ -18,4 +18,15 @@ class GroundedPostTitleTest {
     fun `keeps inferred title when body has no explicit collection title`() {
         assertEquals("연희동 Lodge190", groundedPostTitle("빙수를 먹으러 왔다", "연희동 Lodge190"))
     }
+
+    @Test
+    fun `keeps a short collection headline from the body when no region is present`() {
+        assertEquals(
+            "느좋카페 10선",
+            groundedPostTitle(
+                body = "| 느좋카페 10선 \n\n에디터가 사랑하는 느낌 좋은 카페 모음집",
+                inferredTitle = "Instagram 게시물",
+            ),
+        )
+    }
 }

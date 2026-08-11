@@ -89,16 +89,28 @@ class ProcessPlaceParsingJobUseCase(
             }
             jobPort.storeImageTranscripts(job.postId, extracted)
         }
-        val imageClues = extractClues(job, transcripts).filter { clue ->
-            clue.hasImageEvidence(images.size).also { grounded ->
-                if (!grounded) {
-                    logger.warn {
-                        "Ungrounded image place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
-                            "placeName=${clue.name}, evidence=${clue.evidence}"
-                    }
+        val primaryImageClues = extractClues(job, transcripts)
+            .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
+        val recoveredImageClues = ImageClueRecallRecovery(
+            retranscribe = { recoveryImages ->
+                measure(job, IMAGE_TRANSCRIPT_STAGE) {
+                    extractImageTranscripts(imageTextExtractor, recoveryImages)
                 }
-            }
-        }
+            },
+            storeTranscripts = { recovered -> jobPort.storeImageTranscripts(job.postId, recovered) },
+            extractClues = { recoveryTranscripts -> extractClues(job, recoveryTranscripts) },
+        ).recover(
+            ImageClueRecallRecovery.Request(
+                postId = job.postId,
+                attempt = job.attempt,
+                images = images,
+                transcripts = transcripts,
+                primaryClues = primaryImageClues,
+                knownPlaceCount = textPlaceCount,
+                expectedPlaceCount = expectedPlaceCount,
+            ),
+        ).filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = true)
+        val imageClues = primaryImageClues + recoveredImageClues
         return resolveClues(job, imageClues)
     }
 
@@ -308,10 +320,6 @@ private fun PlaceClue.isGroundedIn(job: ClaimedPlaceParsingJob): Boolean {
         .any { clueText -> sources.any { source -> source.contains(clueText) } }
 }
 
-private fun PlaceClue.hasImageEvidence(imageCount: Int): Boolean = evidence.any { evidence ->
-    evidence.imageIndex in 1..imageCount && evidence.evidenceText.isNotBlank()
-}
-
 private fun requiresImageAnalysis(textPlaceCount: Int, expectedPlaceCount: Int?): Boolean =
     textPlaceCount == 0 || expectedPlaceCount?.let { textPlaceCount < it } == true
 
@@ -379,20 +387,3 @@ private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6
 private val ADDRESS_KEY_PATTERN = Regex(
     "([가-힣A-Za-z0-9]+(?:대로|로|길|동|읍|면|리))\\s*(\\d+(?:-\\d+)?)",
 )
-
-private fun extractImageTranscripts(
-    extractor: ImageTextExtractor,
-    images: List<ImageTextExtractor.ImageInput>,
-): List<ImageTranscript> = images.chunked(IMAGE_BATCH_SIZE).flatMap { batch ->
-    extractor.extract(ImageTextExtractor.Request(batch)).also { transcripts ->
-        val requestedIndexes = batch.map(ImageTextExtractor.ImageInput::imageIndex).toSet()
-        require(
-            transcripts.size == batch.size &&
-                transcripts.map(ImageTranscript::imageIndex).toSet() == requestedIndexes,
-        ) {
-            "OpenAI did not return exactly one transcript for every image"
-        }
-    }
-}.distinctBy(ImageTranscript::imageIndex).sortedBy(ImageTranscript::imageIndex)
-
-private const val IMAGE_BATCH_SIZE = 5
