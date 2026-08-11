@@ -1,5 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.post
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -38,6 +40,7 @@ class PostContentParsingPersistenceAdapterTest {
         hashtagRepository,
         placeJobRepository,
         eventPublisher,
+        jacksonObjectMapper(),
         CLOCK,
     )
 
@@ -82,7 +85,11 @@ class PostContentParsingPersistenceAdapterTest {
         `when`(placeJobRepository.findByPostId(101)).thenReturn(null)
         `when`(placeJobRepository.save(any(PlaceParsingJobEntity::class.java))).thenReturn(placeJob)
 
-        adapter.complete(101, post)
+        adapter.complete(
+            postId = 101,
+            post = post,
+            textPlaceClues = listOf(PlaceClue("성수 식당", "성수", listOf("성수 식당"))),
+        )
 
         assertEquals(PostContentParsingStatus.COMPLETED, job.status)
         verify(postEntity).updateContent(post)
@@ -91,6 +98,10 @@ class PostContentParsingPersistenceAdapterTest {
         val placeJobCaptor = ArgumentCaptor.forClass(PlaceParsingJobEntity::class.java)
         verify(placeJobRepository).save(placeJobCaptor.capture())
         assertEquals(PlaceParsingStatus.PENDING, placeJobCaptor.value.status)
+        assertEquals(
+            """[{"name":"성수 식당","region":"성수","queries":["성수 식당"],"evidence":[]}]""",
+            placeJobCaptor.value.textPlaceClues,
+        )
         val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
         verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture())
         val placeEvent = eventCaptor.allValues.filterIsInstance<PlaceParsingJobRequestedEvent>().single()

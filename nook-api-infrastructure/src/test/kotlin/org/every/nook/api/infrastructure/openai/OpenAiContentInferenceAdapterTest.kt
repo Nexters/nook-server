@@ -7,7 +7,7 @@ import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceClueEvidence
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceTagExtractor
-import org.every.nook.api.application.post.PostTitleGenerator
+import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.domain.place.PlaceTag
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
@@ -61,20 +61,39 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
-    fun `generates a title with structured output`() {
+    fun `infers a title and text place clues with one structured output`() {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(header("Authorization", "Bearer test-key"))
-            .andExpect(content().string(containsString("post_title")))
+            .andExpect(content().string(containsString("post_content_inference")))
             .andExpect(content().string(containsString("홍보성")))
             .andExpect(content().string(containsString("\"maxLength\":25")))
-            .andRespond(withSuccess(response("""{"title":"용산 미나리 삼겹살"}"""), MediaType.APPLICATION_JSON))
+            .andExpect(content().string(containsString("\"maxItems\":10")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {
+                          "title":"용산 미나리 삼겹살",
+                          "places":[{
+                            "name":"원동미나리삼겹살",
+                            "region":"용산구",
+                            "queries":["용산 원동미나리삼겹살"],
+                            "evidence":[]
+                          }]
+                        }
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
 
-        val title = fixture.adapter.generate(
-            PostTitleGenerator.Request("원동미나리삼겹살 방문", listOf("용산맛집"), "용산구"),
+        val inference = fixture.adapter.infer(
+            PostContentInference.Request("원동미나리삼겹살 방문", listOf("용산맛집"), "용산구"),
         )
 
-        assertEquals("용산 미나리 삼겹살", title)
+        assertEquals("용산 미나리 삼겹살", inference.title)
+        assertEquals(listOf("원동미나리삼겹살"), inference.placeClues.map(PlaceClue::name))
         fixture.server.verify()
     }
 
@@ -90,8 +109,13 @@ class OpenAiContentInferenceAdapterTest {
                         """
                         {
                           "places": [
-                            {"name":"원동미나리삼겹살","region":"용산구","queries":["용산 원동미나리삼겹살"]},
-                            {"name":"서울역","region":null,"queries":["서울역"]}
+                            {
+                              "name":"원동미나리삼겹살",
+                              "region":"용산구",
+                              "queries":["용산 원동미나리삼겹살"],
+                              "evidence":[]
+                            },
+                            {"name":"서울역","region":null,"queries":["서울역"],"evidence":[]}
                           ]
                         }
                         """.trimIndent(),
@@ -259,7 +283,8 @@ class OpenAiContentInferenceAdapterTest {
                           "places": [{
                             "name": "Lodge190",
                             "region": "연희동",
-                            "queries": ["Lodge190", "롯지190", "롯지 190", "연희동 Lodge"]
+                            "queries": ["Lodge190", "롯지190", "롯지 190", "연희동 Lodge"],
+                            "evidence": []
                           }]
                         }
                         """.trimIndent(),
@@ -292,7 +317,7 @@ class OpenAiContentInferenceAdapterTest {
             .andRespond(withSuccess(REFUSAL_RESPONSE, MediaType.APPLICATION_JSON))
 
         assertFailsWith<IllegalStateException> {
-            fixture.adapter.generate(PostTitleGenerator.Request(null, emptyList(), null))
+            fixture.adapter.infer(PostContentInference.Request(null, emptyList(), null))
         }
     }
 

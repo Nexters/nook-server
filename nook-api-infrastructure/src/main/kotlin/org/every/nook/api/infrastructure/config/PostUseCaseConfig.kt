@@ -10,8 +10,8 @@ import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobs
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
+import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.application.post.PostContentParsingJobPort
-import org.every.nook.api.application.post.PostTitleGenerator
 import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
 import org.every.nook.api.application.post.StorePostMediaUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
@@ -57,13 +57,13 @@ class PostUseCaseConfig {
     fun processPostContentParsingJobUseCase(
         jobPort: PostContentParsingJobPort,
         extractPostContentUseCase: ExtractPostContentUseCase,
-        postTitleGenerator: PostTitleGenerator,
+        postContentInference: PostContentInference,
         processingMetrics: ObjectProvider<ProcessingMetrics>,
         properties: PostContentParsingProperties,
     ): ProcessPostContentParsingJobUseCase = ProcessPostContentParsingJobUseCase(
         jobPort = jobPort,
         extractPostContent = extractPostContentUseCase,
-        titleGenerator = postTitleGenerator,
+        contentInference = postContentInference,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
         metrics = processingMetrics.ifAvailable ?: NoOpProcessingMetrics,

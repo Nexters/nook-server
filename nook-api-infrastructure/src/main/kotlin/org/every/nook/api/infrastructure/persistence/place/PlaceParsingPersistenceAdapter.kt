@@ -1,9 +1,12 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagSource
@@ -40,6 +43,7 @@ class PlaceParsingPersistenceAdapter(
     private val userPlaceBookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val postPlaceTagRepository: PostPlaceTagJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
 ) : PlaceParsingJobPort,
     PlaceThumbnailUpdatePort,
@@ -67,6 +71,7 @@ class PlaceParsingPersistenceAdapter(
                 job.postId,
                 PostMedia.MediaType.IMAGE,
             ).map { it.mediaUrl },
+            textClues = job.textPlaceClues?.let { objectMapper.readValue<List<PlaceClue>>(it) },
         )
     }
 

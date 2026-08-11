@@ -10,7 +10,7 @@ import org.every.nook.api.application.place.PlaceClueEvidence
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.application.place.PlaceTagExtractor
-import org.every.nook.api.application.post.PostTitleGenerator
+import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.domain.place.PlaceTag
 import org.springframework.web.client.RestClient
 
@@ -18,20 +18,23 @@ class OpenAiContentInferenceAdapter(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
-) : PostTitleGenerator,
+) : PostContentInference,
     PlaceClueExtractor,
     PlaceCandidateSelector,
     PlaceTagExtractor {
-    override fun generate(request: PostTitleGenerator.Request): String {
+    override fun infer(request: PostContentInference.Request): PostContentInference.Inference {
         val result = requestStructured(
-            name = "post_title",
-            instructions = TITLE_INSTRUCTIONS,
+            name = "post_content_inference",
+            instructions = CONTENT_INFERENCE_INSTRUCTIONS,
             input = request.toInput(),
-            schema = titleSchema(),
-            maxOutputTokens = TITLE_MAX_OUTPUT_TOKENS,
+            schema = contentInferenceSchema,
+            maxOutputTokens = CONTENT_INFERENCE_MAX_OUTPUT_TOKENS,
         )
-        return result.path("title").asText().trim().take(MAX_TITLE_LENGTH)
-            .ifBlank { DEFAULT_TITLE }
+        return PostContentInference.Inference(
+            title = result.path("title").asText().trim().take(MAX_TITLE_LENGTH)
+                .ifBlank { DEFAULT_TITLE },
+            placeClues = result.toPlaceClues(),
+        )
     }
 
     override fun extract(request: PlaceClueExtractor.Request): List<PlaceClue> {
@@ -39,26 +42,28 @@ class OpenAiContentInferenceAdapter(
             name = "place_clues",
             instructions = PLACE_INSTRUCTIONS,
             input = request.toInput(),
-            schema = placeSchema(),
+            schema = placeSchema,
             maxOutputTokens = if (request.imageUrls.isEmpty()) {
                 PLACE_MAX_OUTPUT_TOKENS
             } else {
                 IMAGE_PLACE_MAX_OUTPUT_TOKENS
             },
         )
-        return result.path("places").map { place ->
-            PlaceClue(
-                name = place.path("name").asText().trim(),
-                region = place.path("region").takeUnless(JsonNode::isNull)?.asText()?.trim()?.ifBlank { null },
-                queries = place.path("queries").map(JsonNode::asText).map(String::trim).filter(String::isNotEmpty),
-                evidence = place.path("evidence").map { evidence ->
-                    PlaceClueEvidence(
-                        imageIndex = evidence.path("imageIndex").asInt(),
-                        evidenceText = evidence.path("evidenceText").asText().trim(),
-                    )
-                },
-            )
-        }
+        return result.toPlaceClues()
+    }
+
+    private fun JsonNode.toPlaceClues(): List<PlaceClue> = path("places").map { place ->
+        PlaceClue(
+            name = place.path("name").asText().trim(),
+            region = place.path("region").takeUnless(JsonNode::isNull)?.asText()?.trim()?.ifBlank { null },
+            queries = place.path("queries").map(JsonNode::asText).map(String::trim).filter(String::isNotEmpty),
+            evidence = place.path("evidence").map { evidence ->
+                PlaceClueEvidence(
+                    imageIndex = evidence.path("imageIndex").asInt(),
+                    evidenceText = evidence.path("evidenceText").asText().trim(),
+                )
+            },
+        )
     }
 
     override fun select(request: PlaceCandidateSelector.Request): org.every.nook.api.application.place.PlaceCandidate? {
@@ -140,7 +145,7 @@ class OpenAiContentInferenceAdapter(
         }
     }
 
-    private fun PostTitleGenerator.Request.toInput(): String =
+    private fun PostContentInference.Request.toInput(): String =
         contentInput(objectMapper, body, hashtags, sourceLocationTag)
 
     private fun PlaceClueExtractor.Request.toInput(): Any {
@@ -193,59 +198,6 @@ class OpenAiContentInferenceAdapter(
         ),
     )
 
-    private fun titleSchema(): Map<String, Any> = mapOf(
-        "type" to "object",
-        "properties" to mapOf(
-            "title" to mapOf("type" to "string", "maxLength" to MAX_TITLE_LENGTH),
-        ),
-        "required" to listOf("title"),
-        "additionalProperties" to false,
-    )
-
-    private fun placeSchema(): Map<String, Any> = mapOf(
-        "type" to "object",
-        "properties" to mapOf(
-            "places" to mapOf(
-                "type" to "array",
-                "maxItems" to MAX_PLACE_COUNT,
-                "items" to mapOf(
-                    "type" to "object",
-                    "properties" to mapOf(
-                        "name" to mapOf("type" to "string"),
-                        "region" to mapOf("type" to listOf("string", "null")),
-                        "queries" to mapOf(
-                            "type" to "array",
-                            "minItems" to 1,
-                            "maxItems" to MAX_QUERY_COUNT,
-                            "items" to mapOf("type" to "string"),
-                        ),
-                        "evidence" to mapOf(
-                            "type" to "array",
-                            "maxItems" to MAX_IMAGE_COUNT,
-                            "items" to mapOf(
-                                "type" to "object",
-                                "properties" to mapOf(
-                                    "imageIndex" to mapOf(
-                                        "type" to "integer",
-                                        "minimum" to 1,
-                                        "maximum" to MAX_IMAGE_COUNT,
-                                    ),
-                                    "evidenceText" to mapOf("type" to "string"),
-                                ),
-                                "required" to listOf("imageIndex", "evidenceText"),
-                                "additionalProperties" to false,
-                            ),
-                        ),
-                    ),
-                    "required" to listOf("name", "region", "queries", "evidence"),
-                    "additionalProperties" to false,
-                ),
-            ),
-        ),
-        "required" to listOf("places"),
-        "additionalProperties" to false,
-    )
-
     private fun candidateSelectionSchema(lastCandidateIndex: Int): Map<String, Any> = mapOf(
         "type" to "object",
         "properties" to mapOf(
@@ -265,12 +217,63 @@ class OpenAiContentInferenceAdapter(
         const val MAX_TITLE_LENGTH = 25
         const val MAX_PLACE_COUNT = 10
         const val MAX_QUERY_COUNT = 4
-        const val TITLE_MAX_OUTPUT_TOKENS = 200
+        const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 1000
         const val PLACE_MAX_OUTPUT_TOKENS = 800
         const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 1600
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
         const val PLACE_TAG_MAX_OUTPUT_TOKENS = 600
         const val DEFAULT_TITLE = "Instagram 게시물"
+        val placeListSchema: Map<String, Any> = mapOf(
+            "type" to "array",
+            "maxItems" to MAX_PLACE_COUNT,
+            "items" to mapOf(
+                "type" to "object",
+                "properties" to mapOf(
+                    "name" to mapOf("type" to "string"),
+                    "region" to mapOf("type" to listOf("string", "null")),
+                    "queries" to mapOf(
+                        "type" to "array",
+                        "minItems" to 1,
+                        "maxItems" to MAX_QUERY_COUNT,
+                        "items" to mapOf("type" to "string"),
+                    ),
+                    "evidence" to mapOf(
+                        "type" to "array",
+                        "maxItems" to MAX_IMAGE_COUNT,
+                        "items" to mapOf(
+                            "type" to "object",
+                            "properties" to mapOf(
+                                "imageIndex" to mapOf(
+                                    "type" to "integer",
+                                    "minimum" to 1,
+                                    "maximum" to MAX_IMAGE_COUNT,
+                                ),
+                                "evidenceText" to mapOf("type" to "string"),
+                            ),
+                            "required" to listOf("imageIndex", "evidenceText"),
+                            "additionalProperties" to false,
+                        ),
+                    ),
+                ),
+                "required" to listOf("name", "region", "queries", "evidence"),
+                "additionalProperties" to false,
+            ),
+        )
+        val contentInferenceSchema: Map<String, Any> = mapOf(
+            "type" to "object",
+            "properties" to mapOf(
+                "title" to mapOf("type" to "string", "maxLength" to MAX_TITLE_LENGTH),
+                "places" to placeListSchema,
+            ),
+            "required" to listOf("title", "places"),
+            "additionalProperties" to false,
+        )
+        val placeSchema: Map<String, Any> = mapOf(
+            "type" to "object",
+            "properties" to mapOf("places" to placeListSchema),
+            "required" to listOf("places"),
+            "additionalProperties" to false,
+        )
         const val TITLE_INSTRUCTIONS =
             "입력된 Instagram 본문, 해시태그, 장소 태그에 명시된 사실만 사용해 검색과 보관에 적합한 한국어 제목을 작성한다. " +
                 "제목은 최대 25자이며 지역명, 상호명, 업종, 장소 개수 중 확인 가능한 핵심 정보만 사용한다. " +
@@ -302,6 +305,8 @@ class OpenAiContentInferenceAdapter(
                 "queries는 원문 Lodge190, 한글 음차 롯지190, 띄어쓰기 변형 롯지 190, " +
                 "지역을 붙인 축약형 연희동 Lodge 순서로 반환한다. " +
                 "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 10개 가게와 가게당 최대 4개 검색어만 반환한다."
+        const val CONTENT_INFERENCE_INSTRUCTIONS =
+            "title과 places를 하나의 응답으로 함께 반환한다. " + TITLE_INSTRUCTIONS + " " + PLACE_INSTRUCTIONS
         const val CANDIDATE_SELECTION_INSTRUCTIONS =
             "placeClue는 Instagram 게시물에서 추출한 장소 단서이고 candidates는 실제 장소 검색 결과다. " +
                 "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, 주소, region, 이미지 evidence, matchedQueries를 함께 비교해 " +

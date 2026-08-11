@@ -1,5 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.post
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.post.ClaimedPostContentParsingJob
 import org.every.nook.api.application.post.OutstandingPostContentParsingJob
@@ -25,6 +27,7 @@ class PostContentParsingPersistenceAdapter(
     private val hashtagRepository: PostHashtagJpaRepository,
     private val placeParsingJobRepository: PlaceParsingJobJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
 ) : PostContentParsingJobPort {
     @Transactional
@@ -59,7 +62,7 @@ class PostContentParsingPersistenceAdapter(
         }
 
     @Transactional
-    override fun complete(postId: Long, post: Post) {
+    override fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PostContentParsingStatus.PROCESSING)
         val entity = postRepository.findById(postId).orElseThrow()
@@ -92,6 +95,7 @@ class PostContentParsingPersistenceAdapter(
             placeParsingJobRepository.save(
                 PlaceParsingJobEntity(
                     postId = postId,
+                    textPlaceClues = objectMapper.writeValueAsString(textPlaceClues),
                     status = PlaceParsingStatus.PENDING,
                     nextAttemptAt = clock.instant(),
                 ),
