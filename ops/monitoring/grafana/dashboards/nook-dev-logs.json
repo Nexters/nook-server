@@ -257,7 +257,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | label_format log_type=\"{{ if contains \\\"req:\\\" .message }}API{{ else }}Server{{ end }}\" | log_type=~\"${logType:regex}\" | line_format \"[{{.service_name}}] [{{.level}}]  {{.message}}\" | keep service_name, level, log_type",
+          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | label_format log_type=\"{{ if contains \\\"req:\\\" .message }}API{{ else }}Server{{ end }}\" | log_type=~\"${logType:regex}\" | line_format \"[{{.service_name}}] [{{.level}}]  {{.message}}\"",
           "queryType": "range",
           "refId": "A"
         }
