@@ -13,7 +13,7 @@ import kotlin.test.assertNull
 class ProcessPlaceParsingJobUseCaseTest {
     @Test
     fun `resolves and completes multiple place clues in order`() {
-        val port = FakeJobPort()
+        val port = FakeJobPort(body = "원동미나리삼겹살과 서울역")
         val extractor = PlaceClueExtractor {
             listOf(
                 PlaceClue("원동미나리삼겹살", "용산구", listOf("용산 원동미나리삼겹살")),
@@ -40,7 +40,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     @Test
     fun `skips image fallback when text resolves at least one place`() {
-        val port = FakeJobPort(imageUrls = listOf("https://cdn.test/1.jpg"))
+        val port = FakeJobPort(body = "텍스트 장소", imageUrls = listOf("https://cdn.test/1.jpg"))
         val requests = mutableListOf<PlaceClueExtractor.Request>()
         val extractor = PlaceClueExtractor { request ->
             requests += request
@@ -62,6 +62,7 @@ class ProcessPlaceParsingJobUseCaseTest {
     @Test
     fun `reuses stored text clues without another text inference call`() {
         val port = FakeJobPort(
+            body = "저장된 장소",
             textClues = listOf(PlaceClue("저장된 장소", "서울", listOf("저장된 장소"))),
         )
         val useCase = useCase(
@@ -77,6 +78,82 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `rejects an ungrounded text clue before searching and uses image evidence`() {
+        val port = FakeJobPort(
+            body = "느좋카페 10선",
+            imageUrls = listOf("https://cdn.test/1.jpg"),
+        )
+        val requests = mutableListOf<PlaceClueExtractor.Request>()
+        val searchedQueries = mutableListOf<String>()
+        val extractor = PlaceClueExtractor { request ->
+            requests += request
+            if (request.imageUrls.isEmpty()) {
+                listOf(PlaceClue("무심", null, listOf("무심")))
+            } else {
+                listOf(
+                    PlaceClue(
+                        "원형들",
+                        "서울 중구",
+                        listOf("원형들"),
+                        listOf(PlaceClueEvidence(1, "원형들 / 서울 중구 창경궁로1길 38")),
+                    ),
+                )
+            }
+        }
+        val provider = PlaceSearchProvider { request ->
+            searchedQueries += request.query
+            listOf(candidate("1", "원형들", "서울 중구 창경궁로1길 38"))
+        }
+        val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(2, requests.size)
+        assertEquals(listOf("원형들"), searchedQueries)
+        assertEquals(listOf("1"), port.completed.map { it.externalPlaceId })
+    }
+
+    @Test
+    fun `merges image places when text results do not meet the expected count`() {
+        val port = FakeJobPort(
+            body = "카페 2곳: 텍스트 장소",
+            imageUrls = listOf("https://cdn.test/1.jpg", "https://cdn.test/2.jpg"),
+        )
+        val requests = mutableListOf<PlaceClueExtractor.Request>()
+        val extractor = PlaceClueExtractor { request ->
+            requests += request
+            if (request.imageUrls.isEmpty()) {
+                listOf(PlaceClue("텍스트 장소", "서울", listOf("텍스트 장소")))
+            } else {
+                listOf(
+                    PlaceClue(
+                        "텍스트 장소",
+                        "서울",
+                        listOf("텍스트 장소"),
+                        listOf(PlaceClueEvidence(1, "텍스트 장소 / 서울 중구")),
+                    ),
+                    PlaceClue(
+                        "이미지 장소",
+                        "서울",
+                        listOf("이미지 장소"),
+                        listOf(PlaceClueEvidence(2, "이미지 장소 / 서울 종로구")),
+                    ),
+                )
+            }
+        }
+        val provider = PlaceSearchProvider { request ->
+            when (request.query) {
+                "텍스트 장소" -> listOf(candidate("1", "텍스트 장소", "서울 중구"))
+                else -> listOf(candidate("2", "이미지 장소", "서울 종로구"))
+            }
+        }
+        val useCase = useCase(port, extractor, SearchPlaceCandidatesUseCase(provider))
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(2, requests.size)
+        assertEquals(listOf("1", "2"), port.completed.map { it.externalPlaceId })
+    }
+
+    @Test
     fun `uses at most twenty images in one fallback extraction`() {
         val imageUrls = (0 until 25).map { "https://cdn.test/$it.jpg" }
         val port = FakeJobPort(imageUrls = imageUrls)
@@ -86,7 +163,14 @@ class ProcessPlaceParsingJobUseCaseTest {
             if (request.imageUrls.isEmpty()) {
                 emptyList()
             } else {
-                listOf(PlaceClue("이미지 장소", "서울", listOf("이미지 장소")))
+                listOf(
+                    PlaceClue(
+                        "이미지 장소",
+                        "서울",
+                        listOf("이미지 장소"),
+                        listOf(PlaceClueEvidence(1, "이미지 장소 / 서울 중구")),
+                    ),
+                )
             }
         }
         val useCase = useCase(
@@ -112,7 +196,14 @@ class ProcessPlaceParsingJobUseCaseTest {
             if (request.imageUrls.isEmpty()) {
                 listOf(PlaceClue("잘못 읽은 장소", null, listOf("잘못 읽은 장소")))
             } else {
-                listOf(PlaceClue("이미지 장소", null, listOf("이미지 장소")))
+                listOf(
+                    PlaceClue(
+                        "이미지 장소",
+                        null,
+                        listOf("이미지 장소"),
+                        listOf(PlaceClueEvidence(1, "이미지 장소")),
+                    ),
+                )
             }
         }
         val useCase = useCase(
@@ -134,7 +225,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     @Test
     fun `stops searching after the first query resolves one strict match`() {
-        val port = FakeJobPort()
+        val port = FakeJobPort(body = "Lodge190")
         val queries = listOf("Lodge190", "롯지190", "롯지 190", "연희동 Lodge")
         val extractor = PlaceClueExtractor {
             listOf(PlaceClue("Lodge190", "연희동", queries))
@@ -157,7 +248,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     @Test
     fun `completes with resolved places when some place clues do not match`() {
-        val port = FakeJobPort()
+        val port = FakeJobPort(body = "첫 번째 장소, 매칭 실패 장소, 두 번째 장소")
         val extractor = PlaceClueExtractor {
             listOf(
                 PlaceClue("첫 번째 장소", "서울", listOf("첫 번째 장소")),
@@ -182,7 +273,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     @Test
     fun `resolves a single exact name candidate despite an incorrect region`() {
-        val port = FakeJobPort()
+        val port = FakeJobPort(body = "이츠야")
         val extractor = PlaceClueExtractor {
             listOf(
                 PlaceClue(
@@ -209,7 +300,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     @Test
     fun `does not choose arbitrarily when multiple exact name candidates do not match region`() {
-        val port = FakeJobPort(attempt = 4)
+        val port = FakeJobPort(attempt = 4, body = "동일상호")
         val extractor = PlaceClueExtractor {
             listOf(PlaceClue("동일상호", "서초구", listOf("동일상호")))
         }
@@ -228,7 +319,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     @Test
     fun `fails without retry when every place clue fails to match and no image is available`() {
-        val port = FakeJobPort(attempt = 2)
+        val port = FakeJobPort(attempt = 2, body = "매칭 실패 장소")
         val extractor = PlaceClueExtractor {
             listOf(PlaceClue("매칭 실패 장소", "서울", listOf("매칭 실패 장소")))
         }
@@ -246,7 +337,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     @Test
     fun `retries the whole job when place search provider fails after a resolved clue`() {
-        val port = FakeJobPort(attempt = 2)
+        val port = FakeJobPort(attempt = 2, body = "정상 장소와 검색 오류 장소")
         val extractor = PlaceClueExtractor {
             listOf(
                 PlaceClue("정상 장소", "서울", listOf("정상 장소")),
@@ -342,6 +433,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
     private class FakeJobPort(
         private val attempt: Int = 1,
+        private val body: String = "본문",
         private val imageUrls: List<String> = emptyList(),
         private val textClues: List<PlaceClue>? = null,
     ) : PlaceParsingJobPort {
@@ -353,7 +445,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob = ClaimedPlaceParsingJob(
             postId = postId,
             attempt = attempt,
-            body = "본문",
+            body = body,
             hashtags = emptyList(),
             sourceLocationTag = null,
             imageUrls = imageUrls,

@@ -24,26 +24,30 @@ class ProcessPlaceParsingJobUseCase(
         logger.info { "Place parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
-            val textClues = job.textClues ?: extractClues(job)
+            val expectedPlaceCount = expectedPlaceCount(job.body)
+            val textClues = (job.textClues ?: extractClues(job)).filter { clue ->
+                clue.isGroundedIn(job).also { grounded ->
+                    if (!grounded) {
+                        logger.warn {
+                            "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
+                                "placeName=${clue.name}, region=${clue.region}, queries=${clue.queries}"
+                        }
+                    }
+                }
+            }
             val textResolution = resolveClues(job, textClues)
-            val places = if (textResolution.places.isNotEmpty()) {
-                textResolution.places
-            } else {
-                val imageUrls = job.imageUrls.take(MAX_IMAGE_COUNT)
-                if (imageUrls.isEmpty()) {
-                    terminalFailure(textResolution.failure?.message ?: NO_PLACE_RESOLVED_REASON)
-                }
-                logger.info {
-                    "Place parsing image fallback started: postId=${job.postId}, attempt=${job.attempt}, " +
-                        "imageCount=${imageUrls.size}"
-                }
-                val imageClues = extractClues(job, imageUrls)
-                val imageResolution = resolveClues(job, imageClues)
-                imageResolution.places.ifEmpty {
-                    terminalFailure(
-                        imageResolution.failure?.message ?: NO_PLACE_RESOLVED_AFTER_IMAGE_REASON,
-                    )
-                }
+            val imageResolution = resolveImageClues(job, textResolution.places.size, expectedPlaceCount)
+            val places = (textResolution.places + imageResolution?.places.orEmpty())
+                .distinctBy { it.provider to it.externalPlaceId }
+            if (places.isEmpty()) {
+                val failure = imageResolution?.failure ?: textResolution.failure
+                terminalFailure(
+                    failure?.message ?: if (imageResolution == null) {
+                        NO_PLACE_RESOLVED_REASON
+                    } else {
+                        NO_PLACE_RESOLVED_AFTER_IMAGE_REASON
+                    },
+                )
             }
             measure(job, COMPLETE_STAGE) {
                 jobPort.complete(job.postId, places)
@@ -57,6 +61,33 @@ class ProcessPlaceParsingJobUseCase(
         }.getOrElse { exception ->
             handleFailure(job, exception, startedAt)
         }
+    }
+
+    private fun resolveImageClues(
+        job: ClaimedPlaceParsingJob,
+        textPlaceCount: Int,
+        expectedPlaceCount: Int?,
+    ): ClueResolution? {
+        val imageUrls = job.imageUrls.take(MAX_IMAGE_COUNT)
+        if (imageUrls.isEmpty() || !requiresImageAnalysis(textPlaceCount, expectedPlaceCount)) {
+            return null
+        }
+        logger.info {
+            "Place parsing image fallback started: postId=${job.postId}, attempt=${job.attempt}, " +
+                "imageCount=${imageUrls.size}, textPlaceCount=$textPlaceCount, " +
+                "expectedPlaceCount=$expectedPlaceCount"
+        }
+        val imageClues = extractClues(job, imageUrls).filter { clue ->
+            clue.hasImageEvidence(imageUrls.size).also { grounded ->
+                if (!grounded) {
+                    logger.warn {
+                        "Ungrounded image place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
+                            "placeName=${clue.name}, evidence=${clue.evidence}"
+                    }
+                }
+            }
+        }
+        return resolveClues(job, imageClues)
     }
 
     private fun extractClues(job: ClaimedPlaceParsingJob, imageUrls: List<String> = emptyList()): List<PlaceClue> =
@@ -95,7 +126,9 @@ class ProcessPlaceParsingJobUseCase(
     }
 
     private fun resolve(job: ClaimedPlaceParsingJob, clue: PlaceClue): PlaceCandidate {
-        validate(clue)
+        if (clue.name.isBlank() || clue.queries.isEmpty() || clue.queries.size > MAX_QUERY_COUNT) {
+            failResolution("Invalid place clue")
+        }
         val candidates = searchCandidates(job, clue)
         logger.info {
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
@@ -168,12 +201,6 @@ class ProcessPlaceParsingJobUseCase(
         clock = clock,
         action = action,
     )
-
-    private fun validate(clue: PlaceClue) {
-        if (clue.name.isBlank() || clue.queries.isEmpty() || clue.queries.size > MAX_QUERY_COUNT) {
-            failResolution("Invalid place clue")
-        }
-    }
 
     private fun failResolution(message: String): Nothing = throw PlaceResolutionException(message)
 
@@ -250,6 +277,33 @@ class ProcessPlaceParsingJobUseCase(
     private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
 }
 
+private fun PlaceClue.isGroundedIn(job: ClaimedPlaceParsingJob): Boolean {
+    val sources = buildList {
+        job.body?.let(::add)
+        addAll(job.hashtags)
+        job.sourceLocationTag?.let(::add)
+    }.map(String::groundingKey)
+    return (listOf(name) + queries)
+        .asSequence()
+        .map(String::groundingKey)
+        .filter { it.length >= MIN_GROUNDING_KEY_LENGTH }
+        .any { clueText -> sources.any { source -> source.contains(clueText) } }
+}
+
+private fun PlaceClue.hasImageEvidence(imageCount: Int): Boolean = evidence.any { evidence ->
+    evidence.imageIndex in 1..imageCount && evidence.evidenceText.isNotBlank()
+}
+
+private fun requiresImageAnalysis(textPlaceCount: Int, expectedPlaceCount: Int?): Boolean =
+    textPlaceCount == 0 || expectedPlaceCount?.let { textPlaceCount < it } == true
+
+private fun expectedPlaceCount(body: String?): Int? = body?.let { content ->
+    EXPECTED_PLACE_COUNT_PATTERN.findAll(content)
+        .mapNotNull { match -> match.groupValues[1].toIntOrNull() }
+        .filter { count -> count in MIN_EXPECTED_PLACE_COUNT..MAX_EXPECTED_PLACE_COUNT }
+        .maxOrNull()
+}
+
 private fun strictMatches(
     clue: PlaceClue,
     candidates: Collection<PlaceCandidateSelector.Candidate>,
@@ -263,3 +317,10 @@ private fun strictMatches(
 }
 
 private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)
+
+private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
+
+private const val MIN_GROUNDING_KEY_LENGTH = 2
+private const val MIN_EXPECTED_PLACE_COUNT = 2
+private const val MAX_EXPECTED_PLACE_COUNT = 10
+private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
