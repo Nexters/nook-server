@@ -87,6 +87,7 @@ class MemberProfileUseCasesTest {
             uploadUrl = "https://s3.example.com/upload",
             profileImageUrl = "https://cdn.example.com/profile.jpg",
             contentType = "image/jpeg",
+            headers = mapOf("Content-Type" to "image/jpeg"),
             expiresAt = Instant.parse("2026-08-10T00:00:00Z"),
             maxBytes = 1024,
         )

@@ -188,6 +188,8 @@ data class ProfileImageUploadResponse(
     val method: String = "PUT",
     @field:Schema(description = "업로드 시 포함할 Content-Type")
     val contentType: String,
+    @field:Schema(description = "업로드 PUT 요청에 그대로 포함할 헤더")
+    val headers: Map<String, String>,
     @field:Schema(description = "업로드 URL 만료 시각")
     val expiresAt: String,
     @field:Schema(description = "업로드 가능한 최대 바이트")
@@ -198,6 +200,7 @@ data class ProfileImageUploadResponse(
             uploadUrl = upload.uploadUrl,
             profileImageUrl = upload.profileImageUrl,
             contentType = upload.contentType,
+            headers = upload.headers,
             expiresAt = upload.expiresAt.toString(),
             maxBytes = upload.maxBytes,
         )

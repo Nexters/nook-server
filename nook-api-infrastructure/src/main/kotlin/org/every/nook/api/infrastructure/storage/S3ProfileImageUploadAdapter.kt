@@ -36,6 +36,10 @@ class S3ProfileImageUploadAdapter(
             uploadUrl = presigned.url().toString(),
             profileImageUrl = "${properties.cloudFrontBaseUrl.trimEnd('/')}/$key",
             contentType = contentType,
+            headers = mapOf(
+                "Content-Type" to contentType,
+                "Cache-Control" to CACHE_CONTROL,
+            ),
             expiresAt = expiresAt,
             maxBytes = properties.maxImageBytes,
         )

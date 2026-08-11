@@ -12,6 +12,7 @@ data class ProfileImageUpload(
     val uploadUrl: String,
     val profileImageUrl: String,
     val contentType: String,
+    val headers: Map<String, String>,
     val expiresAt: Instant,
     val maxBytes: Long,
 )
