@@ -56,7 +56,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertEquals(1, requests.size)
-        assertEquals(emptyList(), requests.single().imageUrls)
+        assertEquals(emptyList(), requests.single().imageTranscripts)
     }
 
     @Test
@@ -78,6 +78,38 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `reuses stored image transcripts without another vision call`() {
+        val transcript = ImageTranscript(1, listOf("원형들", "서울 중구 창경궁로1길 38"))
+        val port = FakeJobPort(
+            body = "카페 2곳",
+            imageUrls = listOf("https://cdn.test/1.jpg"),
+            textClues = emptyList(),
+            imageTranscripts = listOf(transcript),
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { request ->
+                assertEquals(listOf(transcript), request.imageTranscripts)
+                listOf(
+                    PlaceClue(
+                        "원형들",
+                        "서울 중구",
+                        listOf("원형들"),
+                        listOf(PlaceClueEvidence(1, "원형들 / 서울 중구 창경궁로1길 38")),
+                    ),
+                )
+            },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "원형들", "서울 중구 창경궁로1길 38"))
+            },
+            imageTextExtractor = ImageTextExtractor { error("vision must not be called") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertNull(port.storedImageTranscripts)
+    }
+
+    @Test
     fun `rejects an ungrounded text clue before searching and uses image evidence`() {
         val port = FakeJobPort(
             body = "느좋카페 10선",
@@ -87,7 +119,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         val searchedQueries = mutableListOf<String>()
         val extractor = PlaceClueExtractor { request ->
             requests += request
-            if (request.imageUrls.isEmpty()) {
+            if (request.imageTranscripts.isEmpty()) {
                 listOf(PlaceClue("무심", null, listOf("무심")))
             } else {
                 listOf(
@@ -121,7 +153,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         val requests = mutableListOf<PlaceClueExtractor.Request>()
         val extractor = PlaceClueExtractor { request ->
             requests += request
-            if (request.imageUrls.isEmpty()) {
+            if (request.imageTranscripts.isEmpty()) {
                 listOf(PlaceClue("텍스트 장소", "서울", listOf("텍스트 장소")))
             } else {
                 listOf(
@@ -151,16 +183,18 @@ class ProcessPlaceParsingJobUseCaseTest {
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertEquals(2, requests.size)
         assertEquals(listOf("1", "2"), port.completed.map { it.externalPlaceId })
+        assertEquals(listOf(1, 2), port.storedImageTranscripts?.map(ImageTranscript::imageIndex))
     }
 
     @Test
-    fun `uses at most twenty images in one fallback extraction`() {
+    fun `transcribes at most twenty images in batches of five`() {
         val imageUrls = (0 until 25).map { "https://cdn.test/$it.jpg" }
         val port = FakeJobPort(imageUrls = imageUrls)
         val requests = mutableListOf<PlaceClueExtractor.Request>()
+        val transcriptRequests = mutableListOf<ImageTextExtractor.Request>()
         val extractor = PlaceClueExtractor { request ->
             requests += request
-            if (request.imageUrls.isEmpty()) {
+            if (request.imageTranscripts.isEmpty()) {
                 emptyList()
             } else {
                 listOf(
@@ -179,11 +213,16 @@ class ProcessPlaceParsingJobUseCaseTest {
             SearchPlaceCandidatesUseCase {
                 listOf(candidate("1", "이미지 장소", "서울 중구"))
             },
+            imageTextExtractor = ImageTextExtractor { request ->
+                transcriptRequests += request
+                request.images.map { ImageTranscript(it.imageIndex, listOf("이미지 장소 / 서울 중구")) }
+            },
         )
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertEquals(2, requests.size)
-        assertEquals(imageUrls.take(20), requests.last().imageUrls)
+        assertEquals(listOf(5, 5, 5, 5), transcriptRequests.map { it.images.size })
+        assertEquals((1..20).toList(), requests.last().imageTranscripts.map(ImageTranscript::imageIndex))
         assertEquals(listOf("1"), port.completed.map { it.externalPlaceId })
     }
 
@@ -193,7 +232,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         val requests = mutableListOf<PlaceClueExtractor.Request>()
         val extractor = PlaceClueExtractor { request ->
             requests += request
-            if (request.imageUrls.isEmpty()) {
+            if (request.imageTranscripts.isEmpty()) {
                 listOf(PlaceClue("잘못 읽은 장소", null, listOf("잘못 읽은 장소")))
             } else {
                 listOf(
@@ -318,6 +357,77 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `accepts a candidate whose name extends the image clue name`() {
+        assertImageCandidateAccepted(
+            clue = PlaceClue(
+                name = "니트커피",
+                region = "서울",
+                queries = listOf("니트커피"),
+                evidence = listOf(PlaceClueEvidence(1, "니트 커피")),
+            ),
+            selected = candidate("1", "니트커피 아뜰리에", "서울 종로구"),
+        )
+    }
+
+    @Test
+    fun `accepts a candidate matching an explicit English alias query`() {
+        assertImageCandidateAccepted(
+            clue = PlaceClue(
+                name = "니트커피",
+                region = "서울",
+                queries = listOf("니트커피", "NEAT COFFEE"),
+                evidence = listOf(PlaceClueEvidence(1, "니트 커피")),
+            ),
+            selected = candidate("1", "NEAT COFFEE 성수점", "서울 성동구"),
+        )
+    }
+
+    @Test
+    fun `accepts a candidate with the same road and building number`() {
+        assertImageCandidateAccepted(
+            clue = PlaceClue(
+                name = "원형들",
+                region = "서울",
+                queries = listOf("원형들"),
+                evidence = listOf(PlaceClueEvidence(1, "서울 중구 창경궁로1길 38")),
+            ),
+            selected = candidate("1", "ONEHYUNG", "서울특별시 중구 창경궁로1길 38 (을지로4가)"),
+        )
+    }
+
+    @Test
+    fun `rejects a selected candidate that is unrelated to image evidence`() {
+        val transcript = ImageTranscript(1, listOf("니트커피 아뜰리에"))
+        val port = FakeJobPort(
+            attempt = 4,
+            imageUrls = listOf("https://cdn.test/1.jpg"),
+            textClues = emptyList(),
+            imageTranscripts = listOf(transcript),
+        )
+        val extractor = PlaceClueExtractor {
+            listOf(
+                PlaceClue(
+                    name = "나이트 커피",
+                    region = "서울",
+                    queries = listOf("나이트 커피"),
+                    evidence = listOf(PlaceClueEvidence(1, "니트커피 아뜰리에")),
+                ),
+            )
+        }
+        val unrelated = candidate("1", "콤포타블 커피 궁정동점", "서울 종로구")
+        val useCase = useCase(
+            port,
+            extractor,
+            SearchPlaceCandidatesUseCase { listOf(unrelated) },
+            PlaceCandidateSelector { unrelated },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
+        assertEquals(emptyList(), port.completed)
+        assertEquals("Selected place is not grounded in image evidence: 나이트 커피", port.failedReason)
+    }
+
+    @Test
     fun `fails without retry when every place clue fails to match and no image is available`() {
         val port = FakeJobPort(attempt = 2, body = "매칭 실패 장소")
         val extractor = PlaceClueExtractor {
@@ -416,13 +526,34 @@ class ProcessPlaceParsingJobUseCaseTest {
         assertNull(port.nextAttemptAt)
     }
 
+    private fun assertImageCandidateAccepted(clue: PlaceClue, selected: PlaceCandidate) {
+        val port = FakeJobPort(
+            imageUrls = listOf("https://cdn.test/1.jpg"),
+            textClues = emptyList(),
+            imageTranscripts = listOf(ImageTranscript(1, clue.evidence.map(PlaceClueEvidence::evidenceText))),
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(clue) },
+            search = SearchPlaceCandidatesUseCase { listOf(selected) },
+            selector = PlaceCandidateSelector { selected },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf(selected.externalPlaceId), port.completed.map(PlaceCandidate::externalPlaceId))
+    }
+
     private fun useCase(
         port: FakeJobPort,
         extractor: PlaceClueExtractor,
         search: SearchPlaceCandidatesUseCase,
         selector: PlaceCandidateSelector = PlaceCandidateSelector { null },
+        imageTextExtractor: ImageTextExtractor = ImageTextExtractor { request ->
+            request.images.map { ImageTranscript(it.imageIndex, listOf("전사 텍스트")) }
+        },
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = port,
+        imageTextExtractor = imageTextExtractor,
         clueExtractor = extractor,
         searchPlaceCandidates = search,
         candidateSelector = selector,
@@ -436,11 +567,13 @@ class ProcessPlaceParsingJobUseCaseTest {
         private val body: String = "본문",
         private val imageUrls: List<String> = emptyList(),
         private val textClues: List<PlaceClue>? = null,
+        private val imageTranscripts: List<ImageTranscript>? = null,
     ) : PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
         var failedReason: String? = null
         var nextAttemptAt: Instant? = null
         var retryReason: String? = null
+        var storedImageTranscripts: List<ImageTranscript>? = null
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob = ClaimedPlaceParsingJob(
             postId = postId,
@@ -450,9 +583,14 @@ class ProcessPlaceParsingJobUseCaseTest {
             sourceLocationTag = null,
             imageUrls = imageUrls,
             textClues = textClues,
+            imageTranscripts = imageTranscripts,
         )
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
+
+        override fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>) {
+            storedImageTranscripts = transcripts
+        }
 
         override fun complete(postId: Long, places: List<PlaceCandidate>) {
             completed = places

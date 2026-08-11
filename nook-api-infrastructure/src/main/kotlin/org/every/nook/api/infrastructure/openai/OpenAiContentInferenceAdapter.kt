@@ -43,7 +43,7 @@ class OpenAiContentInferenceAdapter(
             instructions = PLACE_INSTRUCTIONS,
             input = request.toInput(),
             schema = placeSchema,
-            maxOutputTokens = if (request.imageUrls.isEmpty()) {
+            maxOutputTokens = if (request.imageTranscripts.isEmpty()) {
                 PLACE_MAX_OUTPUT_TOKENS
             } else {
                 IMAGE_PLACE_MAX_OUTPUT_TOKENS
@@ -149,29 +149,19 @@ class OpenAiContentInferenceAdapter(
     private fun PostContentInference.Request.toInput(): String =
         contentInput(objectMapper, body, hashtags, sourceLocationTag)
 
-    private fun PlaceClueExtractor.Request.toInput(): Any {
-        val context = contentInput(objectMapper, body, hashtags, sourceLocationTag)
-        if (imageUrls.isEmpty()) {
-            return context
-        }
-        return listOf(
-            mapOf(
-                "role" to "user",
-                "content" to buildList {
-                    add(mapOf("type" to "input_text", "text" to context))
-                    imageUrls.forEach { imageUrl ->
-                        add(
-                            mapOf(
-                                "type" to "input_image",
-                                "image_url" to imageUrl,
-                                "detail" to IMAGE_DETAIL,
-                            ),
-                        )
-                    }
-                },
-            ),
-        )
-    }
+    private fun PlaceClueExtractor.Request.toInput(): String = objectMapper.writeValueAsString(
+        mapOf(
+            "body" to body,
+            "hashtags" to hashtags,
+            "sourceLocationTag" to sourceLocationTag,
+            "imageTranscripts" to imageTranscripts.map { transcript ->
+                mapOf(
+                    "imageIndex" to transcript.imageIndex,
+                    "texts" to transcript.texts,
+                )
+            },
+        ),
+    )
 
     private fun PlaceCandidateSelector.Request.toInput(): String = objectMapper.writeValueAsString(
         mapOf(
@@ -216,11 +206,11 @@ class OpenAiContentInferenceAdapter(
         val logger = KotlinLogging.logger {}
 
         const val MAX_TITLE_LENGTH = 25
-        const val MAX_PLACE_COUNT = 10
+        const val MAX_PLACE_COUNT = 20
         const val MAX_QUERY_COUNT = 4
-        const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 1000
+        const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 3000
         const val PLACE_MAX_OUTPUT_TOKENS = 800
-        const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 1600
+        const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 4000
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
         const val PLACE_TAG_MAX_OUTPUT_TOKENS = 600
         const val DEFAULT_TITLE = "Instagram 게시물"
@@ -280,10 +270,13 @@ class OpenAiContentInferenceAdapter(
                 "제목은 최대 25자이며 지역명, 상호명, 업종, 장소 개수 중 확인 가능한 핵심 정보만 사용한다. " +
                 "한 가게는 '중랑구 임현숙의이화김치찌개', 여러 가게는 '중곡동 맛집 5곳', " +
                 "지역이 없으면 '홍별감네 외 맛집 5곳' 형식을 따른다. " +
+                "본문에 지역, 업종, 장소 개수가 명시되면 그 표현과 숫자를 그대로 유지한다. 카페를 맛집으로 바꾸지 않는다. " +
+                "sourceLocationTag가 도시나 국가 같은 지역 메타데이터이면 상호명으로 사용하지 않는다. " +
+                "입력에 0개라고 명시되지 않은 한 제목에 0곳을 사용하지 않는다. " +
                 "투어, 감동, 보물, 한자리 같은 홍보성·감상적 표현과 따옴표, 해시태그를 사용하지 않는다. " +
                 "정보가 부족하면 'Instagram 게시물'을 반환한다."
         const val PLACE_INSTRUCTIONS =
-            "입력된 Instagram 본문, 해시태그, 장소 태그와 제공된 이미지에서 게시물이 방문, 소개 또는 추천하는 " +
+            "입력된 Instagram 본문, 해시태그, 장소 태그와 imageTranscripts에서 게시물이 방문, 소개 또는 추천하는 " +
                 "실제 영업 장소만 추출한다. " +
                 "가게는 음식점, 카페, 술집, 상점, 숙박업소처럼 상호명이 있는 영업 장소를 뜻한다. " +
                 "도시, 구, 동, 거리, 역, 공원, 관광지는 가게로 반환하지 말고 가게 검색을 위한 region과 query 단서로만 사용한다. " +
@@ -292,12 +285,12 @@ class OpenAiContentInferenceAdapter(
                 "이때 name은 sourceLocationTag 원문을 그대로 사용하고, 본문의 수식어나 별칭을 name에 붙이지 않는다. " +
                 "sourceLocationTag와 본문이 같은 가게를 가리키면 하나의 장소로 합친다. " +
                 "sourceLocationTag가 없거나 지역명 같은 비상호명 정보인 경우에만 본문과 해시태그에서 name을 결정한다. " +
-                "이미지가 제공되면 각 이미지의 전체 영역에서 읽을 수 있는 텍스트를 독립적으로 확인한다. " +
+                "imageTranscripts는 이미지별로 별도 전사된 원문이므로 이미지별 텍스트를 독립적으로 확인한다. " +
                 "텍스트의 위치, 크기, 번호, 카드 형식이나 이미지당 장소 개수를 가정하지 않는다. " +
                 "한 이미지에서 장소가 없거나 여러 개일 수 있고, 같은 장소가 여러 이미지에 나오면 하나로 합친다. " +
                 "표지 제목, 장소 개수 문구, 지역명 또는 일반 업종명만으로 상호명을 만들지 않는다. " +
-                "이미지 근거가 있는 장소는 입력 이미지 순서인 1부터 시작하는 imageIndex와 상호명 또는 주소를 실제로 읽은 " +
-                "문구 evidenceText를 evidence에 담는다. 이미지가 없거나 이미지 근거가 아니면 evidence는 빈 배열이다. " +
+                "이미지 근거가 있는 장소는 imageTranscripts의 imageIndex와 상호명 또는 주소가 포함된 실제 전사 문구를 " +
+                "evidenceText로 evidence에 담는다. 이미지가 없거나 이미지 근거가 아니면 evidence는 빈 배열이다. " +
                 "읽을 수 없는 글씨나 로고를 추측하지 않는다. " +
                 "장소별 상호명 name, 확인 가능한 region, 카카오 장소 검색용 queries를 반환한다. " +
                 "queries의 첫 항목은 sourceLocationTag가 상호명이면 원문 그대로 사용하고, 이후에는 본문에서 확인되는 " +
@@ -305,7 +298,7 @@ class OpenAiContentInferenceAdapter(
                 "예를 들어 sourceLocationTag가 Lodge190이고 본문이 '연희동 사랑방 롯지190'이면 name은 Lodge190이고 " +
                 "queries는 원문 Lodge190, 한글 음차 롯지190, 띄어쓰기 변형 롯지 190, " +
                 "지역을 붙인 축약형 연희동 Lodge 순서로 반환한다. " +
-                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 10개 가게와 가게당 최대 4개 검색어만 반환한다."
+                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 20개 가게와 가게당 최대 4개 검색어만 반환한다."
         const val CONTENT_INFERENCE_INSTRUCTIONS =
             "title과 places를 하나의 응답으로 함께 반환한다. " + TITLE_INSTRUCTIONS + " " + PLACE_INSTRUCTIONS
         const val CANDIDATE_SELECTION_INSTRUCTIONS =
