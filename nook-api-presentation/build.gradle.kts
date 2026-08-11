@@ -16,7 +16,7 @@ dependencies {
     implementation("org.springframework:spring-tx")
     implementation("org.springframework.security:spring-security-oauth2-resource-server")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("io.github.cdimascio:dotenv-kotlin:6.5.1")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
@@ -25,6 +25,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-oauth2-jose")
     testImplementation("org.springframework.security:spring-security-test")
+    testRuntimeOnly("com.h2database:h2")
     testImplementation(kotlin("test"))
 }
 

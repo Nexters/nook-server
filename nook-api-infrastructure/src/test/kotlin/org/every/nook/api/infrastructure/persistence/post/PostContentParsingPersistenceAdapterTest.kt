@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.persistence.post
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
@@ -18,6 +17,7 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.context.ApplicationEventPublisher
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant

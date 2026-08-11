@@ -1,7 +1,5 @@
 package org.every.nook.api.infrastructure.instagram
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
@@ -13,6 +11,8 @@ import org.springframework.http.MediaType
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.net.SocketTimeoutException
 
 class BrightDataInstagramPostContentExtractor(

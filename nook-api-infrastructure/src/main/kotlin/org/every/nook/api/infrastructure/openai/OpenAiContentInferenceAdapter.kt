@@ -1,7 +1,5 @@
 package org.every.nook.api.infrastructure.openai
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidateSelector
@@ -13,6 +11,8 @@ import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.domain.place.PlaceTag
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 
 class OpenAiContentInferenceAdapter(
     private val restClient: RestClient,
@@ -52,12 +52,13 @@ class OpenAiContentInferenceAdapter(
         return result.toPlaceClues()
     }
 
-    private fun JsonNode.toPlaceClues(): List<PlaceClue> = path("places").map { place ->
+    private fun JsonNode.toPlaceClues(): List<PlaceClue> = path("places").toList().map { place ->
         PlaceClue(
             name = place.path("name").asText().trim(),
             region = place.path("region").takeUnless(JsonNode::isNull)?.asText()?.trim()?.ifBlank { null },
-            queries = place.path("queries").map(JsonNode::asText).map(String::trim).filter(String::isNotEmpty),
-            evidence = place.path("evidence").map { evidence ->
+            queries = place.path("queries").toList().map(JsonNode::asText).map(String::trim)
+                .filter(String::isNotEmpty),
+            evidence = place.path("evidence").toList().map { evidence ->
                 PlaceClueEvidence(
                     imageIndex = evidence.path("imageIndex").asInt(),
                     evidenceText = evidence.path("evidenceText").asText().trim(),
@@ -90,7 +91,7 @@ class OpenAiContentInferenceAdapter(
             schema = placeTagSchema(),
             maxOutputTokens = PLACE_TAG_MAX_OUTPUT_TOKENS,
         )
-        return result.path("tags").map { tag ->
+        return result.path("tags").toList().map { tag ->
             InferredPlaceTag(
                 tag = PlaceTag.valueOf(tag.path("tag").asText()),
                 confidence = tag.path("confidence").asDouble(),

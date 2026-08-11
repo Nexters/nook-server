@@ -1,7 +1,5 @@
 package org.every.nook.api.infrastructure.persistence.place
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.MapPlaceView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceView
@@ -10,6 +8,8 @@ import org.every.nook.api.domain.place.GeoBounds
 import org.every.nook.api.domain.place.PlaceTag
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 @Component
 class PlaceMapQueryPersistenceAdapter(

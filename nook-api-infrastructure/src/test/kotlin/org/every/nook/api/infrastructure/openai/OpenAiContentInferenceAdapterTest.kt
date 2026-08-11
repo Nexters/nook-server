@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.openai
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClue
@@ -18,6 +17,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals

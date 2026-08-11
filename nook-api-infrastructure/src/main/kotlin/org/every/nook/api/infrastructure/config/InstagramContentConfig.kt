@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.config
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostSourceResolver
@@ -19,6 +18,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 @Configuration
 @EnableConfigurationProperties(BrightDataProperties::class, ApifyProperties::class)

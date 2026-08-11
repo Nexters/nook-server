@@ -1,7 +1,5 @@
 package org.every.nook.api.infrastructure.persistence.group
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.group.GroupPlacePage
 import org.every.nook.api.application.group.GroupPlaceSummary
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
@@ -11,6 +9,8 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaReposi
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 @Component
 class GroupPlaceQueryPersistenceAdapter(
