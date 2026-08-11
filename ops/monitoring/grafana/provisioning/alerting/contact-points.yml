@@ -1,10 +1,14 @@
 apiVersion: 1
 
+deleteContactPoints:
+  - orgId: 1
+    uid: slack_nook_alerts
+
 contactPoints:
   - orgId: 1
-    name: slack-nook-alerts
+    name: slack-nook-alerts-v2
     receivers:
-      - uid: slack_nook_alerts
+      - uid: slack_nook_alerts_v2
         type: slack
         disableResolveMessage: false
         settings:
