@@ -8,14 +8,10 @@ import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
-import jakarta.validation.constraints.Size
 import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
-import org.every.nook.api.application.place.SearchAllStoredPlacesUseCase
-import org.every.nook.api.application.place.SearchMyStoredPlacesUseCase
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.presentation.auth.UserContext
@@ -24,7 +20,6 @@ import org.every.nook.api.presentation.place.response.MapPlaceResponse
 import org.every.nook.api.presentation.place.response.PlaceDetailResponse
 import org.every.nook.api.presentation.place.response.PlaceSearchSliceResponse
 import org.every.nook.api.presentation.place.response.RecentPlaceSliceResponse
-import org.every.nook.api.presentation.place.response.StoredPlaceSearchSliceResponse
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
@@ -40,7 +35,6 @@ private const val MAX_PLACE_POST_PAGE_SIZE = 100L
 private const val MAX_RECENT_PLACE_PAGE_SIZE = 100L
 private const val MAX_PLACE_SEARCH_PAGE = 44L
 private const val MAX_PLACE_SEARCH_PAGE_SIZE = 15L
-private const val MAX_STORED_PLACE_SEARCH_PAGE_SIZE = 100L
 
 @Tag(name = "Place")
 @Validated
@@ -52,8 +46,6 @@ class PlaceController(
     private val getMapPlacesUseCase: GetMapPlacesUseCase,
     private val getRecentPlacesUseCase: GetRecentPlacesUseCase,
     private val searchPlacesUseCase: SearchPlacesUseCase,
-    private val searchAllStoredPlacesUseCase: SearchAllStoredPlacesUseCase,
-    private val searchMyStoredPlacesUseCase: SearchMyStoredPlacesUseCase,
 ) {
     @Operation(summary = "지도 영역의 북마크 장소 조회")
     @GetMapping("/map")
@@ -154,56 +146,6 @@ class PlaceController(
             ),
         )
         return ApiResponse.success(PlaceSearchSliceResponse.from(result))
-    }
-
-    @Operation(summary = "DB 전체 장소 검색")
-    @GetMapping("/database/search")
-    fun searchAllStoredPlaces(
-        @Parameter(hidden = true) userContext: UserContext,
-        @Parameter(description = "검색할 장소명 또는 주소")
-        @RequestParam
-        @NotBlank
-        @Size(max = 100)
-        query: String,
-        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
-        @RequestParam(defaultValue = "0")
-        @Min(0)
-        page: Int,
-        @Parameter(description = "페이지당 장소 수")
-        @RequestParam(defaultValue = "20")
-        @Min(1)
-        @Max(MAX_STORED_PLACE_SEARCH_PAGE_SIZE)
-        size: Int,
-    ): ApiResponse<StoredPlaceSearchSliceResponse> {
-        val result = searchAllStoredPlacesUseCase(
-            SearchAllStoredPlacesUseCase.Query(userContext.userId, query, page, size),
-        )
-        return ApiResponse.success(StoredPlaceSearchSliceResponse.from(result))
-    }
-
-    @Operation(summary = "내가 저장한 장소 검색")
-    @GetMapping("/my/search")
-    fun searchMyStoredPlaces(
-        @Parameter(hidden = true) userContext: UserContext,
-        @Parameter(description = "검색할 장소명 또는 주소")
-        @RequestParam
-        @NotBlank
-        @Size(max = 100)
-        query: String,
-        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
-        @RequestParam(defaultValue = "0")
-        @Min(0)
-        page: Int,
-        @Parameter(description = "페이지당 장소 수")
-        @RequestParam(defaultValue = "20")
-        @Min(1)
-        @Max(MAX_STORED_PLACE_SEARCH_PAGE_SIZE)
-        size: Int,
-    ): ApiResponse<StoredPlaceSearchSliceResponse> {
-        val result = searchMyStoredPlacesUseCase(
-            SearchMyStoredPlacesUseCase.Query(userContext.userId, query, page, size),
-        )
-        return ApiResponse.success(StoredPlaceSearchSliceResponse.from(result))
     }
 
     @Operation(summary = "장소 상세 및 연관 게시물 조회")

@@ -17,11 +17,7 @@ import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
-import org.every.nook.api.application.place.SearchAllStoredPlacesUseCase
-import org.every.nook.api.application.place.SearchMyStoredPlacesUseCase
 import org.every.nook.api.application.place.SearchPlacesUseCase
-import org.every.nook.api.application.place.StoredPlaceSearchSliceView
-import org.every.nook.api.application.place.StoredPlaceSearchView
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -48,8 +44,6 @@ class PlaceControllerTest {
     private lateinit var getMapPlacesUseCase: GetMapPlacesUseCase
     private lateinit var getRecentPlacesUseCase: GetRecentPlacesUseCase
     private lateinit var searchPlacesUseCase: SearchPlacesUseCase
-    private lateinit var searchAllStoredPlacesUseCase: SearchAllStoredPlacesUseCase
-    private lateinit var searchMyStoredPlacesUseCase: SearchMyStoredPlacesUseCase
 
     @BeforeTest
     fun setUp() {
@@ -60,8 +54,6 @@ class PlaceControllerTest {
         getMapPlacesUseCase = mock(GetMapPlacesUseCase::class.java)
         getRecentPlacesUseCase = mock(GetRecentPlacesUseCase::class.java)
         searchPlacesUseCase = mock(SearchPlacesUseCase::class.java)
-        searchAllStoredPlacesUseCase = mock(SearchAllStoredPlacesUseCase::class.java)
-        searchMyStoredPlacesUseCase = mock(SearchMyStoredPlacesUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 PlaceController(
@@ -70,8 +62,6 @@ class PlaceControllerTest {
                     getMapPlacesUseCase,
                     getRecentPlacesUseCase,
                     searchPlacesUseCase,
-                    searchAllStoredPlacesUseCase,
-                    searchMyStoredPlacesUseCase,
                 ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
@@ -282,37 +272,6 @@ class PlaceControllerTest {
     }
 
     @Test
-    fun `searches all stored places`() {
-        val query = SearchAllStoredPlacesUseCase.Query(TEST_USER_ID, "용산", 0, 20)
-        `when`(searchAllStoredPlacesUseCase(query)).thenReturn(storedPlaceSearchSlice(bookmarked = false))
-
-        mockMvc.get("/api/v1/places/database/search?query=용산&page=0&size=20")
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.success.items[0].name") { value("원동미나리삼겹살") }
-                jsonPath("$.success.items[0].bookmarked") { value(false) }
-                jsonPath("$.success.hasNext") { value(false) }
-            }
-
-        verify(searchAllStoredPlacesUseCase)(query)
-    }
-
-    @Test
-    fun `searches my stored places`() {
-        val query = SearchMyStoredPlacesUseCase.Query(TEST_USER_ID, "용산", 0, 20)
-        `when`(searchMyStoredPlacesUseCase(query)).thenReturn(storedPlaceSearchSlice(bookmarked = true))
-
-        mockMvc.get("/api/v1/places/my/search?query=용산&page=0&size=20")
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.success.items[0].bookmarked") { value(true) }
-                jsonPath("$.success.items[0].tags[0]") { value("조용한") }
-            }
-
-        verify(searchMyStoredPlacesUseCase)(query)
-    }
-
-    @Test
     fun `updates a place bookmark without a post identifier`() {
         mockMvc.patch("/api/v1/places/17/bookmark") {
             contentType = MediaType.APPLICATION_JSON
@@ -330,25 +289,6 @@ class PlaceControllerTest {
             ),
         )
     }
-
-    private fun storedPlaceSearchSlice(bookmarked: Boolean): StoredPlaceSearchSliceView = StoredPlaceSearchSliceView(
-        items = listOf(
-            StoredPlaceSearchView(
-                id = 17,
-                name = "원동미나리삼겹살",
-                address = "서울 용산구",
-                category = "한식",
-                latitude = BigDecimal("37.5"),
-                longitude = BigDecimal("127.0"),
-                thumbnailUrl = null,
-                tags = listOf("조용한"),
-                bookmarked = bookmarked,
-            ),
-        ),
-        page = 0,
-        size = 20,
-        hasNext = false,
-    )
 
     private companion object {
         const val TEST_USER_ID = 1L
