@@ -10,7 +10,7 @@ API 요청, 서버 로그, 에러 로그를 같은 요청 컨텍스트로 묶어
 - 요청별 MDC에 `request.id`, `user.id`, `http.route`, `transaction.name`, `transaction.duration.ms` 등을 남깁니다.
 - API access log를 Spring Boot 구조화 로그의 `logstash` JSON 형식으로 출력합니다.
 - 허용된 request header 기반 클라이언트 컨텍스트를 로그 필드로 남깁니다.
-- JSON request/response body를 설정 기반으로 수집하고, 제한 깊이로 `request.body.*`, `response.body.*` 필드에 평탄화합니다.
+- JSON request/response body를 설정 기반으로 수집하고, `request.body`, `response.body` JSON 문자열 필드로 남깁니다.
 - body 수집 시 크기 제한과 민감 필드 마스킹을 적용합니다.
 - 요청에서 시작된 비동기 parsing task와 retry scheduler 로그에 MDC request context를 전파합니다.
 - dev Promtail이 JSON 로그의 `level` 필드를 Loki label로 추출하도록 갱신합니다.
@@ -52,7 +52,7 @@ body 로그는 다음 정책을 따릅니다.
 - `HTTP_LOG_REQUEST_BODY_ENABLED`, `HTTP_LOG_RESPONSE_BODY_ENABLED`로 환경별 override가 가능합니다.
 - `application/json`, `application/*+json`만 수집합니다.
 - 기본 최대 크기는 16KB입니다.
-- JSON 필드는 최대 깊이 5, 최대 80개 필드, 배열당 최대 10개 항목만 평탄화합니다.
+- body JSON은 최대 16KB까지 수집하고, 초과 여부를 `request.body.truncated`, `response.body.truncated`로 남깁니다.
 - `authorization`, `cookie`, `password`, `secret`, `token`, `signature`, `presigned` 등 민감 키워드가 포함된 필드는 `[REDACTED]`로 남깁니다.
 
 주요 로그 필드는 다음과 같습니다.
@@ -74,8 +74,8 @@ response.status
 transaction.name
 transaction.type
 transaction.duration.ms
-request.body.<field>
-response.body.<field>
+request.body
+response.body
 error.type
 error.message
 ```
@@ -90,7 +90,7 @@ Loki label은 `env`, `job`, `container`, `stream`, `level`처럼 cardinality가 
 {env="dev", job="nook-api"} | json | user_id="42"
 {env="dev", job="nook-api"} | json | http_route="/api/v1/posts/{postId}"
 {env="dev", job="nook-api"} | json | response_status="500"
-{env="dev", job="nook-api"} | json | request_body_url="https://example.com/post"
+{env="dev", job="nook-api"} | json | request_body=~".*https://example.com/post.*"
 ```
 
 Grafana/Loki의 `json` parser는 dot key를 query identifier에서 underscore로 노출할 수 있습니다. 예를 들어
@@ -98,7 +98,7 @@ Grafana/Loki의 `json` parser는 dot key를 query identifier에서 underscore로
 
 ## Grafana 대시보드 검색
 
-`Nook Dev Logs` 대시보드는 다음 변수로 `Filtered API Request Logs` 패널을 필터링합니다.
+`Nook Dev Logs` 대시보드는 다음 변수로 `API Request Summary`와 `Raw API Logs` 패널을 필터링합니다.
 
 ```text
 Level
@@ -113,8 +113,8 @@ Keyword
 입력하고, 특정 사용자의 로그만 보려면 `User ID`에 user id를 입력합니다. 경로와 상태 코드는 각각 `Route`,
 `Status`로 좁힙니다.
 
-`Filtered API Request Logs` 패널은 입력값을 로그 라인에 대한 포함 검색으로 적용한 뒤 JSON 필드를 펼쳐 보여줍니다.
-구조화되지 않았거나 요청 컨텍스트가 없는 로그도 기본 상태에서는 함께 확인할 수 있습니다.
+`API Request Summary` 패널은 입력값을 로그 라인에 대한 포함 검색으로 적용한 뒤 주요 API 필드만 테이블로 보여줍니다.
+구조화되지 않았거나 요청 컨텍스트가 없는 로그는 `Raw API Logs` 패널에서 확인합니다.
 
 ## 성공 기준
 

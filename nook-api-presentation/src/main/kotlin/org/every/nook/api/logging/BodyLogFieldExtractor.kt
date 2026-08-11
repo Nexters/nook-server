@@ -4,11 +4,18 @@ import org.springframework.http.MediaType
 import tools.jackson.core.JacksonException
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.node.ArrayNode
+import tools.jackson.databind.node.JsonNodeFactory
+import tools.jackson.databind.node.ObjectNode
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
-class BodyLogFieldExtractor(private val properties: HttpLoggingProperties, private val objectMapper: ObjectMapper) {
+class BodyLogFieldExtractor(
+    private val properties: HttpLoggingProperties,
+    private val objectMapper: ObjectMapper,
+    private val privacyArgumentFieldNames: PrivacyArgumentFieldNames,
+) {
     fun extract(prefix: String, body: ByteArray?, contentType: String?, charset: String?): Map<String, String> {
         if (!shouldExtract(body, contentType)) {
             return emptyMap()
@@ -22,11 +29,13 @@ class BodyLogFieldExtractor(private val properties: HttpLoggingProperties, priva
 
         try {
             val root = objectMapper.readTree(limitedBody.toString(charset(charset)))
-            flattenJson(prefix, root, fields, depth = 0, sensitive = false)
+            fields[prefix] = objectMapper.writeValueAsString(redactJson(root, sensitive = false))
         } catch (_: IllegalArgumentException) {
             fields["$prefix.parse_error"] = "true"
+            fields[prefix] = limitedBody.toString(charset(charset))
         } catch (_: JacksonException) {
             fields["$prefix.parse_error"] = "true"
+            fields[prefix] = limitedBody.toString(charset(charset))
         }
 
         return fields
@@ -46,39 +55,21 @@ class BodyLogFieldExtractor(private val properties: HttpLoggingProperties, priva
     private fun shouldExtract(body: ByteArray?, contentType: String?): Boolean =
         body != null && body.isNotEmpty() && hasIncludedContentType(contentType)
 
-    private fun flattenJson(
-        prefix: String,
-        node: JsonNode,
-        output: MutableMap<String, String>,
-        depth: Int,
-        sensitive: Boolean,
-    ) {
-        if (output.size >= properties.body.maxFlattenedFields) {
-            output["$prefix.fields_truncated"] = "true"
-            return
-        }
-        if (depth >= properties.body.maxDepth || node.isValueNode || node.isNull) {
-            output[prefix] = if (sensitive) MASKED_VALUE else node.asString("")
-            return
-        }
+    private fun redactJson(node: JsonNode, sensitive: Boolean): JsonNode = when {
+        sensitive -> JsonNodeFactory.instance.stringNode(MASKED_VALUE)
+        node.isObject -> redactObject(node)
+        node.isArray -> redactArray(node)
+        else -> node
+    }
 
-        when {
-            node.isObject -> node.properties().forEach { (name, child) ->
-                flattenJson(
-                    prefix = "$prefix.${name.toLogFieldName()}",
-                    node = child,
-                    output = output,
-                    depth = depth + 1,
-                    sensitive = sensitive || name.isSensitiveFieldName(),
-                )
-            }
-
-            node.isArray -> node.take(properties.body.maxArrayItems).forEachIndexed { index, child ->
-                flattenJson("$prefix.$index", child, output, depth + 1, sensitive)
-            }
-
-            else -> output[prefix] = node.toString()
+    private fun redactObject(node: JsonNode): ObjectNode = JsonNodeFactory.instance.objectNode().apply {
+        node.properties().forEach { (name, child) ->
+            set(name, redactJson(child, sensitive = name.isSensitiveFieldName()))
         }
+    }
+
+    private fun redactArray(node: JsonNode): ArrayNode = JsonNodeFactory.instance.arrayNode().apply {
+        node.forEach { child -> add(redactJson(child, sensitive = false)) }
     }
 
     private fun charset(name: String?): Charset =
@@ -86,7 +77,8 @@ class BodyLogFieldExtractor(private val properties: HttpLoggingProperties, priva
 
     private fun String.isSensitiveFieldName(): Boolean {
         val normalized = toLogFieldName().replace("_", "")
-        return properties.body.sensitiveFieldKeywords.any { normalized.contains(it.lowercase(Locale.ROOT)) }
+        return privacyArgumentFieldNames.contains(this) ||
+            properties.body.sensitiveFieldKeywords.any { normalized.contains(it.lowercase(Locale.ROOT)) }
     }
 
     private fun String.toLogFieldName(): String = lowercase(Locale.ROOT)
@@ -96,6 +88,6 @@ class BodyLogFieldExtractor(private val properties: HttpLoggingProperties, priva
         .trim('_')
 
     private companion object {
-        const val MASKED_VALUE = "[REDACTED]"
+        const val MASKED_VALUE = "****"
     }
 }

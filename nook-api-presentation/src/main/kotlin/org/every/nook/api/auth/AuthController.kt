@@ -13,6 +13,7 @@ import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
 import org.every.nook.api.application.auth.SocialCredential
 import org.every.nook.api.application.auth.SocialLoginProvider
 import org.every.nook.api.application.member.LogoutMemberUseCase
+import org.every.nook.api.logging.PrivacyArgument
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.http.ResponseEntity
@@ -58,10 +59,13 @@ data class SocialAuthRequest(
     @field:NotNull
     val provider: SocialLoginProvider?,
     @field:Schema(description = "provider access token", nullable = true)
+    @field:PrivacyArgument
     val accessToken: String? = null,
     @field:Schema(description = "provider identity token", nullable = true)
+    @field:PrivacyArgument
     val identityToken: String? = null,
     @field:Schema(description = "provider authorization code", nullable = true)
+    @field:PrivacyArgument
     val authorizationCode: String? = null,
 ) {
     fun toCredential(): SocialCredential = SocialCredential(
@@ -75,13 +79,16 @@ data class SocialAuthRequest(
 data class RefreshTokenRequest(
     @field:Schema(description = "서비스 refresh token")
     @field:NotBlank
+    @field:PrivacyArgument
     val refreshToken: String,
 )
 
 data class SocialAuthResponse(
     @field:Schema(description = "서비스 access token")
+    @field:PrivacyArgument
     val accessToken: String,
     @field:Schema(description = "서비스 refresh token")
+    @field:PrivacyArgument
     val refreshToken: String,
 ) {
     companion object {
@@ -91,8 +98,10 @@ data class SocialAuthResponse(
 
 data class TokenResponse(
     @field:Schema(description = "서비스 access token")
+    @field:PrivacyArgument
     val accessToken: String,
     @field:Schema(description = "서비스 refresh token")
+    @field:PrivacyArgument
     val refreshToken: String,
 ) {
     companion object {
