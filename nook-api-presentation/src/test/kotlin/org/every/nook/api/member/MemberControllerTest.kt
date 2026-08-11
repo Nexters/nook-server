@@ -159,6 +159,10 @@ class MemberControllerTest {
                     uploadUrl = "https://s3.example.com/upload",
                     profileImageUrl = "https://cdn.example.com/profile.jpg",
                     contentType = "image/jpeg",
+                    headers = mapOf(
+                        "Content-Type" to "image/jpeg",
+                        "Cache-Control" to "public, max-age=31536000, immutable",
+                    ),
                     expiresAt = Instant.parse("2026-08-10T00:00:00Z"),
                     maxBytes = 20_971_520,
                 ),
@@ -173,6 +177,8 @@ class MemberControllerTest {
             jsonPath("$.success.profileImageUrl") { value("https://cdn.example.com/profile.jpg") }
             jsonPath("$.success.method") { value("PUT") }
             jsonPath("$.success.contentType") { value("image/jpeg") }
+            jsonPath("$.success.headers.Content-Type") { value("image/jpeg") }
+            jsonPath("$.success.headers.Cache-Control") { value("public, max-age=31536000, immutable") }
             jsonPath("$.success.expiresAt") { value("2026-08-10T00:00:00Z") }
             jsonPath("$.success.maxBytes") { value(20_971_520) }
         }

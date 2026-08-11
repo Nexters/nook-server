@@ -17,6 +17,10 @@ Parameters:
   MediaWriterRoleName:
     Type: String
     Description: Existing application role that receives environment-scoped media permissions
+  UploadCorsAllowedOrigins:
+    Type: CommaDelimitedList
+    Default: "https://everynook.co.kr"
+    Description: Origins allowed to upload profile images with presigned S3 URLs
 
 Resources:
   MediaBucket:
@@ -34,6 +38,17 @@ Resources:
             Status: Enabled
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 7
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - Content-Type
+              - Cache-Control
+            AllowedMethods:
+              - PUT
+            AllowedOrigins: !Ref UploadCorsAllowedOrigins
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3000
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
@@ -135,7 +150,14 @@ Resources:
             Action:
               - s3:GetObject
               - s3:PutObject
-            Resource: !Sub "${MediaBucket.Arn}/post-media/*"
+            Resource:
+              - !Sub "${MediaBucket.Arn}/post-media/*"
+          - Sid: WriteProfileImageObjects
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub "${MediaBucket.Arn}/profile-images/*"
 
 Outputs:
   BucketName:

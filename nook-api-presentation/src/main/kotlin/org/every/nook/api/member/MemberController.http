@@ -32,6 +32,7 @@ Content-Type: application/json
 ### 프로필 이미지 업로드
 PUT replace-with-upload-url
 Content-Type: image/jpeg
+Cache-Control: public, max-age=31536000, immutable
 
 < ./profile.jpg
 
