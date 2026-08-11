@@ -60,6 +60,23 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `reuses stored text clues without another text inference call`() {
+        val port = FakeJobPort(
+            textClues = listOf(PlaceClue("저장된 장소", "서울", listOf("저장된 장소"))),
+        )
+        val useCase = useCase(
+            port,
+            PlaceClueExtractor { error("text inference must not be called") },
+            SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "저장된 장소", "서울 중구"))
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf("1"), port.completed.map { it.externalPlaceId })
+    }
+
+    @Test
     fun `uses at most twenty images in one fallback extraction`() {
         val imageUrls = (0 until 25).map { "https://cdn.test/$it.jpg" }
         val port = FakeJobPort(imageUrls = imageUrls)
@@ -323,15 +340,25 @@ class ProcessPlaceParsingJobUseCaseTest {
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 
-    private class FakeJobPort(private val attempt: Int = 1, private val imageUrls: List<String> = emptyList()) :
-        PlaceParsingJobPort {
+    private class FakeJobPort(
+        private val attempt: Int = 1,
+        private val imageUrls: List<String> = emptyList(),
+        private val textClues: List<PlaceClue>? = null,
+    ) : PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
         var failedReason: String? = null
         var nextAttemptAt: Instant? = null
         var retryReason: String? = null
 
-        override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob =
-            ClaimedPlaceParsingJob(postId, attempt, "본문", emptyList(), null, imageUrls)
+        override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob = ClaimedPlaceParsingJob(
+            postId = postId,
+            attempt = attempt,
+            body = "본문",
+            hashtags = emptyList(),
+            sourceLocationTag = null,
+            imageUrls = imageUrls,
+            textClues = textClues,
+        )
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
 

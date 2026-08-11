@@ -4,6 +4,7 @@ import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
+import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostMedia
@@ -44,9 +45,12 @@ class ProcessPostContentParsingJobUseCaseTest {
         val useCase = ProcessPostContentParsingJobUseCase(
             jobPort = port,
             extractPostContent = ExtractPostContentUseCase(listOf(extractor)),
-            titleGenerator = PostTitleGenerator {
-                calls += "title"
-                "성수 맛집"
+            contentInference = PostContentInference {
+                calls += "inference"
+                PostContentInference.Inference(
+                    title = "성수 맛집",
+                    placeClues = listOf(PlaceClue("성수 식당", "성수", listOf("성수 식당"))),
+                )
             },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),
@@ -54,12 +58,13 @@ class ProcessPostContentParsingJobUseCaseTest {
         )
 
         assertIs<ProcessPostContentParsingJobUseCase.Result.Completed>(useCase(101))
-        assertEquals(listOf("claim", "extract", "title", "complete"), calls)
+        assertEquals(listOf("claim", "extract", "inference", "complete"), calls)
         val completed = requireNotNull(port.completedPost)
         assertEquals("성수 맛집", completed.title)
         assertEquals("성수", completed.sourceLocationTag)
         assertEquals(listOf("맛집", "서울"), completed.hashtags)
         assertEquals("https://source/image.jpg", completed.media.single().url)
+        assertEquals(listOf("성수 식당"), port.completedTextPlaceClues.map(PlaceClue::name))
     }
 
     @Test
@@ -76,7 +81,7 @@ class ProcessPostContentParsingJobUseCaseTest {
                     },
                 ),
             ),
-            titleGenerator = PostTitleGenerator { error("title must not be generated") },
+            contentInference = PostContentInference { error("content must not be inferred") },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),
             clock = CLOCK,
@@ -104,7 +109,7 @@ class ProcessPostContentParsingJobUseCaseTest {
                     },
                 ),
             ),
-            titleGenerator = PostTitleGenerator { error("title must not be generated") },
+            contentInference = PostContentInference { error("content must not be inferred") },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),
             clock = CLOCK,
@@ -131,7 +136,9 @@ class ProcessPostContentParsingJobUseCaseTest {
         val useCase = ProcessPostContentParsingJobUseCase(
             jobPort = port,
             extractPostContent = ExtractPostContentUseCase(listOf(extractor)),
-            titleGenerator = PostTitleGenerator { "Instagram 게시물" },
+            contentInference = PostContentInference {
+                PostContentInference.Inference("Instagram 게시물", emptyList())
+            },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),
             metrics = ProcessingMetrics(measurements::add),
@@ -139,13 +146,14 @@ class ProcessPostContentParsingJobUseCaseTest {
         )
 
         assertIs<ProcessPostContentParsingJobUseCase.Result.Completed>(useCase(101))
-        assertEquals(listOf("extract", "title", "complete"), measurements.map { it.stage })
+        assertEquals(listOf("extract", "inference", "complete"), measurements.map { it.stage })
         assertEquals(listOf("post-content", "post-content", "post-content"), measurements.map { it.flow })
     }
 
     private class RecordingPort(private val calls: MutableList<String> = mutableListOf()) :
         PostContentParsingJobPort {
         var completedPost: Post? = null
+        var completedTextPlaceClues: List<PlaceClue> = emptyList()
         var retryAt: Instant? = null
         var failureReason: String? = null
 
@@ -160,9 +168,10 @@ class ProcessPostContentParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPostContentParsingJob> = emptyList()
 
-        override fun complete(postId: Long, post: Post) {
+        override fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>) {
             calls += "complete"
             completedPost = post
+            completedTextPlaceClues = textPlaceClues
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {

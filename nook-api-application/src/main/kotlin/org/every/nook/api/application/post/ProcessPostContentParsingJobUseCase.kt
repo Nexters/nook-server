@@ -16,7 +16,7 @@ import java.time.Instant
 class ProcessPostContentParsingJobUseCase(
     private val jobPort: PostContentParsingJobPort,
     private val extractPostContent: ExtractPostContentUseCase,
-    private val titleGenerator: PostTitleGenerator,
+    private val contentInference: PostContentInference,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
@@ -35,19 +35,18 @@ class ProcessPostContentParsingJobUseCase(
                 sourceLocationTag = extracted.toSourceLocationTag(),
                 hashtags = extracted.hashtags.toPersistentHashtags(),
             )
-            val completedPost = providedPost.copy(
-                title = measure(job, TITLE_STAGE) {
-                    titleGenerator.generate(
-                        PostTitleGenerator.Request(
-                            body = providedPost.body,
-                            hashtags = providedPost.hashtags,
-                            sourceLocationTag = providedPost.sourceLocationTag,
-                        ),
-                    )
-                },
-            )
+            val inference = measure(job, INFERENCE_STAGE) {
+                contentInference.infer(
+                    PostContentInference.Request(
+                        body = providedPost.body,
+                        hashtags = providedPost.hashtags,
+                        sourceLocationTag = providedPost.sourceLocationTag,
+                    ),
+                )
+            }
+            val completedPost = providedPost.copy(title = inference.title)
             measure(job, COMPLETE_STAGE) {
-                jobPort.complete(job.postId, completedPost)
+                jobPort.complete(job.postId, completedPost, inference.placeClues)
             }
             val duration = Duration.between(startedAt, clock.instant()).toMillis()
             logger.info {
@@ -129,7 +128,7 @@ class ProcessPostContentParsingJobUseCase(
         const val DEFAULT_FAILURE_REASON = "Post content parsing failed"
         const val CONTENT_FLOW = "post-content"
         const val EXTRACT_STAGE = "extract"
-        const val TITLE_STAGE = "title"
+        const val INFERENCE_STAGE = "inference"
         const val COMPLETE_STAGE = "complete"
     }
 }

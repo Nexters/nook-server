@@ -1,7 +1,9 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -54,6 +56,7 @@ class PlaceParsingPersistenceAdapterTest {
         userPlaceBookmarkRepository = bookmarkRepository,
         postPlaceTagRepository = postPlaceTagRepository,
         eventPublisher = eventPublisher,
+        objectMapper = jacksonObjectMapper(),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 
@@ -86,6 +89,27 @@ class PlaceParsingPersistenceAdapterTest {
         assertEquals(PlaceParsingStatus.PROCESSING, job.status)
         assertEquals("previous failure", job.failureReason)
         assertEquals(NOW, job.nextAttemptAt)
+    }
+
+    @Test
+    fun `returns stored text clues when claiming a new inference job`() {
+        val job = PlaceParsingJobEntity(
+            postId = 11,
+            status = PlaceParsingStatus.PENDING,
+            textPlaceClues = """[{"name":"성수 식당","region":"성수","queries":["성수 식당"],"evidence":[]}]""",
+            nextAttemptAt = NOW.minusSeconds(1),
+        )
+        val post = mock(PostEntity::class.java)
+        `when`(jobRepository.findByPostIdForUpdate(11)).thenReturn(job)
+        `when`(postRepository.findById(11)).thenReturn(Optional.of(post))
+        `when`(hashtagRepository.findAllByPostIdOrderBySequenceAsc(11)).thenReturn(emptyList())
+        `when`(
+            mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(11, PostMedia.MediaType.IMAGE),
+        ).thenReturn(emptyList())
+
+        val claimed = requireNotNull(adapter.claim(11, Duration.ofMinutes(1)))
+
+        assertEquals(listOf("성수 식당"), claimed.textClues?.map(PlaceClue::name))
     }
 
     @Test

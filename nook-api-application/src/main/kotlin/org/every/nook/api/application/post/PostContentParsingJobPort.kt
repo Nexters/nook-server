@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post
 
+import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.domain.post.Post
 import java.time.Duration
 import java.time.Instant
@@ -9,7 +10,7 @@ interface PostContentParsingJobPort {
 
     fun findOutstanding(processingTimeout: Duration): List<OutstandingPostContentParsingJob>
 
-    fun complete(postId: Long, post: Post)
+    fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>)
 
     fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
 

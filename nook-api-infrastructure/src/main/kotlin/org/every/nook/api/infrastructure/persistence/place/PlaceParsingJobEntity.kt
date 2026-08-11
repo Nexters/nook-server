@@ -37,6 +37,8 @@ class PlaceParsingJobEntity(
         columnDefinition = "VARCHAR(20) COLLATE utf8mb4_bin",
     )
     var status: PlaceParsingStatus,
+    @Column(name = "text_place_clues", nullable = true, columnDefinition = "TEXT")
+    var textPlaceClues: String? = null,
     @Column(
         name = "failure_reason",
         nullable = true,

@@ -24,7 +24,7 @@ class ProcessPlaceParsingJobUseCase(
         logger.info { "Place parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
-            val textClues = extractClues(job)
+            val textClues = job.textClues ?: extractClues(job)
             val textResolution = resolveClues(job, textClues)
             val places = if (textResolution.places.isNotEmpty()) {
                 textResolution.places
