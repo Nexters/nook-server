@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.infrastructure.openai.OpenAiContentInferenceAdapter
+import org.every.nook.api.infrastructure.openai.OpenAiImageTextExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiProperties
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -30,6 +31,16 @@ class OpenAiConfig {
         @Qualifier("openAiRestClient") restClient: RestClient,
         properties: OpenAiProperties,
     ): OpenAiContentInferenceAdapter = OpenAiContentInferenceAdapter(
+        restClient = restClient,
+        objectMapper = jacksonObjectMapper(),
+        properties = properties,
+    )
+
+    @Bean
+    fun openAiImageTextExtractor(
+        @Qualifier("openAiRestClient") restClient: RestClient,
+        properties: OpenAiProperties,
+    ): OpenAiImageTextExtractor = OpenAiImageTextExtractor(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,

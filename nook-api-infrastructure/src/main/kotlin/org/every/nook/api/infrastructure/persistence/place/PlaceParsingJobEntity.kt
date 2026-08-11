@@ -39,6 +39,8 @@ class PlaceParsingJobEntity(
     var status: PlaceParsingStatus,
     @Column(name = "text_place_clues", nullable = true, columnDefinition = "TEXT")
     var textPlaceClues: String? = null,
+    @Column(name = "image_transcripts", nullable = true, columnDefinition = "MEDIUMTEXT")
+    var imageTranscripts: String? = null,
     @Column(
         name = "failure_reason",
         nullable = true,

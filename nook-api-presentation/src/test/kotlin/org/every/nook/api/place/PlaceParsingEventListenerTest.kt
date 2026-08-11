@@ -35,6 +35,7 @@ class PlaceParsingEventListenerTest {
     private val listener = PlaceParsingEventListener(
         processPlaceParsingJob = ProcessPlaceParsingJobUseCase(
             jobPort = jobPort,
+            imageTextExtractor = org.every.nook.api.application.place.ImageTextExtractor { emptyList() },
             clueExtractor = PlaceClueExtractor {
                 listOf(org.every.nook.api.application.place.PlaceClue("롯지190", null, listOf("롯지190")))
             },
@@ -105,6 +106,11 @@ class PlaceParsingEventListenerTest {
             ClaimedPlaceParsingJob(postId, 1, "롯지190", emptyList(), null)
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = outstanding
+
+        override fun storeImageTranscripts(
+            postId: Long,
+            transcripts: List<org.every.nook.api.application.place.ImageTranscript>,
+        ) = Unit
 
         override fun complete(postId: Long, places: List<PlaceCandidate>) {
             completed = true

@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceClue
@@ -110,6 +111,37 @@ class PlaceParsingPersistenceAdapterTest {
         val claimed = requireNotNull(adapter.claim(11, Duration.ofMinutes(1)))
 
         assertEquals(listOf("성수 식당"), claimed.textClues?.map(PlaceClue::name))
+    }
+
+    @Test
+    fun `returns stored image transcripts when claiming a retry`() {
+        val job = PlaceParsingJobEntity(
+            postId = 11,
+            status = PlaceParsingStatus.PENDING,
+            imageTranscripts = """[{"imageIndex":1,"texts":["원형들","서울 중구"]}]""",
+            nextAttemptAt = NOW.minusSeconds(1),
+        )
+        val post = mock(PostEntity::class.java)
+        `when`(jobRepository.findByPostIdForUpdate(11)).thenReturn(job)
+        `when`(postRepository.findById(11)).thenReturn(Optional.of(post))
+        `when`(hashtagRepository.findAllByPostIdOrderBySequenceAsc(11)).thenReturn(emptyList())
+        `when`(
+            mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(11, PostMedia.MediaType.IMAGE),
+        ).thenReturn(emptyList())
+
+        val claimed = requireNotNull(adapter.claim(11, Duration.ofMinutes(1)))
+
+        assertEquals(listOf("원형들", "서울 중구"), claimed.imageTranscripts?.single()?.texts)
+    }
+
+    @Test
+    fun `stores image transcripts on a processing job`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+
+        adapter.storeImageTranscripts(11, listOf(ImageTranscript(1, listOf("원형들", "서울 중구"))))
+
+        assertEquals("""[{"imageIndex":1,"texts":["원형들","서울 중구"]}]""", job.imageTranscripts)
     }
 
     @Test

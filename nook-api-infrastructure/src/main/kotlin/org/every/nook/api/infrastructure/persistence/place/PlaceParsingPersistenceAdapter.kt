@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.ClaimedPlaceParsingJob
+import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
@@ -72,7 +73,15 @@ class PlaceParsingPersistenceAdapter(
                 PostMedia.MediaType.IMAGE,
             ).map { it.mediaUrl },
             textClues = job.textPlaceClues?.let { objectMapper.readValue<List<PlaceClue>>(it) },
+            imageTranscripts = job.imageTranscripts?.let { objectMapper.readValue<List<ImageTranscript>>(it) },
         )
+    }
+
+    @Transactional
+    override fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>) {
+        val job = requireNotNull(jobRepository.findByPostId(postId))
+        check(job.status == PlaceParsingStatus.PROCESSING)
+        job.imageTranscripts = objectMapper.writeValueAsString(transcripts)
     }
 
     @Transactional(readOnly = true)

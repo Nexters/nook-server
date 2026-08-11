@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
+import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceParsingJobPort
@@ -26,6 +27,7 @@ class PlaceParsingUseCaseConfig {
     @Bean
     fun processPlaceParsingJobUseCase(
         jobPort: PlaceParsingJobPort,
+        imageTextExtractor: ImageTextExtractor,
         clueExtractor: PlaceClueExtractor,
         searchPlaceCandidates: SearchPlaceCandidatesUseCase,
         candidateSelector: PlaceCandidateSelector,
@@ -33,6 +35,7 @@ class PlaceParsingUseCaseConfig {
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = jobPort,
+        imageTextExtractor = imageTextExtractor,
         clueExtractor = clueExtractor,
         searchPlaceCandidates = searchPlaceCandidates,
         candidateSelector = candidateSelector,

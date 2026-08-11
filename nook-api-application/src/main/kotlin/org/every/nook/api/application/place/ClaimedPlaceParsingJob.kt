@@ -8,4 +8,5 @@ data class ClaimedPlaceParsingJob(
     val sourceLocationTag: String?,
     val imageUrls: List<String> = emptyList(),
     val textClues: List<PlaceClue>? = null,
+    val imageTranscripts: List<ImageTranscript>? = null,
 )
