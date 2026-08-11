@@ -234,112 +234,18 @@
         "uid": "loki"
       },
       "gridPos": {
-        "h": 12,
+        "h": 20,
         "w": 24,
         "x": 0,
         "y": 8
       },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": true,
-            "inspect": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "duration_ms"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          }
-        ]
-      },
       "id": 4,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"req:\" |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | line_format \"{\\\"level\\\":\\\"{{.level}}\\\",\\\"request_id\\\":\\\"{{.request_id}}\\\",\\\"user_id\\\":\\\"{{.user_id}}\\\",\\\"method\\\":\\\"{{.http_method}}\\\",\\\"route\\\":\\\"{{.http_route}}\\\",\\\"status\\\":\\\"{{.response_status}}\\\",\\\"duration_ms\\\":\\\"{{.transaction_duration_ms}}\\\",\\\"transaction\\\":\\\"{{.transaction_name}}\\\"}\"",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "API Request Summary",
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "format": "json",
-            "replace": true,
-            "source": "Line"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "Time": 0,
-              "level": 1,
-              "request_id": 2,
-              "user_id": 3,
-              "method": 4,
-              "route": 5,
-              "status": 6,
-              "duration_ms": 7,
-              "transaction": 8
-            },
-            "renameByName": {
-              "Time": "time"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      },
-      "id": 5,
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
         "prettifyLogMessage": false,
         "showCommonLabels": false,
-        "showLabels": true,
+        "showLabels": false,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
@@ -351,12 +257,12 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"}",
+          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | label_format log_type=\"{{ if contains \\\"req:\\\" .message }}API{{ else }}Server{{ end }}\" | log_type=~\"${logType:regex}\" | line_format \"[{{.service_name}}] [{{.level}}]  {{.message}}\" | keep service_name, level, log_type",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Raw API Logs",
+      "title": "Server & API Logs",
       "type": "logs"
     }
   ],
@@ -414,6 +320,39 @@
           }
         ],
         "query": "TRACE,DEBUG,INFO,WARN,ERROR",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "allValue": "API|Server",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Log Type",
+        "multi": false,
+        "name": "logType",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "API",
+            "value": "API"
+          },
+          {
+            "selected": false,
+            "text": "Server",
+            "value": "Server"
+          }
+        ],
+        "query": "API,Server",
         "skipUrlSync": false,
         "type": "custom"
       },
