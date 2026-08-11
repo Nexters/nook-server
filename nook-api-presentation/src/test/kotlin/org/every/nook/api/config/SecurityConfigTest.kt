@@ -1,6 +1,7 @@
 package org.every.nook.api.config
 
 import io.swagger.v3.oas.annotations.Parameter
+import org.every.nook.api.logging.RequestLoggingFields
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -74,6 +75,12 @@ class SecurityConfigTest {
             .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"))
             .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
             .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+            .andExpect(
+                header().string(
+                    HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS,
+                    RequestLoggingFields.REQUEST_ID_HEADER,
+                ),
+            )
     }
 
     @Test

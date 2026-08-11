@@ -1,5 +1,6 @@
 package org.every.nook.api.config
 
+import org.every.nook.api.logging.RequestContextInterceptor
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import kotlin.test.Test
@@ -11,7 +12,7 @@ class WebMvcConfigTest {
         val resolver = UserContextArgumentResolver()
         val resolvers = mutableListOf<HandlerMethodArgumentResolver>()
 
-        WebMvcConfig(resolver).addArgumentResolvers(resolvers)
+        WebMvcConfig(resolver, RequestContextInterceptor()).addArgumentResolvers(resolvers)
 
         assertEquals(listOf<HandlerMethodArgumentResolver>(resolver), resolvers)
     }
