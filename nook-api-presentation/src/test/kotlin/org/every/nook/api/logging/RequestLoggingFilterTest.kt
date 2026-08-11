@@ -52,18 +52,16 @@ class RequestLoggingFilterTest {
             "req: POST /api/v1/posts/17\nres: 200 ${mdc[RequestLoggingFields.TRANSACTION_DURATION_MS]}ms",
             event.formattedMessage,
         )
-        assertEquals("req-test-1", response.getHeader(RequestLoggingFields.REQUEST_ID_HEADER))
+        assertEquals("reqtest1", response.getHeader(RequestLoggingFields.REQUEST_ID_HEADER))
         assertEquals("""{"success":{"id":17,"refreshToken":"secret"}}""", response.contentAsString)
-        assertEquals("req-test-1", mdc[RequestLoggingFields.REQUEST_ID])
+        assertEquals("reqtest1", mdc[RequestLoggingFields.REQUEST_ID])
         assertEquals("POST", mdc[RequestLoggingFields.REQUEST_METHOD])
         assertEquals("/api/v1/posts/{postId}", mdc[RequestLoggingFields.HTTP_ROUTE])
         assertEquals("POST /api/v1/posts/{postId}", mdc[RequestLoggingFields.TRANSACTION_NAME])
         assertEquals("203.0.113.10", mdc[RequestLoggingFields.REQUEST_CLIENT_IP])
         assertEquals("Nook iOS", mdc["request.headers.user_agent"])
-        assertEquals("https://example.com/post", mdc["request.body.url"])
-        assertEquals("[REDACTED]", mdc["request.body.accesstoken"])
-        assertEquals("17", mdc["response.body.success.id"])
-        assertEquals("[REDACTED]", mdc["response.body.success.refreshtoken"])
+        assertEquals("""{"url":"https://example.com/post","accessToken":"****"}""", mdc["request.body"])
+        assertEquals("""{"success":{"id":17,"refreshToken":"****"}}""", mdc["response.body"])
         assertNotNull(mdc[RequestLoggingFields.TRANSACTION_DURATION_MS])
     }
 
@@ -79,6 +77,19 @@ class RequestLoggingFilterTest {
         val requestId = response.getHeader(RequestLoggingFields.REQUEST_ID_HEADER)
         assertNotNull(requestId)
         assertFalse(requestId.contains("bad request id"))
+        assertEquals(16, requestId.length)
+    }
+
+    @Test
+    fun `normalizes incoming request id to 16 alphanumeric characters`() {
+        val request = MockHttpServletRequest("GET", "/api/v1/members/me").apply {
+            addHeader(RequestLoggingFields.REQUEST_ID_HEADER, "04939fb0-ec31-4ddd-ab13-04cdf5d9d7cd")
+        }
+        val response = MockHttpServletResponse()
+
+        requestLoggingFilter(HttpLoggingProperties()).doFilter(request, response, emptyChain())
+
+        assertEquals("04939fb0ec314ddd", response.getHeader(RequestLoggingFields.REQUEST_ID_HEADER))
     }
 
     @Test
@@ -105,7 +116,11 @@ class RequestLoggingFilterTest {
 
     private fun requestLoggingFilter(properties: HttpLoggingProperties): RequestLoggingFilter = RequestLoggingFilter(
         properties = properties,
-        bodyLogFieldExtractor = BodyLogFieldExtractor(properties, ObjectMapper()),
+        bodyLogFieldExtractor = BodyLogFieldExtractor(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            privacyArgumentFieldNames = PrivacyArgumentFieldNames(setOf("access_token", "refresh_token")),
+        ),
     )
 
     private fun emptyChain(): FilterChain = object : FilterChain {

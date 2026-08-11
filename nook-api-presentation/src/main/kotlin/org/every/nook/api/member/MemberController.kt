@@ -20,6 +20,7 @@ import org.every.nook.api.application.member.UpdateMemberProfileCommand
 import org.every.nook.api.application.member.UpdateMemberProfileUseCase
 import org.every.nook.api.application.member.WithdrawMemberUseCase
 import org.every.nook.api.application.member.port.ProfileImageUpload
+import org.every.nook.api.logging.PrivacyArgument
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.http.ResponseEntity
@@ -181,6 +182,7 @@ data class MemberActionResponse(
 
 data class ProfileImageUploadResponse(
     @field:Schema(description = "이미지를 업로드할 presigned PUT URL")
+    @field:PrivacyArgument
     val uploadUrl: String,
     @field:Schema(description = "업로드 완료 후 프로필에 저장할 공개 이미지 URL")
     val profileImageUrl: String,

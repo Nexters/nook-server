@@ -9,8 +9,14 @@ import tools.jackson.databind.ObjectMapper
 @EnableConfigurationProperties(HttpLoggingProperties::class)
 class HttpLoggingConfig {
     @Bean
-    fun bodyLogFieldExtractor(properties: HttpLoggingProperties, objectMapper: ObjectMapper): BodyLogFieldExtractor =
-        BodyLogFieldExtractor(properties, objectMapper)
+    fun privacyArgumentFieldNames(): PrivacyArgumentFieldNames = PrivacyArgumentFieldNames.scan("org.every.nook.api")
+
+    @Bean
+    fun bodyLogFieldExtractor(
+        properties: HttpLoggingProperties,
+        objectMapper: ObjectMapper,
+        privacyArgumentFieldNames: PrivacyArgumentFieldNames,
+    ): BodyLogFieldExtractor = BodyLogFieldExtractor(properties, objectMapper, privacyArgumentFieldNames)
 
     @Bean
     fun requestLoggingFilter(

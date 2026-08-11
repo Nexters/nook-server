@@ -130,7 +130,8 @@ class RequestLoggingFilter(
         return incoming
             ?.takeIf { id -> id.length in 1..MAX_REQUEST_ID_LENGTH }
             ?.takeIf { id -> id.all { it.isLetterOrDigit() || it in REQUEST_ID_ALLOWED_SYMBOLS } }
-            ?: UUID.randomUUID().toString()
+            ?.toRequestId()
+            ?: newRequestId()
     }
 
     private fun clientIp(request: HttpServletRequest): String? = request.getHeader("X-Forwarded-For")
@@ -167,3 +168,11 @@ private fun apiLogMessage(request: HttpServletRequest, response: HttpServletResp
 
 private fun requestTarget(request: HttpServletRequest): String =
     request.queryString?.takeIf { it.isNotBlank() }?.let { "${request.requestURI}?$it" } ?: request.requestURI
+
+private fun newRequestId(): String = UUID.randomUUID().toString().toRequestId()
+
+private fun String.toRequestId(): String = filter { it.isLetterOrDigit() }
+    .take(REQUEST_ID_LENGTH)
+    .ifBlank { newRequestId() }
+
+private const val REQUEST_ID_LENGTH = 16
