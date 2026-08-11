@@ -29,7 +29,6 @@ replay_pid*
 .kotlin/
 .idea/
 **/build/
-__pycache__/
 *.iml
 .env
 mysql-exporter.my.cnf

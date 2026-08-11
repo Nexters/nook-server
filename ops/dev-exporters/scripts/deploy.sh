@@ -12,11 +12,6 @@ if [ ! -f mysql-exporter.my.cnf ]; then
   exit 1
 fi
 
-if ! grep -q '^ERROR_LOG_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/' .env; then
-  echo "ERROR_LOG_SLACK_WEBHOOK_URL must be set in .env before deploying error log forwarding." >&2
-  exit 1
-fi
-
 docker compose pull
 docker compose up -d
 docker compose ps

@@ -276,47 +276,29 @@
   "templating": {
     "list": [
       {
-        "allValue": "INFO|DEBUG|WARN|ERROR",
+        "allValue": "TRACE|DEBUG|INFO|WARN|ERROR",
         "current": {
           "selected": true,
           "text": "All",
           "value": "$__all"
         },
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "definition": "label_values({env=\"dev\", job=\"nook-api\"}, level)",
         "hide": 0,
         "includeAll": true,
         "label": "Level",
         "multi": true,
         "name": "level",
-        "options": [
-          {
-            "selected": true,
-            "text": "All",
-            "value": "$__all"
-          },
-          {
-            "selected": false,
-            "text": "INFO",
-            "value": "INFO"
-          },
-          {
-            "selected": false,
-            "text": "DEBUG",
-            "value": "DEBUG"
-          },
-          {
-            "selected": false,
-            "text": "WARN",
-            "value": "WARN"
-          },
-          {
-            "selected": false,
-            "text": "ERROR",
-            "value": "ERROR"
-          }
-        ],
-        "query": "INFO,DEBUG,WARN,ERROR",
+        "options": [],
+        "query": "label_values({env=\"dev\", job=\"nook-api\"}, level)",
+        "refresh": 1,
+        "regex": "",
         "skipUrlSync": false,
-        "type": "custom"
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
