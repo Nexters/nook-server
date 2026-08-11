@@ -239,44 +239,16 @@
         "x": 0,
         "y": 8
       },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": true,
-            "inspect": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "duration_ms"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          }
-        ]
-      },
       "id": 4,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": true,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
       },
       "targets": [
         {
@@ -285,42 +257,13 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"req:\" |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | line_format \"{\\\"level\\\":\\\"{{.level}}\\\",\\\"request_id\\\":\\\"{{.request_id}}\\\",\\\"user_id\\\":\\\"{{.user_id}}\\\",\\\"method\\\":\\\"{{.http_method}}\\\",\\\"route\\\":\\\"{{.http_route}}\\\",\\\"status\\\":\\\"{{.response_status}}\\\",\\\"duration_ms\\\":\\\"{{.transaction_duration_ms}}\\\",\\\"transaction\\\":\\\"{{.transaction_name}}\\\"}\"",
+          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"req:\" |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | line_format \"[{{.service_name}}]  {{.message}}\" | keep service_name",
           "queryType": "range",
           "refId": "A"
         }
       ],
       "title": "API Request Summary",
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "format": "json",
-            "replace": true,
-            "source": "Line"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "Time": 0,
-              "level": 1,
-              "request_id": 2,
-              "user_id": 3,
-              "method": 4,
-              "route": 5,
-              "status": 6,
-              "duration_ms": 7,
-              "transaction": 8
-            },
-            "renameByName": {
-              "Time": "time"
-            }
-          }
-        }
-      ],
-      "type": "table"
+      "type": "logs"
     },
     {
       "datasource": {
