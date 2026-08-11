@@ -1,5 +1,7 @@
 package org.every.nook.api.infrastructure.openai
 
+import org.every.nook.api.application.place.ImageTextExtractor
+import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClue
@@ -68,7 +70,7 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(content().string(containsString("post_content_inference")))
             .andExpect(content().string(containsString("홍보성")))
             .andExpect(content().string(containsString("\"maxLength\":25")))
-            .andExpect(content().string(containsString("\"maxItems\":10")))
+            .andExpect(content().string(containsString("\"maxItems\":20")))
             .andRespond(
                 withSuccess(
                     response(
@@ -102,7 +104,7 @@ class OpenAiContentInferenceAdapterTest {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(containsString("place_clues")))
-            .andExpect(content().string(containsString("\"maxItems\":10")))
+            .andExpect(content().string(containsString("\"maxItems\":20")))
             .andRespond(
                 withSuccess(
                     response(
@@ -131,44 +133,72 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
-    fun `extracts grounded image place clues from varied layouts in one high detail request`() {
+    fun `transcribes every image with its global index in one high detail request`() {
         val fixture = adapterFixture()
+        val imageUrls = TEST_IMAGE_URLS.take(2)
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(containsString("\"type\":\"input_image\"")))
-            .andExpect(content().string(containsString(TEST_IMAGE_URLS.first())))
-            .andExpect(content().string(containsString(TEST_IMAGE_URLS.last())))
+            .andExpect(content().string(containsString(imageUrls.first())))
+            .andExpect(content().string(containsString(imageUrls.last())))
             .andExpect(content().string(containsString("\"detail\":\"high\"")))
-            .andExpect(content().string(containsString("\"max_output_tokens\":1600")))
-            .andExpect(content().string(containsString("텍스트의 위치, 크기, 번호, 카드 형식")))
-            .andExpect(content().string(containsString("한 이미지에서 장소가 없거나 여러 개일 수 있고")))
+            .andExpect(content().string(containsString("\"max_output_tokens\":4000")))
+            .andExpect(content().string(containsString("판단, 요약, 번역, 맞춤법 교정")))
             .andExpect(content().string(containsString("imageIndex")))
-            .andExpect(content().string(not(containsString("좌측 하단"))))
             .andRespond(
                 withSuccess(
                     response(
                         """
                         {
-                          "places": [
+                          "images": [
                             {
-                              "name":"빈브라더스 커피하우스 서울",
-                              "region":"서울 마포구 상수동",
-                              "queries":["빈브라더스 커피하우스 서울","상수동 빈브라더스"],
-                              "evidence":[{
-                                "imageIndex":2,
-                                "evidenceText":"빈브라더스 커피하우스 서울 / 서울 마포구 상수동 354-12"
-                              }]
+                              "imageIndex":2,
+                              "texts":["빈브라더스 커피하우스 서울","서울 마포구 상수동 354-12"]
                             },
                             {
-                              "name":"누뗀",
-                              "region":"서울 서초구 신원동",
-                              "queries":["누뗀","신원동 누뗀"],
-                              "evidence":[{
-                                "imageIndex":3,
-                                "evidenceText":"누뗀 / 서울 서초구 신원동 489-7"
-                              }]
+                              "imageIndex":3,
+                              "texts":["누뗀","서울 서초구 신원동 489-7"]
                             }
                           ]
                         }
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val transcripts = fixture.imageTextExtractor.extract(
+            ImageTextExtractor.Request(
+                imageUrls.mapIndexed { index, url ->
+                    ImageTextExtractor.ImageInput(imageIndex = index + 2, imageUrl = url)
+                },
+            ),
+        )
+
+        assertEquals(listOf(2, 3), transcripts.map(ImageTranscript::imageIndex))
+        assertEquals(
+            listOf("빈브라더스 커피하우스 서울", "서울 마포구 상수동 354-12"),
+            transcripts.first().texts,
+        )
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `extracts place clues from stored image transcripts without image inputs`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(not(containsString("\"type\":\"input_image\""))))
+            .andExpect(content().string(containsString("빈브라더스 커피하우스 서울")))
+            .andExpect(content().string(containsString("\"max_output_tokens\":4000")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {"places":[{
+                          "name":"빈브라더스 커피하우스 서울",
+                          "region":"서울 마포구 상수동",
+                          "queries":["빈브라더스 커피하우스 서울","상수동 빈브라더스"],
+                          "evidence":[{"imageIndex":2,"evidenceText":"빈브라더스 커피하우스 서울"}]
+                        }]}
                         """.trimIndent(),
                     ),
                     MediaType.APPLICATION_JSON,
@@ -180,16 +210,14 @@ class OpenAiContentInferenceAdapterTest {
                 body = null,
                 hashtags = emptyList(),
                 sourceLocationTag = null,
-                imageUrls = TEST_IMAGE_URLS,
+                imageTranscripts = listOf(
+                    ImageTranscript(2, listOf("빈브라더스 커피하우스 서울", "서울 마포구 상수동 354-12")),
+                ),
             ),
         )
 
-        assertEquals(listOf("빈브라더스 커피하우스 서울", "누뗀"), places.map(PlaceClue::name))
-        assertEquals(2, places.first().evidence.single().imageIndex)
-        assertEquals(
-            "빈브라더스 커피하우스 서울 / 서울 마포구 상수동 354-12",
-            places.first().evidence.single().evidenceText,
-        )
+        assertEquals("빈브라더스 커피하우스 서울", places.single().name)
+        assertEquals(2, places.single().evidence.single().imageIndex)
         fixture.server.verify()
     }
 
@@ -324,12 +352,16 @@ class OpenAiContentInferenceAdapterTest {
     private fun adapterFixture(): AdapterFixture {
         val builder = RestClient.builder().baseUrl("https://api.openai.test")
         val server = MockRestServiceServer.bindTo(builder).build()
+        val restClient = builder.build()
+        val objectMapper = jacksonObjectMapper()
+        val properties = OpenAiProperties(apiKey = "test-key")
         return AdapterFixture(
             adapter = OpenAiContentInferenceAdapter(
-                restClient = builder.build(),
-                objectMapper = jacksonObjectMapper(),
-                properties = OpenAiProperties(apiKey = "test-key"),
+                restClient = restClient,
+                objectMapper = objectMapper,
+                properties = properties,
             ),
+            imageTextExtractor = OpenAiImageTextExtractor(restClient, objectMapper, properties),
             server = server,
         )
     }
@@ -346,7 +378,11 @@ class OpenAiContentInferenceAdapterTest {
         providerUrl = null,
     )
 
-    private data class AdapterFixture(val adapter: OpenAiContentInferenceAdapter, val server: MockRestServiceServer)
+    private data class AdapterFixture(
+        val adapter: OpenAiContentInferenceAdapter,
+        val imageTextExtractor: OpenAiImageTextExtractor,
+        val server: MockRestServiceServer,
+    )
 
     private companion object {
         fun response(output: String): String =

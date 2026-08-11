@@ -44,7 +44,9 @@ class ProcessPostContentParsingJobUseCase(
                     ),
                 )
             }
-            val completedPost = providedPost.copy(title = inference.title)
+            val completedPost = providedPost.copy(
+                title = groundedPostTitle(providedPost.body, inference.title),
+            )
             measure(job, COMPLETE_STAGE) {
                 jobPort.complete(job.postId, completedPost, inference.placeClues)
             }

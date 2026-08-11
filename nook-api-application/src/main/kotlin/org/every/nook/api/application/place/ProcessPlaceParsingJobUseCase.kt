@@ -10,6 +10,7 @@ import java.time.Instant
 
 class ProcessPlaceParsingJobUseCase(
     private val jobPort: PlaceParsingJobPort,
+    private val imageTextExtractor: ImageTextExtractor,
     private val clueExtractor: PlaceClueExtractor,
     private val searchPlaceCandidates: SearchPlaceCandidatesUseCase,
     private val candidateSelector: PlaceCandidateSelector,
@@ -68,17 +69,28 @@ class ProcessPlaceParsingJobUseCase(
         textPlaceCount: Int,
         expectedPlaceCount: Int?,
     ): ClueResolution? {
-        val imageUrls = job.imageUrls.take(MAX_IMAGE_COUNT)
-        if (imageUrls.isEmpty() || !requiresImageAnalysis(textPlaceCount, expectedPlaceCount)) {
+        val images = job.imageUrls.take(MAX_IMAGE_COUNT).mapIndexed { index, imageUrl ->
+            ImageTextExtractor.ImageInput(imageIndex = index + 1, imageUrl = imageUrl)
+        }
+        if (images.isEmpty() || !requiresImageAnalysis(textPlaceCount, expectedPlaceCount)) {
             return null
         }
         logger.info {
             "Place parsing image fallback started: postId=${job.postId}, attempt=${job.attempt}, " +
-                "imageCount=${imageUrls.size}, textPlaceCount=$textPlaceCount, " +
+                "imageCount=${images.size}, textPlaceCount=$textPlaceCount, " +
                 "expectedPlaceCount=$expectedPlaceCount"
         }
-        val imageClues = extractClues(job, imageUrls).filter { clue ->
-            clue.hasImageEvidence(imageUrls.size).also { grounded ->
+        val transcripts = job.imageTranscripts ?: measure(job, IMAGE_TRANSCRIPT_STAGE) {
+            extractImageTranscripts(imageTextExtractor, images)
+        }.also { extracted ->
+            logger.info {
+                "Image transcripts received: postId=${job.postId}, attempt=${job.attempt}, " +
+                    "imageCount=${images.size}, transcriptCount=${extracted.size}"
+            }
+            jobPort.storeImageTranscripts(job.postId, extracted)
+        }
+        val imageClues = extractClues(job, transcripts).filter { clue ->
+            clue.hasImageEvidence(images.size).also { grounded ->
                 if (!grounded) {
                     logger.warn {
                         "Ungrounded image place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -90,23 +102,25 @@ class ProcessPlaceParsingJobUseCase(
         return resolveClues(job, imageClues)
     }
 
-    private fun extractClues(job: ClaimedPlaceParsingJob, imageUrls: List<String> = emptyList()): List<PlaceClue> =
-        measure(job, if (imageUrls.isEmpty()) TEXT_CLUE_STAGE else IMAGE_CLUE_STAGE) {
-            clueExtractor.extract(
-                PlaceClueExtractor.Request(
-                    body = job.body,
-                    hashtags = job.hashtags,
-                    sourceLocationTag = job.sourceLocationTag,
-                    imageUrls = imageUrls,
-                ),
-            )
-        }.also { clues ->
-            require(clues.size <= MAX_PLACE_COUNT) { "Too many place clues" }
-            logger.info {
-                "OpenAI place clues received: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "imageCount=${imageUrls.size}, placeCount=${clues.size}, places=$clues"
-            }
+    private fun extractClues(
+        job: ClaimedPlaceParsingJob,
+        imageTranscripts: List<ImageTranscript> = emptyList(),
+    ): List<PlaceClue> = measure(job, if (imageTranscripts.isEmpty()) TEXT_CLUE_STAGE else IMAGE_CLUE_STAGE) {
+        clueExtractor.extract(
+            PlaceClueExtractor.Request(
+                body = job.body,
+                hashtags = job.hashtags,
+                sourceLocationTag = job.sourceLocationTag,
+                imageTranscripts = imageTranscripts,
+            ),
+        )
+    }.also { clues ->
+        require(clues.size <= MAX_PLACE_COUNT) { "Too many place clues" }
+        logger.info {
+            "OpenAI place clues received: postId=${job.postId}, attempt=${job.attempt}, " +
+                "transcriptCount=${imageTranscripts.size}, placeCount=${clues.size}, places=$clues"
         }
+    }
 
     private fun resolveClues(job: ClaimedPlaceParsingJob, clues: List<PlaceClue>): ClueResolution {
         var lastFailure: PlaceResolutionException? = null
@@ -157,6 +171,9 @@ class ProcessPlaceParsingJobUseCase(
             } ?: failResolution(
                 "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
             )
+        }
+        if (!clue.isSupportedBy(resolved)) {
+            failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
         logger.info {
             "Place resolved: provider=${resolved.provider}, externalPlaceId=${resolved.externalPlaceId}, " +
@@ -254,7 +271,7 @@ class ProcessPlaceParsingJobUseCase(
     private companion object {
         val logger = KotlinLogging.logger {}
 
-        const val MAX_PLACE_COUNT = 10
+        const val MAX_PLACE_COUNT = 20
         const val MAX_QUERY_COUNT = 4
         const val MAX_IMAGE_COUNT = 20
         const val CANDIDATE_LOG_LIMIT = 5
@@ -264,6 +281,7 @@ class ProcessPlaceParsingJobUseCase(
         const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
         const val PLACE_FLOW = "place"
         const val TEXT_CLUE_STAGE = "clue-text"
+        const val IMAGE_TRANSCRIPT_STAGE = "image-transcript"
         const val IMAGE_CLUE_STAGE = "clue-image"
         const val SEARCH_STAGE = "search"
         const val SELECT_STAGE = "select"
@@ -322,5 +340,59 @@ private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrD
 
 private const val MIN_GROUNDING_KEY_LENGTH = 2
 private const val MIN_EXPECTED_PLACE_COUNT = 2
-private const val MAX_EXPECTED_PLACE_COUNT = 10
+private const val MAX_EXPECTED_PLACE_COUNT = 20
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
+
+private fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
+    if (evidence.isEmpty()) return true
+    val candidateName = candidate.name.groundingKey()
+    val clueName = name.groundingKey()
+    val hasCompatibleName = candidateName == clueName ||
+        candidateName.isCompatibleName(clueName) ||
+        queries.asSequence().map(String::groundingKey).any(candidateName::isCompatibleName)
+    val candidateAddress = candidate.address.groundingKey()
+    val candidateAddressKeys = candidate.address.addressKeys()
+    val hasCompatibleEvidence = evidence.asSequence()
+        .map(PlaceClueEvidence::evidenceText)
+        .any { evidenceText ->
+            val normalizedEvidence = evidenceText.groundingKey()
+            val containsName = candidateName.length >= MIN_GROUNDING_KEY_LENGTH &&
+                normalizedEvidence.contains(candidateName)
+            val containsAddress = candidateAddress.length >= MIN_ADDRESS_GROUNDING_KEY_LENGTH &&
+                normalizedEvidence.contains(candidateAddress)
+            containsName || containsAddress ||
+                candidateAddressKeys.any { it in evidenceText.addressKeys() }
+        }
+    return hasCompatibleName || hasCompatibleEvidence
+}
+
+private fun String.isCompatibleName(other: String): Boolean = length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
+    other.length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
+    (contains(other) || other.contains(this))
+
+private fun String.addressKeys(): Set<String> = ADDRESS_KEY_PATTERN.findAll(this).map { match ->
+    match.groupValues.drop(1).joinToString(separator = "").groundingKey()
+}.toSet()
+
+private const val MIN_NAME_COMPATIBILITY_KEY_LENGTH = 3
+private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6
+private val ADDRESS_KEY_PATTERN = Regex(
+    "([가-힣A-Za-z0-9]+(?:대로|로|길|동|읍|면|리))\\s*(\\d+(?:-\\d+)?)",
+)
+
+private fun extractImageTranscripts(
+    extractor: ImageTextExtractor,
+    images: List<ImageTextExtractor.ImageInput>,
+): List<ImageTranscript> = images.chunked(IMAGE_BATCH_SIZE).flatMap { batch ->
+    extractor.extract(ImageTextExtractor.Request(batch)).also { transcripts ->
+        val requestedIndexes = batch.map(ImageTextExtractor.ImageInput::imageIndex).toSet()
+        require(
+            transcripts.size == batch.size &&
+                transcripts.map(ImageTranscript::imageIndex).toSet() == requestedIndexes,
+        ) {
+            "OpenAI did not return exactly one transcript for every image"
+        }
+    }
+}.distinctBy(ImageTranscript::imageIndex).sortedBy(ImageTranscript::imageIndex)
+
+private const val IMAGE_BATCH_SIZE = 5
