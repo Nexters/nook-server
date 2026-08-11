@@ -19,7 +19,7 @@ Parameters:
     Description: Existing application role that receives environment-scoped media permissions
   UploadCorsAllowedOrigins:
     Type: CommaDelimitedList
-    Default: "https://app-dev.everynook.co.kr,https://everynook.co.kr,http://localhost:5173,http://localhost:4173"
+    Default: "https://everynook.co.kr"
     Description: Origins allowed to upload profile images with presigned S3 URLs
 
 Resources:
@@ -145,7 +145,6 @@ Resources:
               StringLike:
                 s3:prefix:
                   - post-media/*
-                  - profile-images/*
           - Sid: ReadAndWriteMediaObjects
             Effect: Allow
             Action:
@@ -153,6 +152,11 @@ Resources:
               - s3:PutObject
             Resource:
               - !Sub "${MediaBucket.Arn}/post-media/*"
+          - Sid: WriteProfileImageObjects
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
               - !Sub "${MediaBucket.Arn}/profile-images/*"
 
 Outputs:
