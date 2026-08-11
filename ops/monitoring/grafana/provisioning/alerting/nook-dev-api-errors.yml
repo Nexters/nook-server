@@ -20,7 +20,7 @@ groups:
                 type: loki
                 uid: loki
               editorMode: code
-              expr: 'sum(count_over_time({env="dev", job="nook-api"} |~ "(?i)(ERROR|Unexpected API exception)" [5m]))'
+              expr: 'sum(count_over_time({env="dev", job="nook-api", level="ERROR"}[5m]))'
               intervalMs: 1000
               maxDataPoints: 43200
               queryType: range
@@ -73,7 +73,7 @@ groups:
         for: 1m
         annotations:
           summary: dev API에서 ERROR 로그가 감지됐습니다.
-          description: 최근 5분 동안 nook-dev-api 로그에 ERROR 또는 Unexpected API exception 패턴이 기록됐습니다.
+          description: 최근 5분 동안 nook-dev-api 로그에 ERROR 레벨 로그가 기록됐습니다.
         labels:
           env: dev
           service: nook-api
