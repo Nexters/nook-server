@@ -102,7 +102,7 @@ class PlaceParsingEventListenerTest {
         var outstanding = emptyList<OutstandingPlaceParsingJob>()
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob =
-            ClaimedPlaceParsingJob(postId, 1, null, emptyList(), null)
+            ClaimedPlaceParsingJob(postId, 1, "롯지190", emptyList(), null)
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = outstanding
 
