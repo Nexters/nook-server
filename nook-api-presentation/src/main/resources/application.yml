@@ -37,6 +37,30 @@ management:
       probes:
         enabled: true
 
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        "service.name": ${spring.application.name:nook-api}
+        "service.env": ${APP_ENV:${spring.profiles.active:local}}
+      stacktrace:
+        max-length: 20000
+  level:
+    org.every.nook.api.logging.RequestLoggingFilter: info
+
+app:
+  logging:
+    http:
+      body:
+        request-enabled: ${HTTP_LOG_REQUEST_BODY_ENABLED:false}
+        response-enabled: ${HTTP_LOG_RESPONSE_BODY_ENABLED:false}
+        max-bytes: ${HTTP_LOG_BODY_MAX_BYTES:16384}
+        max-flattened-fields: ${HTTP_LOG_BODY_MAX_FLATTENED_FIELDS:80}
+        max-depth: ${HTTP_LOG_BODY_MAX_DEPTH:5}
+        max-array-items: ${HTTP_LOG_BODY_MAX_ARRAY_ITEMS:10}
+
 place-parsing:
   worker:
     retry-backoffs: ${PLACE_PARSING_RETRY_BACKOFFS:3s,3s,3s}

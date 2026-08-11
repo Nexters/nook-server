@@ -2,6 +2,13 @@ logging:
   level:
     org.every.nook.api: info
 
+app:
+  logging:
+    http:
+      body:
+        request-enabled: ${HTTP_LOG_REQUEST_BODY_ENABLED:true}
+        response-enabled: ${HTTP_LOG_RESPONSE_BODY_ENABLED:true}
+
 nook:
   openapi:
     servers:

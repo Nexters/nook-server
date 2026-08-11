@@ -15,8 +15,9 @@ scrape_configs:
         refresh_interval: 10s
     pipeline_stages:
       - docker: {}
-      - regex:
-          expression: '.*\s(?P<level>TRACE|DEBUG|INFO|WARN|ERROR)\s+.*'
+      - json:
+          expressions:
+            level: level
       - labels:
           level:
     relabel_configs:

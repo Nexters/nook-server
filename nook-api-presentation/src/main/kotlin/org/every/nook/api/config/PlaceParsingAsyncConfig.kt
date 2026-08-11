@@ -1,8 +1,10 @@
 package org.every.nook.api.config
 
+import org.every.nook.api.logging.MdcTaskDecorator
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.task.SimpleAsyncTaskExecutor
+import org.springframework.core.task.TaskDecorator
 import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
@@ -12,22 +14,31 @@ import java.util.concurrent.Executor
 @EnableAsync
 @EnableScheduling
 class PlaceParsingAsyncConfig {
+    @Bean
+    fun mdcTaskDecorator(): TaskDecorator = MdcTaskDecorator()
+
     @Bean("placeParsingTaskExecutor")
-    fun placeParsingTaskExecutor(): Executor = SimpleAsyncTaskExecutor(THREAD_NAME_PREFIX).apply {
-        setVirtualThreads(true)
-    }
+    fun placeParsingTaskExecutor(mdcTaskDecorator: TaskDecorator): Executor =
+        SimpleAsyncTaskExecutor(THREAD_NAME_PREFIX).apply {
+            setVirtualThreads(true)
+            setTaskDecorator(mdcTaskDecorator)
+        }
 
     @Bean("postContentParsingTaskExecutor")
-    fun postContentParsingTaskExecutor(): Executor = SimpleAsyncTaskExecutor(POST_CONTENT_THREAD_NAME_PREFIX).apply {
-        setVirtualThreads(true)
-    }
+    fun postContentParsingTaskExecutor(mdcTaskDecorator: TaskDecorator): Executor =
+        SimpleAsyncTaskExecutor(POST_CONTENT_THREAD_NAME_PREFIX).apply {
+            setVirtualThreads(true)
+            setTaskDecorator(mdcTaskDecorator)
+        }
 
     @Bean("parsingRetryTaskScheduler")
-    fun parsingRetryTaskScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
-        poolSize = RETRY_SCHEDULER_POOL_SIZE
-        setThreadNamePrefix(RETRY_THREAD_NAME_PREFIX)
-        setWaitForTasksToCompleteOnShutdown(true)
-    }
+    fun parsingRetryTaskScheduler(mdcTaskDecorator: TaskDecorator): ThreadPoolTaskScheduler =
+        ThreadPoolTaskScheduler().apply {
+            poolSize = RETRY_SCHEDULER_POOL_SIZE
+            setThreadNamePrefix(RETRY_THREAD_NAME_PREFIX)
+            setTaskDecorator(mdcTaskDecorator)
+            setWaitForTasksToCompleteOnShutdown(true)
+        }
 
     private companion object {
         const val THREAD_NAME_PREFIX = "place-parsing-"

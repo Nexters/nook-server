@@ -1,5 +1,6 @@
 package org.every.nook.api.config
 
+import org.every.nook.api.logging.RequestLoggingFields
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties("app.cors")
@@ -14,7 +15,7 @@ data class CorsProperties(
     ),
     val allowedMethods: List<String> = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
     val allowedHeaders: List<String> = listOf("*"),
-    val exposedHeaders: List<String> = emptyList(),
+    val exposedHeaders: List<String> = listOf(RequestLoggingFields.REQUEST_ID_HEADER),
     val allowCredentials: Boolean = true,
     val maxAgeSeconds: Long = 3_600,
 )

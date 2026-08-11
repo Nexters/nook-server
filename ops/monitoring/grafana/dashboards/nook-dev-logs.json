@@ -257,12 +257,49 @@
             "uid": "loki"
           },
           "editorMode": "code",
+          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Filtered API Request Logs",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
           "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "API Logs",
+      "title": "Raw API Logs",
       "type": "logs"
     }
   ],
@@ -276,7 +313,7 @@
   "templating": {
     "list": [
       {
-        "allValue": "INFO|DEBUG|WARN|ERROR",
+        "allValue": "TRACE|DEBUG|INFO|WARN|ERROR",
         "current": {
           "selected": true,
           "text": "All",
@@ -292,6 +329,11 @@
             "selected": true,
             "text": "All",
             "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "TRACE",
+            "value": "TRACE"
           },
           {
             "selected": false,
@@ -314,9 +356,79 @@
             "value": "ERROR"
           }
         ],
-        "query": "INFO,DEBUG,WARN,ERROR",
+        "query": "TRACE,DEBUG,INFO,WARN,ERROR",
         "skipUrlSync": false,
         "type": "custom"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Request ID",
+        "name": "requestIdText",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "User ID",
+        "name": "userIdText",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Route",
+        "name": "routeText",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Status",
+        "name": "statusText",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Keyword",
+        "name": "keywordText",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
       }
     ]
   },
