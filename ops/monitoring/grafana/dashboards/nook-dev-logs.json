@@ -234,7 +234,7 @@
         "uid": "loki"
       },
       "gridPos": {
-        "h": 12,
+        "h": 20,
         "w": 24,
         "x": 0,
         "y": 8
@@ -244,45 +244,8 @@
         "dedupStrategy": "none",
         "enableLogDetails": true,
         "prettifyLogMessage": false,
-        "showCommonLabels": true,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"req:\" |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | line_format \"[{{.service_name}}]  {{.message}}\" | keep service_name",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "API Request Summary",
-      "type": "logs"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      },
-      "id": 5,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
         "showCommonLabels": false,
-        "showLabels": true,
+        "showLabels": false,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
@@ -294,12 +257,12 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"}",
+          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | line_format \"[{{.service_name}}] [{{.level}}]  {{.message}}\" | keep service_name, level",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Raw API Logs",
+      "title": "Server & API Logs",
       "type": "logs"
     }
   ],
