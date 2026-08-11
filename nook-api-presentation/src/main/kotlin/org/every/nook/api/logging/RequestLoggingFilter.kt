@@ -18,6 +18,7 @@ import java.util.UUID
 class RequestLoggingFilter(
     private val properties: HttpLoggingProperties,
     private val bodyLogFieldExtractor: BodyLogFieldExtractor,
+    private val requestParameterLogFieldExtractor: RequestParameterLogFieldExtractor,
 ) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
         !properties.enabled || properties.ignoredPathPrefixes.any { request.requestURI.startsWith(it) }
@@ -46,7 +47,7 @@ class RequestLoggingFilter(
             try {
                 val durationMs = ((System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND)
                 putResponseContext(requestToUse, responseToUse, durationMs, chainException)
-                apiLogger.info(apiLogMessage(requestToUse, responseToUse, durationMs))
+                apiLogger.info(apiLogMessage(requestToUse, responseToUse, durationMs, route(requestToUse)))
             } finally {
                 (responseToUse as? ContentCachingResponseWrapper)?.copyBodyToResponse()
                 MDC.clear()
@@ -68,7 +69,7 @@ class RequestLoggingFilter(
         putMdc(RequestLoggingFields.REQUEST_ID, requestId)
         putMdc(RequestLoggingFields.REQUEST_METHOD, request.method)
         putMdc(RequestLoggingFields.REQUEST_PATH, request.requestURI)
-        putMdc(RequestLoggingFields.REQUEST_QUERY, request.queryString)
+        putMdc(RequestLoggingFields.REQUEST_QUERY_PARAMS, requestParameterLogFieldExtractor.queryParams(request))
         putMdc(RequestLoggingFields.REQUEST_URL, request.requestURL.toString())
         putMdc(RequestLoggingFields.REQUEST_CLIENT_IP, clientIp(request))
         putMdc(RequestLoggingFields.REQUEST_CONTENT_TYPE, request.contentType)
@@ -96,6 +97,7 @@ class RequestLoggingFilter(
         putMdc(RequestLoggingFields.TRANSACTION_DURATION_MS, durationMs)
         putMdc(RequestLoggingFields.RESPONSE_STATUS, status)
         putMdc(RequestLoggingFields.RESPONSE_CONTENT_TYPE, response.contentType)
+        putMdc(RequestLoggingFields.REQUEST_PATH_PARAMS, requestParameterLogFieldExtractor.pathParams(request))
         putMdc(
             RequestLoggingFields.RESPONSE_SIZE_BYTES,
             (response as? ContentCachingResponseWrapper)?.contentSize?.takeIf { it >= 0 },
@@ -163,11 +165,12 @@ private fun putMdc(key: String, value: Any?) {
     value?.toString()?.takeIf { it.isNotBlank() }?.let { MDC.put(key, it) }
 }
 
-private fun apiLogMessage(request: HttpServletRequest, response: HttpServletResponse, durationMs: Long): String =
-    "req: ${request.method} ${requestTarget(request)}\nres: ${response.status} ${durationMs}ms"
-
-private fun requestTarget(request: HttpServletRequest): String =
-    request.queryString?.takeIf { it.isNotBlank() }?.let { "${request.requestURI}?$it" } ?: request.requestURI
+private fun apiLogMessage(
+    request: HttpServletRequest,
+    response: HttpServletResponse,
+    durationMs: Long,
+    route: String?,
+): String = "req: ${request.method} ${route ?: request.requestURI}\nres: ${response.status} ${durationMs}ms"
 
 private fun newRequestId(): String = UUID.randomUUID().toString().toRequestId()
 

@@ -23,6 +23,7 @@ class RequestLoggingFilterTest {
     fun `adds request id response header and logs structured request context`() {
         val appender = attachLogAppender()
         val request = MockHttpServletRequest("POST", "/api/v1/posts/17").apply {
+            queryString = "includePlaces=true&tag=cafe&tag=date&accessToken=secret&keyword=coffee%20shop"
             contentType = MediaType.APPLICATION_JSON_VALUE
             setContent("""{"url":"https://example.com/post","accessToken":"secret"}""".toByteArray())
             addHeader(RequestLoggingFields.REQUEST_ID_HEADER, "req-test-1")
@@ -35,6 +36,10 @@ class RequestLoggingFilterTest {
             override fun doFilter(servletRequest: ServletRequest, servletResponse: ServletResponse) {
                 servletRequest.getInputStream().readBytes()
                 servletRequest.setAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE, "/api/v1/posts/{postId}")
+                servletRequest.setAttribute(
+                    HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE,
+                    mapOf("postId" to "17"),
+                )
                 servletResponse.contentType = MediaType.APPLICATION_JSON_VALUE
                 servletResponse.writer.write("""{"success":{"id":17,"refreshToken":"secret"}}""")
             }
@@ -49,13 +54,19 @@ class RequestLoggingFilterTest {
         val event = appender.list.single()
         val mdc = event.mdcPropertyMap
         assertEquals(
-            "req: POST /api/v1/posts/17\nres: 200 ${mdc[RequestLoggingFields.TRANSACTION_DURATION_MS]}ms",
+            "req: POST /api/v1/posts/{postId}\nres: 200 ${mdc[RequestLoggingFields.TRANSACTION_DURATION_MS]}ms",
             event.formattedMessage,
         )
         assertEquals("reqtest1", response.getHeader(RequestLoggingFields.REQUEST_ID_HEADER))
         assertEquals("""{"success":{"id":17,"refreshToken":"secret"}}""", response.contentAsString)
         assertEquals("reqtest1", mdc[RequestLoggingFields.REQUEST_ID])
         assertEquals("POST", mdc[RequestLoggingFields.REQUEST_METHOD])
+        assertEquals(
+            """{"includePlaces":["true"],"tag":["cafe","date"],"accessToken":["****"],"keyword":["coffee shop"]}""",
+            mdc[RequestLoggingFields.REQUEST_QUERY_PARAMS],
+        )
+        assertFalse(mdc.containsKey("request.query"))
+        assertEquals("""{"postId":"17"}""", mdc[RequestLoggingFields.REQUEST_PATH_PARAMS])
         assertEquals("/api/v1/posts/{postId}", mdc[RequestLoggingFields.HTTP_ROUTE])
         assertEquals("POST /api/v1/posts/{postId}", mdc[RequestLoggingFields.TRANSACTION_NAME])
         assertEquals("203.0.113.10", mdc[RequestLoggingFields.REQUEST_CLIENT_IP])
@@ -78,6 +89,29 @@ class RequestLoggingFilterTest {
         assertNotNull(requestId)
         assertFalse(requestId.contains("bad request id"))
         assertEquals(16, requestId.length)
+    }
+
+    @Test
+    fun `uses request uri without query string when route is unavailable`() {
+        val appender = attachLogAppender()
+        val request = MockHttpServletRequest("GET", "/unknown/17").apply {
+            queryString = "keyword=cafe"
+        }
+        val response = MockHttpServletResponse()
+
+        try {
+            requestLoggingFilter(HttpLoggingProperties()).doFilter(request, response, emptyChain())
+        } finally {
+            detachLogAppender(appender)
+        }
+
+        val event = appender.list.single()
+        assertEquals(
+            "req: GET /unknown/17\nres: 200 ${event.mdcPropertyMap[RequestLoggingFields.TRANSACTION_DURATION_MS]}ms",
+            event.formattedMessage,
+        )
+        assertEquals("""{"keyword":["cafe"]}""", event.mdcPropertyMap[RequestLoggingFields.REQUEST_QUERY_PARAMS])
+        assertFalse(event.mdcPropertyMap.containsKey(RequestLoggingFields.REQUEST_PATH_PARAMS))
     }
 
     @Test
@@ -117,6 +151,11 @@ class RequestLoggingFilterTest {
     private fun requestLoggingFilter(properties: HttpLoggingProperties): RequestLoggingFilter = RequestLoggingFilter(
         properties = properties,
         bodyLogFieldExtractor = BodyLogFieldExtractor(
+            properties = properties,
+            objectMapper = ObjectMapper(),
+            privacyArgumentFieldNames = PrivacyArgumentFieldNames(setOf("access_token", "refresh_token")),
+        ),
+        requestParameterLogFieldExtractor = RequestParameterLogFieldExtractor(
             properties = properties,
             objectMapper = ObjectMapper(),
             privacyArgumentFieldNames = PrivacyArgumentFieldNames(setOf("access_token", "refresh_token")),
