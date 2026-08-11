@@ -19,8 +19,17 @@ class HttpLoggingConfig {
     ): BodyLogFieldExtractor = BodyLogFieldExtractor(properties, objectMapper, privacyArgumentFieldNames)
 
     @Bean
+    fun requestParameterLogFieldExtractor(
+        properties: HttpLoggingProperties,
+        objectMapper: ObjectMapper,
+        privacyArgumentFieldNames: PrivacyArgumentFieldNames,
+    ): RequestParameterLogFieldExtractor =
+        RequestParameterLogFieldExtractor(properties, objectMapper, privacyArgumentFieldNames)
+
+    @Bean
     fun requestLoggingFilter(
         properties: HttpLoggingProperties,
         bodyLogFieldExtractor: BodyLogFieldExtractor,
-    ): RequestLoggingFilter = RequestLoggingFilter(properties, bodyLogFieldExtractor)
+        requestParameterLogFieldExtractor: RequestParameterLogFieldExtractor,
+    ): RequestLoggingFilter = RequestLoggingFilter(properties, bodyLogFieldExtractor, requestParameterLogFieldExtractor)
 }
