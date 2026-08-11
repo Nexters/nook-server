@@ -257,7 +257,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | line_format \"[{{.service_name}}] [{{.level}}]  {{.message}}\" | keep service_name, level",
+          "expr": "{env=\"dev\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | label_format log_type=\"{{ if contains \\\"req:\\\" .message }}API{{ else }}Server{{ end }}\" | log_type=~\"${logType:regex}\" | line_format \"[{{.service_name}}] [{{.level}}]  {{.message}}\" | keep service_name, level, log_type",
           "queryType": "range",
           "refId": "A"
         }
@@ -320,6 +320,39 @@
           }
         ],
         "query": "TRACE,DEBUG,INFO,WARN,ERROR",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "allValue": "API|Server",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Log Type",
+        "multi": false,
+        "name": "logType",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "API",
+            "value": "API"
+          },
+          {
+            "selected": false,
+            "text": "Server",
+            "value": "Server"
+          }
+        ],
+        "query": "API,Server",
         "skipUrlSync": false,
         "type": "custom"
       },
