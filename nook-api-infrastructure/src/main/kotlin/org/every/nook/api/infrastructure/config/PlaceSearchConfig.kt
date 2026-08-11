@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.config
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
@@ -21,6 +20,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 

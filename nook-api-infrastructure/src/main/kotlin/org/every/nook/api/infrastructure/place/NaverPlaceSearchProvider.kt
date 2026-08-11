@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.place
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSearchProvider
@@ -10,6 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
+import tools.jackson.databind.ObjectMapper
 import java.net.SocketTimeoutException
 
 class NaverPlaceSearchProvider(

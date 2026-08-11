@@ -2,7 +2,7 @@ package org.every.nook.api.infrastructure.instagram
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class BrightDataInstagramRecord(

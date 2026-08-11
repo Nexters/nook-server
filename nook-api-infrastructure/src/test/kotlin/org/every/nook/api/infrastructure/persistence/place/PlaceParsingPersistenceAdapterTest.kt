@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.persistence.place
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceClue
@@ -25,6 +24,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.context.ApplicationEventPublisher
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration

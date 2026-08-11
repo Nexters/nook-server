@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.place
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.hamcrest.Matchers.containsString
@@ -13,6 +12,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.request
 import org.springframework.test.web.client.response.MockRestResponseCreators.withServerError
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

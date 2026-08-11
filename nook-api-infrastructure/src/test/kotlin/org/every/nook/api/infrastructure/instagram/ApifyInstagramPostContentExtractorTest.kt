@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.instagram
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
@@ -20,6 +19,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.request
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

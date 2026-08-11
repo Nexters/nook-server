@@ -1,7 +1,5 @@
 package org.every.nook.api.infrastructure.persistence.place
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
@@ -27,6 +25,8 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaReposi
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.readValue
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
