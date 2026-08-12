@@ -18,9 +18,9 @@ data class PlaceSupplement(
 }
 
 data class PlaceOpeningHours(
-    val timeZone: String,
-    val periods: List<PlaceOpeningPeriod>,
-    val weekdayDescriptions: List<String>,
+    val timeZone: String = "",
+    val periods: List<PlaceOpeningPeriod> = emptyList(),
+    val weekdayDescriptions: List<String> = emptyList(),
 ) {
     fun isOpenAt(instant: Instant): Boolean {
         val local = instant.atZone(ZoneId.of(timeZone))
@@ -49,9 +49,9 @@ data class PlaceOpeningHours(
     }
 }
 
-data class PlaceOpeningPeriod(val open: PlaceOpeningPoint, val close: PlaceOpeningPoint?)
+data class PlaceOpeningPeriod(val open: PlaceOpeningPoint = PlaceOpeningPoint(), val close: PlaceOpeningPoint? = null)
 
-data class PlaceOpeningPoint(val day: Int, val hour: Int, val minute: Int) {
+data class PlaceOpeningPoint(val day: Int = 0, val hour: Int = 0, val minute: Int = 0) {
     init {
         require(day in MIN_DAY..MAX_DAY) { "Opening day must be between $MIN_DAY and $MAX_DAY" }
         require(hour in MIN_HOUR..MAX_HOUR) { "Opening hour must be between $MIN_HOUR and $MAX_HOUR" }
