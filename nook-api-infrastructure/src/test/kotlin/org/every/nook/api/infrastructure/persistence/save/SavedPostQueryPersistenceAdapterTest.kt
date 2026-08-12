@@ -4,6 +4,7 @@ import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
+import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
@@ -178,7 +179,14 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(owner.nickname).thenReturn("Purr")
         `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
         `when`(memberRepository.findById(9)).thenReturn(Optional.of(owner))
-        `when`(savedPostRepository.findAllByUserIdAndGroupId(7, 17, requestedPage))
+        `when`(
+            savedPostRepository.findAllByUserIdAndGroupId(
+                7,
+                17,
+                PostContentParsingStatus.FAILED,
+                requestedPage,
+            ),
+        )
             .thenReturn(PageImpl(listOf(firstSavedPost, secondSavedPost), requestedPage, 2))
         `when`(postRepository.findAllById(listOf(101L, 102L))).thenReturn(listOf(firstPost, secondPost))
         `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
@@ -193,7 +201,12 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(2, result.totalElements)
         verify(memberRepository).findById(9)
         verify(postPlaceRepository, times(2)).findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L))
-        verify(savedPostRepository).findAllByUserIdAndGroupId(7, 17, requestedPage)
+        verify(savedPostRepository).findAllByUserIdAndGroupId(
+            7,
+            17,
+            PostContentParsingStatus.FAILED,
+            requestedPage,
+        )
     }
 
     @Test

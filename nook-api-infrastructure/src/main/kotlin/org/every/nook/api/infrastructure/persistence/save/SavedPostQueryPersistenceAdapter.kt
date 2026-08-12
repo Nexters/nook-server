@@ -76,7 +76,12 @@ class SavedPostQueryPersistenceAdapter(
             size,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
         )
-        val savedPosts = savedPostRepository.findAllByUserIdAndGroupId(userId, groupId, pageable)
+        val savedPosts = savedPostRepository.findAllByUserIdAndGroupId(
+            userId,
+            groupId,
+            PostContentParsingStatus.FAILED,
+            pageable,
+        )
         val savedPostPage = savedPosts.toPage()
         val sourcePostIdBySavedPostId = savedPosts.content.associate {
             requireNotNull(it.id) to it.postId
