@@ -9,3 +9,15 @@ policies:
     group_wait: 30s
     group_interval: 5m
     repeat_interval: 1h
+    routes:
+      - receiver: slack-nook-alerts-v2
+        object_matchers:
+          - - alertname
+            - =
+            - DatasourceError
+        group_by:
+          - datasource_uid
+          - rulename
+        group_wait: 2m
+        group_interval: 10m
+        repeat_interval: 6h
