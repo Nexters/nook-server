@@ -7,7 +7,22 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface GroupPostJpaRepository : JpaRepository<GroupPostEntity, Long> {
-    fun countByGroupId(groupId: Long): Long
+    @Query(
+        value = """
+            SELECT COUNT(group_post.id)
+            FROM group_posts group_post
+            INNER JOIN user_saved_posts saved_post
+                ON saved_post.id = group_post.user_saved_post_id
+                AND saved_post.deleted_at IS NULL
+            INNER JOIN post_content_parsing_jobs content_parsing_job
+                ON content_parsing_job.post_id = saved_post.post_id
+                AND content_parsing_job.status <> 'FAILED'
+            WHERE group_post.group_id = :groupId
+              AND group_post.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun countByGroupId(@Param("groupId") groupId: Long): Long
 
     fun findAllByUserSavedPostId(userSavedPostId: Long): List<GroupPostEntity>
 
