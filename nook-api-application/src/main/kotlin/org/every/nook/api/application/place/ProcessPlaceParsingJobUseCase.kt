@@ -3,7 +3,11 @@ package org.every.nook.api.application.place
 import mu.KotlinLogging
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.error
+import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.measure
+import org.every.nook.api.application.processing.warn
+import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -22,46 +26,59 @@ class ProcessPlaceParsingJobUseCase(
     operator fun invoke(postId: Long): Result {
         val job = jobPort.claim(postId, processingTimeout) ?: return Result.Skipped
         val startedAt = clock.instant()
+        eventLogger.info(job.event("place.job.claimed", JOB_STAGE, SUCCESS_OUTCOME))
         logger.info { "Place parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
-        return runCatching {
-            val expectedPlaceCount = expectedPlaceCount(job.body)
-            val textClues = (job.textClues ?: extractClues(job)).filter { clue ->
-                clue.isGroundedIn(job).also { grounded ->
-                    if (!grounded) {
-                        logger.warn {
-                            "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
-                                "placeName=${clue.name}, region=${clue.region}, queries=${clue.queries}"
-                        }
+        return runCatching { process(job, startedAt) }.getOrElse { exception ->
+            handleFailure(job, exception, startedAt)
+        }
+    }
+
+    private fun process(job: ClaimedPlaceParsingJob, startedAt: Instant): Result {
+        val expectedPlaceCount = expectedPlaceCount(job.body)
+        val textClues = (job.textClues ?: extractClues(job)).filter { clue ->
+            clue.isGroundedIn(job).also { grounded ->
+                if (!grounded) {
+                    logger.warn {
+                        "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
+                            "placeName=${clue.name}, region=${clue.region}, queries=${clue.queries}"
                     }
                 }
             }
-            val textResolution = resolveClues(job, textClues)
-            val imageResolution = resolveImageClues(job, textResolution.places.size, expectedPlaceCount)
-            val places = (textResolution.places + imageResolution?.places.orEmpty())
-                .distinctBy { it.provider to it.externalPlaceId }
-            if (places.isEmpty()) {
-                val failure = imageResolution?.failure ?: textResolution.failure
-                terminalFailure(
-                    failure?.message ?: if (imageResolution == null) {
-                        NO_PLACE_RESOLVED_REASON
-                    } else {
-                        NO_PLACE_RESOLVED_AFTER_IMAGE_REASON
-                    },
-                )
-            }
-            measure(job, COMPLETE_STAGE) {
-                jobPort.complete(job.postId, places)
-            }
-            val duration = Duration.between(startedAt, clock.instant()).toMillis()
-            logger.info {
-                "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "placeCount=${places.size}, durationMs=$duration"
-            }
-            Result.Completed
-        }.getOrElse { exception ->
-            handleFailure(job, exception, startedAt)
         }
+        val textResolution = resolveClues(job, textClues)
+        logOcrDecision(eventLogger, job, textResolution.places.size, expectedPlaceCount)
+        val imageResolution = resolveImageClues(job, textResolution.places.size, expectedPlaceCount)
+        val places = (textResolution.places + imageResolution?.places.orEmpty())
+            .distinctBy { it.provider to it.externalPlaceId }
+        if (places.isEmpty()) {
+            val failure = imageResolution?.failure ?: textResolution.failure
+            terminalFailure(
+                failure?.message ?: if (imageResolution == null) {
+                    NO_PLACE_RESOLVED_REASON
+                } else {
+                    NO_PLACE_RESOLVED_AFTER_IMAGE_REASON
+                },
+            )
+        }
+        measure(job, COMPLETE_STAGE) {
+            jobPort.complete(job.postId, places)
+        }
+        val duration = Duration.between(startedAt, clock.instant()).toMillis()
+        logger.info {
+            "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
+                "placeCount=${places.size}, durationMs=$duration"
+        }
+        eventLogger.info(
+            job.event(
+                "place.job.completed",
+                JOB_STAGE,
+                SUCCESS_OUTCOME,
+                duration,
+                mapOf("place.resolved_count" to places.size),
+            ),
+        )
+        return Result.Completed
     }
 
     private fun resolveImageClues(
@@ -187,6 +204,20 @@ class ProcessPlaceParsingJobUseCase(
         if (!clue.isSupportedBy(resolved)) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
+        eventLogger.info(
+            job.event(
+                "place.candidate.selected",
+                SELECT_STAGE,
+                SUCCESS_OUTCOME,
+                fields = mapOf(
+                    "provider.name" to resolved.provider,
+                    "place.external_id" to resolved.externalPlaceId,
+                    "place.selection_method" to if (matches.size == 1) "strict_match" else "openai",
+                    "place.candidate_count" to candidates.size,
+                    "place.strict_match_count" to matches.size,
+                ),
+            ),
+        )
         logger.info {
             "Place resolved: provider=${resolved.provider}, externalPlaceId=${resolved.externalPlaceId}, " +
                 "name=${resolved.name}, address=${resolved.address}"
@@ -234,10 +265,14 @@ class ProcessPlaceParsingJobUseCase(
     private fun failResolution(message: String): Nothing = throw PlaceResolutionException(message)
 
     private fun handleFailure(job: ClaimedPlaceParsingJob, exception: Throwable, startedAt: Instant): Result {
-        val reason = failureReason(exception)
+        val reason = placeFailureReason(exception)
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         if (exception is TerminalPlaceParsingException) {
             jobPort.fail(job.postId, reason)
+            eventLogger.warn(
+                job.event("place.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
+                exception,
+            )
             logger.warn {
                 "Place parsing failed without retry: postId=${job.postId}, attempt=${job.attempt}, " +
                     "durationMs=$duration, reason=$reason"
@@ -249,6 +284,16 @@ class ProcessPlaceParsingJobUseCase(
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(backoff)
             jobPort.retry(job.postId, nextAttemptAt, reason)
+            eventLogger.warn(
+                job.event(
+                    "place.job.retry_scheduled",
+                    JOB_STAGE,
+                    FAILURE_OUTCOME,
+                    duration,
+                    failureFields(exception, reason) + ("retry.next_attempt_at" to nextAttemptAt),
+                ),
+                exception,
+            )
             logger.warn(exception) {
                 "Place parsing retry scheduled: postId=${job.postId}, attempt=${job.attempt}, " +
                     "nextAttemptAt=$nextAttemptAt, durationMs=$duration, reason=$reason"
@@ -257,16 +302,16 @@ class ProcessPlaceParsingJobUseCase(
         }
 
         jobPort.fail(job.postId, reason)
+        eventLogger.error(
+            job.event("place.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
+            exception,
+        )
         logger.error(exception) {
             "Place parsing failed permanently: postId=${job.postId}, attempt=${job.attempt}, " +
                 "durationMs=$duration, reason=$reason"
         }
         return Result.Failed
     }
-
-    private fun failureReason(exception: Throwable): String = exception.message.orEmpty()
-        .ifBlank { DEFAULT_FAILURE_REASON }
-        .take(MAX_FAILURE_REASON_LENGTH)
 
     private fun terminalFailure(message: String): Nothing = throw TerminalPlaceParsingException(message)
 
@@ -282,13 +327,12 @@ class ProcessPlaceParsingJobUseCase(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        val eventLogger = LoggerFactory.getLogger(ProcessPlaceParsingJobUseCase::class.java)
 
         const val MAX_PLACE_COUNT = 20
         const val MAX_QUERY_COUNT = 4
         const val MAX_IMAGE_COUNT = 20
         const val CANDIDATE_LOG_LIMIT = 5
-        const val MAX_FAILURE_REASON_LENGTH = 500
-        const val DEFAULT_FAILURE_REASON = "Place parsing failed"
         const val NO_PLACE_RESOLVED_REASON = "No place could be resolved from text"
         const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
         const val PLACE_FLOW = "place"
@@ -298,6 +342,10 @@ class ProcessPlaceParsingJobUseCase(
         const val SEARCH_STAGE = "search"
         const val SELECT_STAGE = "select"
         const val COMPLETE_STAGE = "complete"
+        const val JOB_STAGE = "job"
+        const val OCR_STAGE = "ocr"
+        const val SUCCESS_OUTCOME = "success"
+        const val FAILURE_OUTCOME = "failure"
     }
 
     private class PlaceResolutionException(message: String) : IllegalStateException(message)
@@ -305,6 +353,28 @@ class ProcessPlaceParsingJobUseCase(
     private class TerminalPlaceParsingException(message: String) : IllegalStateException(message)
 
     private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
+}
+
+private fun logOcrDecision(
+    logger: org.slf4j.Logger,
+    job: ClaimedPlaceParsingJob,
+    textPlaceCount: Int,
+    expectedPlaceCount: Int?,
+) {
+    logger.info(
+        job.event(
+            "place.ocr.decision",
+            "ocr",
+            "success",
+            fields = mapOf(
+                "ocr.required" to requiresImageAnalysis(textPlaceCount, expectedPlaceCount),
+                "ocr.reason" to ocrReason(textPlaceCount, expectedPlaceCount, job.imageUrls.isEmpty()),
+                "place.text_resolved_count" to textPlaceCount,
+                "place.expected_count" to expectedPlaceCount,
+                "content.image_count" to job.imageUrls.size,
+            ),
+        ),
+    )
 }
 
 private fun PlaceClue.isGroundedIn(job: ClaimedPlaceParsingJob): Boolean {
@@ -322,6 +392,13 @@ private fun PlaceClue.isGroundedIn(job: ClaimedPlaceParsingJob): Boolean {
 
 private fun requiresImageAnalysis(textPlaceCount: Int, expectedPlaceCount: Int?): Boolean =
     textPlaceCount == 0 || expectedPlaceCount?.let { textPlaceCount < it } == true
+
+private fun ocrReason(textPlaceCount: Int, expectedPlaceCount: Int?, imagesEmpty: Boolean): String = when {
+    imagesEmpty -> "no_images"
+    textPlaceCount == 0 -> "no_text_place_resolved"
+    expectedPlaceCount != null && textPlaceCount < expectedPlaceCount -> "expected_place_count_shortfall"
+    else -> "text_places_sufficient"
+}
 
 private fun expectedPlaceCount(body: String?): Int? = body?.let { content ->
     EXPECTED_PLACE_COUNT_PATTERN.findAll(content)

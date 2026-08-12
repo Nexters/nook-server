@@ -5,6 +5,10 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
+import org.every.nook.api.application.processing.ProcessingLogEvent
+import org.every.nook.api.application.processing.info
+import org.every.nook.api.application.processing.warn
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.ExecutorService
 
@@ -26,6 +30,7 @@ class CompositePlaceSearchProvider(
                 pending.asSequence()
                     .filterNot { future -> future.isDone }
                     .forEach { future -> future.cancel(true) }
+                eventLogger.info(result.event("place.search.selected", "success"))
                 return result.candidates
             }
         }
@@ -40,6 +45,7 @@ class CompositePlaceSearchProvider(
 
         val emptySuccess = results.filterIsInstance<ProviderResult.Success>().firstOrNull()
         if (emptySuccess != null) {
+            eventLogger.info(emptySuccess.event("place.search.completed", "empty"))
             return emptySuccess.candidates
         }
 
@@ -53,12 +59,25 @@ class CompositePlaceSearchProvider(
     private fun NamedPlaceSearchProvider.searchSafely(request: PlaceSearchProvider.Request): ProviderResult = try {
         ProviderResult.Success(name, provider.search(request))
     } catch (exception: PlaceSearchProviderTimeoutException) {
+        eventLogger.warn(ProviderResult.Timeout(name).event("place.provider.search.failed", "timeout"), exception)
         logger.warn(exception) { "Place search provider timed out: provider=$name, query=${request.query}" }
         ProviderResult.Timeout(name)
     } catch (exception: PlaceSearchProviderException) {
+        eventLogger.warn(ProviderResult.Failure(name).event("place.provider.search.failed", "failure"), exception)
         logger.warn(exception) { "Place search provider failed: provider=$name, query=${request.query}" }
         ProviderResult.Failure(name)
     }
+
+    private fun ProviderResult.event(action: String, outcome: String) = ProcessingLogEvent(
+        action = action,
+        flow = "place",
+        stage = "search",
+        outcome = outcome,
+        fields = mapOf(
+            "provider.name" to provider,
+            "provider.result_count" to (this as? ProviderResult.Success)?.candidates?.size,
+        ),
+    )
 
     data class NamedPlaceSearchProvider(val name: String, val provider: PlaceSearchProvider)
 
@@ -72,5 +91,6 @@ class CompositePlaceSearchProvider(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        val eventLogger = LoggerFactory.getLogger(CompositePlaceSearchProvider::class.java)
     }
 }
