@@ -9,7 +9,11 @@ import org.every.nook.api.application.place.PlaceOpeningPoint
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.processing.debug
+import org.every.nook.api.application.processing.info
+import org.every.nook.api.application.processing.warn
 import org.every.nook.api.domain.post.PostMedia
+import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
 import java.math.BigDecimal
@@ -27,12 +31,14 @@ class GooglePlacePhotoProvider(
         val shouldSkip = !properties.enabled ||
             properties.apiKey.isBlank()
         return if (shouldSkip) {
+            eventLogger.logGoogleSkipped(place)
             logger.warn {
                 "Google place photo skipped: reason=invalid_configuration, enabled=${properties.enabled}, " +
                     "apiKeyConfigured=${properties.apiKey.isNotBlank()}"
             }
             null
         } else {
+            val startedAt = System.nanoTime()
             runCatching {
                 logger.info {
                     "Google place photo search started: provider=${place.provider}, " +
@@ -46,11 +52,14 @@ class GooglePlacePhotoProvider(
                     }
                     null
                 } else {
-                    val photoUrls = googlePlace.photos.orEmpty()
+                    val availablePhotos = googlePlace.photos.orEmpty()
                         .mapNotNull(GooglePhoto::name)
                         .distinct()
                         .take(PlaceSupplement.MAX_PHOTO_COUNT)
+                    eventLogger.logGooglePhotoList(place, googlePlace.photos.orEmpty().size, availablePhotos.size)
+                    val photoUrls = availablePhotos
                         .mapIndexedNotNull { sequence, photoName -> storePhoto(photoName, sequence, place) }
+                    eventLogger.logGooglePhotoPipeline(place, availablePhotos.size, photoUrls.size)
                     PlaceSupplement(
                         openingHours = googlePlace.toOpeningHours(),
                         photoUrls = photoUrls,
@@ -58,6 +67,7 @@ class GooglePlacePhotoProvider(
                     )
                 }
             }.onFailure { exception ->
+                eventLogger.logGoogleFetchFailure(place, exception, startedAt)
                 logger.warn(exception) {
                     "Google place photo fetch failed: provider=${place.provider}, " +
                         "externalPlaceId=${place.externalPlaceId}, name=${place.name}"
@@ -68,6 +78,7 @@ class GooglePlacePhotoProvider(
 
     private fun searchPlace(place: PlaceCandidate): GooglePlace? {
         place.googlePlaceId?.let { return getPlace(it) }
+        val startedAt = System.nanoTime()
         val response = restClient.post()
             .uri("/v1/places:searchText")
             .contentType(MediaType.APPLICATION_JSON)
@@ -93,12 +104,21 @@ class GooglePlacePhotoProvider(
         val matched = scored.maxByOrNull { it.second }
             ?.takeIf { it.second >= MIN_MATCH_SCORE }
             ?.first
-        logger.debug {
-            "[PostParcingTracker] stage=GOOGLE_PLACE_MATCH status=COMPLETED " +
-                "provider=${place.provider} externalPlaceId=${place.externalPlaceId} " +
-                "candidateScores=${scored.map { "${it.first.placeId()}:${it.second}" }} " +
-                "selectedId=${matched?.placeId()}"
-        }
+        eventLogger.info(
+            place.event(
+                "google.place.match.completed",
+                SEARCH_STAGE,
+                if (matched == null) "empty" else "success",
+                mapOf(
+                    "event.duration_ms" to elapsedMillis(startedAt),
+                    "google.place_candidate_count" to response?.places.orEmpty().size,
+                    "google.place_candidate_scores" to scored.map { "${it.first.placeId()}:${it.second}" },
+                    "google.place_selected_id" to matched?.placeId(),
+                    "google.place_matched" to (matched != null),
+                    "empty.reason" to if (matched == null) "place_not_matched" else null,
+                ),
+            ),
+        )
         logger.info {
             "Google place photo search completed: provider=${place.provider}, " +
                 "externalPlaceId=${place.externalPlaceId}, googlePlaceCount=${response?.places.orEmpty().size}, " +
@@ -156,16 +176,37 @@ class GooglePlacePhotoProvider(
 
     private fun String.normalize(): String = lowercase().filter(Char::isLetterOrDigit)
 
-    private fun storePhoto(photoName: String, sequence: Int, place: PlaceCandidate): String? = runCatching {
-        fetchPhotoUri(photoName)?.let { photoUri ->
+    private fun storePhoto(photoName: String, sequence: Int, place: PlaceCandidate): String? {
+        val photoUri = runCatching { fetchPhotoUri(photoName, sequence, place) }
+            .onFailure { exception ->
+                eventLogger.warn(
+                    place.photoEvent("google.photo.media.failed", PHOTO_MEDIA_STAGE, sequence, exception),
+                    exception,
+                )
+            }.getOrNull() ?: return null
+        val startedAt = System.nanoTime()
+        return runCatching {
             mediaStorage.store(PostMedia(PostMedia.MediaType.IMAGE, photoUri, sequence)).url
-        }
-    }.onFailure { exception ->
-        logger.warn(exception) {
-            "Google place photo storage failed: provider=${place.provider}, " +
-                "externalPlaceId=${place.externalPlaceId}, sequence=$sequence"
-        }
-    }.getOrNull()
+        }.onSuccess {
+            eventLogger.debug(
+                place.event(
+                    "google.photo.store.completed",
+                    PHOTO_STORE_STAGE,
+                    "success",
+                    mapOf("event.duration_ms" to elapsedMillis(startedAt), "media.sequence" to sequence),
+                ),
+            )
+        }.onFailure { exception ->
+            eventLogger.warn(
+                place.photoEvent("google.photo.store.failed", PHOTO_STORE_STAGE, sequence, exception, startedAt),
+                exception,
+            )
+            logger.warn(exception) {
+                "Google place photo storage failed: provider=${place.provider}, " +
+                    "externalPlaceId=${place.externalPlaceId}, sequence=$sequence"
+            }
+        }.getOrNull()
+    }
 
     private fun GooglePlace.toOpeningHours(): PlaceOpeningHours? {
         val hours = regularOpeningHours ?: return null
@@ -185,7 +226,8 @@ class GooglePlacePhotoProvider(
         return runCatching { PlaceOpeningPoint(validDay, hour ?: 0, minute ?: 0) }.getOrNull()
     }
 
-    private fun fetchPhotoUri(photoName: String): String? {
+    private fun fetchPhotoUri(photoName: String, sequence: Int, place: PlaceCandidate): String? {
+        val startedAt = System.nanoTime()
         val photoUri = restClient.get()
             .uri { builder ->
                 builder
@@ -198,6 +240,19 @@ class GooglePlacePhotoProvider(
             .retrieve()
             .body(PhotoMediaResponse::class.java)
             ?.photoUri
+        eventLogger.debug(
+            place.event(
+                "google.photo.media.completed",
+                PHOTO_MEDIA_STAGE,
+                if (photoUri == null) "empty" else "success",
+                mapOf(
+                    "event.duration_ms" to elapsedMillis(startedAt),
+                    "media.sequence" to sequence,
+                    "google.photo_uri_found" to (photoUri != null),
+                    "empty.reason" to if (photoUri == null) "photo_uri_missing" else null,
+                ),
+            ),
+        )
         logger.info { "Google place photo media completed: photoUriFound=${photoUri != null}" }
         return photoUri
     }
@@ -266,6 +321,7 @@ class GooglePlacePhotoProvider(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        val eventLogger = LoggerFactory.getLogger(GooglePlacePhotoProvider::class.java)
         const val API_KEY_HEADER = "X-Goog-Api-Key"
         const val FIELD_MASK_HEADER = "X-Goog-FieldMask"
         const val DETAIL_FIELD_MASK =
@@ -285,6 +341,10 @@ class GooglePlacePhotoProvider(
         const val FAR_MATCH_DISTANCE_METERS = 2_000.0
         const val CLOSE_MATCH_DISTANCE_METERS = 100.0
         const val EARTH_RADIUS_METERS = 6_371_000.0
+        const val SEARCH_STAGE = "google-place-match"
+        const val PHOTO_LIST_STAGE = "google-photo-list"
+        const val PHOTO_MEDIA_STAGE = "google-photo-media"
+        const val PHOTO_STORE_STAGE = "google-photo-store"
 
         fun distanceMeters(lat1: BigDecimal, lon1: BigDecimal, lat2: BigDecimal, lon2: BigDecimal): Double {
             val latitudeDelta = Math.toRadians(lat2.toDouble() - lat1.toDouble())
