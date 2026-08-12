@@ -13,6 +13,8 @@ import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostPlaceParsingSnapshot
 import org.every.nook.api.application.post.port.ReusePostPort
 import org.every.nook.api.application.post.port.UpdatePostMemoPort
+import org.every.nook.api.application.processing.ProcessingLogEvent
+import org.every.nook.api.application.processing.info
 import org.every.nook.api.domain.place.GeoPoint
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -33,6 +35,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJ
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -86,7 +89,8 @@ class PostPersistenceAdapter(
                     nextAttemptAt = clock.instant(),
                 ),
             )
-        val userPost = findOrCreateUserPost(userId, sourcePostId, memo).entity
+        val userPostCreation = findOrCreateUserPost(userId, sourcePostId, memo)
+        val userPost = userPostCreation.entity
         addToGroups(requireNotNull(userPost.id), groupIds)
         if (existingContentJob == null) {
             eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(sourcePostId, clock.instant()))
@@ -94,11 +98,13 @@ class PostPersistenceAdapter(
             restartFailedJob(sourcePostId, contentJob)
         }
 
-        return CreatedPost(
+        val createdPost = CreatedPost(
             postId = requireNotNull(userPost.id),
             contentParsingStatus = contentJob.status,
             placeParsingStatus = placeParsingJobJpaRepository.findByPostId(sourcePostId)?.status,
         )
+        logSavedPostMapping(sourcePostId, createdPost.postId, userPostCreation.created, "post.save.completed")
+        return createdPost
     }
 
     @Transactional
@@ -119,11 +125,13 @@ class PostPersistenceAdapter(
         addToGroups(requireNotNull(userPost.id), groupIds)
         restartFailedJob(sourcePostId, contentJob)
         val placeParsingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
-        return CreatedPost(
+        val createdPost = CreatedPost(
             postId = requireNotNull(userPost.id),
             contentParsingStatus = contentJob.status,
             placeParsingStatus = placeParsingJob?.status,
         )
+        logSavedPostMapping(sourcePostId, createdPost.postId, userPostCreation.created, "post.reuse.completed")
+        return createdPost
     }
 
     @Transactional
@@ -275,3 +283,21 @@ class PostPersistenceAdapter(
         id = id,
     )
 }
+
+private fun logSavedPostMapping(sourcePostId: Long, savedPostId: Long, created: Boolean, action: String) {
+    postPersistenceEventLogger.info(
+        ProcessingLogEvent(
+            action = action,
+            flow = "post-save",
+            stage = "persist",
+            outcome = "success",
+            sourcePostId = sourcePostId,
+            fields = mapOf(
+                "saved_post.id" to savedPostId,
+                "saved_post.created" to created,
+            ),
+        ),
+    )
+}
+
+private val postPersistenceEventLogger = LoggerFactory.getLogger(PostPersistenceAdapter::class.java)

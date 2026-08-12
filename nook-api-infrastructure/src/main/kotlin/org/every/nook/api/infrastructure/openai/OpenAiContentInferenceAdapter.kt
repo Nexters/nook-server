@@ -9,7 +9,10 @@ import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.PostContentInference
+import org.every.nook.api.application.processing.ProcessingLogEvent
+import org.every.nook.api.application.processing.info
 import org.every.nook.api.domain.place.PlaceTag
+import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
@@ -108,6 +111,7 @@ class OpenAiContentInferenceAdapter(
         schema: Map<String, Any>,
         maxOutputTokens: Int,
     ): JsonNode {
+        val startedAt = System.nanoTime()
         require(properties.apiKey.isNotBlank()) { "OpenAI API key is not configured" }
         val request = mapOf(
             "model" to properties.model,
@@ -143,6 +147,16 @@ class OpenAiContentInferenceAdapter(
             ?: error("OpenAI returned no structured output")
         return objectMapper.readTree(text).also { result ->
             logger.info { "OpenAI structured output received: name=$name, output=$result" }
+            eventLogger.info(
+                ProcessingLogEvent(
+                    action = "openai.response.completed",
+                    flow = "content-inference",
+                    stage = name,
+                    outcome = "success",
+                    durationMs = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND,
+                    fields = mapOf("provider.name" to "openai", "openai.model" to properties.model),
+                ),
+            )
         }
     }
 
@@ -204,6 +218,8 @@ class OpenAiContentInferenceAdapter(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        val eventLogger = LoggerFactory.getLogger(OpenAiContentInferenceAdapter::class.java)
+        const val NANOS_PER_MILLISECOND = 1_000_000
 
         const val MAX_TITLE_LENGTH = 25
         const val MAX_PLACE_COUNT = 20

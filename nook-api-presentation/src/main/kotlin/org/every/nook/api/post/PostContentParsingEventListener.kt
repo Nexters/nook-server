@@ -8,6 +8,7 @@ import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
 import org.every.nook.api.application.post.StorePostMediaUseCase
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.withProcessingLogContext
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -69,45 +70,49 @@ class PostContentParsingEventListener(
     @Async("postContentParsingTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun process(event: PostContentParsingJobRequestedEvent) {
-        logger.info {
-            "Post content parsing event received: postId=${event.postId}, availableAt=${event.availableAt}"
-        }
-        if (scheduleWhenUnavailable(event)) {
-            return
-        }
-        recordQueueDelay(event.availableAt, event.postId)
-        when (val result = processPostContentParsingJob(event.postId)) {
-            is ProcessPostContentParsingJobUseCase.Result.Retry -> schedule(
-                PostContentParsingJobRequestedEvent(event.postId, result.nextAttemptAt),
-            )
+        withProcessingLogContext(event.postId, CONTENT_FLOW) {
+            logger.info {
+                "Post content parsing event received: postId=${event.postId}, availableAt=${event.availableAt}"
+            }
+            if (scheduleWhenUnavailable(event)) {
+                return@withProcessingLogContext
+            }
+            recordQueueDelay(event.availableAt, event.postId)
+            when (val result = processPostContentParsingJob(event.postId)) {
+                is ProcessPostContentParsingJobUseCase.Result.Retry -> schedule(
+                    PostContentParsingJobRequestedEvent(event.postId, result.nextAttemptAt),
+                )
 
-            ProcessPostContentParsingJobUseCase.Result.Completed,
-            ProcessPostContentParsingJobUseCase.Result.Failed,
-            ProcessPostContentParsingJobUseCase.Result.Skipped,
-            -> Unit
+                ProcessPostContentParsingJobUseCase.Result.Completed,
+                ProcessPostContentParsingJobUseCase.Result.Failed,
+                ProcessPostContentParsingJobUseCase.Result.Skipped,
+                -> Unit
+            }
         }
     }
 
     @Async("postContentParsingTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun storeMedia(event: PostMediaStorageRequestedEvent) {
-        runCatching {
-            storePostMedia(
-                event.postId,
-                StorePostMediaUseCase.Command(event.mediaType, event.sourceUrl, event.sequence),
-            )
-        }.onFailure { exception ->
-            if (event.attempt < MEDIA_MAX_ATTEMPTS) {
-                val retryAt = clock.instant().plus(mediaRetryBackoff)
-                scheduleMedia(event.copy(attempt = event.attempt + 1, availableAt = retryAt))
-                logger.warn(exception) {
-                    "Post media storage retry scheduled: postId=${event.postId}, sequence=${event.sequence}, " +
-                        "attempt=${event.attempt}, nextAttemptAt=$retryAt"
-                }
-            } else {
-                logger.error(exception) {
-                    "Post media storage failed permanently: postId=${event.postId}, " +
-                        "sequence=${event.sequence}, attempt=${event.attempt}"
+        withProcessingLogContext(event.postId, MEDIA_FLOW) {
+            runCatching {
+                storePostMedia(
+                    event.postId,
+                    StorePostMediaUseCase.Command(event.mediaType, event.sourceUrl, event.sequence),
+                )
+            }.onFailure { exception ->
+                if (event.attempt < MEDIA_MAX_ATTEMPTS) {
+                    val retryAt = clock.instant().plus(mediaRetryBackoff)
+                    scheduleMedia(event.copy(attempt = event.attempt + 1, availableAt = retryAt))
+                    logger.warn(exception) {
+                        "Post media storage retry scheduled: postId=${event.postId}, sequence=${event.sequence}, " +
+                            "attempt=${event.attempt}, nextAttemptAt=$retryAt"
+                    }
+                } else {
+                    logger.error(exception) {
+                        "Post media storage failed permanently: postId=${event.postId}, " +
+                            "sequence=${event.sequence}, attempt=${event.attempt}"
+                    }
                 }
             }
         }
@@ -154,6 +159,7 @@ class PostContentParsingEventListener(
     private companion object {
         val logger = KotlinLogging.logger {}
         const val CONTENT_FLOW = "post-content"
+        const val MEDIA_FLOW = "post-media"
         const val QUEUE_STAGE = "queue"
         const val MEDIA_MAX_ATTEMPTS = 4
         const val DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS = 3L

@@ -2,6 +2,9 @@ package org.every.nook.api.infrastructure.openai
 
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.ImageTranscript
+import org.every.nook.api.application.processing.ProcessingLogEvent
+import org.every.nook.api.application.processing.info
+import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
@@ -12,6 +15,7 @@ class OpenAiImageTextExtractor(
     private val properties: OpenAiProperties,
 ) : ImageTextExtractor {
     override fun extract(request: ImageTextExtractor.Request): List<ImageTranscript> {
+        val startedAt = System.nanoTime()
         require(request.images.isNotEmpty()) { "At least one image is required" }
         require(request.images.size <= MAX_BATCH_SIZE) { "Too many images in transcript request" }
         require(properties.apiKey.isNotBlank()) { "OpenAI API key is not configured" }
@@ -36,6 +40,22 @@ class OpenAiImageTextExtractor(
                 imageIndex = image.path("imageIndex").asInt(),
                 texts = image.path("texts").toList().map(JsonNode::asText).map(String::trim)
                     .filter(String::isNotEmpty),
+            )
+        }.also { transcripts ->
+            logger.info(
+                ProcessingLogEvent(
+                    action = "openai.response.completed",
+                    flow = "place",
+                    stage = "image-transcript",
+                    outcome = "success",
+                    durationMs = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND,
+                    fields = mapOf(
+                        "provider.name" to "openai",
+                        "openai.model" to properties.model,
+                        "content.image_count" to request.images.size,
+                        "ocr.transcript_count" to transcripts.size,
+                    ),
+                ),
             )
         }
     }
@@ -73,6 +93,8 @@ class OpenAiImageTextExtractor(
     )
 
     private companion object {
+        val logger = LoggerFactory.getLogger(OpenAiImageTextExtractor::class.java)
+        const val NANOS_PER_MILLISECOND = 1_000_000
         const val MAX_BATCH_SIZE = 5
         const val MAX_IMAGE_COUNT = 20
         const val MAX_OUTPUT_TOKENS = 4000
