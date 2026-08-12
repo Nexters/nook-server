@@ -14,10 +14,15 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 user_group.id AS id,
                 user_group.name AS name,
                 user_group.color AS color,
-                COUNT(group_post.id) AS postCount
+                COUNT(content_parsing_job.id) AS postCount
             FROM user_groups user_group
             LEFT JOIN group_posts group_post ON group_post.group_id = user_group.id
                 AND group_post.deleted_at IS NULL
+            LEFT JOIN user_saved_posts saved_post ON saved_post.id = group_post.user_saved_post_id
+                AND saved_post.deleted_at IS NULL
+            LEFT JOIN post_content_parsing_jobs content_parsing_job
+                ON content_parsing_job.post_id = saved_post.post_id
+                AND content_parsing_job.status <> 'FAILED'
             WHERE user_group.user_id = :userId
               AND user_group.deleted_at IS NULL
             GROUP BY user_group.id, user_group.name, user_group.color
@@ -55,6 +60,9 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 INNER JOIN group_posts group_post ON group_post.group_id = user_group.id
                 INNER JOIN user_saved_posts saved_post ON saved_post.id = group_post.user_saved_post_id
                 INNER JOIN posts post ON post.id = saved_post.post_id
+                INNER JOIN post_content_parsing_jobs content_parsing_job
+                    ON content_parsing_job.post_id = saved_post.post_id
+                    AND content_parsing_job.status <> 'FAILED'
                 LEFT JOIN post_media post_media
                     ON post_media.post_id = saved_post.post_id
                     AND post_media.media_type = 'IMAGE'

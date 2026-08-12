@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.save
 
+import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
@@ -26,11 +27,18 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
                   FROM GroupPostEntity groupPost
                   WHERE groupPost.groupId = :groupId
               )
+              AND EXISTS (
+                  SELECT contentParsingJob.postId
+                  FROM PostContentParsingJobEntity contentParsingJob
+                  WHERE contentParsingJob.postId = savedPost.postId
+                    AND contentParsingJob.status <> :excludedStatus
+              )
         """,
     )
     fun findAllByUserIdAndGroupId(
         @Param("userId") userId: Long,
         @Param("groupId") groupId: Long,
+        @Param("excludedStatus") excludedStatus: PostContentParsingStatus,
         pageable: Pageable,
     ): Page<UserSavedPostEntity>
 
