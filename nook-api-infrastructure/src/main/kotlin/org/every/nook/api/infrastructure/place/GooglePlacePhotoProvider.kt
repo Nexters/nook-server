@@ -54,7 +54,7 @@ class GooglePlacePhotoProvider(
                     PlaceSupplement(
                         openingHours = googlePlace.toOpeningHours(),
                         photoUrls = photoUrls,
-                        googlePlaceId = googlePlace.id,
+                        googlePlaceId = googlePlace.placeId(),
                     )
                 }
             }.onFailure { exception ->
@@ -96,7 +96,8 @@ class GooglePlacePhotoProvider(
         logger.debug {
             "[PostParcingTracker] stage=GOOGLE_PLACE_MATCH status=COMPLETED " +
                 "provider=${place.provider} externalPlaceId=${place.externalPlaceId} " +
-                "candidateScores=${scored.map { "${it.first.id}:${it.second}" }} selectedId=${matched?.id}"
+                "candidateScores=${scored.map { "${it.first.placeId()}:${it.second}" }} " +
+                "selectedId=${matched?.placeId()}"
         }
         logger.info {
             "Google place photo search completed: provider=${place.provider}, " +
@@ -207,13 +208,24 @@ class GooglePlacePhotoProvider(
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class GooglePlace(
         val id: String? = null,
+        val name: String? = null,
         val displayName: LocalizedText? = null,
         val formattedAddress: String? = null,
         val location: GoogleLocation? = null,
         val timeZone: GoogleTimeZone? = null,
         val regularOpeningHours: GoogleOpeningHours? = null,
         val photos: List<GooglePhoto>? = null,
-    )
+    ) {
+        fun placeId(): String? = id
+            ?: name?.removePrefix(PLACE_RESOURCE_PREFIX)?.takeIf(String::isNotBlank)
+            ?: photos.orEmpty().asSequence()
+                .mapNotNull(GooglePhoto::name)
+                .mapNotNull { photoName ->
+                    photoName.removePrefix(PLACE_RESOURCE_PREFIX).substringBefore(PHOTO_RESOURCE_SEPARATOR)
+                        .takeIf(String::isNotBlank)
+                }
+                .firstOrNull()
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class LocalizedText(val text: String? = null)
@@ -257,10 +269,12 @@ class GooglePlacePhotoProvider(
         const val API_KEY_HEADER = "X-Goog-Api-Key"
         const val FIELD_MASK_HEADER = "X-Goog-FieldMask"
         const val DETAIL_FIELD_MASK =
-            "id,displayName,formattedAddress,location,timeZone,regularOpeningHours,photos.name"
+            "id,name,displayName,formattedAddress,location,timeZone,regularOpeningHours,photos.name"
         const val SEARCH_FIELD_MASK =
-            "places.id,places.displayName,places.formattedAddress,places.location,places.timeZone," +
+            "places.id,places.name,places.displayName,places.formattedAddress,places.location,places.timeZone," +
                 "places.regularOpeningHours,places.photos.name"
+        const val PLACE_RESOURCE_PREFIX = "places/"
+        const val PHOTO_RESOURCE_SEPARATOR = "/photos/"
         const val SEARCH_PAGE_SIZE = 5
         const val LOCATION_BIAS_RADIUS_METERS = 1_000.0
         const val MIN_MATCH_SCORE = 45

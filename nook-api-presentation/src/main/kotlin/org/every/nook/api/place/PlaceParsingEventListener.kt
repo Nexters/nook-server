@@ -88,7 +88,7 @@ class PlaceParsingEventListener(
         }
     }
 
-    @Async("placeParsingTaskExecutor")
+    @Async("placeSupplementTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun storeThumbnail(event: PlaceThumbnailRequestedEvent) {
         runCatching {

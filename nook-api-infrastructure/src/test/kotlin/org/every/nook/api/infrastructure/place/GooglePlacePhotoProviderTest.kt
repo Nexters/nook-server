@@ -92,6 +92,31 @@ class GooglePlacePhotoProviderTest {
     }
 
     @Test
+    fun `recovers Google place id from resource name when id field is absent`() {
+        val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchText")))
+            .andRespond(
+                withSuccess(
+                    """
+                    {"places":[{
+                      "name":"places/fallback-place-id",
+                      "displayName":{"text":"원동미나리삼겹살"},
+                      "formattedAddress":"서울 용산구 한강대로77길 4-1",
+                      "location":{"latitude":37.1,"longitude":127.1},
+                      "photos":[]
+                    }]}
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val result = fixture.provider.fetch(candidate())
+
+        assertEquals("fallback-place-id", result?.googlePlaceId)
+        fixture.server.verify()
+    }
+
+    @Test
     fun `disabled provider does not call Google`() {
         val fixture = providerFixture(properties = GooglePlacePhotoProperties(enabled = false, apiKey = "google-key"))
 
