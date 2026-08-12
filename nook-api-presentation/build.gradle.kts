@@ -17,6 +17,7 @@ dependencies {
     implementation("org.springframework.security:spring-security-oauth2-resource-server")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("tools.jackson.module:jackson-module-kotlin")
+    runtimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("io.github.cdimascio:dotenv-kotlin:6.5.1")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
