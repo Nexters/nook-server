@@ -87,12 +87,12 @@ external:
     rest-api-key: ${KAKAO_REST_API_KEY:}
     connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:3s}
     read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:5s}
-  naver-map:
-    base-url: ${NAVER_MAP_BASE_URL:https://maps.apigw.ntruss.com}
-    client-id: ${NAVER_CLIENT_ID:}
-    client-secret: ${NAVER_CLIENT_SECRET:}
-    connect-timeout: ${NAVER_MAP_CONNECT_TIMEOUT:3s}
-    read-timeout: ${NAVER_MAP_READ_TIMEOUT:5s}
+  naver-api-hub:
+    base-url: ${NAVER_API_HUB_BASE_URL:https://naverapihub.apigw.ntruss.com}
+    client-id: ${NAVER_API_HUB_CLIENT_ID:}
+    client-secret: ${NAVER_API_HUB_CLIENT_SECRET:}
+    connect-timeout: ${NAVER_API_HUB_CONNECT_TIMEOUT:3s}
+    read-timeout: ${NAVER_API_HUB_READ_TIMEOUT:5s}
   google-place-photo:
     enabled: ${GOOGLE_PLACE_PHOTO_ENABLED:false}
     base-url: ${GOOGLE_PLACE_BASE_URL:https://places.googleapis.com}

@@ -19,10 +19,11 @@ import kotlin.test.assertFailsWith
 
 class NaverPlaceSearchProviderTest {
     @Test
-    fun `uses Naver Cloud map credentials`() {
+    fun `uses Naver API Hub local search credentials`() {
         val fixture = providerFixture()
-        fixture.server.expect(requestTo(containsString("/map-geocode/v2/geocode")))
+        fixture.server.expect(requestTo(containsString("/search/v1/local")))
             .andExpect(requestTo(containsString("query=Nook%20Cafe")))
+            .andExpect(requestTo(containsString("display=5")))
             .andExpect(method(HttpMethod.GET))
             .andExpect(header("X-NCP-APIGW-API-KEY-ID", "test-client-id"))
             .andExpect(header("X-NCP-APIGW-API-KEY", "test-client-secret"))
@@ -38,7 +39,7 @@ class NaverPlaceSearchProviderTest {
     @Test
     fun `provider error is converted to application exception`() {
         val fixture = providerFixture()
-        fixture.server.expect(requestTo(containsString("/map-geocode/v2/geocode")))
+        fixture.server.expect(requestTo(containsString("/search/v1/local")))
             .andRespond(withServerError())
 
         assertFailsWith<PlaceSearchProviderException> {
@@ -80,12 +81,14 @@ class NaverPlaceSearchProviderTest {
         val SUCCESS_RESPONSE =
             """
             {
-              "status": "OK",
-              "addresses": [{
+              "items": [{
+                "title": "<b>Nook Cafe</b>",
+                "link": "https://map.naver.com/place/1",
+                "category": "카페",
+                "address": "서울특별시 용산구 갈월동 99-1",
                 "roadAddress": "서울특별시 용산구 한강대로77길 4-1",
-                "jibunAddress": "서울특별시 용산구 갈월동 99-1",
-                "x": "126.972332",
-                "y": "37.543123"
+                "mapx": "126.972332",
+                "mapy": "37.543123"
               }]
             }
             """.trimIndent()

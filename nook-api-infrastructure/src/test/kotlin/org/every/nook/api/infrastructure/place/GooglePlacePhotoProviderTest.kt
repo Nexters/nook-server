@@ -31,6 +31,7 @@ class GooglePlacePhotoProviderTest {
                     """
                     {
                       "places": [{
+                        "id": "google-place-id",
                         "displayName": {"text": "원동미나리삼겹살"},
                         "formattedAddress": "서울 용산구 한강대로77길 4-1",
                         "location": {"latitude": 37.1, "longitude": 127.1},
@@ -74,6 +75,7 @@ class GooglePlacePhotoProviderTest {
         val result = fixture.provider.fetch(candidate())
 
         assertEquals(6, result?.photoUrls?.size)
+        assertEquals("google-place-id", result?.googlePlaceId)
         assertEquals("Asia/Seoul", result?.openingHours?.timeZone)
         assertEquals(1, result?.openingHours?.periods?.single()?.open?.day)
         assertEquals((0..5).toList(), fixture.storage.captured.map(PostMedia::sequence))

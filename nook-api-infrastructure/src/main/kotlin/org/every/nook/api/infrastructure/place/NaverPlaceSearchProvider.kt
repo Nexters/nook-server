@@ -25,6 +25,8 @@ class NaverPlaceSearchProvider(
                 .uri { builder ->
                     builder.path(SEARCH_PATH)
                         .queryParam(QUERY, request.query)
+                        .queryParam(DISPLAY, request.size.coerceIn(1, MAX_DISPLAY))
+                        .queryParam(START, 1)
                         .build()
                 }
                 .header(CLIENT_ID, properties.clientId)
@@ -45,11 +47,11 @@ class NaverPlaceSearchProvider(
             mapper.map(request.query, objectMapper.readValue(responseBody, NaverPlaceResponse::class.java))
                 .also { candidates ->
                     logger.info {
-                        "Naver map geocoding completed: query=${request.query}, candidateCount=${candidates.size}"
+                        "Naver local search completed: query=${request.query}, candidateCount=${candidates.size}"
                     }
                 }
         }.getOrElse { exception ->
-            logger.warn(exception) { "Failed to map Naver Map geocoding response" }
+            logger.warn(exception) { "Failed to map Naver local search response" }
             providerFailure(exception)
         }
     }
@@ -70,8 +72,11 @@ class NaverPlaceSearchProvider(
     private companion object {
         val logger = KotlinLogging.logger {}
 
-        const val SEARCH_PATH = "/map-geocode/v2/geocode"
+        const val SEARCH_PATH = "/search/v1/local"
         const val QUERY = "query"
+        const val DISPLAY = "display"
+        const val START = "start"
+        const val MAX_DISPLAY = 5
         const val CLIENT_ID = "X-NCP-APIGW-API-KEY-ID"
         const val CLIENT_SECRET = "X-NCP-APIGW-API-KEY"
     }

@@ -3,9 +3,9 @@ package org.every.nook.api.infrastructure.place
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
 
-@ConfigurationProperties("external.naver-map")
+@ConfigurationProperties("external.naver-api-hub")
 data class NaverPlaceProperties(
-    val baseUrl: String = "https://maps.apigw.ntruss.com",
+    val baseUrl: String = "https://naverapihub.apigw.ntruss.com",
     val clientId: String = "",
     val clientSecret: String = "",
     val connectTimeout: Duration = Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS),

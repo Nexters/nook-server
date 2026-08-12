@@ -3,7 +3,11 @@ package org.every.nook.api.application.place
 import java.time.Instant
 import java.time.ZoneId
 
-data class PlaceSupplement(val openingHours: PlaceOpeningHours?, val photoUrls: List<String>) {
+data class PlaceSupplement(
+    val openingHours: PlaceOpeningHours?,
+    val photoUrls: List<String>,
+    val googlePlaceId: String? = null,
+) {
     init {
         require(photoUrls.size <= MAX_PHOTO_COUNT) { "Place photos must not exceed $MAX_PHOTO_COUNT" }
     }

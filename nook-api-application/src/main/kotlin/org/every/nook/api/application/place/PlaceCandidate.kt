@@ -15,4 +15,5 @@ data class PlaceCandidate(
     val providerUrl: String?,
     val distanceMeters: Int? = null,
     val city: String? = KoreanCityNameExtractor.extract(address),
+    val googlePlaceId: String? = null,
 )
