@@ -10,6 +10,7 @@ import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.withProcessingLogContext
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.ApplicationEventPublisher
@@ -69,34 +70,38 @@ class PlaceParsingEventListener(
     @Async("placeParsingTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun process(event: PlaceParsingJobRequestedEvent) {
-        logger.info {
-            "Place parsing event received: postId=${event.postId}, availableAt=${event.availableAt}"
-        }
-        if (scheduleWhenUnavailable(event)) {
-            return
-        }
-        recordQueueDelay(event.availableAt, event.postId)
-        when (val result = processPlaceParsingJob(event.postId)) {
-            is ProcessPlaceParsingJobUseCase.Result.Retry -> schedule(
-                PlaceParsingJobRequestedEvent(event.postId, result.nextAttemptAt),
-            )
+        withProcessingLogContext(event.postId, PLACE_FLOW) {
+            logger.info {
+                "Place parsing event received: postId=${event.postId}, availableAt=${event.availableAt}"
+            }
+            if (scheduleWhenUnavailable(event)) {
+                return@withProcessingLogContext
+            }
+            recordQueueDelay(event.availableAt, event.postId)
+            when (val result = processPlaceParsingJob(event.postId)) {
+                is ProcessPlaceParsingJobUseCase.Result.Retry -> schedule(
+                    PlaceParsingJobRequestedEvent(event.postId, result.nextAttemptAt),
+                )
 
-            ProcessPlaceParsingJobUseCase.Result.Completed,
-            ProcessPlaceParsingJobUseCase.Result.Failed,
-            ProcessPlaceParsingJobUseCase.Result.Skipped,
-            -> Unit
+                ProcessPlaceParsingJobUseCase.Result.Completed,
+                ProcessPlaceParsingJobUseCase.Result.Failed,
+                ProcessPlaceParsingJobUseCase.Result.Skipped,
+                -> Unit
+            }
         }
     }
 
     @Async("placeParsingTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun storeThumbnail(event: PlaceThumbnailRequestedEvent) {
-        runCatching {
-            storePlaceThumbnail(event.postId, event.place)
-        }.onFailure { exception ->
-            logger.warn(exception) {
-                "Place thumbnail storage failed: postId=${event.postId}, provider=${event.place.provider}, " +
-                    "externalPlaceId=${event.place.externalPlaceId}"
+        withProcessingLogContext(event.postId, THUMBNAIL_FLOW) {
+            runCatching {
+                storePlaceThumbnail(event.postId, event.place)
+            }.onFailure { exception ->
+                logger.warn(exception) {
+                    "Place thumbnail storage failed: postId=${event.postId}, provider=${event.place.provider}, " +
+                        "externalPlaceId=${event.place.externalPlaceId}"
+                }
             }
         }
     }
@@ -104,12 +109,14 @@ class PlaceParsingEventListener(
     @Async("placeParsingTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun storeTags(event: PlaceTagsRequestedEvent) {
-        runCatching {
-            storePlaceTags(event)
-        }.onFailure { exception ->
-            logger.warn(exception) {
-                "Place tag storage failed: postId=${event.postId}, placeId=${event.placeId}, " +
-                    "provider=${event.place.provider}, externalPlaceId=${event.place.externalPlaceId}"
+        withProcessingLogContext(event.postId, TAG_FLOW) {
+            runCatching {
+                storePlaceTags(event)
+            }.onFailure { exception ->
+                logger.warn(exception) {
+                    "Place tag storage failed: postId=${event.postId}, placeId=${event.placeId}, " +
+                        "provider=${event.place.provider}, externalPlaceId=${event.place.externalPlaceId}"
+                }
             }
         }
     }
@@ -148,6 +155,8 @@ class PlaceParsingEventListener(
     private companion object {
         val logger = KotlinLogging.logger {}
         const val PLACE_FLOW = "place"
+        const val THUMBNAIL_FLOW = "place-thumbnail"
+        const val TAG_FLOW = "place-tags"
         const val QUEUE_STAGE = "queue"
     }
 }

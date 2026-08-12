@@ -25,14 +25,17 @@ class ApifyInstagramPostContentExtractor(
     override fun supports(url: String): Boolean = InstagramContentUrl.supports(url)
 
     override fun extract(url: String): ExtractedPostContent {
+        val startedAt = System.nanoTime()
         val instagramUrl = InstagramContentUrl.parse(url)
         responseCache.find(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode)?.let { cached ->
+            logger.logCacheHit(PROVIDER, startedAt)
             return mapResponse(instagramUrl, parseResponse(cached))
         }
         if (properties.apiToken.isBlank()) {
             providerFailure()
         }
         val responseBody = try {
+            logger.logProviderRequestStarted(PROVIDER)
             restClient.post()
                 .uri { builder ->
                     builder.path(RUN_SYNC_PATH)
@@ -52,16 +55,19 @@ class ApifyInstagramPostContentExtractor(
                 .retrieve()
                 .body(String::class.java)
         } catch (exception: RestClientResponseException) {
+            logger.logProviderRequestFailed(PROVIDER, startedAt, exception, exception.statusCode.value())
             if (exception.statusCode.value() in TIMEOUT_STATUSES) {
                 providerTimeout(exception)
             }
             providerFailure(exception)
         } catch (exception: ResourceAccessException) {
+            logger.logProviderRequestFailed(PROVIDER, startedAt, exception)
             handleResourceAccessException(exception)
         }
 
         val extracted = mapResponse(instagramUrl, parseResponse(responseBody))
         responseBody?.let { body -> responseCache.save(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode, body) }
+        logger.logProviderRequestCompleted(PROVIDER, startedAt, extracted.post.media.size)
         return extracted
     }
 
