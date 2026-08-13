@@ -70,7 +70,7 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(content().string(containsString("post_content_inference")))
             .andExpect(content().string(containsString("홍보성")))
             .andExpect(content().string(containsString("\"maxLength\":25")))
-            .andExpect(content().string(containsString("\"maxItems\":20")))
+            .andExpect(content().string(containsString("\"maxItems\":60")))
             .andRespond(
                 withSuccess(
                     response(
@@ -104,7 +104,7 @@ class OpenAiContentInferenceAdapterTest {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(containsString("place_clues")))
-            .andExpect(content().string(containsString("\"maxItems\":20")))
+            .andExpect(content().string(containsString("\"maxItems\":60")))
             .andRespond(
                 withSuccess(
                     response(
@@ -188,7 +188,7 @@ class OpenAiContentInferenceAdapterTest {
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(not(containsString("\"type\":\"input_image\""))))
             .andExpect(content().string(containsString("빈브라더스 커피하우스 서울")))
-            .andExpect(content().string(containsString("\"max_output_tokens\":4000")))
+            .andExpect(content().string(containsString("\"max_output_tokens\":12000")))
             .andRespond(
                 withSuccess(
                     response(
