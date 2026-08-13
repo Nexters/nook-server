@@ -187,6 +187,79 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `uses image fallback when text results do not meet a high expected count`() {
+        val port = FakeJobPort(
+            body = "압구정 맛집 52곳: 텍스트 장소",
+            imageUrls = listOf("https://cdn.test/1.jpg"),
+        )
+        val requests = mutableListOf<PlaceClueExtractor.Request>()
+        val extractor = PlaceClueExtractor { request ->
+            requests += request
+            if (request.imageTranscripts.isEmpty()) {
+                listOf(PlaceClue("텍스트 장소", "압구정", listOf("텍스트 장소")))
+            } else {
+                listOf(
+                    PlaceClue(
+                        "이미지 장소",
+                        "압구정",
+                        listOf("이미지 장소"),
+                        listOf(PlaceClueEvidence(1, "이미지 장소 / 압구정")),
+                    ),
+                )
+            }
+        }
+        val useCase = useCase(
+            port,
+            extractor,
+            SearchPlaceCandidatesUseCase { request ->
+                listOf(candidate(request.query, request.query, "서울 강남구 압구정"))
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(2, requests.size)
+        assertEquals(listOf("텍스트 장소", "이미지 장소"), port.completed.map(PlaceCandidate::name))
+    }
+
+    @Test
+    fun `resolves more than twenty image place clues`() {
+        val placeCount = 25
+        val port = FakeJobPort(
+            body = "압구정 맛집 ${placeCount}곳",
+            imageUrls = (1..20).map { "https://cdn.test/$it.jpg" },
+            textClues = emptyList(),
+            imageTranscripts = (1..20).map { imageIndex ->
+                ImageTranscript(imageIndex, listOf("이미지 장소 $imageIndex"))
+            },
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { request ->
+                if (request.imageTranscripts.isEmpty()) {
+                    emptyList()
+                } else {
+                    (1..placeCount).map { index ->
+                        val imageIndex = ((index - 1) % 20) + 1
+                        PlaceClue(
+                            name = "이미지 장소 $index",
+                            region = "압구정",
+                            queries = listOf("이미지 장소 $index"),
+                            evidence = listOf(PlaceClueEvidence(imageIndex, "이미지 장소 $index / 압구정")),
+                        )
+                    }
+                }
+            },
+            search = SearchPlaceCandidatesUseCase { request ->
+                listOf(candidate(request.query, request.query, "서울 강남구 압구정"))
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(placeCount, port.completed.size)
+        assertEquals("이미지 장소 25", port.completed.last().name)
+    }
+
+    @Test
     fun `transcribes at most twenty images in batches of five`() {
         val imageUrls = (0 until 25).map { "https://cdn.test/$it.jpg" }
         val port = FakeJobPort(imageUrls = imageUrls)
