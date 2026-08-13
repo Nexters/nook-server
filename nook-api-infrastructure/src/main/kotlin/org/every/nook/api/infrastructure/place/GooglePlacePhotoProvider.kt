@@ -107,27 +107,13 @@ class GooglePlacePhotoProvider(
                     .thenBy { it.score }
                     .thenBy { it.photoCount },
             )
-        eventLogger.info(
-            place.event(
-                "google.place.match.completed",
-                SEARCH_STAGE,
-                if (matched == null) "empty" else "success",
-                mapOf(
-                    "event.duration_ms" to elapsedMillis(startedAt),
-                    "google.place_nearby_candidate_count" to nearbyCandidates.size,
-                    "google.place_query_count" to queries.size,
-                    "google.place_queries" to queries,
-                    "google.place_candidate_count" to allCandidates.size,
-                    "google.place_matched" to (matched != null),
-                    "google.place_candidate_scores" to allCandidates.map {
-                        "${it.query}:${it.place.placeId()}:${it.score}:photos=${it.photoCount}"
-                    },
-                    "google.place_selected_id" to matched?.place?.placeId(),
-                    "google.place_selected_query" to matched?.query,
-                    "empty.reason" to if (matched == null) "place_not_matched" else null,
-                ),
-            ),
-        )
+        logger.debug {
+            "Google place candidates evaluated: provider=${place.provider}, " +
+                "externalPlaceId=${place.externalPlaceId}, nearbyCandidateCount=${nearbyCandidates.size}, " +
+                "queryCount=${queries.size}, candidateCount=${allCandidates.size}, " +
+                "matchedPlaceId=${matched?.place?.placeId()}, selectedQuery=${matched?.query}, " +
+                "durationNs=${System.nanoTime() - startedAt}"
+        }
         logger.info {
             "Google place photo search completed: provider=${place.provider}, " +
                 "externalPlaceId=${place.externalPlaceId}, googlePlaceCount=${allCandidates.size}, " +
