@@ -22,8 +22,11 @@ import kotlin.test.assertTrue
 
 class GooglePlacePhotoProviderTest {
     @Test
+    @Suppress("LongMethod")
     fun `fetches opening hours and stores up to six Google place photos`() {
         val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
         fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
             .andExpect(method(HttpMethod.POST))
             .andExpect(header("X-Goog-Api-Key", "google-key"))
@@ -87,6 +90,8 @@ class GooglePlacePhotoProviderTest {
     @Test
     fun `returns null when Google request fails`() {
         val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
         fixture.server.expect(requestTo(containsString("/v1/places:searchText")))
             .andRespond(withServerError())
 
@@ -96,6 +101,8 @@ class GooglePlacePhotoProviderTest {
     @Test
     fun `recovers Google place id from resource name when id field is absent`() {
         val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
         fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
             .andRespond(
                 withSuccess(
@@ -128,6 +135,8 @@ class GooglePlacePhotoProviderTest {
     @Test
     fun `does not store supplement when Google result does not match candidate`() {
         val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
         fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
             .andRespond(
                 withSuccess(
@@ -150,6 +159,8 @@ class GooglePlacePhotoProviderTest {
     @Test
     fun `retries with category query and prefers candidate with photos`() {
         val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
         fixture.server.expect(requestTo(containsString("/v1/places:searchText")))
             .andExpect(content().string(containsString("모로코코 서울 용산구")))
             .andRespond(
@@ -211,7 +222,7 @@ class GooglePlacePhotoProviderTest {
     @Test
     fun `avoids far away place even when names match`() {
         val fixture = providerFixture()
-        fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
             .andRespond(
                 withSuccess(
                     """
@@ -219,6 +230,7 @@ class GooglePlacePhotoProviderTest {
                       "id":"wrong-region-place",
                       "displayName":{"text":"보니스피자 용산점"},
                       "formattedAddress":"부산 해운대구 달맞이길 10",
+                      "primaryType":"restaurant",
                       "location":{"latitude":35.1587,"longitude":129.1604},
                       "photos":[{"name":"places/wrong-region-place/photos/photo-1"}]
                     }]}
@@ -226,6 +238,8 @@ class GooglePlacePhotoProviderTest {
                     MediaType.APPLICATION_JSON,
                 ),
             )
+        fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
 
         assertNull(
             fixture.provider.fetch(
@@ -238,6 +252,87 @@ class GooglePlacePhotoProviderTest {
                 ),
             ),
         )
+        assertTrue(fixture.storage.captured.isEmpty())
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `uses nearby search when Google place name differs but address is close`() {
+        val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
+            .andRespond(
+                withSuccess(
+                    """
+                    {"places":[{
+                      "id":"nearby-place-id",
+                      "displayName":{"text":"청송함흥냉면"},
+                      "formattedAddress":"서울특별시 서대문구 연희맛로 6",
+                      "primaryType":"restaurant",
+                      "location":{"latitude":37.5681,"longitude":126.9327},
+                      "photos":[{"name":"places/nearby-place-id/photos/photo-1"}]
+                    }]}
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+        fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
+        fixture.server.expect(requestTo(containsString("/v1/places/nearby-place-id/photos/photo-1/media")))
+            .andRespond(
+                withSuccess(
+                    """{"photoUri":"https://lh3.googleusercontent.com/nearby-photo-1"}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val result = fixture.provider.fetch(
+            candidate(
+                name = "청송함흥냉면전문점 본관",
+                address = "서울 서대문구 연희맛로 6",
+                latitude = BigDecimal("37.5681"),
+                longitude = BigDecimal("126.9327"),
+                category = "음식점",
+            ),
+        )
+
+        assertEquals("nearby-place-id", result?.googlePlaceId)
+        assertEquals(1, result?.photoUrls?.size)
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `ignores unrelated nearby place and falls back to text search`() {
+        val fixture = providerFixture()
+        fixture.server.expect(requestTo(containsString("/v1/places:searchNearby")))
+            .andRespond(
+                withSuccess(
+                    """
+                    {"places":[{
+                      "id":"wrong-nearby-place",
+                      "displayName":{"text":"치킨사냥"},
+                      "formattedAddress":"서울특별시 서대문구 연희동 135-3",
+                      "primaryType":"restaurant",
+                      "location":{"latitude":37.5682,"longitude":126.9328},
+                      "photos":[{"name":"places/wrong-nearby-place/photos/photo-1"}]
+                    }]}
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+        fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
+            .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
+
+        val result = fixture.provider.fetch(
+            candidate(
+                name = "청송함흥냉면전문점 본관",
+                address = "서울 서대문구 연희맛로 6",
+                latitude = BigDecimal("37.5681"),
+                longitude = BigDecimal("126.9327"),
+                category = "음식점",
+            ),
+        )
+
+        assertNull(result)
         assertTrue(fixture.storage.captured.isEmpty())
         fixture.server.verify()
     }
