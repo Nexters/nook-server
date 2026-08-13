@@ -7,8 +7,8 @@ import org.hamcrest.Matchers.containsString
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.ExpectedCount
-import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.content
+import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withServerError
@@ -184,8 +184,14 @@ class GooglePlacePhotoProviderTest {
             )
         fixture.server.expect(ExpectedCount.manyTimes(), requestTo(containsString("/v1/places:searchText")))
             .andRespond(withSuccess("""{"places":[]}""", MediaType.APPLICATION_JSON))
-        fixture.server.expect(requestTo(containsString("/v1/places/place-with-photo/photos/photo-1/media")))
-            .andRespond(withSuccess("""{"photoUri":"https://lh3.googleusercontent.com/photo-1"}""", MediaType.APPLICATION_JSON))
+        fixture.server.expect(
+            requestTo(containsString("/v1/places/place-with-photo/photos/photo-1/media")),
+        ).andRespond(
+            withSuccess(
+                """{"photoUri":"https://lh3.googleusercontent.com/photo-1"}""",
+                MediaType.APPLICATION_JSON,
+            ),
+        )
 
         val result = fixture.provider.fetch(
             candidate(
