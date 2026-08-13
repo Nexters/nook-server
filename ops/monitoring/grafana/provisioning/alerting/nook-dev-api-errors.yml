@@ -69,7 +69,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 1m
         annotations:
           summary: dev API에서 ERROR 로그가 감지됐습니다.

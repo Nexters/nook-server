@@ -64,7 +64,7 @@ groups:
               refId: C
               type: threshold
         noDataState: Alerting
-        execErrState: Error
+        execErrState: KeepLast
         for: 2m
         annotations:
           summary: dev API target이 응답하지 않습니다.
@@ -133,7 +133,7 @@ groups:
               refId: C
               type: threshold
         noDataState: Alerting
-        execErrState: Error
+        execErrState: KeepLast
         for: 5m
         annotations:
           summary: dev MySQL exporter target이 응답하지 않습니다.
@@ -202,7 +202,7 @@ groups:
               refId: C
               type: threshold
         noDataState: Alerting
-        execErrState: Error
+        execErrState: KeepLast
         for: 5m
         annotations:
           summary: dev node exporter target이 응답하지 않습니다.
@@ -271,7 +271,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 5m
         annotations:
           summary: dev API의 HTTP 5xx 응답이 증가했습니다.
@@ -340,7 +340,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 10m
         annotations:
           summary: dev API의 HTTP p95 latency가 높습니다.
@@ -409,7 +409,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 15m
         annotations:
           summary: dev VM 루트 디스크 사용률이 80%를 넘었습니다.
@@ -478,7 +478,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 5m
         annotations:
           summary: dev VM 루트 디스크 사용률이 90%를 넘었습니다.
@@ -547,7 +547,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 10m
         annotations:
           summary: dev VM 메모리 사용률이 90%를 넘었습니다.
@@ -616,7 +616,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 3m
         annotations:
           summary: dev API의 DB connection pool이 고갈되고 있습니다.
@@ -685,7 +685,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: KeepLast
         for: 0s
         annotations:
           summary: dev API에서 DB connection 획득 timeout이 발생했습니다.

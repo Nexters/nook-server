@@ -29,6 +29,9 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: nook-ops-grafana
+    entrypoint:
+      - /bin/sh
+      - /etc/grafana/startup/wait-for-datasources.sh
     depends_on:
       - prometheus
       - loki
@@ -41,6 +44,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./grafana/startup:/etc/grafana/startup:ro
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     restart: unless-stopped

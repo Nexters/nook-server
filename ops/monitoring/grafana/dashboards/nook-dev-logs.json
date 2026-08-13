@@ -158,8 +158,8 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({env=\"dev\", job=\"nook-api\", level=\"ERROR\"}[$__range]))",
-          "queryType": "range",
+          "expr": "sum(count_over_time({env=\"dev\", job=\"nook-api\", level=\"ERROR\"}[$__range])) or on() vector(0)",
+          "queryType": "instant",
           "refId": "A"
         }
       ],
@@ -220,8 +220,8 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({env=\"dev\", job=\"nook-api\", level=\"WARN\"}[$__range]))",
-          "queryType": "range",
+          "expr": "sum(count_over_time({env=\"dev\", job=\"nook-api\", level=\"WARN\"}[$__range])) or on() vector(0)",
+          "queryType": "instant",
           "refId": "A"
         }
       ],
