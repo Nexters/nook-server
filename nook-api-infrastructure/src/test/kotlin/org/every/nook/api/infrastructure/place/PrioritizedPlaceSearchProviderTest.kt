@@ -41,11 +41,51 @@ class PrioritizedPlaceSearchProviderTest {
         assertEquals(true, naverCalled)
     }
 
-    private fun candidate(provider: String, name: String) = PlaceCandidate(
+    @Test
+    fun `prefers Kakao candidate in same region over different region with same name`() {
+        val provider = PrioritizedPlaceSearchProvider(
+            kakao = PlaceSearchProvider {
+                listOf(
+                    candidate("KAKAO", "보니스피자", address = "부산 해운대구 달맞이길 10"),
+                    candidate("KAKAO", "보니스피자", address = "서울 용산구 신흥로3길 2"),
+                )
+            },
+            naver = PlaceSearchProvider { emptyList() },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request("보니스피자 용산구 신흥로3길"))
+
+        assertEquals("서울 용산구 신흥로3길 2", result.first().address)
+    }
+
+    @Test
+    fun `does not boost Kakao candidate when Naver match is in different region`() {
+        val provider = PrioritizedPlaceSearchProvider(
+            kakao = PlaceSearchProvider {
+                listOf(
+                    candidate("KAKAO", "모로코코", address = "서울 용산구 신흥로 34"),
+                    candidate("KAKAO", "모로코코", address = "부산 수영구 광안해변로 1"),
+                )
+            },
+            naver = PlaceSearchProvider {
+                listOf(candidate("NAVER", "모로코코", address = "부산 수영구 광안해변로 1"))
+            },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request("모로코코 용산구 카페"))
+
+        assertEquals("서울 용산구 신흥로 34", result.first().address)
+    }
+
+    private fun candidate(
+        provider: String,
+        name: String,
+        address: String = "서울 용산구 한강대로 1",
+    ) = PlaceCandidate(
         provider = provider,
         externalPlaceId = "$provider-$name",
         name = name,
-        address = "서울 용산구 한강대로 1",
+        address = address,
         latitude = BigDecimal("37.5"),
         longitude = BigDecimal("127.0"),
         category = null,
