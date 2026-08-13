@@ -29,6 +29,8 @@ class NaverPlaceSearchProvider(
                 .uri { builder ->
                     builder.path(SEARCH_PATH)
                         .queryParam(QUERY, request.query)
+                        .queryParam(DISPLAY, request.size.coerceIn(1, MAX_DISPLAY))
+                        .queryParam(START, 1)
                         .build()
                 }
                 .header(CLIENT_ID, properties.clientId)
@@ -62,11 +64,11 @@ class NaverPlaceSearchProvider(
                         ),
                     )
                     logger.info {
-                        "Naver map geocoding completed: query=${request.query}, candidateCount=${candidates.size}"
+                        "Naver local search completed: query=${request.query}, candidateCount=${candidates.size}"
                     }
                 }
         }.getOrElse { exception ->
-            logger.warn(exception) { "Failed to map Naver Map geocoding response" }
+            logger.warn(exception) { "Failed to map Naver local search response" }
             providerFailure(exception)
         }
     }
@@ -89,8 +91,11 @@ class NaverPlaceSearchProvider(
         val eventLogger = LoggerFactory.getLogger(NaverPlaceSearchProvider::class.java)
         const val NANOS_PER_MILLISECOND = 1_000_000
 
-        const val SEARCH_PATH = "/map-geocode/v2/geocode"
+        const val SEARCH_PATH = "/search/v1/local"
         const val QUERY = "query"
+        const val DISPLAY = "display"
+        const val START = "start"
+        const val MAX_DISPLAY = 5
         const val CLIENT_ID = "X-NCP-APIGW-API-KEY-ID"
         const val CLIENT_SECRET = "X-NCP-APIGW-API-KEY"
     }

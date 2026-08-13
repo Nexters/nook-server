@@ -63,6 +63,7 @@ class GooglePlacePhotoProvider(
                     PlaceSupplement(
                         openingHours = googlePlace.toOpeningHours(),
                         photoUrls = photoUrls,
+                        googlePlaceId = googlePlace.placeId(),
                     )
                 }
             }.onFailure { exception ->
@@ -76,16 +77,33 @@ class GooglePlacePhotoProvider(
     }
 
     private fun searchPlace(place: PlaceCandidate): GooglePlace? {
+        place.googlePlaceId?.let { return getPlace(it) }
         val startedAt = System.nanoTime()
         val response = restClient.post()
             .uri("/v1/places:searchText")
             .contentType(MediaType.APPLICATION_JSON)
             .header(API_KEY_HEADER, properties.apiKey)
             .header(FIELD_MASK_HEADER, SEARCH_FIELD_MASK)
-            .body(TextSearchRequest(textQuery = "${place.name} ${place.address}".trim(), languageCode = "ko"))
+            .body(
+                TextSearchRequest(
+                    textQuery = "${place.name} ${place.address}".trim(),
+                    languageCode = "ko",
+                    regionCode = "KR",
+                    pageSize = SEARCH_PAGE_SIZE,
+                    locationBias = LocationBias(
+                        Circle(
+                            center = GoogleLocation(place.latitude.toDouble(), place.longitude.toDouble()),
+                            radius = LOCATION_BIAS_RADIUS_METERS,
+                        ),
+                    ),
+                ),
+            )
             .retrieve()
             .body(TextSearchResponse::class.java)
-        val matched = response?.places.orEmpty().firstOrNull { it.matches(place) }
+        val scored = response?.places.orEmpty().map { it to it.matchScore(place) }
+        val matched = scored.maxByOrNull { it.second }
+            ?.takeIf { it.second >= MIN_MATCH_SCORE }
+            ?.first
         eventLogger.info(
             place.event(
                 "google.place.match.completed",
@@ -95,6 +113,8 @@ class GooglePlacePhotoProvider(
                     "event.duration_ms" to elapsedMillis(startedAt),
                     "google.place_candidate_count" to response?.places.orEmpty().size,
                     "google.place_matched" to (matched != null),
+                    "google.place_candidate_scores" to scored.map { "${it.first.placeId()}:${it.second}" },
+                    "google.place_selected_id" to matched?.placeId(),
                     "empty.reason" to if (matched == null) "place_not_matched" else null,
                 ),
             ),
@@ -107,24 +127,51 @@ class GooglePlacePhotoProvider(
         return matched
     }
 
-    private fun GooglePlace.matches(candidate: PlaceCandidate): Boolean {
-        val googleName = displayName?.text?.normalize() ?: return false
+    private fun getPlace(googlePlaceId: String): GooglePlace? = restClient.get()
+        .uri("/v1/places/{placeId}", googlePlaceId)
+        .header(API_KEY_HEADER, properties.apiKey)
+        .header(FIELD_MASK_HEADER, DETAIL_FIELD_MASK)
+        .retrieve()
+        .body(GooglePlace::class.java)
+
+    private fun GooglePlace.matchScore(candidate: PlaceCandidate): Int {
+        val googleName = displayName?.text?.normalize() ?: return 0
         val candidateName = candidate.name.normalize()
-        val nameMatches = googleName.contains(candidateName) || candidateName.contains(googleName)
+        val nameScore = nameScore(googleName, candidateName, displayName.text.orEmpty(), candidate.name)
         val addressMatches = formattedAddress?.normalize()?.let { googleAddress ->
             val candidateAddress = candidate.address.normalize()
             googleAddress.contains(candidateAddress) || candidateAddress.contains(googleAddress)
         } ?: false
-        val googleLocation = location ?: return false
-        val distance = distanceMeters(
-            candidate.latitude,
-            candidate.longitude,
-            BigDecimal.valueOf(googleLocation.latitude),
-            BigDecimal.valueOf(googleLocation.longitude),
-        )
-        val locationMatches = distance <= CLOSE_MATCH_DISTANCE_METERS ||
-            (addressMatches && distance <= MAX_MATCH_DISTANCE_METERS)
-        return nameMatches && locationMatches
+        val distance = location?.let { googleLocation ->
+            distanceMeters(
+                candidate.latitude,
+                candidate.longitude,
+                BigDecimal.valueOf(googleLocation.latitude),
+                BigDecimal.valueOf(googleLocation.longitude),
+            )
+        }
+        val addressScore = if (addressMatches) 30 else 0
+        val distanceScore = when {
+            distance == null -> 0
+            distance <= CLOSE_MATCH_DISTANCE_METERS -> 25
+            distance <= MAX_MATCH_DISTANCE_METERS -> 15
+            distance <= FAR_MATCH_DISTANCE_METERS -> 5
+            else -> 0
+        }
+        return nameScore + addressScore + distanceScore
+    }
+
+    private fun nameScore(googleName: String, candidateName: String, rawGoogleName: String, rawCandidateName: String) =
+        when {
+            googleName == candidateName -> EXACT_NAME_SCORE
+            googleName.contains(candidateName) || candidateName.contains(googleName) -> CONTAINS_NAME_SCORE
+            else -> tokenOverlap(rawGoogleName, rawCandidateName) * TOKEN_NAME_SCORE
+        }
+
+    private fun tokenOverlap(left: String, right: String): Int {
+        val leftTokens = left.lowercase().split(Regex("[^가-힣a-z0-9]+")).filter { it.length >= 2 }.toSet()
+        val rightTokens = right.lowercase().split(Regex("[^가-힣a-z0-9]+")).filter { it.length >= 2 }.toSet()
+        return if (leftTokens.intersect(rightTokens).isEmpty()) 0 else 1
     }
 
     private fun String.normalize(): String = lowercase().filter(Char::isLetterOrDigit)
@@ -215,13 +262,25 @@ class GooglePlacePhotoProvider(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class GooglePlace(
+        val id: String? = null,
+        val name: String? = null,
         val displayName: LocalizedText? = null,
         val formattedAddress: String? = null,
         val location: GoogleLocation? = null,
         val timeZone: GoogleTimeZone? = null,
         val regularOpeningHours: GoogleOpeningHours? = null,
         val photos: List<GooglePhoto>? = null,
-    )
+    ) {
+        fun placeId(): String? = id
+            ?: name?.removePrefix(PLACE_RESOURCE_PREFIX)?.takeIf(String::isNotBlank)
+            ?: photos.orEmpty().asSequence()
+                .mapNotNull(GooglePhoto::name)
+                .mapNotNull { photoName ->
+                    photoName.removePrefix(PLACE_RESOURCE_PREFIX).substringBefore(PHOTO_RESOURCE_SEPARATOR)
+                        .takeIf(String::isNotBlank)
+                }
+                .firstOrNull()
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class LocalizedText(val text: String? = null)
@@ -247,7 +306,15 @@ class GooglePlacePhotoProvider(
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class GooglePhoto(val name: String? = null)
 
-    private data class TextSearchRequest(val textQuery: String, val languageCode: String)
+    private data class TextSearchRequest(
+        val textQuery: String,
+        val languageCode: String,
+        val regionCode: String,
+        val pageSize: Int,
+        val locationBias: LocationBias,
+    )
+    private data class LocationBias(val circle: Circle)
+    private data class Circle(val center: GoogleLocation, val radius: Double)
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class PhotoMediaResponse(val photoUri: String? = null)
@@ -257,10 +324,21 @@ class GooglePlacePhotoProvider(
         val eventLogger = LoggerFactory.getLogger(GooglePlacePhotoProvider::class.java)
         const val API_KEY_HEADER = "X-Goog-Api-Key"
         const val FIELD_MASK_HEADER = "X-Goog-FieldMask"
+        const val DETAIL_FIELD_MASK =
+            "id,name,displayName,formattedAddress,location,timeZone,regularOpeningHours,photos.name"
         const val SEARCH_FIELD_MASK =
-            "places.displayName,places.formattedAddress,places.location,places.timeZone," +
+            "places.id,places.name,places.displayName,places.formattedAddress,places.location,places.timeZone," +
                 "places.regularOpeningHours,places.photos.name"
+        const val PLACE_RESOURCE_PREFIX = "places/"
+        const val PHOTO_RESOURCE_SEPARATOR = "/photos/"
+        const val SEARCH_PAGE_SIZE = 5
+        const val LOCATION_BIAS_RADIUS_METERS = 1_000.0
+        const val MIN_MATCH_SCORE = 45
+        const val EXACT_NAME_SCORE = 60
+        const val CONTAINS_NAME_SCORE = 45
+        const val TOKEN_NAME_SCORE = 30
         const val MAX_MATCH_DISTANCE_METERS = 500.0
+        const val FAR_MATCH_DISTANCE_METERS = 2_000.0
         const val CLOSE_MATCH_DISTANCE_METERS = 100.0
         const val EARTH_RADIUS_METERS = 6_371_000.0
         const val SEARCH_STAGE = "google-place-match"

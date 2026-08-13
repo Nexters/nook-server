@@ -9,7 +9,7 @@ class NaverPlaceMapperTest {
         val result = NaverPlaceMapper().map(
             query = "원동미나리삼겹살",
             response = NaverPlaceResponse(
-                addresses = listOf(
+                items = listOf(
                     address(
                         roadAddress = "서울특별시 용산구 한강대로77길 4-1",
                         x = "126.972332",
@@ -32,7 +32,7 @@ class NaverPlaceMapperTest {
         val result = NaverPlaceMapper().map(
             query = "Nook Cafe",
             response = NaverPlaceResponse(
-                addresses = listOf(address(x = "1269723320", y = "375431230")),
+                items = listOf(address(x = "1269723320", y = "375431230")),
             ),
         )
 
@@ -46,7 +46,7 @@ class NaverPlaceMapperTest {
         val result = NaverPlaceMapper().map(
             query = "Nook Cafe",
             response = NaverPlaceResponse(
-                addresses = listOf(address(x = "9999999999", y = "9999999999")),
+                items = listOf(address(x = "9999999999", y = "9999999999")),
             ),
         )
 
@@ -55,16 +55,18 @@ class NaverPlaceMapperTest {
 
     private fun address(
         roadAddress: String? = "서울특별시 용산구 한강대로77길 4-1",
-        jibunAddress: String? = null,
         address: String? = null,
         x: String? = "126.972332",
         y: String? = "37.543123",
-    ): NaverPlaceResponse.Address = NaverPlaceResponse.Address(
-        roadAddress = roadAddress,
-        jibunAddress = jibunAddress,
-        englishAddress = null,
+    ): NaverPlaceResponse.Item = NaverPlaceResponse.Item(
+        title = "<b>원동미나리삼겹살</b>",
+        link = "https://map.naver.com/place/1",
+        category = "음식점>한식",
+        description = null,
+        telephone = null,
         address = address,
-        x = x,
-        y = y,
+        roadAddress = roadAddress,
+        mapx = x,
+        mapy = y,
     )
 }

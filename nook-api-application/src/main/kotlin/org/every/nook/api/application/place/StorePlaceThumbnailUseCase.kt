@@ -19,36 +19,45 @@ class StorePlaceThumbnailUseCase(
     operator fun invoke(postId: Long, place: PlaceCandidate) {
         val startedAt = clock.millis()
         logger.info(event(postId, place, "place.thumbnail.started", FETCH_STAGE, "started"))
-        updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.PROCESSING)
-        val supplement = runCatching {
-            metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
+        runCatching {
+            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.PROCESSING)
+            val supplement = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
                 thumbnailProvider.fetch(place)
             }
+            metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
+                updatePort.update(
+                    place.provider,
+                    place.externalPlaceId,
+                    PlaceThumbnailParsingStatus.COMPLETED,
+                    supplement,
+                )
+            }
+            logger.info(
+                event(
+                    postId,
+                    place,
+                    "place.thumbnail.completed",
+                    COMPLETE_STAGE,
+                    "success",
+                    startedAt,
+                    mapOf(
+                        "place.photo_count" to supplement?.photoUrls?.size,
+                        "place.opening_hours_found" to (supplement?.openingHours != null),
+                    ),
+                ),
+            )
         }.getOrElse { exception ->
-            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.FAILED)
+            runCatching {
+                updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.FAILED)
+            }.onFailure { statusException ->
+                exception.addSuppressed(statusException)
+            }
             logger.error(
                 event(postId, place, "place.thumbnail.failed", FETCH_STAGE, "failure", startedAt),
                 exception,
             )
             throw exception
         }
-        metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
-            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.COMPLETED, supplement)
-        }
-        logger.info(
-            event(
-                postId,
-                place,
-                "place.thumbnail.completed",
-                COMPLETE_STAGE,
-                "success",
-                startedAt,
-                mapOf(
-                    "place.photo_count" to supplement?.photoUrls?.size,
-                    "place.opening_hours_found" to (supplement?.openingHours != null),
-                ),
-            ),
-        )
     }
 
     private fun event(
