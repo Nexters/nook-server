@@ -6,13 +6,13 @@ import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.application.place.port.PlaceDetailQueryPort
 import org.every.nook.api.application.place.port.UpdatePlaceBookmarkPort
-import org.every.nook.api.infrastructure.place.CompositePlaceSearchProvider
 import org.every.nook.api.infrastructure.place.KakaoPlaceMapper
 import org.every.nook.api.infrastructure.place.KakaoPlaceProperties
 import org.every.nook.api.infrastructure.place.KakaoPlaceSearchProvider
 import org.every.nook.api.infrastructure.place.NaverPlaceMapper
 import org.every.nook.api.infrastructure.place.NaverPlaceProperties
 import org.every.nook.api.infrastructure.place.NaverPlaceSearchProvider
+import org.every.nook.api.infrastructure.place.PrioritizedPlaceSearchProvider
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -21,8 +21,6 @@ import org.springframework.context.annotation.Primary
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.module.kotlin.jacksonObjectMapper
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 @Configuration
 @EnableConfigurationProperties(KakaoPlaceProperties::class, NaverPlaceProperties::class)
@@ -81,23 +79,12 @@ class PlaceSearchConfig {
         mapper = mapper,
     )
 
-    @Bean(destroyMethod = "shutdown")
-    fun placeSearchExecutor(): java.util.concurrent.ExecutorService =
-        Executors.newFixedThreadPool(PLACE_SEARCH_THREAD_COUNT)
-
     @Bean
     @Primary
     fun placeSearchProvider(
         @Qualifier("kakaoPlaceSearchProvider") kakaoProvider: PlaceSearchProvider,
         @Qualifier("naverPlaceSearchProvider") naverProvider: PlaceSearchProvider,
-        @Qualifier("placeSearchExecutor") placeSearchExecutor: ExecutorService,
-    ): PlaceSearchProvider = CompositePlaceSearchProvider(
-        providers = listOf(
-            CompositePlaceSearchProvider.NamedPlaceSearchProvider("KAKAO", kakaoProvider),
-            CompositePlaceSearchProvider.NamedPlaceSearchProvider("NAVER", naverProvider),
-        ),
-        executor = placeSearchExecutor,
-    )
+    ): PlaceSearchProvider = PrioritizedPlaceSearchProvider(kakaoProvider, naverProvider)
 
     @Bean
     fun searchPlaceCandidatesUseCase(
@@ -111,8 +98,4 @@ class PlaceSearchConfig {
     @Bean
     fun getPlaceDetailUseCase(placeDetailQueryPort: PlaceDetailQueryPort): GetPlaceDetailUseCase =
         GetPlaceDetailUseCase(placeDetailQueryPort)
-
-    private companion object {
-        const val PLACE_SEARCH_THREAD_COUNT = 2
-    }
 }

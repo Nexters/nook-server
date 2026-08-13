@@ -60,6 +60,8 @@ class PlaceEntity(
     val category: String? = null,
     @Column(name = "phone_number", nullable = true, length = Place.MAX_PHONE_NUMBER_LENGTH)
     val phoneNumber: String? = null,
+    @Column(name = "google_place_id", nullable = true, length = GOOGLE_PLACE_ID_MAX_LENGTH)
+    var googlePlaceId: String? = null,
     @Column(name = "thumbnail_url", nullable = true, length = THUMBNAIL_URL_MAX_LENGTH)
     var thumbnailUrl: String? = null,
     @Enumerated(EnumType.STRING)
@@ -91,6 +93,7 @@ class PlaceEntity(
         const val COORDINATE_SCALE = 7
         const val THUMBNAIL_URL_MAX_LENGTH = 2048
         const val THUMBNAIL_PARSING_STATUS_LENGTH = 20
+        const val GOOGLE_PLACE_ID_MAX_LENGTH = 255
         private const val MAX_REPRESENTATIVE_TAG_COUNT = 4
         private val logger = KotlinLogging.logger {}
     }
@@ -118,6 +121,7 @@ class PlaceEntity(
     }
 
     fun updateSupplement(supplement: PlaceSupplement) {
+        supplement.googlePlaceId?.let { googlePlaceId = it }
         supplement.openingHours?.let { openingHours = it }
         if (supplement.photoUrls.isNotEmpty()) {
             photoUrls = supplement.photoUrls

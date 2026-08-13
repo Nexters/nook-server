@@ -13,17 +13,26 @@ class StorePlaceThumbnailUseCase(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     operator fun invoke(postId: Long, place: PlaceCandidate) {
-        updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.PROCESSING)
-        val supplement = runCatching {
-            metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
+        runCatching {
+            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.PROCESSING)
+            val supplement = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
                 thumbnailProvider.fetch(place)
             }
+            metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
+                updatePort.update(
+                    place.provider,
+                    place.externalPlaceId,
+                    PlaceThumbnailParsingStatus.COMPLETED,
+                    supplement,
+                )
+            }
         }.getOrElse { exception ->
-            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.FAILED)
+            runCatching {
+                updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.FAILED)
+            }.onFailure { statusException ->
+                exception.addSuppressed(statusException)
+            }
             throw exception
-        }
-        metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
-            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.COMPLETED, supplement)
         }
     }
 

@@ -102,11 +102,14 @@ class PlaceParsingPersistenceAdapter(
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
         val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
-        val postPlaces = distinctPlaces.mapIndexed { sequence, candidate ->
+        val resolvedPlaces = distinctPlaces.map { candidate ->
             val place = placeRepository.findByProviderAndExternalPlaceId(
                 candidate.provider,
                 candidate.externalPlaceId,
             ) ?: placeRepository.save(candidate.toEntity())
+            candidate.copy(googlePlaceId = place.googlePlaceId) to place
+        }
+        val postPlaces = resolvedPlaces.mapIndexed { sequence, (_, place) ->
             PostPlaceEntity(
                 postId = postId,
                 placeId = requireNotNull(place.id),
@@ -121,7 +124,7 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
-        distinctPlaces.zip(postPlaces).forEach { (place, postPlace) ->
+        resolvedPlaces.map { it.first }.zip(postPlaces).forEach { (place, postPlace) ->
             eventPublisher.publishEvent(PlaceThumbnailRequestedEvent(postId, place, clock.instant()))
             eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, postPlace.placeId, place))
         }
@@ -199,6 +202,7 @@ class PlaceParsingPersistenceAdapter(
         longitude = longitude,
         category = category,
         phoneNumber = phoneNumber,
+        googlePlaceId = googlePlaceId,
     )
 
     private companion object {
