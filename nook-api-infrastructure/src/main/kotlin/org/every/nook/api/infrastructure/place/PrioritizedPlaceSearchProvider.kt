@@ -34,7 +34,12 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
             return naverCandidates.sortedByDescending { score(queryContext, it) }
         }
         return kakaoCandidates.sortedByDescending { candidate ->
-            score(queryContext, candidate) + naverValidationScore(candidate, naverCandidates, queryContext)
+            score(queryContext, candidate) +
+                naverValidationScore(
+                    candidate,
+                    naverCandidates,
+                    queryContext,
+                )
         }
     }
 
@@ -42,8 +47,9 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
         candidate: PlaceCandidate,
         naverCandidates: List<PlaceCandidate>,
         queryContext: QueryContext,
-    ): Int =
-        if (naverCandidates.any { naver ->
+    ): Int {
+        @Suppress("FunctionExpressionBody")
+        return if (naverCandidates.any { naver ->
                 val namesMatch = candidate.name.normalize().let { kakaoName ->
                     val naverName = naver.name.normalize()
                     kakaoName.contains(naverName) || naverName.contains(kakaoName)
@@ -59,6 +65,7 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
         } else {
             0
         }
+    }
 
     private fun score(queryContext: QueryContext, candidate: PlaceCandidate): Int {
         val normalizedQuery = queryContext.normalizedQuery
@@ -71,7 +78,9 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
             queryContext.tokens.any { it.length >= MIN_TOKEN_LENGTH && normalizedAddress.contains(it) } -> ADDRESS_SCORE
             else -> 0
         }
-        return baseScore + regionScore(queryContext, candidate.address) - regionMismatchPenalty(queryContext, candidate.address)
+        return baseScore +
+            regionScore(queryContext, candidate.address) -
+            regionMismatchPenalty(queryContext, candidate.address)
     }
 
     private fun regionScore(queryContext: QueryContext, address: String): Int {
