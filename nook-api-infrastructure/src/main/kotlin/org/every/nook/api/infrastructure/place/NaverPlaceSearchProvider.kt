@@ -5,6 +5,9 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
+import org.every.nook.api.application.processing.ProcessingLogEvent
+import org.every.nook.api.application.processing.info
+import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
@@ -19,6 +22,7 @@ class NaverPlaceSearchProvider(
     private val mapper: NaverPlaceMapper,
 ) : PlaceSearchProvider {
     override fun search(request: PlaceSearchProvider.Request): List<PlaceCandidate> {
+        val startedAt = System.nanoTime()
         ensureConfigured()
         val responseBody = try {
             restClient.get()
@@ -46,6 +50,19 @@ class NaverPlaceSearchProvider(
         return runCatching {
             mapper.map(request.query, objectMapper.readValue(responseBody, NaverPlaceResponse::class.java))
                 .also { candidates ->
+                    eventLogger.info(
+                        ProcessingLogEvent(
+                            action = "place.provider.search.completed",
+                            flow = "place",
+                            stage = "search",
+                            outcome = "success",
+                            durationMs = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND,
+                            fields = mapOf(
+                                "provider.name" to "naver",
+                                "provider.result_count" to candidates.size,
+                            ),
+                        ),
+                    )
                     logger.info {
                         "Naver local search completed: query=${request.query}, candidateCount=${candidates.size}"
                     }
@@ -71,6 +88,8 @@ class NaverPlaceSearchProvider(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        val eventLogger = LoggerFactory.getLogger(NaverPlaceSearchProvider::class.java)
+        const val NANOS_PER_MILLISECOND = 1_000_000
 
         const val SEARCH_PATH = "/search/v1/local"
         const val QUERY = "query"

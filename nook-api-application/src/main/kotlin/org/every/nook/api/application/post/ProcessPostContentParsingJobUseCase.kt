@@ -6,9 +6,14 @@ import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.error
+import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.measure
+import org.every.nook.api.application.processing.warn
 import org.every.nook.api.domain.post.Post
+import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -25,6 +30,7 @@ class ProcessPostContentParsingJobUseCase(
     operator fun invoke(postId: Long): Result {
         val job = jobPort.claim(postId, processingTimeout) ?: return Result.Skipped
         val startedAt = clock.instant()
+        eventLogger.info(job.event("content.job.claimed", JOB_STAGE, SUCCESS_OUTCOME))
         logger.info { "Post content parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
@@ -55,6 +61,15 @@ class ProcessPostContentParsingJobUseCase(
                 "Post content parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
                     "mediaCount=${completedPost.media.size}, durationMs=$duration"
             }
+            eventLogger.info(
+                job.event(
+                    action = "content.job.completed",
+                    stage = JOB_STAGE,
+                    outcome = SUCCESS_OUTCOME,
+                    durationMs = duration,
+                    fields = mapOf("content.media_count" to completedPost.media.size),
+                ),
+            )
             Result.Completed
         }.getOrElse { exception ->
             handleFailure(job, exception, startedAt)
@@ -77,6 +92,10 @@ class ProcessPostContentParsingJobUseCase(
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         if (exception is PostContentNotFoundException || exception is UnsupportedPostUrlException) {
             jobPort.fail(job.postId, reason)
+            eventLogger.warn(
+                job.event("content.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
+                exception,
+            )
             logger.warn {
                 "Post content parsing failed without retry: postId=${job.postId}, attempt=${job.attempt}, " +
                     "durationMs=$duration, reason=$reason"
@@ -87,6 +106,16 @@ class ProcessPostContentParsingJobUseCase(
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(backoff)
             jobPort.retry(job.postId, nextAttemptAt, reason)
+            eventLogger.warn(
+                job.event(
+                    "content.job.retry_scheduled",
+                    JOB_STAGE,
+                    FAILURE_OUTCOME,
+                    duration,
+                    failureFields(exception, reason) + ("retry.next_attempt_at" to nextAttemptAt),
+                ),
+                exception,
+            )
             logger.warn(exception) {
                 "Post content parsing retry scheduled: postId=${job.postId}, attempt=${job.attempt}, " +
                     "nextAttemptAt=$nextAttemptAt, durationMs=$duration, reason=$reason"
@@ -95,6 +124,10 @@ class ProcessPostContentParsingJobUseCase(
         }
 
         jobPort.fail(job.postId, reason)
+        eventLogger.error(
+            job.event("content.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
+            exception,
+        )
         logger.error(exception) {
             "Post content parsing failed permanently: postId=${job.postId}, attempt=${job.attempt}, " +
                 "durationMs=$duration, reason=$reason"
@@ -114,6 +147,19 @@ class ProcessPostContentParsingJobUseCase(
         .distinct()
         .toList()
 
+    private fun ClaimedPostContentParsingJob.event(
+        action: String,
+        stage: String,
+        outcome: String,
+        durationMs: Long? = null,
+        fields: Map<String, Any?> = emptyMap(),
+    ) = ProcessingLogEvent(action, CONTENT_FLOW, stage, outcome, postId, attempt, durationMs, fields)
+
+    private fun failureFields(exception: Throwable, reason: String): Map<String, Any?> = mapOf(
+        "failure.type" to exception::class.simpleName,
+        "failure.reason" to reason,
+    )
+
     sealed interface Result {
         data object Completed : Result
 
@@ -126,11 +172,15 @@ class ProcessPostContentParsingJobUseCase(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        val eventLogger = LoggerFactory.getLogger(ProcessPostContentParsingJobUseCase::class.java)
         const val MAX_FAILURE_REASON_LENGTH = 500
         const val DEFAULT_FAILURE_REASON = "Post content parsing failed"
         const val CONTENT_FLOW = "post-content"
         const val EXTRACT_STAGE = "extract"
         const val INFERENCE_STAGE = "inference"
         const val COMPLETE_STAGE = "complete"
+        const val JOB_STAGE = "job"
+        const val SUCCESS_OUTCOME = "success"
+        const val FAILURE_OUTCOME = "failure"
     }
 }

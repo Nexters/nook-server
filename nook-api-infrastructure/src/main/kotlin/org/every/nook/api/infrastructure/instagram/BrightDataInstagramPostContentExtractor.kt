@@ -25,14 +25,17 @@ class BrightDataInstagramPostContentExtractor(
     override fun supports(url: String): Boolean = InstagramContentUrl.supports(url)
 
     override fun extract(url: String): ExtractedPostContent {
+        val startedAt = System.nanoTime()
         val instagramUrl = InstagramContentUrl.parse(url)
         responseCache.find(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode)?.let { cached ->
+            logger.logCacheHit(PROVIDER, startedAt)
             return mapResponse(instagramUrl, parseResponse(cached))
         }
         if (properties.apiToken.isBlank()) {
             providerFailure()
         }
         val responseBody = try {
+            logger.logProviderRequestStarted(PROVIDER)
             restClient.post()
                 .uri { builder ->
                     builder.path(SCRAPE_PATH)
@@ -46,8 +49,10 @@ class BrightDataInstagramPostContentExtractor(
                 .retrieve()
                 .body(String::class.java)
         } catch (exception: RestClientResponseException) {
+            logger.logProviderRequestFailed(PROVIDER, startedAt, exception, exception.statusCode.value())
             handleResponseException(exception)
         } catch (exception: ResourceAccessException) {
+            logger.logProviderRequestFailed(PROVIDER, startedAt, exception)
             handleResourceAccessException(exception)
         }
 
@@ -55,6 +60,7 @@ class BrightDataInstagramPostContentExtractor(
         responseBody?.let { body ->
             responseCache.save(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode, body)
         }
+        logger.logProviderRequestCompleted(PROVIDER, startedAt, extracted.post.media.size)
         return extracted
     }
 

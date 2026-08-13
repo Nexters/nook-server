@@ -7,6 +7,9 @@ import org.every.nook.api.application.place.PlaceCandidatePage
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
+import org.every.nook.api.application.processing.ProcessingLogEvent
+import org.every.nook.api.application.processing.info
+import org.slf4j.LoggerFactory
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
@@ -24,6 +27,7 @@ class KakaoPlaceSearchProvider(
         searchPage(request.copy(page = FIRST_PAGE, size = DEFAULT_RESULT_SIZE)).items
 
     override fun searchPage(request: PlaceSearchProvider.Request): PlaceCandidatePage {
+        val startedAt = System.nanoTime()
         ensureConfigured()
         val responseBody = try {
             restClient.get()
@@ -57,6 +61,21 @@ class KakaoPlaceSearchProvider(
                 size = request.size,
                 hasNext = !response.meta.isEnd,
             ).also { page ->
+                eventLogger.info(
+                    ProcessingLogEvent(
+                        action = "place.provider.search.completed",
+                        flow = "place",
+                        stage = "search",
+                        outcome = "success",
+                        durationMs = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND,
+                        fields = mapOf(
+                            "provider.name" to "kakao",
+                            "provider.result_count" to page.items.size,
+                            "provider.page" to request.page,
+                            "provider.has_next" to page.hasNext,
+                        ),
+                    ),
+                )
                 logger.info {
                     "Kakao place search completed: query=${request.query}, page=${request.page}, " +
                         "candidateCount=${page.items.size}"
@@ -83,6 +102,8 @@ class KakaoPlaceSearchProvider(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        val eventLogger = LoggerFactory.getLogger(KakaoPlaceSearchProvider::class.java)
+        const val NANOS_PER_MILLISECOND = 1_000_000
 
         const val SEARCH_PATH = "/v2/local/search/keyword.json"
         const val QUERY = "query"
