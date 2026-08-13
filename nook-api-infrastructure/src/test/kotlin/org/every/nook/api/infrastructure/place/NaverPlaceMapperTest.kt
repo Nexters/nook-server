@@ -25,6 +25,7 @@ class NaverPlaceMapperTest {
         assertEquals("서울특별시 용산구 한강대로77길 4-1", candidate.address)
         assertEquals("126.972332".toBigDecimal(), candidate.longitude)
         assertEquals("37.543123".toBigDecimal(), candidate.latitude)
+        assertEquals("음식점", candidate.category)
     }
 
     @Test

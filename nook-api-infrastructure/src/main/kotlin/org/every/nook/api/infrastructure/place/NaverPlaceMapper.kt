@@ -25,7 +25,7 @@ class NaverPlaceMapper {
                 address = displayAddress,
                 latitude = latitude,
                 longitude = longitude,
-                category = item.category.toPlainText(),
+                category = item.category.toTopLevelCategory(),
                 phoneNumber = item.telephone.toNullableValue(),
                 providerUrl = item.link.toNullableValue(),
             )
@@ -51,6 +51,10 @@ class NaverPlaceMapper {
         ?.trim()
         ?.takeIf(String::isNotEmpty)
 
+    private fun String?.toTopLevelCategory(): String? = toPlainText()
+        ?.substringBefore(CATEGORY_DELIMITER)
+        ?.toNullableValue()
+
     private fun stableId(name: String, address: String, longitude: BigDecimal, latitude: BigDecimal): String =
         MessageDigest.getInstance("SHA-256")
             .digest("$name|$address|${longitude.toPlainString()}|${latitude.toPlainString()}".toByteArray())
@@ -59,6 +63,7 @@ class NaverPlaceMapper {
     private companion object {
         const val PROVIDER = "NAVER"
         const val WGS84_SCALE = 7
+        const val CATEGORY_DELIMITER = ">"
         val HTML_TAG = Regex("<[^>]+>")
         val MIN_LONGITUDE = BigDecimal("-180")
         val MAX_LONGITUDE = BigDecimal("180")
