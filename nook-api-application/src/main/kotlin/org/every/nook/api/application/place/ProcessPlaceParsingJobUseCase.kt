@@ -337,7 +337,7 @@ class ProcessPlaceParsingJobUseCase(
         val logger = KotlinLogging.logger {}
         val eventLogger = LoggerFactory.getLogger(ProcessPlaceParsingJobUseCase::class.java)
 
-        const val MAX_PLACE_COUNT = 20
+        const val MAX_PLACE_COUNT = 60
         const val MAX_QUERY_COUNT = 4
         const val MAX_IMAGE_COUNT = 20
         const val CANDIDATE_LOG_LIMIT = 5
@@ -434,7 +434,7 @@ private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrD
 
 private const val MIN_GROUNDING_KEY_LENGTH = 2
 private const val MIN_EXPECTED_PLACE_COUNT = 2
-private const val MAX_EXPECTED_PLACE_COUNT = 20
+private const val MAX_EXPECTED_PLACE_COUNT = 80
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
 
 private fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {

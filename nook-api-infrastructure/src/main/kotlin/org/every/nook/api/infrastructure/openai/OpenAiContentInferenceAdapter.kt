@@ -222,11 +222,11 @@ class OpenAiContentInferenceAdapter(
         const val NANOS_PER_MILLISECOND = 1_000_000
 
         const val MAX_TITLE_LENGTH = 25
-        const val MAX_PLACE_COUNT = 20
+        const val MAX_PLACE_COUNT = 60
         const val MAX_QUERY_COUNT = 4
-        const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 3000
-        const val PLACE_MAX_OUTPUT_TOKENS = 800
-        const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 4000
+        const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 8000
+        const val PLACE_MAX_OUTPUT_TOKENS = 2500
+        const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 12000
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
         const val PLACE_TAG_MAX_OUTPUT_TOKENS = 600
         const val DEFAULT_TITLE = "Instagram 게시물"
@@ -316,7 +316,7 @@ class OpenAiContentInferenceAdapter(
                 "예를 들어 sourceLocationTag가 Lodge190이고 본문이 '연희동 사랑방 롯지190'이면 name은 Lodge190이고 " +
                 "queries는 원문 Lodge190, 한글 음차 롯지190, 띄어쓰기 변형 롯지 190, " +
                 "지역을 붙인 축약형 연희동 Lodge 순서로 반환한다. " +
-                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 20개 가게와 가게당 최대 4개 검색어만 반환한다."
+                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 60개 가게와 가게당 최대 4개 검색어만 반환한다."
         const val CONTENT_INFERENCE_INSTRUCTIONS =
             "title과 places를 하나의 응답으로 함께 반환한다. " + TITLE_INSTRUCTIONS + " " + PLACE_INSTRUCTIONS
         const val CANDIDATE_SELECTION_INSTRUCTIONS =
