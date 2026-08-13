@@ -22,6 +22,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+@Suppress("TooManyFunctions")
 class GooglePlacePhotoProvider(
     private val restClient: RestClient,
     private val properties: GooglePlacePhotoProperties,
@@ -95,7 +96,7 @@ class GooglePlacePhotoProvider(
             .maxWithOrNull(
                 compareBy<RankedGooglePlace> { it.photoCount > 0 }
                     .thenBy { it.score }
-                    .thenBy { it.photoCount }
+                    .thenBy { it.photoCount },
             )
         eventLogger.info(
             place.event(
@@ -156,6 +157,7 @@ class GooglePlacePhotoProvider(
         .retrieve()
         .body(GooglePlace::class.java)
 
+    @Suppress("CyclomaticComplexMethod")
     private fun GooglePlace.matchScore(candidate: PlaceCandidate): Int {
         val googleName = displayName?.text?.normalize() ?: return 0
         val candidateName = candidate.name.normalize()
@@ -174,7 +176,11 @@ class GooglePlacePhotoProvider(
                 BigDecimal.valueOf(googleLocation.longitude),
             )
         }
-        val addressScore = if (addressMatches) 30 else if (cityMatches) 10 else 0
+        val addressScore = when {
+            addressMatches -> 30
+            cityMatches -> 10
+            else -> 0
+        }
         val distanceScore = when {
             distance == null -> 0
             distance <= CLOSE_MATCH_DISTANCE_METERS -> 25

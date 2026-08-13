@@ -77,19 +77,16 @@ class PrioritizedPlaceSearchProviderTest {
         assertEquals("서울 용산구 신흥로 34", result.first().address)
     }
 
-    private fun candidate(
-        provider: String,
-        name: String,
-        address: String = "서울 용산구 한강대로 1",
-    ) = PlaceCandidate(
-        provider = provider,
-        externalPlaceId = "$provider-$name",
-        name = name,
-        address = address,
-        latitude = BigDecimal("37.5"),
-        longitude = BigDecimal("127.0"),
-        category = null,
-        phoneNumber = null,
-        providerUrl = null,
-    )
+    private fun candidate(provider: String, name: String, address: String = "서울 용산구 한강대로 1"): PlaceCandidate =
+        PlaceCandidate(
+            provider = provider,
+            externalPlaceId = "$provider-$name",
+            name = name,
+            address = address,
+            latitude = BigDecimal("37.5"),
+            longitude = BigDecimal("127.0"),
+            category = null,
+            phoneNumber = null,
+            providerUrl = null,
+        )
 }
