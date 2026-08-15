@@ -26,6 +26,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         `when`(row.id).thenReturn(17)
         `when`(row.name).thenReturn("퍼머넌트해비탯")
         `when`(row.city).thenReturn("서울")
+        `when`(row.category).thenReturn("음식점")
         `when`(row.latitude).thenReturn(BigDecimal("37.5"))
         `when`(row.longitude).thenReturn(BigDecimal("127.0"))
         `when`(row.color).thenReturn("BLUE")
@@ -44,6 +45,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         assertEquals(17, result.single().id)
         assertEquals("퍼머넌트해비탯", result.single().name)
         assertEquals("서울", result.single().city)
+        assertEquals("음식점", result.single().category)
         assertEquals(BigDecimal("37.5"), result.single().latitude)
         assertEquals("BLUE", result.single().color)
     }

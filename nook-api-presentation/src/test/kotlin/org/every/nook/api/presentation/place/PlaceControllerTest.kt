@@ -157,6 +157,7 @@ class PlaceControllerTest {
                     id = 17,
                     name = "퍼머넌트해비탯",
                     city = "서울",
+                    category = "음식점",
                     latitude = BigDecimal("37.5"),
                     longitude = BigDecimal("127.0"),
                     color = "BLUE",
@@ -173,6 +174,7 @@ class PlaceControllerTest {
             jsonPath("$.success[0].id") { value(17) }
             jsonPath("$.success[0].name") { value("퍼머넌트해비탯") }
             jsonPath("$.success[0].city") { value("서울") }
+            jsonPath("$.success[0].category") { value("음식점") }
             jsonPath("$.success[0].latitude") { value(37.5) }
             jsonPath("$.success[0].longitude") { value(127.0) }
             jsonPath("$.success[0].color") { value("BLUE") }

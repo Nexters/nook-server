@@ -7,6 +7,7 @@ data class MapPlaceView(
     val id: Long,
     val name: String,
     val city: String?,
+    val category: String?,
     val latitude: BigDecimal,
     val longitude: BigDecimal,
     val color: String,

@@ -18,6 +18,7 @@ class GetMapPlacesUseCaseTest {
                 id = 17,
                 name = "퍼머넌트해비탯",
                 city = "서울",
+                category = "음식점",
                 latitude = BigDecimal("37.5"),
                 longitude = BigDecimal("127.0"),
                 color = "BLUE",
