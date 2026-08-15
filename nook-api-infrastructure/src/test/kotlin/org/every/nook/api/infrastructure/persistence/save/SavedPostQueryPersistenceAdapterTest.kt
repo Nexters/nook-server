@@ -49,7 +49,6 @@ class SavedPostQueryPersistenceAdapterTest {
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
-    private val placeMemoRepository = mock(UserSavedPostPlaceMemoJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
@@ -63,7 +62,6 @@ class SavedPostQueryPersistenceAdapterTest {
         postPlaceRepository,
         placeRepository,
         bookmarkRepository,
-        placeMemoRepository,
         parsingJobRepository,
         contentParsingJobRepository,
         groupRepository,
@@ -94,6 +92,7 @@ class SavedPostQueryPersistenceAdapterTest {
         val bookmark = mock(UserPlaceBookmarkEntity::class.java)
         val group = mock(GroupEntity::class.java)
         `when`(bookmark.placeId).thenReturn(202)
+        `when`(bookmark.memo).thenReturn("둘째 장소 메모")
         `when`(group.id).thenReturn(301)
         `when`(group.name).thenReturn("맛집")
         `when`(group.color).thenReturn(GroupColor.YELLOW)
@@ -108,12 +107,6 @@ class SavedPostQueryPersistenceAdapterTest {
             .thenReturn(listOf(firstPlace, secondPlace))
         `when`(placeRepository.findAllById(listOf(201, 202))).thenReturn(listOf(placeTwo, placeOne))
         `when`(bookmarkRepository.findAllByUserIdAndPlaceIdIn(7, listOf(201, 202))).thenReturn(listOf(bookmark))
-        `when`(placeMemoRepository.findAllByUserSavedPostIdAndPlaceIdIn(11, listOf(201, 202)))
-            .thenReturn(
-                listOf(
-                    placeMemo(savedPostId = 11, placeId = 201, memo = "첫 장소 메모"),
-                ),
-            )
         `when`(parsingJobRepository.findByPostId(101))
             .thenReturn(PlaceParsingJobEntity(101, PlaceParsingStatus.COMPLETED))
         `when`(groupPostRepository.findAllByUserSavedPostIdIn(listOf(11)))
@@ -126,7 +119,7 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf("첫태그", "둘째태그"), detail.hashtags)
         assertEquals(listOf("첫 장소", "둘째 장소"), detail.places.map { it.name })
         assertEquals(listOf(false, true), detail.places.map { it.bookmarked })
-        assertEquals(listOf("첫 장소 메모", null), detail.places.map { it.memo })
+        assertEquals(listOf(null, "둘째 장소 메모"), detail.places.map { it.memo })
         assertEquals(PlaceParsingStatusView.COMPLETED, detail.placeParsingStatus)
         assertEquals("내 메모", detail.memo)
         assertEquals(listOf("맛집"), detail.groups.map { it.name })
@@ -232,14 +225,6 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(savedPost.createdAt).thenReturn(Instant.parse("2026-07-27T00:00:00Z"))
         return savedPost
     }
-
-    private fun placeMemo(savedPostId: Long, placeId: Long, memo: String): UserSavedPostPlaceMemoEntity =
-        UserSavedPostPlaceMemoEntity(
-            userId = 7,
-            userSavedPostId = savedPostId,
-            placeId = placeId,
-            memo = memo,
-        )
 
     private fun sourcePost(id: Long, title: String): PostEntity {
         val post = mock(PostEntity::class.java)

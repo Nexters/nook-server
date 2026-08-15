@@ -50,7 +50,6 @@ class PostPersistenceAdapter(
     private val postPlaceJpaRepository: PostPlaceJpaRepository,
     private val placeJpaRepository: PlaceJpaRepository,
     private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
-    private val placeMemoJpaRepository: UserSavedPostPlaceMemoJpaRepository,
     private val groupJpaRepository: GroupJpaRepository,
     private val groupPostJpaRepository: GroupPostJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
@@ -97,7 +96,7 @@ class PostPersistenceAdapter(
             created = userPostCreation.created,
             sourcePostId = sourcePostId,
             postPlaceRepository = postPlaceJpaRepository,
-            placeMemoRepository = placeMemoJpaRepository,
+            bookmarkRepository = userPlaceBookmarkJpaRepository,
         )
         addToGroups(requireNotNull(userPost.id), groupIds)
         if (existingContentJob == null) {
@@ -130,7 +129,7 @@ class PostPersistenceAdapter(
             created = userPostCreation.created,
             sourcePostId = sourcePostId,
             postPlaceRepository = postPlaceJpaRepository,
-            placeMemoRepository = placeMemoJpaRepository,
+            bookmarkRepository = userPlaceBookmarkJpaRepository,
         )
         if (userPostCreation.created) {
             postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(sourcePostId).forEach { postPlace ->
@@ -161,22 +160,15 @@ class PostPersistenceAdapter(
         val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return null
         val parsingJob = placeParsingJobJpaRepository.findByPostId(userPost.postId)
         val postPlaces = postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(userPost.postId)
-        val bookmarkedPlaceIds = if (postPlaces.isEmpty()) {
-            emptySet()
+        val bookmarks = if (postPlaces.isEmpty()) {
+            emptyList()
         } else {
-            userPlaceBookmarkJpaRepository
-                .findAllByUserIdAndPlaceIdIn(userId, postPlaces.map { it.placeId })
-                .mapTo(mutableSetOf()) { it.placeId }
+            userPlaceBookmarkJpaRepository.findAllByUserIdAndPlaceIdIn(userId, postPlaces.map { it.placeId })
         }
+        val bookmarkedPlaceIds = bookmarks.mapTo(mutableSetOf()) { it.placeId }
+        val memoByPlaceId = bookmarks.mapNotNull { bookmark -> bookmark.memo?.let { bookmark.placeId to it } }.toMap()
         val placesById = placeJpaRepository.findAllById(postPlaces.map { it.placeId })
             .associateBy { requireNotNull(it.id) }
-        val memoByPlaceId = if (postPlaces.isEmpty()) {
-            emptyMap()
-        } else {
-            placeMemoJpaRepository
-                .findAllByUserSavedPostIdAndPlaceIdIn(requireNotNull(userPost.id), postPlaces.map { it.placeId })
-                .associate { it.placeId to it.memo }
-        }
 
         return PostPlaceParsingSnapshot(
             postId = postId,
@@ -328,16 +320,15 @@ private fun seedPlaceMemosFromPostMemo(
     created: Boolean,
     sourcePostId: Long,
     postPlaceRepository: PostPlaceJpaRepository,
-    placeMemoRepository: UserSavedPostPlaceMemoJpaRepository,
+    bookmarkRepository: UserPlaceBookmarkJpaRepository,
 ) {
     val memo = savedPost.memo ?: return
     if (!created) {
         return
     }
     postPlaceRepository.findAllByPostIdOrderBySequenceAsc(sourcePostId).forEach { postPlace ->
-        placeMemoRepository.insertIgnore(
+        bookmarkRepository.insertIgnoreWithMemo(
             userId = savedPost.userId,
-            userSavedPostId = requireNotNull(savedPost.id),
             placeId = postPlace.placeId,
             memo = memo,
         )
