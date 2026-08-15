@@ -8,20 +8,27 @@ import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import java.util.Base64
 
 class GoogleCloudVisionImageTextExtractor(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: GoogleCloudVisionProperties,
+    private val imageDownloader: VisionImageDownloader,
 ) : ImageTextExtractor {
     override fun extract(request: ImageTextExtractor.Request): List<ImageTranscript> {
         val startedAt = System.nanoTime()
         require(request.images.isNotEmpty()) { "At least one image is required" }
         require(request.images.size <= MAX_BATCH_SIZE) { "Too many images in transcript request" }
         require(properties.apiKey.isNotBlank()) { "Google Cloud Vision API key is not configured" }
+        val payloads = request.images.map { image -> image to imageDownloader.download(image.imageUrl) }
+        val totalBytes = payloads.sumOf { (_, bytes) -> bytes.size.toLong() }
+        check(totalBytes <= properties.maxRequestBytes) {
+            "Cloud Vision request is too large: $totalBytes bytes, limit ${properties.maxRequestBytes}"
+        }
         val response = restClient.post()
             .uri { builder -> builder.path("/v1/images:annotate").queryParam("key", properties.apiKey).build() }
-            .body(request.toVisionRequest())
+            .body(payloads.toVisionRequest())
             .retrieve()
             .body(String::class.java)
             ?: error("Google Cloud Vision returned an empty response")
@@ -41,6 +48,7 @@ class GoogleCloudVisionImageTextExtractor(
                     "provider.name" to "google-cloud-vision",
                     "vision.feature_type" to properties.featureType,
                     "content.image_count" to request.images.size,
+                    "content.image_bytes" to totalBytes,
                     "ocr.transcript_count" to transcripts.size,
                 ),
             ),
@@ -48,10 +56,10 @@ class GoogleCloudVisionImageTextExtractor(
         return transcripts
     }
 
-    private fun ImageTextExtractor.Request.toVisionRequest(): Map<String, Any> = mapOf(
-        "requests" to images.map { image ->
+    private fun List<Pair<ImageTextExtractor.ImageInput, ByteArray>>.toVisionRequest(): Map<String, Any> = mapOf(
+        "requests" to map { (_, bytes) ->
             mapOf(
-                "image" to mapOf("source" to mapOf("imageUri" to image.imageUrl)),
+                "image" to mapOf("content" to Base64.getEncoder().encodeToString(bytes)),
                 "features" to listOf(mapOf("type" to properties.featureType)),
                 "imageContext" to mapOf("languageHints" to LANGUAGE_HINTS),
             )

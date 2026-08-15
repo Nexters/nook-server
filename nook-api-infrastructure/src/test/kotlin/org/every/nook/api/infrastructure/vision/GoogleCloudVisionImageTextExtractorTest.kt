@@ -7,6 +7,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.content
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
+import org.springframework.test.web.client.response.MockRestResponseCreators
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
 import tools.jackson.module.kotlin.jacksonObjectMapper
@@ -20,7 +21,8 @@ class GoogleCloudVisionImageTextExtractorTest {
         val fixture = extractorFixture()
         fixture.server.expect(requestTo("https://vision.test/v1/images:annotate?key=test-key"))
             .andExpect(content().string(containsString("DOCUMENT_TEXT_DETECTION")))
-            .andExpect(content().string(containsString("https://cdn.example.com/1.jpg")))
+            .andExpect(content().string(containsString(ENCODED_IMAGE)))
+            .andExpect(content().string(org.hamcrest.Matchers.not(containsString("imageUri"))))
             .andExpect(content().string(containsString("languageHints")))
             .andRespond(
                 withSuccess(
@@ -64,7 +66,7 @@ class GoogleCloudVisionImageTextExtractorTest {
 
     @Test
     fun `falls back to text annotations when full text annotation is absent`() {
-        val fixture = extractorFixture()
+        val fixture = extractorFixture(imageCount = 1)
         fixture.server.expect(requestTo("https://vision.test/v1/images:annotate?key=test-key"))
             .andRespond(
                 withSuccess(
@@ -93,7 +95,7 @@ class GoogleCloudVisionImageTextExtractorTest {
 
     @Test
     fun `fails when Cloud Vision returns an annotation error`() {
-        val fixture = extractorFixture()
+        val fixture = extractorFixture(imageCount = 1)
         fixture.server.expect(requestTo("https://vision.test/v1/images:annotate?key=test-key"))
             .andRespond(
                 withSuccess(
@@ -110,16 +112,86 @@ class GoogleCloudVisionImageTextExtractorTest {
         fixture.server.verify()
     }
 
-    private fun extractorFixture(): Fixture {
+    @Test
+    fun `fails when the image cannot be downloaded`() {
         val builder = RestClient.builder().baseUrl("https://vision.test")
         val server = MockRestServiceServer.bindTo(builder).build()
+        val imageBuilder = RestClient.builder()
+        val imageServer = MockRestServiceServer.bindTo(imageBuilder).build()
+        imageServer.expect(requestTo("https://cdn.example.com/1.jpg"))
+            .andRespond(MockRestResponseCreators.withServerError())
+        val properties = GoogleCloudVisionProperties(baseUrl = "https://vision.test", apiKey = "test-key")
         val extractor = GoogleCloudVisionImageTextExtractor(
             restClient = builder.build(),
             objectMapper = jacksonObjectMapper(),
-            properties = GoogleCloudVisionProperties(baseUrl = "https://vision.test", apiKey = "test-key"),
+            properties = properties,
+            imageDownloader = VisionImageDownloader(imageBuilder.build(), properties.maxImageBytes),
         )
-        return Fixture(extractor, server)
+
+        val failure = assertFailsWith<IllegalStateException> {
+            extractor.extract(
+                ImageTextExtractor.Request(listOf(ImageTextExtractor.ImageInput(1, "https://cdn.example.com/1.jpg"))),
+            )
+        }
+
+        assertEquals(true, failure.message?.contains("Failed to download image"))
+        // Vision 은 아예 호출되지 않는다.
+        server.verify()
     }
 
-    private data class Fixture(val extractor: GoogleCloudVisionImageTextExtractor, val server: MockRestServiceServer)
+    @Test
+    fun `fails when the downloaded image exceeds the size limit`() {
+        val builder = RestClient.builder().baseUrl("https://vision.test")
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val imageBuilder = RestClient.builder()
+        val imageServer = MockRestServiceServer.bindTo(imageBuilder).build()
+        imageServer.expect(requestTo("https://cdn.example.com/1.jpg"))
+            .andRespond(withSuccess(ByteArray(16), MediaType.IMAGE_JPEG))
+        val properties = GoogleCloudVisionProperties(baseUrl = "https://vision.test", apiKey = "test-key")
+        val extractor = GoogleCloudVisionImageTextExtractor(
+            restClient = builder.build(),
+            objectMapper = jacksonObjectMapper(),
+            properties = properties,
+            imageDownloader = VisionImageDownloader(imageBuilder.build(), maxImageBytes = 8),
+        )
+
+        val failure = assertFailsWith<IllegalStateException> {
+            extractor.extract(
+                ImageTextExtractor.Request(listOf(ImageTextExtractor.ImageInput(1, "https://cdn.example.com/1.jpg"))),
+            )
+        }
+
+        assertEquals(true, failure.message?.contains("too large"))
+        server.verify()
+    }
+
+    private fun extractorFixture(imageCount: Int = 2): Fixture {
+        val builder = RestClient.builder().baseUrl("https://vision.test")
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val imageBuilder = RestClient.builder()
+        val imageServer = MockRestServiceServer.bindTo(imageBuilder).build()
+        repeat(imageCount) { index ->
+            imageServer.expect(requestTo("https://cdn.example.com/${index + 1}.jpg"))
+                .andRespond(withSuccess(IMAGE_BYTES, MediaType.IMAGE_JPEG))
+        }
+        val properties = GoogleCloudVisionProperties(baseUrl = "https://vision.test", apiKey = "test-key")
+        val extractor = GoogleCloudVisionImageTextExtractor(
+            restClient = builder.build(),
+            objectMapper = jacksonObjectMapper(),
+            properties = properties,
+            imageDownloader = VisionImageDownloader(imageBuilder.build(), properties.maxImageBytes),
+        )
+        return Fixture(extractor, server, imageServer)
+    }
+
+    private companion object {
+        val IMAGE_BYTES = byteArrayOf(1, 2, 3, 4)
+        val ENCODED_IMAGE: String = java.util.Base64.getEncoder().encodeToString(IMAGE_BYTES)
+    }
+
+    private data class Fixture(
+        val extractor: GoogleCloudVisionImageTextExtractor,
+        val server: MockRestServiceServer,
+        val imageServer: MockRestServiceServer,
+    )
 }
