@@ -10,6 +10,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceMemoJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -27,6 +28,7 @@ class ConnectPostPlacePersistenceAdapterTest {
     private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
+    private val placeMemoRepository = mock(UserSavedPostPlaceMemoJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = ConnectPostPlacePersistenceAdapter(
@@ -35,6 +37,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         placeRepository,
         postPlaceRepository,
         bookmarkRepository,
+        placeMemoRepository,
         parsingJobRepository,
         eventPublisher,
     )
@@ -107,6 +110,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         assertEquals(17, captor.value.placeId)
         assertEquals(1, captor.value.sequence)
         verify(bookmarkRepository).insertIgnore(7, 17)
+        verify(placeMemoRepository).insertIgnore(7, 11, 17, "게시물 메모")
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
         assertEquals(null, job.failureReason)
     }
@@ -130,11 +134,13 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         verify(postPlaceRepository, never()).save(org.mockito.ArgumentMatchers.any())
         verify(bookmarkRepository).insertIgnore(7, 17)
+        verify(placeMemoRepository).insertIgnore(7, 11, 17, "게시물 메모")
     }
 
     private fun savedPost(): UserSavedPostEntity {
         val savedPost = mock(UserSavedPostEntity::class.java)
         `when`(savedPost.postId).thenReturn(101)
+        `when`(savedPost.memo).thenReturn("게시물 메모")
         return savedPost
     }
 

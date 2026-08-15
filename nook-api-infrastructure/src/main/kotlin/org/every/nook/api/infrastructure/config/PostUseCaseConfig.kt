@@ -15,6 +15,7 @@ import org.every.nook.api.application.post.PostContentParsingJobPort
 import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
 import org.every.nook.api.application.post.StorePostMediaUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
+import org.every.nook.api.application.post.UpdatePostPlaceMemoUseCase
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.DeleteSavedPostPort
 import org.every.nook.api.application.post.port.FindExistingPostPort
@@ -24,6 +25,7 @@ import org.every.nook.api.application.post.port.ReusePostPort
 import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.application.post.port.UpdatePostMediaUrlPort
 import org.every.nook.api.application.post.port.UpdatePostMemoPort
+import org.every.nook.api.application.post.port.UpdatePostPlaceMemoPort
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.springframework.beans.factory.ObjectProvider
@@ -104,6 +106,10 @@ class PostUseCaseConfig {
     @Bean
     fun updatePostMemoUseCase(updatePostMemoPort: UpdatePostMemoPort): UpdatePostMemoUseCase =
         UpdatePostMemoUseCase(updatePostMemoPort)
+
+    @Bean
+    fun updatePostPlaceMemoUseCase(updatePostPlaceMemoPort: UpdatePostPlaceMemoPort): UpdatePostPlaceMemoUseCase =
+        UpdatePostPlaceMemoUseCase(updatePostPlaceMemoPort)
 
     @Bean
     fun deleteSavedPostUseCase(deleteSavedPostPort: DeleteSavedPostPort): DeleteSavedPostUseCase =

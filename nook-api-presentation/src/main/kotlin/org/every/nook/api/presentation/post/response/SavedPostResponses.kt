@@ -197,6 +197,8 @@ data class SavedPostPlaceResponse(
     val tags: List<String>,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
+    @field:Schema(description = "사용자의 저장 게시물 장소 메모", nullable = true)
+    val memo: String?,
     @field:Schema(description = "게시물 내 장소 순서")
     val sequence: Int,
 ) {
@@ -215,6 +217,7 @@ data class SavedPostPlaceResponse(
             thumbnailParsingStatus = result.thumbnailParsingStatus,
             tags = result.tags,
             bookmarked = result.bookmarked,
+            memo = result.memo,
             sequence = result.sequence,
         )
     }
