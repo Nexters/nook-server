@@ -13,6 +13,11 @@ interface UserSavedPostPlaceMemoJpaRepository : JpaRepository<UserSavedPostPlace
         placeIds: Collection<Long>,
     ): List<UserSavedPostPlaceMemoEntity>
 
+    fun findAllByPlaceIdAndUserSavedPostIdIn(
+        placeId: Long,
+        userSavedPostIds: Collection<Long>,
+    ): List<UserSavedPostPlaceMemoEntity>
+
     @Modifying
     @Query(
         value = """
