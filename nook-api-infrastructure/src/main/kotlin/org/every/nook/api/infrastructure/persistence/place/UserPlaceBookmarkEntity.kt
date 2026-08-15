@@ -26,6 +26,8 @@ class UserPlaceBookmarkEntity(
     val userId: Long,
     @Column(name = "place_id", nullable = false)
     val placeId: Long,
+    @Column(name = "memo", columnDefinition = "TEXT")
+    var memo: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

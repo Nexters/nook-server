@@ -4,8 +4,10 @@ import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
+import org.every.nook.api.application.place.UpdatePlaceMemoUseCase
 import org.every.nook.api.application.place.port.PlaceDetailQueryPort
 import org.every.nook.api.application.place.port.UpdatePlaceBookmarkPort
+import org.every.nook.api.application.place.port.UpdatePlaceMemoPort
 import org.every.nook.api.infrastructure.place.KakaoPlaceMapper
 import org.every.nook.api.infrastructure.place.KakaoPlaceProperties
 import org.every.nook.api.infrastructure.place.KakaoPlaceSearchProvider
@@ -94,6 +96,10 @@ class PlaceSearchConfig {
     @Bean
     fun updatePlaceBookmarkUseCase(updatePlaceBookmarkPort: UpdatePlaceBookmarkPort): UpdatePlaceBookmarkUseCase =
         UpdatePlaceBookmarkUseCase(updatePlaceBookmarkPort)
+
+    @Bean
+    fun updatePlaceMemoUseCase(updatePlaceMemoPort: UpdatePlaceMemoPort): UpdatePlaceMemoUseCase =
+        UpdatePlaceMemoUseCase(updatePlaceMemoPort)
 
     @Bean
     fun getPlaceDetailUseCase(placeDetailQueryPort: PlaceDetailQueryPort): GetPlaceDetailUseCase =

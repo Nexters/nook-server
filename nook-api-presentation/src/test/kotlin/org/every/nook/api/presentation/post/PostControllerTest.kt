@@ -12,7 +12,6 @@ import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
-import org.every.nook.api.application.post.UpdatePostPlaceMemoUseCase
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PlaceView
 import org.every.nook.api.application.post.model.PostProcessingStageView
@@ -52,7 +51,6 @@ class PostControllerTest {
     private lateinit var listUseCase: ListSavedPostsUseCase
     private lateinit var detailUseCase: GetSavedPostDetailUseCase
     private lateinit var updateMemoUseCase: UpdatePostMemoUseCase
-    private lateinit var updatePostPlaceMemoUseCase: UpdatePostPlaceMemoUseCase
     private lateinit var replaceGroupsUseCase: ReplaceSavedPostGroupsUseCase
     private lateinit var connectPostPlaceUseCase: ConnectPostPlaceUseCase
     private lateinit var deleteSavedPostUseCase: DeleteSavedPostUseCase
@@ -66,7 +64,6 @@ class PostControllerTest {
         listUseCase = mock(ListSavedPostsUseCase::class.java)
         detailUseCase = mock(GetSavedPostDetailUseCase::class.java)
         updateMemoUseCase = mock(UpdatePostMemoUseCase::class.java)
-        updatePostPlaceMemoUseCase = mock(UpdatePostPlaceMemoUseCase::class.java)
         replaceGroupsUseCase = mock(ReplaceSavedPostGroupsUseCase::class.java)
         connectPostPlaceUseCase = mock(ConnectPostPlaceUseCase::class.java)
         deleteSavedPostUseCase = mock(DeleteSavedPostUseCase::class.java)
@@ -82,7 +79,6 @@ class PostControllerTest {
                     listUseCase,
                     detailUseCase,
                     updateMemoUseCase,
-                    updatePostPlaceMemoUseCase,
                     replaceGroupsUseCase,
                     connectPostPlaceUseCase,
                     deleteSavedPostUseCase,
@@ -161,26 +157,6 @@ class PostControllerTest {
                 userId = TEST_USER_ID,
                 postId = 11,
                 memo = null,
-            ),
-        )
-    }
-
-    @Test
-    fun `updates a memo on my saved post place`() {
-        mockMvc.patch("/api/v1/posts/11/places/17/memo") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"memo":"대표 메뉴는 라자냐"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.resultType") { value("SUCCESS") }
-        }
-
-        verify(updatePostPlaceMemoUseCase)(
-            UpdatePostPlaceMemoUseCase.Command(
-                userId = TEST_USER_ID,
-                postId = 11,
-                placeId = 17,
-                memo = "대표 메뉴는 라자냐",
             ),
         )
     }

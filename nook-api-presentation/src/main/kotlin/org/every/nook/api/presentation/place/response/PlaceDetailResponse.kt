@@ -47,6 +47,8 @@ data class PlaceDetailResponse(
     val tags: List<String>,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
+    @field:Schema(description = "사용자가 이 장소에 남긴 메모", nullable = true)
+    val memo: String?,
     @field:Schema(description = "이 장소와 연결된 저장 게시물 페이지")
     val posts: PlacePostPageResponse,
 ) {
@@ -68,6 +70,7 @@ data class PlaceDetailResponse(
             openNow = view.openNow,
             tags = view.tags,
             bookmarked = view.bookmarked,
+            memo = view.memo,
             posts = PlacePostPageResponse.from(view.posts),
         )
     }
@@ -144,8 +147,6 @@ data class PlacePostResponse(
     val authorIdentifier: String?,
     @field:Schema(description = "대표 미디어", nullable = true)
     val representativeMedia: PlacePostMediaResponse?,
-    @field:Schema(description = "사용자 메모", nullable = true)
-    val memo: String?,
     @field:Schema(description = "게시물 저장 시각")
     val savedAt: OffsetDateTime,
     @field:Schema(description = "게시물이 속한 그룹 목록")
@@ -157,7 +158,6 @@ data class PlacePostResponse(
             title = view.title,
             authorIdentifier = view.authorIdentifier,
             representativeMedia = view.representativeMedia?.let(PlacePostMediaResponse::from),
-            memo = view.memo,
             savedAt = view.savedAt.toSeoulOffsetDateTime(),
             groups = view.groups.map(PlacePostGroupResponse::from),
         )

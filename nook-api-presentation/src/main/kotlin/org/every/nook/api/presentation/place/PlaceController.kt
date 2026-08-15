@@ -14,8 +14,10 @@ import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
+import org.every.nook.api.application.place.UpdatePlaceMemoUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.place.request.UpdatePlaceBookmarkRequest
+import org.every.nook.api.presentation.place.request.UpdatePlaceMemoRequest
 import org.every.nook.api.presentation.place.response.MapPlaceResponse
 import org.every.nook.api.presentation.place.response.PlaceDetailResponse
 import org.every.nook.api.presentation.place.response.PlaceSearchSliceResponse
@@ -42,6 +44,7 @@ private const val MAX_PLACE_SEARCH_PAGE_SIZE = 15L
 @RequestMapping("/api/v1/places")
 class PlaceController(
     private val updatePlaceBookmarkUseCase: UpdatePlaceBookmarkUseCase,
+    private val updatePlaceMemoUseCase: UpdatePlaceMemoUseCase,
     private val getPlaceDetailUseCase: GetPlaceDetailUseCase,
     private val getMapPlacesUseCase: GetMapPlacesUseCase,
     private val getRecentPlacesUseCase: GetRecentPlacesUseCase,
@@ -192,6 +195,26 @@ class PlaceController(
                 userId = userContext.userId,
                 placeId = placeId,
                 bookmarked = request.bookmarked,
+            ),
+        )
+        return ApiResponse.success(Unit)
+    }
+
+    @Operation(summary = "내 장소 메모 변경")
+    @PatchMapping("/{placeId}/memo")
+    fun updateMemo(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "메모를 변경할 장소 식별자")
+        @PathVariable
+        @Positive
+        placeId: Long,
+        @Valid @RequestBody request: UpdatePlaceMemoRequest,
+    ): ApiResponse<Unit> {
+        updatePlaceMemoUseCase(
+            UpdatePlaceMemoUseCase.Command(
+                userId = userContext.userId,
+                placeId = placeId,
+                memo = request.memo,
             ),
         )
         return ApiResponse.success(Unit)
