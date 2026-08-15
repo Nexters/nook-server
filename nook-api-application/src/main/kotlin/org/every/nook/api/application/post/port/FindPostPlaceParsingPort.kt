@@ -20,5 +20,6 @@ data class PostPlaceParsingSnapshot(
         val thumbnailUrl: String?,
         val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
         val tags: List<String> = emptyList(),
+        val memo: String?,
     )
 }

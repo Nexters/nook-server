@@ -58,6 +58,8 @@ data class PlaceResponse(
     val tags: List<String>,
     @field:Schema(description = "사용자의 장소 북마크 여부")
     val bookmarked: Boolean,
+    @field:Schema(description = "사용자의 저장 게시물 장소 메모", nullable = true)
+    val memo: String?,
 ) {
     companion object {
         fun from(place: PlaceView): PlaceResponse = PlaceResponse(
@@ -74,6 +76,7 @@ data class PlaceResponse(
             thumbnailParsingStatus = place.thumbnailParsingStatus,
             tags = place.tags,
             bookmarked = place.bookmarked,
+            memo = place.memo,
         )
     }
 }

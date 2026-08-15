@@ -1,0 +1,1 @@
+DROP TABLE user_saved_post_place_memos;

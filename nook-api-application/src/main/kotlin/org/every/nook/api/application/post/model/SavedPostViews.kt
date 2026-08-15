@@ -68,5 +68,6 @@ data class SavedPostPlace(
     val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
+    val memo: String?,
     val sequence: Int,
 )

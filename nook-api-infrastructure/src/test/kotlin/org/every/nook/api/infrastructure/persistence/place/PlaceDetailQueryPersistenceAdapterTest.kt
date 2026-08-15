@@ -13,6 +13,8 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceMemoEntity
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceMemoJpaRepository
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -38,6 +40,7 @@ class PlaceDetailQueryPersistenceAdapterTest {
     private val mediaRepository = mock(PostMediaJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
+    private val placeMemoRepository = mock(UserSavedPostPlaceMemoJpaRepository::class.java)
     private val adapter = PlaceDetailQueryPersistenceAdapter(
         placeRepository,
         bookmarkRepository,
@@ -46,6 +49,7 @@ class PlaceDetailQueryPersistenceAdapterTest {
         mediaRepository,
         groupRepository,
         groupPostRepository,
+        placeMemoRepository,
     )
 
     @Test
@@ -86,18 +90,39 @@ class PlaceDetailQueryPersistenceAdapterTest {
         `when`(groupPostRepository.findAllByUserSavedPostIdIn(listOf(21)))
             .thenReturn(listOf(GroupPostEntity(groupId = 301, userSavedPostId = 21)))
         `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(301))).thenReturn(listOf(group))
+        `when`(placeMemoRepository.findAllByPlaceIdAndUserSavedPostIdIn(17, listOf(21)))
+            .thenReturn(listOf(placeMemo("장소 메모")))
 
         val detail = assertNotNull(adapter.find(userId = 7, placeId = 17, page = 1, size = 10))
 
         assertFalse(detail.bookmarked)
         assertEquals(21, detail.posts.items.single().postId)
-        assertEquals("내 메모", detail.posts.items.single().memo)
+        assertEquals("장소 메모", detail.posts.items.single().memo)
         assertEquals(listOf("맛집"), detail.posts.items.single().groups.map { it.name })
         assertEquals(listOf("YELLOW"), detail.posts.items.single().groups.map { it.color })
         assertEquals("https://example.com/image.jpg", detail.posts.items.single().representativeMedia?.url)
         assertEquals(11L, detail.posts.totalElements)
         assertEquals(listOf("createdAt: DESC", "id: DESC"), pageable.sort.map { it.toString() }.toList())
         verify(savedPostRepository).findAllByUserIdAndPlaceId(7, 17, pageable)
+    }
+
+    @Test
+    fun `place memo is absent instead of falling back to the post memo`() {
+        val pageable = expectedPageable(page = 0, size = 20)
+        val place = place()
+        val savedPost = savedPost()
+        val sourcePost = sourcePost()
+        `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
+        `when`(savedPostRepository.findAllByUserIdAndPlaceId(7, 17, pageable))
+            .thenReturn(PageImpl(listOf(savedPost), pageable, 1))
+        `when`(bookmarkRepository.existsByUserIdAndPlaceId(7, 17)).thenReturn(true)
+        `when`(postRepository.findAllById(listOf(101))).thenReturn(listOf(sourcePost))
+        `when`(placeMemoRepository.findAllByPlaceIdAndUserSavedPostIdIn(17, listOf(21)))
+            .thenReturn(emptyList())
+
+        val detail = assertNotNull(adapter.find(userId = 7, placeId = 17, page = 0, size = 20))
+
+        assertNull(detail.posts.items.single().memo)
     }
 
     @Test
@@ -140,6 +165,13 @@ class PlaceDetailQueryPersistenceAdapterTest {
         `when`(savedPost.createdAt).thenReturn(Instant.parse("2026-07-27T00:00:00Z"))
         return savedPost
     }
+
+    private fun placeMemo(memo: String): UserSavedPostPlaceMemoEntity = UserSavedPostPlaceMemoEntity(
+        userId = 7,
+        userSavedPostId = 21,
+        placeId = 17,
+        memo = memo,
+    )
 
     private fun sourcePost(): PostEntity {
         val post = mock(PostEntity::class.java)
