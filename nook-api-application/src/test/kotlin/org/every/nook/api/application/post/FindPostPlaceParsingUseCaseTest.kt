@@ -38,6 +38,7 @@ class FindPostPlaceParsingUseCaseTest {
                         bookmarked = true,
                         thumbnailUrl = "https://example.com/place-thumbnail.jpg",
                         thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
+                        memo = "창가 자리 좋음",
                     ),
                 ),
             )
@@ -51,6 +52,7 @@ class FindPostPlaceParsingUseCaseTest {
         assertEquals("https://example.com/place-thumbnail.jpg", result.places.single().thumbnailUrl)
         assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.places.single().thumbnailParsingStatus)
         assertEquals(true, result.places.single().bookmarked)
+        assertEquals("창가 자리 좋음", result.places.single().memo)
     }
 
     @Test

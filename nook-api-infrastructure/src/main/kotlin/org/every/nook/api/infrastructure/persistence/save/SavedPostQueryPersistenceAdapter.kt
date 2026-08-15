@@ -49,6 +49,7 @@ class SavedPostQueryPersistenceAdapter(
     private val postPlaceRepository: PostPlaceJpaRepository,
     private val placeRepository: PlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val placeMemoRepository: UserSavedPostPlaceMemoJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
     private val contentParsingJobRepository: PostContentParsingJobJpaRepository,
     private val groupRepository: GroupJpaRepository,
@@ -193,6 +194,13 @@ class SavedPostQueryPersistenceAdapter(
                 .findAllByUserIdAndPlaceIdIn(userId, postPlaces.map { it.placeId })
                 .mapTo(mutableSetOf()) { it.placeId }
         }
+        val memoByPlaceId = if (postPlaces.isEmpty()) {
+            emptyMap()
+        } else {
+            placeMemoRepository
+                .findAllByUserSavedPostIdAndPlaceIdIn(postId, postPlaces.map { it.placeId })
+                .associate { it.placeId to it.memo }
+        }
         val parsingJob = parsingJobRepository.findByPostId(savedPost.postId)
         val contentParsingJob = contentParsingJobRepository.findByPostId(savedPost.postId)
         val processing = PostProcessingView.from(
@@ -219,7 +227,7 @@ class SavedPostQueryPersistenceAdapter(
             placeParsingStatus = PlaceParsingStatusView.from(parsingJob?.status ?: PlaceParsingStatus.PENDING),
             placeParsingFailureReason = parsingJob?.failureReason
                 .takeIf { parsingJob?.status == PlaceParsingStatus.FAILED },
-            places = postPlaces.toSavedPostPlaces(placesById, bookmarkedPlaceIds),
+            places = postPlaces.toSavedPostPlaces(placesById, bookmarkedPlaceIds, memoByPlaceId),
             processingStatus = processing.status,
             processingStage = processing.stage,
             processingPercent = processing.processingPercent,
@@ -229,6 +237,7 @@ class SavedPostQueryPersistenceAdapter(
     private fun List<PostPlaceEntity>.toSavedPostPlaces(
         placesById: Map<Long, PlaceEntity>,
         bookmarkedPlaceIds: Set<Long>,
+        memoByPlaceId: Map<Long, String>,
     ): List<SavedPostPlace> = mapNotNull { postPlace ->
         placesById[postPlace.placeId]?.let { place ->
             SavedPostPlace(
@@ -244,6 +253,7 @@ class SavedPostQueryPersistenceAdapter(
                 thumbnailUrl = place.thumbnailUrl,
                 tags = place.representativeTags.map { it.displayName },
                 bookmarked = postPlace.placeId in bookmarkedPlaceIds,
+                memo = memoByPlaceId[postPlace.placeId],
                 thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.thumbnailParsingStatus),
                 sequence = postPlace.sequence,
             )

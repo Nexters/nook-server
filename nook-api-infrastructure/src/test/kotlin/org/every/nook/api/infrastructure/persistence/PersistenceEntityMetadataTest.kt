@@ -21,6 +21,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceMemoEntity
 import kotlin.reflect.KClass
 import kotlin.reflect.full.findAnnotation
 import kotlin.test.Test
@@ -63,6 +64,17 @@ class PersistenceEntityMetadataTest {
         assertEquals("idx_u_user_id_post_id", uniqueConstraint.name)
         assertEquals(listOf("user_id", "post_id"), uniqueConstraint.columnNames.toList())
         assertEquals(setOf("idx_user_id", "idx_post_id"), table.indexes.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `user saved post place memo is unique per saved post place`() {
+        val table = requireNotNull(UserSavedPostPlaceMemoEntity::class.findAnnotation<Table>())
+        val uniqueConstraint = table.uniqueConstraints.single()
+
+        assertEquals("user_saved_post_place_memos", table.name)
+        assertEquals("idx_u_user_saved_post_id_place_id", uniqueConstraint.name)
+        assertEquals(listOf("user_saved_post_id", "place_id"), uniqueConstraint.columnNames.toList())
+        assertEquals(setOf("idx_user_id", "idx_place_id"), table.indexes.map { it.name }.toSet())
     }
 
     @Test
@@ -135,6 +147,7 @@ class PersistenceEntityMetadataTest {
             PlaceParsingJobEntity::class,
             UserPlaceBookmarkEntity::class,
             UserSavedPostEntity::class,
+            UserSavedPostPlaceMemoEntity::class,
             GroupEntity::class,
             GroupPostEntity::class,
             ScrapingProviderResponseEntity::class,

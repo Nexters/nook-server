@@ -50,6 +50,7 @@ class PostPersistenceAdapter(
     private val postPlaceJpaRepository: PostPlaceJpaRepository,
     private val placeJpaRepository: PlaceJpaRepository,
     private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
+    private val placeMemoJpaRepository: UserSavedPostPlaceMemoJpaRepository,
     private val groupJpaRepository: GroupJpaRepository,
     private val groupPostJpaRepository: GroupPostJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
@@ -91,6 +92,13 @@ class PostPersistenceAdapter(
             )
         val userPostCreation = findOrCreateUserPost(userId, sourcePostId, memo)
         val userPost = userPostCreation.entity
+        seedPlaceMemosFromPostMemo(
+            savedPost = userPost,
+            created = userPostCreation.created,
+            sourcePostId = sourcePostId,
+            postPlaceRepository = postPlaceJpaRepository,
+            placeMemoRepository = placeMemoJpaRepository,
+        )
         addToGroups(requireNotNull(userPost.id), groupIds)
         if (existingContentJob == null) {
             eventPublisher.publishEvent(PostContentParsingJobRequestedEvent(sourcePostId, clock.instant()))
@@ -117,6 +125,13 @@ class PostPersistenceAdapter(
         val contentJob = requireNotNull(postContentParsingJobJpaRepository.findByPostId(sourcePostId))
         val userPostCreation = findOrCreateUserPost(userId, sourcePostId, memo)
         val userPost = userPostCreation.entity
+        seedPlaceMemosFromPostMemo(
+            savedPost = userPost,
+            created = userPostCreation.created,
+            sourcePostId = sourcePostId,
+            postPlaceRepository = postPlaceJpaRepository,
+            placeMemoRepository = placeMemoJpaRepository,
+        )
         if (userPostCreation.created) {
             postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(sourcePostId).forEach { postPlace ->
                 userPlaceBookmarkJpaRepository.insertIgnore(userId, postPlace.placeId)
@@ -155,6 +170,13 @@ class PostPersistenceAdapter(
         }
         val placesById = placeJpaRepository.findAllById(postPlaces.map { it.placeId })
             .associateBy { requireNotNull(it.id) }
+        val memoByPlaceId = if (postPlaces.isEmpty()) {
+            emptyMap()
+        } else {
+            placeMemoJpaRepository
+                .findAllByUserSavedPostIdAndPlaceIdIn(requireNotNull(userPost.id), postPlaces.map { it.placeId })
+                .associate { it.placeId to it.memo }
+        }
 
         return PostPlaceParsingSnapshot(
             postId = postId,
@@ -171,6 +193,7 @@ class PostPersistenceAdapter(
                                 ?: error("Place must exist for postPlace"),
                         ),
                         tags = placesById[postPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },
+                        memo = memoByPlaceId[postPlace.placeId],
                     )
                 }
             },
@@ -298,6 +321,27 @@ private fun logSavedPostMapping(sourcePostId: Long, savedPostId: Long, created: 
             ),
         ),
     )
+}
+
+private fun seedPlaceMemosFromPostMemo(
+    savedPost: UserSavedPostEntity,
+    created: Boolean,
+    sourcePostId: Long,
+    postPlaceRepository: PostPlaceJpaRepository,
+    placeMemoRepository: UserSavedPostPlaceMemoJpaRepository,
+) {
+    val memo = savedPost.memo ?: return
+    if (!created) {
+        return
+    }
+    postPlaceRepository.findAllByPostIdOrderBySequenceAsc(sourcePostId).forEach { postPlace ->
+        placeMemoRepository.insertIgnore(
+            userId = savedPost.userId,
+            userSavedPostId = requireNotNull(savedPost.id),
+            placeId = postPlace.placeId,
+            memo = memo,
+        )
+    }
 }
 
 private val postPersistenceEventLogger = LoggerFactory.getLogger(PostPersistenceAdapter::class.java)

@@ -18,6 +18,7 @@ data class PlaceView(
     val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
+    val memo: String?,
 ) {
     companion object {
         fun from(
@@ -26,6 +27,7 @@ data class PlaceView(
             thumbnailUrl: String?,
             thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
             tags: List<String> = emptyList(),
+            memo: String? = null,
         ): PlaceView = PlaceView(
             id = requireNotNull(place.id),
             provider = place.providerReference.provider,
@@ -40,6 +42,7 @@ data class PlaceView(
             thumbnailParsingStatus = thumbnailParsingStatus,
             tags = tags,
             bookmarked = bookmarked,
+            memo = memo,
         )
     }
 }

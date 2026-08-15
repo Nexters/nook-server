@@ -15,6 +15,7 @@ import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
 import org.every.nook.api.application.post.GetSavedPostDetailUseCase
 import org.every.nook.api.application.post.ListSavedPostsUseCase
 import org.every.nook.api.application.post.UpdatePostMemoUseCase
+import org.every.nook.api.application.post.UpdatePostPlaceMemoUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.post.request.ConnectPostPlaceRequest
 import org.every.nook.api.presentation.post.request.CreatePostRequest
@@ -52,6 +53,7 @@ class PostController(
     private val listSavedPostsUseCase: ListSavedPostsUseCase,
     private val getSavedPostDetailUseCase: GetSavedPostDetailUseCase,
     private val updatePostMemoUseCase: UpdatePostMemoUseCase,
+    private val updatePostPlaceMemoUseCase: UpdatePostPlaceMemoUseCase,
     private val replaceSavedPostGroupsUseCase: ReplaceSavedPostGroupsUseCase,
     private val connectPostPlaceUseCase: ConnectPostPlaceUseCase,
     private val deleteSavedPostUseCase: DeleteSavedPostUseCase,
@@ -145,6 +147,31 @@ class PostController(
             UpdatePostMemoUseCase.Command(
                 userId = userContext.userId,
                 postId = postId,
+                memo = request.memo,
+            ),
+        )
+        return ApiResponse.success(Unit)
+    }
+
+    @Operation(summary = "내 저장 게시물 장소 메모 변경")
+    @PatchMapping("/{postId}/places/{placeId}/memo")
+    fun updatePlaceMemo(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "메모를 변경할 저장 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
+        @Parameter(description = "메모를 변경할 장소 식별자")
+        @PathVariable
+        @Positive
+        placeId: Long,
+        @Valid @RequestBody request: UpdatePostMemoRequest,
+    ): ApiResponse<Unit> {
+        updatePostPlaceMemoUseCase(
+            UpdatePostPlaceMemoUseCase.Command(
+                userId = userContext.userId,
+                postId = postId,
+                placeId = placeId,
                 memo = request.memo,
             ),
         )
