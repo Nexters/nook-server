@@ -20,6 +20,7 @@ data class PlaceDetailView(
     val openNow: Boolean? = null,
     val tags: List<String> = emptyList(),
     val bookmarked: Boolean,
+    val memo: String?,
     val posts: PlacePostPageView,
 )
 
@@ -37,7 +38,6 @@ data class PlacePostView(
     val title: String?,
     val authorIdentifier: String?,
     val representativeMedia: PlacePostMediaView?,
-    val memo: String?,
     val savedAt: Instant,
     val groups: List<PlacePostGroupView>,
 )

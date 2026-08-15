@@ -43,7 +43,6 @@ class PostPersistenceAdapterTest {
     private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
-    private val placeMemoRepository = mock(UserSavedPostPlaceMemoJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val eventPublisher = mock(org.springframework.context.ApplicationEventPublisher::class.java)
@@ -55,7 +54,6 @@ class PostPersistenceAdapterTest {
         postPlaceJpaRepository = postPlaceRepository,
         placeJpaRepository = mock(PlaceJpaRepository::class.java),
         userPlaceBookmarkJpaRepository = bookmarkRepository,
-        placeMemoJpaRepository = placeMemoRepository,
         groupJpaRepository = groupRepository,
         groupPostJpaRepository = groupPostRepository,
         eventPublisher = eventPublisher,
@@ -262,10 +260,8 @@ class PostPersistenceAdapterTest {
 
         assertEquals(11, result.postId)
         assertEquals(PlaceParsingStatus.COMPLETED, result.placeParsingStatus)
-        verify(bookmarkRepository).insertIgnore(7, 201)
-        verify(bookmarkRepository).insertIgnore(7, 202)
-        verify(placeMemoRepository).insertIgnore(7, 11, 201, "주말에 방문")
-        verify(placeMemoRepository).insertIgnore(7, 11, 202, "주말에 방문")
+        verify(bookmarkRepository).insertIgnoreWithMemo(7, 201, "주말에 방문")
+        verify(bookmarkRepository).insertIgnoreWithMemo(7, 202, "주말에 방문")
     }
 
     @Test

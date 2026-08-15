@@ -9,7 +9,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
-import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceMemoJpaRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -21,7 +20,6 @@ class ConnectPostPlacePersistenceAdapter(
     private val placeRepository: PlaceJpaRepository,
     private val postPlaceRepository: PostPlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
-    private val placeMemoRepository: UserSavedPostPlaceMemoJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
 ) : ConnectPostPlacePort {
@@ -63,15 +61,7 @@ class ConnectPostPlacePersistenceAdapter(
                 ?: 0
             postPlaceRepository.save(PostPlaceEntity(savedPost.postId, placeId, nextSequence))
         }
-        bookmarkRepository.insertIgnore(userId, placeId)
-        savedPost.memo?.let { memo ->
-            placeMemoRepository.insertIgnore(
-                userId = userId,
-                userSavedPostId = savedPostId,
-                placeId = placeId,
-                memo = memo,
-            )
-        }
+        bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
         if (parsingJob.status == PlaceParsingStatus.FAILED) {
             parsingJob.status = PlaceParsingStatus.COMPLETED
             parsingJob.failureReason = null

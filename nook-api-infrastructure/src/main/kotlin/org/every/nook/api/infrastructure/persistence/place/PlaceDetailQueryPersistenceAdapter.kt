@@ -16,7 +16,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
-import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceMemoJpaRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
@@ -32,7 +31,6 @@ class PlaceDetailQueryPersistenceAdapter(
     private val mediaRepository: PostMediaJpaRepository,
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
-    private val placeMemoRepository: UserSavedPostPlaceMemoJpaRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) : PlaceDetailQueryPort {
     @Transactional(readOnly = true)
@@ -44,7 +42,8 @@ class PlaceDetailQueryPersistenceAdapter(
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
         )
         val savedPosts = savedPostRepository.findAllByUserIdAndPlaceId(userId, placeId, pageable)
-        val bookmarked = bookmarkRepository.existsByUserIdAndPlaceId(userId, placeId)
+        val bookmark = bookmarkRepository.findByUserIdAndPlaceId(userId, placeId)
+        val bookmarked = bookmark != null
         if (!bookmarked && savedPosts.totalElements == 0L) {
             return null
         }
@@ -57,7 +56,6 @@ class PlaceDetailQueryPersistenceAdapter(
         val representativeMediaByPostId = findRepresentativeMedia(sourcePostIds)
         val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
         val groupsBySavedPostId = findGroups(userId, savedPostIds)
-        val memoBySavedPostId = findPlaceMemos(placeId, savedPostIds)
         return PlaceDetailView(
             id = requireNotNull(place.id),
             provider = place.provider,
@@ -75,6 +73,7 @@ class PlaceDetailQueryPersistenceAdapter(
             openNow = place.openingHours?.isOpenAt(clock.instant()),
             tags = place.representativeTags.map { it.displayName },
             bookmarked = bookmarked,
+            memo = bookmark?.memo,
             posts = PlacePostPageView(
                 items = savedPosts.content.mapNotNull { savedPost ->
                     postsById[savedPost.postId]?.toView(
@@ -83,7 +82,6 @@ class PlaceDetailQueryPersistenceAdapter(
                             ?.toPlacePostMedia()
                             ?: representativeMediaByPostId[savedPost.postId],
                         groups = groupsBySavedPostId[requireNotNull(savedPost.id)].orEmpty(),
-                        memo = memoBySavedPostId[requireNotNull(savedPost.id)],
                     )
                 },
                 page = savedPosts.number,
@@ -104,26 +102,15 @@ class PlaceDetailQueryPersistenceAdapter(
             .mapValues { (_, media) -> media.first().toView() }
     }
 
-    private fun findPlaceMemos(placeId: Long, savedPostIds: List<Long>): Map<Long, String> =
-        if (savedPostIds.isEmpty()) {
-            emptyMap()
-        } else {
-            placeMemoRepository
-                .findAllByPlaceIdAndUserSavedPostIdIn(placeId, savedPostIds)
-                .associate { it.userSavedPostId to it.memo }
-        }
-
     private fun PostEntity.toView(
         savedPost: UserSavedPostEntity,
         representativeMedia: PlacePostMediaView?,
         groups: List<PlacePostGroupView>,
-        memo: String?,
     ): PlacePostView = PlacePostView(
         postId = requireNotNull(savedPost.id),
         title = title,
         authorIdentifier = authorIdentifier,
         representativeMedia = representativeMedia,
-        memo = memo,
         savedAt = savedPost.createdAt,
         groups = groups,
     )

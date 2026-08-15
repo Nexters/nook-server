@@ -31,3 +31,19 @@ Content-Type: application/json
 {
   "bookmarked": true
 }
+
+### 내 장소 메모 변경
+PATCH {{baseUrl}}/api/v1/places/{{placeId}}/memo
+Content-Type: application/json
+
+{
+  "memo": "대표 메뉴는 라자냐"
+}
+
+### 내 장소 메모 삭제
+PATCH {{baseUrl}}/api/v1/places/{{placeId}}/memo
+Content-Type: application/json
+
+{
+  "memo": null
+}

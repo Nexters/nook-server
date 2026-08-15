@@ -117,9 +117,13 @@ class PlaceParsingPersistenceAdapter(
             )
         }
         postPlaceRepository.saveAll(postPlaces)
-        userSavedPostRepository.findDistinctUserIdsByPostId(postId).forEach { userId ->
+        userSavedPostRepository.findAllByPostId(postId).forEach { savedPost ->
             postPlaces.forEach { postPlace ->
-                userPlaceBookmarkRepository.insertIgnore(userId, postPlace.placeId)
+                userPlaceBookmarkRepository.insertIgnoreWithMemo(
+                    userId = savedPost.userId,
+                    placeId = postPlace.placeId,
+                    memo = savedPost.memo,
+                )
             }
         }
         job.status = PlaceParsingStatus.COMPLETED
