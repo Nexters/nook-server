@@ -260,6 +260,29 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `retries before image OCR when post image storage is not ready`() {
+        val port = FakeJobPort(
+            body = "카페 2곳",
+            imageUrls = listOf("https://instagram-cdn.test/1.jpg"),
+            imagesReadyForOcr = false,
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { emptyList() },
+            search = SearchPlaceCandidatesUseCase { emptyList() },
+            imageTextExtractor = ImageTextExtractor { error("vision must not be called before images are ready") },
+        )
+
+        val result = assertIs<ProcessPlaceParsingJobUseCase.Result.Retry>(useCase(1))
+
+        assertEquals(NOW.plusSeconds(3), result.nextAttemptAt)
+        assertEquals(NOW.plusSeconds(3), port.nextAttemptAt)
+        assertEquals("OCR image storage is not ready", port.retryReason)
+        assertNull(port.storedImageTranscripts)
+        assertEquals(emptyList(), port.completed)
+    }
+
+    @Test
     fun `transcribes at most twenty images in batches of five`() {
         val imageUrls = (0 until 25).map { "https://cdn.test/$it.jpg" }
         val port = FakeJobPort(imageUrls = imageUrls)
@@ -626,6 +649,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         },
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = port,
+        imageReadinessPort = PlaceImageReadinessPort { port.imagesReadyForOcr },
         imageTextExtractor = imageTextExtractor,
         clueExtractor = extractor,
         searchPlaceCandidates = search,
@@ -641,6 +665,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         private val imageUrls: List<String> = emptyList(),
         private val textClues: List<PlaceClue>? = null,
         private val imageTranscripts: List<ImageTranscript>? = null,
+        val imagesReadyForOcr: Boolean = true,
     ) : PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
         var failedReason: String? = null

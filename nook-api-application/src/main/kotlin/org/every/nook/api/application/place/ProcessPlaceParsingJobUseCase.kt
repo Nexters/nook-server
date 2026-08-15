@@ -20,6 +20,7 @@ class ProcessPlaceParsingJobUseCase(
     private val candidateSelector: PlaceCandidateSelector,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
+    private val imageReadinessPort: PlaceImageReadinessPort = PlaceImageReadinessPort { true },
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -91,6 +92,13 @@ class ProcessPlaceParsingJobUseCase(
         }
         if (images.isEmpty() || !requiresImageAnalysis(textPlaceCount, expectedPlaceCount)) {
             return null
+        }
+        if (!imageReadinessPort.areImageUrlsReadyForOcr(job.postId)) {
+            logger.info {
+                "Place parsing image fallback delayed: postId=${job.postId}, attempt=${job.attempt}, " +
+                    "reason=$OCR_IMAGE_STORAGE_PENDING_REASON, imageCount=${images.size}"
+            }
+            error(OCR_IMAGE_STORAGE_PENDING_REASON)
         }
         logger.info {
             "Place parsing image fallback started: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -335,6 +343,7 @@ class ProcessPlaceParsingJobUseCase(
         const val CANDIDATE_LOG_LIMIT = 5
         const val NO_PLACE_RESOLVED_REASON = "No place could be resolved from text"
         const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
+        const val OCR_IMAGE_STORAGE_PENDING_REASON = "OCR image storage is not ready"
         const val PLACE_FLOW = "place"
         const val TEXT_CLUE_STAGE = "clue-text"
         const val IMAGE_TRANSCRIPT_STAGE = "image-transcript"
