@@ -17,6 +17,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
@@ -180,7 +181,11 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(place.id).thenReturn(17)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(place)
-        `when`(userSavedPostRepository.findDistinctUserIdsByPostId(11)).thenReturn(listOf(7, 8))
+        val savedPosts = listOf(
+            savedPostWithMemo(userId = 7, memo = "내 메모"),
+            savedPostWithMemo(userId = 8, memo = null),
+        )
+        `when`(userSavedPostRepository.findAllByPostId(11)).thenReturn(savedPosts)
 
         adapter.complete(
             postId = 11,
@@ -199,8 +204,8 @@ class PlaceParsingPersistenceAdapterTest {
             ),
         )
 
-        verify(bookmarkRepository).insertIgnore(7, 17)
-        verify(bookmarkRepository).insertIgnore(8, 17)
+        verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "내 메모")
+        verify(bookmarkRepository).insertIgnoreWithMemo(8, 17, null)
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
     }
 
@@ -212,7 +217,7 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(null)
         `when`(placeRepository.save(any(PlaceEntity::class.java))).thenReturn(savedPlace)
-        `when`(userSavedPostRepository.findDistinctUserIdsByPostId(11)).thenReturn(emptyList())
+        `when`(userSavedPostRepository.findAllByPostId(11)).thenReturn(emptyList())
 
         adapter.complete(
             postId = 11,
@@ -265,5 +270,11 @@ class PlaceParsingPersistenceAdapterTest {
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-07-28T00:00:00Z")
+    }
+    private fun savedPostWithMemo(userId: Long, memo: String?): UserSavedPostEntity {
+        val savedPost = mock(UserSavedPostEntity::class.java)
+        `when`(savedPost.userId).thenReturn(userId)
+        `when`(savedPost.memo).thenReturn(memo)
+        return savedPost
     }
 }

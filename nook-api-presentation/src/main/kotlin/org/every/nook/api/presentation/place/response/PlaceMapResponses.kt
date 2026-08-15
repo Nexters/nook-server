@@ -14,6 +14,8 @@ data class MapPlaceResponse(
     val name: String,
     @field:Schema(description = "장소 지역", nullable = true, example = "서울")
     val city: String?,
+    @field:Schema(description = "장소 카테고리", nullable = true)
+    val category: String?,
     @field:Schema(description = "장소 위도")
     val latitude: BigDecimal,
     @field:Schema(description = "장소 경도")
@@ -30,6 +32,7 @@ data class MapPlaceResponse(
             id = view.id,
             name = view.name,
             city = view.city,
+            category = view.category,
             latitude = view.latitude,
             longitude = view.longitude,
             color = view.color,

@@ -10,6 +10,8 @@ import java.time.Instant
 interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity, Long> {
     fun findAllByUserIdAndPlaceIdIn(userId: Long, placeIds: Collection<Long>): List<UserPlaceBookmarkEntity>
 
+    fun findByUserIdAndPlaceId(userId: Long, placeId: Long): UserPlaceBookmarkEntity?
+
     fun existsByUserIdAndPlaceId(userId: Long, placeId: Long): Boolean
 
     @Query(
@@ -37,6 +39,24 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
     )
     fun insertIgnore(@Param("userId") userId: Long, @Param("placeId") placeId: Long): Int
 
+    /**
+     * 북마크를 만들면서 게시물 메모를 장소 메모의 초기값으로 심는다.
+     * 이미 북마크가 있으면 IGNORE 되므로 사용자가 직접 쓴 메모를 덮어쓰지 않는다.
+     */
+    @Modifying
+    @Query(
+        value = """
+            INSERT IGNORE INTO user_place_bookmarks (user_id, place_id, memo, created_at, updated_at)
+            VALUES (:userId, :placeId, :memo, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+        """,
+        nativeQuery = true,
+    )
+    fun insertIgnoreWithMemo(
+        @Param("userId") userId: Long,
+        @Param("placeId") placeId: Long,
+        @Param("memo") memo: String?,
+    ): Int
+
     fun deleteByUserIdAndPlaceId(userId: Long, placeId: Long): Long
 
     @Query(
@@ -45,6 +65,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.id AS id,
                 p.name AS name,
                 p.city AS city,
+                p.category AS category,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 p.thumbnail_url AS thumbnailUrl,
@@ -168,6 +189,7 @@ interface MapPlaceProjection {
     val id: Long
     val name: String
     val city: String?
+    val category: String?
     val latitude: BigDecimal
     val longitude: BigDecimal
     val color: String

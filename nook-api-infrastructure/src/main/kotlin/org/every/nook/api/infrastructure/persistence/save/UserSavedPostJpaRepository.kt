@@ -143,6 +143,8 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
     @Query("SELECT DISTINCT savedPost.userId FROM UserSavedPostEntity savedPost WHERE savedPost.postId = :postId")
     fun findDistinctUserIdsByPostId(@Param("postId") postId: Long): List<Long>
 
+    fun findAllByPostId(postId: Long): List<UserSavedPostEntity>
+
     @Modifying
     @Query(
         value = """

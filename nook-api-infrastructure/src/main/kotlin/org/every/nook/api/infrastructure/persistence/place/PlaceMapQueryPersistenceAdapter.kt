@@ -29,6 +29,7 @@ class PlaceMapQueryPersistenceAdapter(
                 id = row.id,
                 name = row.name,
                 city = row.city,
+                category = row.category,
                 latitude = row.latitude,
                 longitude = row.longitude,
                 color = row.color,

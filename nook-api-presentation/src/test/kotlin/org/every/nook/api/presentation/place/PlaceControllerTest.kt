@@ -19,6 +19,7 @@ import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
+import org.every.nook.api.application.place.UpdatePlaceMemoUseCase
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
 import org.mockito.Mockito.mock
@@ -40,6 +41,7 @@ import kotlin.test.Test
 class PlaceControllerTest {
     private lateinit var mockMvc: MockMvc
     private lateinit var updatePlaceBookmarkUseCase: UpdatePlaceBookmarkUseCase
+    private lateinit var updatePlaceMemoUseCase: UpdatePlaceMemoUseCase
     private lateinit var getPlaceDetailUseCase: GetPlaceDetailUseCase
     private lateinit var getMapPlacesUseCase: GetMapPlacesUseCase
     private lateinit var getRecentPlacesUseCase: GetRecentPlacesUseCase
@@ -54,10 +56,12 @@ class PlaceControllerTest {
         getMapPlacesUseCase = mock(GetMapPlacesUseCase::class.java)
         getRecentPlacesUseCase = mock(GetRecentPlacesUseCase::class.java)
         searchPlacesUseCase = mock(SearchPlacesUseCase::class.java)
+        updatePlaceMemoUseCase = mock(UpdatePlaceMemoUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 PlaceController(
                     updatePlaceBookmarkUseCase,
+                    updatePlaceMemoUseCase,
                     getPlaceDetailUseCase,
                     getMapPlacesUseCase,
                     getRecentPlacesUseCase,
@@ -96,6 +100,7 @@ class PlaceControllerTest {
                 thumbnailUrl = "https://example.com/place-thumbnail.jpg",
                 thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
                 bookmarked = true,
+                memo = "주말 방문",
                 posts = PlacePostPageView(
                     items = listOf(
                         PlacePostView(
@@ -106,7 +111,6 @@ class PlaceControllerTest {
                                 PlacePostMediaTypeView.IMAGE,
                                 "https://example.com/image.jpg",
                             ),
-                            memo = "주말 방문",
                             savedAt = Instant.parse("2026-07-27T00:00:00Z"),
                             groups = listOf(PlacePostGroupView(17, "맛집", "YELLOW")),
                         ),
@@ -153,6 +157,7 @@ class PlaceControllerTest {
                     id = 17,
                     name = "퍼머넌트해비탯",
                     city = "서울",
+                    category = "음식점",
                     latitude = BigDecimal("37.5"),
                     longitude = BigDecimal("127.0"),
                     color = "BLUE",
@@ -169,6 +174,7 @@ class PlaceControllerTest {
             jsonPath("$.success[0].id") { value(17) }
             jsonPath("$.success[0].name") { value("퍼머넌트해비탯") }
             jsonPath("$.success[0].city") { value("서울") }
+            jsonPath("$.success[0].category") { value("음식점") }
             jsonPath("$.success[0].latitude") { value(37.5) }
             jsonPath("$.success[0].longitude") { value(127.0) }
             jsonPath("$.success[0].color") { value("BLUE") }
@@ -288,6 +294,50 @@ class PlaceControllerTest {
                 bookmarked = false,
             ),
         )
+    }
+
+    @Test
+    fun `updates a place memo`() {
+        mockMvc.patch("/api/v1/places/17/memo") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"memo":"대표 메뉴는 라자냐"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.resultType") { value("SUCCESS") }
+        }
+
+        verify(updatePlaceMemoUseCase)(
+            UpdatePlaceMemoUseCase.Command(
+                userId = TEST_USER_ID,
+                placeId = 17,
+                memo = "대표 메뉴는 라자냐",
+            ),
+        )
+    }
+
+    @Test
+    fun `clears a place memo with a null body`() {
+        mockMvc.patch("/api/v1/places/17/memo") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"memo":null}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        verify(updatePlaceMemoUseCase)(
+            UpdatePlaceMemoUseCase.Command(userId = TEST_USER_ID, placeId = 17, memo = null),
+        )
+    }
+
+    @Test
+    fun `rejects an overlong place memo`() {
+        mockMvc.patch("/api/v1/places/17/memo") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"memo":"${"x".repeat(2001)}"}"""
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
+        }
     }
 
     private companion object {
