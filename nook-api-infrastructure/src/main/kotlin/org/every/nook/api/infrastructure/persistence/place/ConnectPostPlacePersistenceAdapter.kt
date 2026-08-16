@@ -5,20 +5,18 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
-import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
-import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
 class ConnectPostPlacePersistenceAdapter(
-    private val savedPostRepository: UserSavedPostJpaRepository,
-    private val postRepository: PostJpaRepository,
+    private val savedPostLockRepository: UserSavedPostLockJpaRepository,
     private val placeRepository: PlaceJpaRepository,
-    private val postPlaceRepository: PostPlaceJpaRepository,
+    private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
@@ -53,26 +51,21 @@ class ConnectPostPlacePersistenceAdapter(
         )
         supplement?.let(place::updateSupplement)
         val placeId = requireNotNull(place.id)
-        val existingPostPlace = postPlaceRepository.findByPostIdAndPlaceId(savedPost.postId, placeId)
-        if (existingPostPlace == null) {
-            val nextSequence = postPlaceRepository.findAllByPostIdOrderBySequenceAsc(savedPost.postId)
-                .maxOfOrNull(PostPlaceEntity::sequence)
+        val existingSavedPostPlace = savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(savedPostId, placeId)
+        if (existingSavedPostPlace == null) {
+            val nextSequence = savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId)
+                .maxOfOrNull(UserSavedPostPlaceEntity::sequence)
                 ?.plus(1)
                 ?: 0
-            postPlaceRepository.save(PostPlaceEntity(savedPost.postId, placeId, nextSequence))
+            savedPostPlaceRepository.save(UserSavedPostPlaceEntity(savedPostId, placeId, nextSequence))
         }
         bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
-        if (parsingJob.status == PlaceParsingStatus.FAILED) {
-            parsingJob.status = PlaceParsingStatus.COMPLETED
-            parsingJob.failureReason = null
-        }
         eventPublisher.publishEvent(PlaceTagsRequestedEvent(savedPost.postId, placeId, candidate))
         return ConnectPostPlacePort.Result.Connected(placeId)
     }
 
     private fun findSavedPostForConnection(savedPostId: Long, userId: Long) =
-        savedPostRepository.findByIdAndUserId(savedPostId, userId)
-            ?.takeIf { postRepository.findByIdForUpdate(it.postId) != null }
+        savedPostLockRepository.findByIdAndUserIdForUpdate(savedPostId, userId)
 
     private companion object {
         val IN_PROGRESS_STATUSES = setOf(PlaceParsingStatus.PENDING, PlaceParsingStatus.PROCESSING)

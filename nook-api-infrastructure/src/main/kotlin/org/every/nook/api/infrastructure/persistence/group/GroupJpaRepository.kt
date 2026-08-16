@@ -43,11 +43,11 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                     COALESCE(
                         (
                             SELECT place.thumbnail_url
-                            FROM post_places post_place
-                            INNER JOIN places place ON place.id = post_place.place_id
-                            WHERE post_place.post_id = saved_post.post_id
+                            FROM user_saved_post_places saved_post_place
+                            INNER JOIN places place ON place.id = saved_post_place.place_id
+                            WHERE saved_post_place.user_saved_post_id = saved_post.id
                               AND place.thumbnail_url IS NOT NULL
-                            ORDER BY post_place.display_order ASC
+                            ORDER BY saved_post_place.display_order ASC
                             LIMIT 1
                         ),
                         post_media.media_url
@@ -79,11 +79,11 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                   AND COALESCE(
                       (
                           SELECT place.thumbnail_url
-                          FROM post_places post_place
-                          INNER JOIN places place ON place.id = post_place.place_id
-                          WHERE post_place.post_id = saved_post.post_id
+                          FROM user_saved_post_places saved_post_place
+                          INNER JOIN places place ON place.id = saved_post_place.place_id
+                          WHERE saved_post_place.user_saved_post_id = saved_post.id
                             AND place.thumbnail_url IS NOT NULL
-                          ORDER BY post_place.display_order ASC
+                          ORDER BY saved_post_place.display_order ASC
                           LIMIT 1
                       ),
                       post_media.media_url

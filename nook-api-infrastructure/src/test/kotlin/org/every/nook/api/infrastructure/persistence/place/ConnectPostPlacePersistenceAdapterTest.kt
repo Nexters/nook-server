@@ -4,12 +4,10 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
-import org.every.nook.api.infrastructure.persistence.post.PostEntity
-import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
-import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -22,18 +20,16 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ConnectPostPlacePersistenceAdapterTest {
-    private val savedPostRepository = mock(UserSavedPostJpaRepository::class.java)
-    private val postRepository = mock(PostJpaRepository::class.java)
+    private val savedPostRepository = mock(UserSavedPostLockJpaRepository::class.java)
     private val placeRepository = mock(PlaceJpaRepository::class.java)
-    private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
+    private val savedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = ConnectPostPlacePersistenceAdapter(
         savedPostRepository,
-        postRepository,
         placeRepository,
-        postPlaceRepository,
+        savedPostPlaceRepository,
         bookmarkRepository,
         parsingJobRepository,
         eventPublisher,
@@ -41,43 +37,41 @@ class ConnectPostPlacePersistenceAdapterTest {
 
     @Test
     fun `hides a saved post owned by another user`() {
-        `when`(savedPostRepository.findByIdAndUserId(11, 7)).thenReturn(null)
+        `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(null)
 
         assertEquals(
             ConnectPostPlacePort.Result.PostNotFound,
             adapter.connect(7, 11, candidate(), null),
         )
-        verifyNoInteractions(postRepository, placeRepository, postPlaceRepository, bookmarkRepository)
+        verifyNoInteractions(placeRepository, savedPostPlaceRepository, bookmarkRepository)
     }
 
     @Test
     fun `rejects connection while place parsing is in progress`() {
         val savedPost = savedPost()
         val job = parsingJob(PlaceParsingStatus.PROCESSING)
-        `when`(savedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
-        `when`(postRepository.findByIdForUpdate(101)).thenReturn(mock(PostEntity::class.java))
+        `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
         `when`(parsingJobRepository.findByPostId(101)).thenReturn(job)
 
         assertEquals(
             ConnectPostPlacePort.Result.ParsingInProgress,
             adapter.connect(7, 11, candidate(), null),
         )
-        verifyNoInteractions(placeRepository, postPlaceRepository, bookmarkRepository)
+        verifyNoInteractions(placeRepository, savedPostPlaceRepository, bookmarkRepository)
     }
 
     @Test
-    fun `creates a missing place link and bookmark then completes a failed job`() {
+    fun `creates a missing user place link and bookmark without changing the shared failed job`() {
         val savedPost = savedPost()
         val job = parsingJob(PlaceParsingStatus.FAILED)
         val place = mock(PlaceEntity::class.java)
         `when`(place.id).thenReturn(17)
-        `when`(savedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
-        `when`(postRepository.findByIdForUpdate(101)).thenReturn(mock(PostEntity::class.java))
+        `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
         `when`(parsingJobRepository.findByPostId(101)).thenReturn(job)
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "1234")).thenReturn(place)
-        `when`(postPlaceRepository.findByPostIdAndPlaceId(101, 17)).thenReturn(null)
-        `when`(postPlaceRepository.findAllByPostIdOrderBySequenceAsc(101))
-            .thenReturn(listOf(PostPlaceEntity(101, 16, 0)))
+        `when`(savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(11, 17)).thenReturn(null)
+        `when`(savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11))
+            .thenReturn(listOf(UserSavedPostPlaceEntity(11, 16, 0)))
 
         assertEquals(
             ConnectPostPlacePort.Result.Connected(17),
@@ -101,39 +95,40 @@ class ConnectPostPlacePersistenceAdapterTest {
             category = "카페",
             phoneNumber = null,
         )
-        val captor = ArgumentCaptor.forClass(PostPlaceEntity::class.java)
-        verify(postPlaceRepository).save(captor.capture())
-        assertEquals(101, captor.value.postId)
+        val captor = ArgumentCaptor.forClass(UserSavedPostPlaceEntity::class.java)
+        verify(savedPostPlaceRepository).save(captor.capture())
+        assertEquals(11, captor.value.userSavedPostId)
         assertEquals(17, captor.value.placeId)
         assertEquals(1, captor.value.sequence)
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "게시물 메모")
-        assertEquals(PlaceParsingStatus.COMPLETED, job.status)
-        assertEquals(null, job.failureReason)
+        assertEquals(PlaceParsingStatus.FAILED, job.status)
+        assertEquals("failed", job.failureReason)
     }
 
     @Test
-    fun `reuses an existing post place link idempotently`() {
+    fun `reuses an existing user place link idempotently`() {
         val savedPost = savedPost()
         val job = parsingJob(PlaceParsingStatus.COMPLETED)
         val place = mock(PlaceEntity::class.java)
         `when`(place.id).thenReturn(17)
-        `when`(savedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
-        `when`(postRepository.findByIdForUpdate(101)).thenReturn(mock(PostEntity::class.java))
+        `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
         `when`(parsingJobRepository.findByPostId(101)).thenReturn(job)
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "1234")).thenReturn(place)
-        `when`(postPlaceRepository.findByPostIdAndPlaceId(101, 17)).thenReturn(PostPlaceEntity(101, 17, 0))
+        `when`(savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(11, 17))
+            .thenReturn(UserSavedPostPlaceEntity(11, 17, 0))
 
         assertEquals(
             ConnectPostPlacePort.Result.Connected(17),
             adapter.connect(7, 11, candidate(), null),
         )
 
-        verify(postPlaceRepository, never()).save(org.mockito.ArgumentMatchers.any())
+        verify(savedPostPlaceRepository, never()).save(org.mockito.ArgumentMatchers.any())
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "게시물 메모")
     }
 
     private fun savedPost(): UserSavedPostEntity {
         val savedPost = mock(UserSavedPostEntity::class.java)
+        `when`(savedPost.id).thenReturn(11)
         `when`(savedPost.postId).thenReturn(101)
         `when`(savedPost.memo).thenReturn("게시물 메모")
         return savedPost

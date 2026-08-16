@@ -1,11 +1,13 @@
 package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
+import org.every.nook.api.application.place.DisconnectPostPlaceUseCase
 import org.every.nook.api.application.place.PagedPlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSelectionTokenPort
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
+import org.every.nook.api.application.place.port.DisconnectPostPlacePort
 import org.every.nook.api.infrastructure.auth.JwtProperties
 import org.every.nook.api.infrastructure.place.JwtPlaceSelectionTokenAdapter
 import org.springframework.beans.factory.annotation.Qualifier
@@ -33,4 +35,8 @@ class ManualPlaceConnectionConfig {
         connectPostPlacePort: ConnectPostPlacePort,
         thumbnailProvider: PlaceThumbnailProvider,
     ): ConnectPostPlaceUseCase = ConnectPostPlaceUseCase(selectionTokenPort, connectPostPlacePort, thumbnailProvider)
+
+    @Bean
+    fun disconnectPostPlaceUseCase(disconnectPostPlacePort: DisconnectPostPlacePort): DisconnectPostPlaceUseCase =
+        DisconnectPostPlaceUseCase(disconnectPostPlacePort)
 }

@@ -22,7 +22,8 @@ import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
-import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -40,7 +41,8 @@ class PlaceParsingPersistenceAdapter(
     private val mediaRepository: PostMediaJpaRepository,
     private val placeRepository: PlaceJpaRepository,
     private val postPlaceRepository: PostPlaceJpaRepository,
-    private val userSavedPostRepository: UserSavedPostJpaRepository,
+    private val userSavedPostLockRepository: UserSavedPostLockJpaRepository,
+    private val userSavedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val userPlaceBookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val postPlaceTagRepository: PostPlaceTagJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
@@ -117,11 +119,13 @@ class PlaceParsingPersistenceAdapter(
             )
         }
         postPlaceRepository.saveAll(postPlaces)
-        userSavedPostRepository.findAllByPostId(postId).forEach { savedPost ->
-            postPlaces.forEach { postPlace ->
+        userSavedPostLockRepository.findAllByPostIdForUpdate(postId).forEach { savedPost ->
+            val savedPostId = requireNotNull(savedPost.id)
+            userSavedPostPlaceRepository.insertAllFromPost(savedPostId, postId)
+            userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId).forEach { place ->
                 userPlaceBookmarkRepository.insertIgnoreWithMemo(
                     userId = savedPost.userId,
-                    placeId = postPlace.placeId,
+                    placeId = place.placeId,
                     memo = savedPost.memo,
                 )
             }
@@ -160,7 +164,10 @@ class PlaceParsingPersistenceAdapter(
 
     @Transactional
     override fun replace(postId: Long, placeId: Long, tags: List<InferredPlaceTag>) {
-        check(postPlaceRepository.findByPostIdAndPlaceId(postId, placeId) != null) {
+        check(
+            postPlaceRepository.findByPostIdAndPlaceId(postId, placeId) != null ||
+                userSavedPostPlaceRepository.existsByPostIdAndPlaceId(postId, placeId) != 0L,
+        ) {
             "Post place relation does not exist"
         }
         postPlaceTagRepository.deleteAllByPostIdAndPlaceId(postId, placeId)

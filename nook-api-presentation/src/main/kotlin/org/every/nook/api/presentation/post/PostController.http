@@ -92,3 +92,6 @@ Content-Type: application/json
 {
   "selectionToken": "{{selectionToken}}"
 }
+
+### 저장 게시물의 장소 연결 삭제
+DELETE {{baseUrl}}/api/v1/posts/{{postId}}/places/{{placeId}}

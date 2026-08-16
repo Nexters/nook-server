@@ -59,15 +59,15 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
                         FROM group_posts thumbnail_group_post
                         INNER JOIN user_saved_posts thumbnail_saved_post
                             ON thumbnail_saved_post.id = thumbnail_group_post.user_saved_post_id
-                        INNER JOIN post_places thumbnail_post_place
-                            ON thumbnail_post_place.post_id = thumbnail_saved_post.post_id
+                        INNER JOIN user_saved_post_places thumbnail_saved_post_place
+                            ON thumbnail_saved_post_place.user_saved_post_id = thumbnail_saved_post.id
                         INNER JOIN post_media post_media
                             ON post_media.post_id = thumbnail_saved_post.post_id
                         WHERE thumbnail_group_post.group_id = :groupId
                           AND thumbnail_group_post.deleted_at IS NULL
                           AND thumbnail_saved_post.user_id = :userId
                           AND thumbnail_saved_post.deleted_at IS NULL
-                          AND thumbnail_post_place.place_id = p.id
+                          AND thumbnail_saved_post_place.place_id = p.id
                           AND post_media.media_type = 'IMAGE'
                         ORDER BY
                             thumbnail_saved_post.created_at DESC,
@@ -80,8 +80,9 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
             FROM user_groups user_group
             INNER JOIN group_posts group_post ON group_post.group_id = user_group.id
             INNER JOIN user_saved_posts saved_post ON saved_post.id = group_post.user_saved_post_id
-            INNER JOIN post_places post_place ON post_place.post_id = saved_post.post_id
-            INNER JOIN places p ON p.id = post_place.place_id
+            INNER JOIN user_saved_post_places saved_post_place
+                ON saved_post_place.user_saved_post_id = saved_post.id
+            INNER JOIN places p ON p.id = saved_post_place.place_id
             WHERE user_group.id = :groupId
               AND user_group.user_id = :userId
               AND user_group.deleted_at IS NULL
@@ -105,8 +106,9 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
             FROM user_groups user_group
             INNER JOIN group_posts group_post ON group_post.group_id = user_group.id
             INNER JOIN user_saved_posts saved_post ON saved_post.id = group_post.user_saved_post_id
-            INNER JOIN post_places post_place ON post_place.post_id = saved_post.post_id
-            INNER JOIN places p ON p.id = post_place.place_id
+            INNER JOIN user_saved_post_places saved_post_place
+                ON saved_post_place.user_saved_post_id = saved_post.id
+            INNER JOIN places p ON p.id = saved_post_place.place_id
             WHERE user_group.id = :groupId
               AND user_group.user_id = :userId
               AND user_group.deleted_at IS NULL
@@ -127,10 +129,10 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
             SELECT savedPost
             FROM UserSavedPostEntity savedPost
             WHERE savedPost.userId = :userId
-              AND savedPost.postId IN (
-                  SELECT postPlace.postId
-                  FROM PostPlaceEntity postPlace
-                  WHERE postPlace.placeId = :placeId
+              AND savedPost.id IN (
+                  SELECT savedPostPlace.userSavedPostId
+                  FROM UserSavedPostPlaceEntity savedPostPlace
+                  WHERE savedPostPlace.placeId = :placeId
               )
         """,
     )

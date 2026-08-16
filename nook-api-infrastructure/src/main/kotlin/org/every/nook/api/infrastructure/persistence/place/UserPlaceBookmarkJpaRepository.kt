@@ -19,10 +19,10 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
             SELECT EXISTS (
                 SELECT 1
                 FROM user_saved_posts usp
-                INNER JOIN post_places pp ON pp.post_id = usp.post_id
+                INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
                 WHERE usp.user_id = :userId
                   AND usp.deleted_at IS NULL
-                  AND pp.place_id = :placeId
+                  AND uspp.place_id = :placeId
             )
         """,
         nativeQuery = true,
@@ -74,8 +74,8 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                     (
                         SELECT user_group.color
                         FROM user_saved_posts color_saved_post
-                        INNER JOIN post_places color_post_place
-                            ON color_post_place.post_id = color_saved_post.post_id
+                        INNER JOIN user_saved_post_places color_saved_post_place
+                            ON color_saved_post_place.user_saved_post_id = color_saved_post.id
                         INNER JOIN group_posts color_group_post
                             ON color_group_post.user_saved_post_id = color_saved_post.id
                         INNER JOIN user_groups user_group
@@ -85,15 +85,15 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                           AND color_saved_post.deleted_at IS NULL
                           AND color_group_post.deleted_at IS NULL
                           AND user_group.deleted_at IS NULL
-                          AND color_post_place.place_id = p.id
+                          AND color_saved_post_place.place_id = p.id
                           AND color_saved_post.id = (
                               SELECT latest_saved_post.id
                               FROM user_saved_posts latest_saved_post
-                              INNER JOIN post_places latest_post_place
-                                  ON latest_post_place.post_id = latest_saved_post.post_id
+                              INNER JOIN user_saved_post_places latest_saved_post_place
+                                  ON latest_saved_post_place.user_saved_post_id = latest_saved_post.id
                               WHERE latest_saved_post.user_id = upb.user_id
                                 AND latest_saved_post.deleted_at IS NULL
-                                AND latest_post_place.place_id = p.id
+                                AND latest_saved_post_place.place_id = p.id
                               ORDER BY latest_saved_post.created_at DESC, latest_saved_post.id DESC
                               LIMIT 1
                           )
@@ -112,10 +112,10 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
               AND EXISTS (
                   SELECT 1
                   FROM user_saved_posts usp
-                  INNER JOIN post_places pp ON pp.post_id = usp.post_id
+                  INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
-                    AND pp.place_id = p.id
+                    AND uspp.place_id = p.id
               )
         """,
         nativeQuery = true,
@@ -146,11 +146,12 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                     (
                     SELECT pm.media_url
                     FROM user_saved_posts usp_image
-                    INNER JOIN post_places pp_image ON pp_image.post_id = usp_image.post_id
+                    INNER JOIN user_saved_post_places uspp_image
+                        ON uspp_image.user_saved_post_id = usp_image.id
                     INNER JOIN post_media pm ON pm.post_id = usp_image.post_id
                     WHERE usp_image.user_id = upb.user_id
                       AND usp_image.deleted_at IS NULL
-                      AND pp_image.place_id = p.id
+                      AND uspp_image.place_id = p.id
                       AND pm.media_type = 'IMAGE'
                     ORDER BY usp_image.created_at DESC, usp_image.id DESC, pm.display_order ASC
                     LIMIT 1
@@ -162,10 +163,10 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
               AND EXISTS (
                   SELECT 1
                   FROM user_saved_posts usp
-                  INNER JOIN post_places pp ON pp.post_id = usp.post_id
+                  INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
-                    AND pp.place_id = p.id
+                    AND uspp.place_id = p.id
               )
               AND (
                   :cursorBookmarkedAt IS NULL

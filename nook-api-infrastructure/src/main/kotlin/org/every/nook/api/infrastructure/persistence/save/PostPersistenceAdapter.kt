@@ -34,7 +34,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobE
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
@@ -46,8 +45,8 @@ class PostPersistenceAdapter(
     private val postJpaRepository: PostJpaRepository,
     private val postContentParsingJobJpaRepository: PostContentParsingJobJpaRepository,
     private val userSavedPostJpaRepository: UserSavedPostJpaRepository,
+    private val userSavedPostPlaceJpaRepository: UserSavedPostPlaceJpaRepository,
     private val placeParsingJobJpaRepository: PlaceParsingJobJpaRepository,
-    private val postPlaceJpaRepository: PostPlaceJpaRepository,
     private val placeJpaRepository: PlaceJpaRepository,
     private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
     private val groupJpaRepository: GroupJpaRepository,
@@ -91,11 +90,11 @@ class PostPersistenceAdapter(
             )
         val userPostCreation = findOrCreateUserPost(userId, sourcePostId, memo)
         val userPost = userPostCreation.entity
-        seedPlaceMemosFromPostMemo(
+        initializeSavedPostPlaces(
             savedPost = userPost,
             created = userPostCreation.created,
             sourcePostId = sourcePostId,
-            postPlaceRepository = postPlaceJpaRepository,
+            savedPostPlaceRepository = userSavedPostPlaceJpaRepository,
             bookmarkRepository = userPlaceBookmarkJpaRepository,
         )
         addToGroups(requireNotNull(userPost.id), groupIds)
@@ -124,18 +123,13 @@ class PostPersistenceAdapter(
         val contentJob = requireNotNull(postContentParsingJobJpaRepository.findByPostId(sourcePostId))
         val userPostCreation = findOrCreateUserPost(userId, sourcePostId, memo)
         val userPost = userPostCreation.entity
-        seedPlaceMemosFromPostMemo(
+        initializeSavedPostPlaces(
             savedPost = userPost,
             created = userPostCreation.created,
             sourcePostId = sourcePostId,
-            postPlaceRepository = postPlaceJpaRepository,
+            savedPostPlaceRepository = userSavedPostPlaceJpaRepository,
             bookmarkRepository = userPlaceBookmarkJpaRepository,
         )
-        if (userPostCreation.created) {
-            postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(sourcePostId).forEach { postPlace ->
-                userPlaceBookmarkJpaRepository.insertIgnore(userId, postPlace.placeId)
-            }
-        }
         addToGroups(requireNotNull(userPost.id), groupIds)
         restartFailedJob(sourcePostId, contentJob)
         val placeParsingJob = placeParsingJobJpaRepository.findByPostId(sourcePostId)
@@ -159,33 +153,38 @@ class PostPersistenceAdapter(
     override fun find(userId: Long, postId: Long): PostPlaceParsingSnapshot? {
         val userPost = userSavedPostJpaRepository.findByIdAndUserId(postId, userId) ?: return null
         val parsingJob = placeParsingJobJpaRepository.findByPostId(userPost.postId)
-        val postPlaces = postPlaceJpaRepository.findAllByPostIdOrderBySequenceAsc(userPost.postId)
-        val bookmarks = if (postPlaces.isEmpty()) {
+        val savedPostPlaces = userSavedPostPlaceJpaRepository.findAllByUserSavedPostIdOrderBySequenceAsc(postId)
+        val bookmarks = if (savedPostPlaces.isEmpty()) {
             emptyList()
         } else {
-            userPlaceBookmarkJpaRepository.findAllByUserIdAndPlaceIdIn(userId, postPlaces.map { it.placeId })
+            userPlaceBookmarkJpaRepository.findAllByUserIdAndPlaceIdIn(userId, savedPostPlaces.map { it.placeId })
         }
         val bookmarkedPlaceIds = bookmarks.mapTo(mutableSetOf()) { it.placeId }
         val memoByPlaceId = bookmarks.mapNotNull { bookmark -> bookmark.memo?.let { bookmark.placeId to it } }.toMap()
-        val placesById = placeJpaRepository.findAllById(postPlaces.map { it.placeId })
+        val placesById = placeJpaRepository.findAllById(savedPostPlaces.map { it.placeId })
             .associateBy { requireNotNull(it.id) }
+        val effectiveParsingStatus = if (savedPostPlaces.isNotEmpty()) {
+            PlaceParsingStatus.COMPLETED
+        } else {
+            parsingJob?.status ?: PlaceParsingStatus.PENDING
+        }
 
         return PostPlaceParsingSnapshot(
             postId = postId,
-            placeParsingStatus = parsingJob?.status ?: PlaceParsingStatus.PENDING,
-            failureReason = parsingJob?.failureReason,
-            places = postPlaces.mapNotNull { postPlace ->
-                placesById[postPlace.placeId]?.toDomain()?.let { place ->
+            placeParsingStatus = effectiveParsingStatus,
+            failureReason = parsingJob?.failureReason.takeIf { effectiveParsingStatus == PlaceParsingStatus.FAILED },
+            places = savedPostPlaces.mapNotNull { savedPostPlace ->
+                placesById[savedPostPlace.placeId]?.toDomain()?.let { place ->
                     PostPlaceParsingSnapshot.RelatedPlace(
                         place = place,
-                        bookmarked = postPlace.placeId in bookmarkedPlaceIds,
-                        thumbnailUrl = placesById[postPlace.placeId]?.thumbnailUrl,
+                        bookmarked = savedPostPlace.placeId in bookmarkedPlaceIds,
+                        thumbnailUrl = placesById[savedPostPlace.placeId]?.thumbnailUrl,
                         thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
-                            placesById[postPlace.placeId]?.thumbnailParsingStatus
+                            placesById[savedPostPlace.placeId]?.thumbnailParsingStatus
                                 ?: error("Place must exist for postPlace"),
                         ),
-                        tags = placesById[postPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },
-                        memo = memoByPlaceId[postPlace.placeId],
+                        tags = placesById[savedPostPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },
+                        memo = memoByPlaceId[savedPostPlace.placeId],
                     )
                 }
             },
@@ -315,22 +314,23 @@ private fun logSavedPostMapping(sourcePostId: Long, savedPostId: Long, created: 
     )
 }
 
-private fun seedPlaceMemosFromPostMemo(
+private fun initializeSavedPostPlaces(
     savedPost: UserSavedPostEntity,
     created: Boolean,
     sourcePostId: Long,
-    postPlaceRepository: PostPlaceJpaRepository,
+    savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     bookmarkRepository: UserPlaceBookmarkJpaRepository,
 ) {
-    val memo = savedPost.memo ?: return
     if (!created) {
         return
     }
-    postPlaceRepository.findAllByPostIdOrderBySequenceAsc(sourcePostId).forEach { postPlace ->
+    val savedPostId = requireNotNull(savedPost.id)
+    savedPostPlaceRepository.insertAllFromPost(savedPostId, sourcePostId)
+    savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId).forEach { place ->
         bookmarkRepository.insertIgnoreWithMemo(
             userId = savedPost.userId,
-            placeId = postPlace.placeId,
-            memo = memo,
+            placeId = place.placeId,
+            memo = savedPost.memo,
         )
     }
 }
