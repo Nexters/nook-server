@@ -62,7 +62,7 @@ class SavedPostQueryPersistenceAdapter(
             size,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
         )
-        return savedPostRepository.findAllByUserId(userId, pageable).toPage()
+        return savedPostRepository.findAllByUserId(userId, pageable).toPage(usePlaceThumbnail = true)
     }
 
     @Transactional(readOnly = true)
@@ -80,7 +80,7 @@ class SavedPostQueryPersistenceAdapter(
             PostContentParsingStatus.FAILED,
             pageable,
         )
-        val savedPostPage = savedPosts.toPage()
+        val savedPostPage = savedPosts.toPage(usePlaceThumbnail = false)
         val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
         val placeCountsBySavedPostId = if (savedPostIds.isEmpty()) {
             emptyMap()
@@ -107,7 +107,7 @@ class SavedPostQueryPersistenceAdapter(
         )
     }
 
-    private fun Page<UserSavedPostEntity>.toPage(): SavedPostPage {
+    private fun Page<UserSavedPostEntity>.toPage(usePlaceThumbnail: Boolean): SavedPostPage {
         val savedPosts = this
         val sourcePostIds = savedPosts.content.map(UserSavedPostEntity::postId)
         val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
@@ -116,17 +116,14 @@ class SavedPostQueryPersistenceAdapter(
         } else {
             postRepository.findAllById(sourcePostIds).associateBy { requireNotNull(it.id) }
         }
-        val firstMediaByPostId = if (sourcePostIds.isEmpty()) {
-            emptyMap()
-        } else {
-            mediaRepository
-                .findAllByPostIdInOrderByPostIdAscSequenceAsc(sourcePostIds)
-                .groupBy(PostMediaEntity::postId)
-                .mapValues { (_, media) -> media.first().toView() }
-        }
+        val firstMediaByPostId = findFirstMediaByPostId(sourcePostIds)
         val savedPostPlaces = findSavedPostPlaces(savedPostIds)
         val savedPostIdsWithPlaces = savedPostPlaces.mapTo(mutableSetOf()) { it.userSavedPostId }
-        val firstPlaceThumbnailBySavedPostId = findFirstPlaceThumbnailBySavedPostId(savedPostPlaces)
+        val firstPlaceThumbnailBySavedPostId = if (usePlaceThumbnail) {
+            findFirstPlaceThumbnailBySavedPostId(savedPostPlaces)
+        } else {
+            emptyMap()
+        }
         val contentJobByPostId = if (sourcePostIds.isEmpty()) {
             emptyMap()
         } else {
@@ -155,7 +152,7 @@ class SavedPostQueryPersistenceAdapter(
                 postsById[savedPost.postId]?.toSummary(
                     savedPost = savedPost,
                     representativeMedia = firstPlaceThumbnailBySavedPostId[savedPost.id]
-                        ?.toSavedPostMedia()
+                        ?.let { SavedPostMedia(SavedPostMediaType.IMAGE, it, THUMBNAIL_SEQUENCE) }
                         ?: firstMediaByPostId[savedPost.postId],
                     processing = processing,
                 )
@@ -300,8 +297,15 @@ class SavedPostQueryPersistenceAdapter(
         sequence = sequence,
     )
 
-    private fun String.toSavedPostMedia(): SavedPostMedia =
-        SavedPostMedia(SavedPostMediaType.IMAGE, this, THUMBNAIL_SEQUENCE)
+    private fun findFirstMediaByPostId(sourcePostIds: List<Long>): Map<Long, SavedPostMedia> =
+        if (sourcePostIds.isEmpty()) {
+            emptyMap()
+        } else {
+            mediaRepository
+                .findAllByPostIdInOrderByPostIdAscSequenceAsc(sourcePostIds)
+                .groupBy(PostMediaEntity::postId)
+                .mapValues { (_, media) -> media.first().toView() }
+        }
 
     private fun findFirstPlaceThumbnailBySavedPostId(
         savedPostPlaces: List<UserSavedPostPlaceEntity>,
