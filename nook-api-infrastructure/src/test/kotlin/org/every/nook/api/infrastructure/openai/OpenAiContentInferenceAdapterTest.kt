@@ -188,6 +188,8 @@ class OpenAiContentInferenceAdapterTest {
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(not(containsString("\"type\":\"input_image\""))))
             .andExpect(content().string(containsString("빈브라더스 커피하우스 서울")))
+            .andExpect(content().string(containsString("층·호 정보를 그대로 유지")))
+            .andExpect(content().string(containsString("\"addressHint\"")))
             .andExpect(content().string(containsString("\"max_output_tokens\":12000")))
             .andRespond(
                 withSuccess(
@@ -196,6 +198,7 @@ class OpenAiContentInferenceAdapterTest {
                         {"places":[{
                           "name":"빈브라더스 커피하우스 서울",
                           "region":"서울 마포구 상수동",
+                          "addressHint":"서울 마포구 상수동 354-12 지하 1층 201호",
                           "queries":["빈브라더스 커피하우스 서울","상수동 빈브라더스"],
                           "evidence":[{"imageIndex":2,"evidenceText":"빈브라더스 커피하우스 서울"}]
                         }]}
@@ -211,12 +214,16 @@ class OpenAiContentInferenceAdapterTest {
                 hashtags = emptyList(),
                 sourceLocationTag = null,
                 imageTranscripts = listOf(
-                    ImageTranscript(2, listOf("빈브라더스 커피하우스 서울", "서울 마포구 상수동 354-12")),
+                    ImageTranscript(
+                        2,
+                        listOf("빈브라더스 커피하우스 서울", "서울 마포구 상수동 354-12 지하 1층 201호"),
+                    ),
                 ),
             ),
         )
 
         assertEquals("빈브라더스 커피하우스 서울", places.single().name)
+        assertEquals("서울 마포구 상수동 354-12 지하 1층 201호", places.single().addressHint)
         assertEquals(2, places.single().evidence.single().imageIndex)
         fixture.server.verify()
     }
@@ -228,6 +235,8 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(content().string(containsString("place_candidate_selection")))
             .andExpect(content().string(containsString("matchedQueries")))
             .andExpect(content().string(containsString("evidenceText")))
+            .andExpect(content().string(containsString("addressHint")))
+            .andExpect(content().string(containsString("서울 마포구 양화로6길 99-9 4층")))
             .andExpect(content().string(containsString("상수동 이츠야")))
             .andRespond(withSuccess(response("""{"candidateIndex":0}"""), MediaType.APPLICATION_JSON))
         val candidate = PlaceCandidate(
@@ -249,6 +258,7 @@ class OpenAiContentInferenceAdapterTest {
                     region = "서울특별시 서초구 상수역 인근",
                     queries = listOf("이츠야", "상수동 이츠야"),
                     evidence = listOf(PlaceClueEvidence(2, "이츠야 / 서울 마포구 양화로6길 99-9")),
+                    addressHint = "서울 마포구 양화로6길 99-9 4층",
                 ),
                 candidates = listOf(
                     PlaceCandidateSelector.Candidate(

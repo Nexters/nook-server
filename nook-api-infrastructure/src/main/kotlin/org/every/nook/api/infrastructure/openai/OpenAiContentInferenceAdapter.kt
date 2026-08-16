@@ -67,6 +67,11 @@ class OpenAiContentInferenceAdapter(
                     evidenceText = evidence.path("evidenceText").asText().trim(),
                 )
             },
+            addressHint = place.path("addressHint")
+                .takeUnless { it.isNull || it.isMissingNode }
+                ?.asText()
+                ?.trim()
+                ?.ifBlank { null },
         )
     }
 
@@ -182,6 +187,7 @@ class OpenAiContentInferenceAdapter(
             "placeClue" to mapOf(
                 "name" to clue.name,
                 "region" to clue.region,
+                "addressHint" to clue.addressHint,
                 "queries" to clue.queries,
                 "evidence" to clue.evidence.map { evidence ->
                     mapOf(
@@ -238,6 +244,7 @@ class OpenAiContentInferenceAdapter(
                 "properties" to mapOf(
                     "name" to mapOf("type" to "string"),
                     "region" to mapOf("type" to listOf("string", "null")),
+                    "addressHint" to mapOf("type" to listOf("string", "null")),
                     "queries" to mapOf(
                         "type" to "array",
                         "minItems" to 1,
@@ -262,7 +269,7 @@ class OpenAiContentInferenceAdapter(
                         ),
                     ),
                 ),
-                "required" to listOf("name", "region", "queries", "evidence"),
+                "required" to listOf("name", "region", "addressHint", "queries", "evidence"),
                 "additionalProperties" to false,
             ),
         )
@@ -296,7 +303,10 @@ class OpenAiContentInferenceAdapter(
                 "실제 영업 장소만 추출한다. " +
                 "가게는 음식점, 카페, 술집, 상점, 숙박업소처럼 상호명이 있는 영업 장소를 뜻한다. " +
                 "도시, 구, 동, 거리, 역, 공원, 관광지는 가게로 반환하지 말고 가게 검색을 위한 region과 query 단서로만 사용한다. " +
-                "상호명이 확인되지 않으면 추측하거나 일반 업종명으로 만들지 않는다. 좌표와 주소도 만들지 않는다. " +
+                "상호명이 확인되지 않으면 추측하거나 일반 업종명으로 만들지 않는다. 좌표는 만들지 않는다. " +
+                "본문이나 imageTranscripts에 주소가 명시된 경우에만 addressHint에 주소 원문 전체를 그대로 담고, " +
+                "주소가 없으면 null을 반환한다. 주소를 축약하거나 보정하거나 추측하지 않는다. " +
+                "특히 1층, 4층, B1, 지하 1층, 201호, 건물명, 출입구 같은 상세 위치를 절대 생략하지 않는다. " +
                 "sourceLocationTag가 상호명인 경우 Instagram이 제공한 명시적 장소 정보이므로 본문과 해시태그보다 우선한다. " +
                 "이때 name은 sourceLocationTag 원문을 그대로 사용하고, 본문의 수식어나 별칭을 name에 붙이지 않는다. " +
                 "sourceLocationTag와 본문이 같은 가게를 가리키면 하나의 장소로 합친다. " +
@@ -310,9 +320,10 @@ class OpenAiContentInferenceAdapter(
                 "이미지 근거가 있는 장소는 imageTranscripts의 imageIndex와 상호명 또는 주소가 포함된 실제 전사 문구를 " +
                 "evidenceText로 evidence에 담는다. 이미지가 없거나 이미지 근거가 아니면 evidence는 빈 배열이다. " +
                 "읽을 수 없는 글씨나 로고를 추측하지 않는다. " +
-                "장소별 상호명 name, 확인 가능한 region, 카카오 장소 검색용 queries를 반환한다. " +
+                "장소별 상호명 name, 확인 가능한 region, 명시된 전체 주소 addressHint, 장소 검색용 queries를 반환한다. " +
                 "queries의 첫 항목은 sourceLocationTag가 상호명이면 원문 그대로 사용하고, 이후에는 본문에서 확인되는 " +
                 "한글·영문 표기와 지역 조합을 우선해 서로 다른 검색어 3~4개를 만든다. " +
+                "addressHint가 있으면 상호명과 전체 주소를 조합한 검색어를 포함하고 층·호 정보를 그대로 유지한다. " +
                 "예를 들어 sourceLocationTag가 Lodge190이고 본문이 '연희동 사랑방 롯지190'이면 name은 Lodge190이고 " +
                 "queries는 원문 Lodge190, 한글 음차 롯지190, 띄어쓰기 변형 롯지 190, " +
                 "지역을 붙인 축약형 연희동 Lodge 순서로 반환한다. " +
@@ -321,8 +332,11 @@ class OpenAiContentInferenceAdapter(
             "title과 places를 하나의 응답으로 함께 반환한다. " + TITLE_INSTRUCTIONS + " " + PLACE_INSTRUCTIONS
         const val CANDIDATE_SELECTION_INSTRUCTIONS =
             "placeClue는 Instagram 게시물에서 추출한 장소 단서이고 candidates는 실제 장소 검색 결과다. " +
-                "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, 주소, region, 이미지 evidence, matchedQueries를 함께 비교해 " +
+                "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, addressHint, 후보 주소, region, " +
+                "이미지 evidence, matchedQueries를 함께 비교해 " +
                 "게시물이 가리키는 장소와 가장 일치하는 candidateIndex 하나를 선택한다. " +
+                "도로명과 건물 번호가 다르거나 양쪽에 명시된 층·호가 충돌하면 선택하지 않는다. " +
+                "도로명 주소만 같고 상호명이 다른 후보를 같은 건물이라는 이유로 선택하지 않는다. " +
                 "후보에 없는 장소를 만들거나 후보 정보를 수정하지 않는다. " +
                 "명확한 근거가 없거나 서로 다른 후보를 하나로 확정할 수 없으면 candidateIndex를 null로 반환한다."
         const val PLACE_TAG_INSTRUCTIONS =
