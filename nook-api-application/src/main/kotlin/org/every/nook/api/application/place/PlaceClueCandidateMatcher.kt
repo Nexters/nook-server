@@ -13,11 +13,11 @@ internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
         return false
     }
 
-    val hasCompatibleName = hasCompatibleName(candidate)
-    if (explicitAddressHint != null && !hasCompatibleName) {
+    val hasCompatibleIdentity = hasCompatibleName(candidate) || hasNameEvidence(candidate)
+    if (explicitAddressHint != null && !hasCompatibleIdentity) {
         return false
     }
-    return evidence.isEmpty() || hasCompatibleName || hasCompatibleEvidence(candidate)
+    return evidence.isEmpty() || hasCompatibleIdentity || hasCompatibleEvidence(candidate)
 }
 
 internal fun Collection<PlaceCandidateSelector.Candidate>.descriptions(limit: Int): List<String> =
@@ -34,6 +34,13 @@ private fun PlaceClue.hasCompatibleName(candidate: PlaceCandidate): Boolean {
                 candidateName.isFuzzyNameMatch(queryName) ||
                 (queryName.length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH && candidateAddress.contains(queryName))
         }
+}
+
+private fun PlaceClue.hasNameEvidence(candidate: PlaceCandidate): Boolean {
+    val candidateName = candidate.name.groundingKey()
+    return candidateName.length >= MIN_GROUNDING_KEY_LENGTH && evidence.any { clueEvidence ->
+        clueEvidence.evidenceText.groundingKey().contains(candidateName)
+    }
 }
 
 private fun PlaceClue.hasCompatibleEvidence(candidate: PlaceCandidate): Boolean {
