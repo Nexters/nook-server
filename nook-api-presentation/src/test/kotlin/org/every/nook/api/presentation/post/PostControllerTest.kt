@@ -5,6 +5,7 @@ import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
+import org.every.nook.api.application.place.DisconnectPostPlaceUseCase
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.DeleteSavedPostUseCase
@@ -53,6 +54,7 @@ class PostControllerTest {
     private lateinit var updateMemoUseCase: UpdatePostMemoUseCase
     private lateinit var replaceGroupsUseCase: ReplaceSavedPostGroupsUseCase
     private lateinit var connectPostPlaceUseCase: ConnectPostPlaceUseCase
+    private lateinit var disconnectPostPlaceUseCase: DisconnectPostPlaceUseCase
     private lateinit var deleteSavedPostUseCase: DeleteSavedPostUseCase
 
     @BeforeTest
@@ -66,6 +68,7 @@ class PostControllerTest {
         updateMemoUseCase = mock(UpdatePostMemoUseCase::class.java)
         replaceGroupsUseCase = mock(ReplaceSavedPostGroupsUseCase::class.java)
         connectPostPlaceUseCase = mock(ConnectPostPlaceUseCase::class.java)
+        disconnectPostPlaceUseCase = mock(DisconnectPostPlaceUseCase::class.java)
         deleteSavedPostUseCase = mock(DeleteSavedPostUseCase::class.java)
         stubCreate()
         stubPlaceParsing(findUseCase)
@@ -81,6 +84,7 @@ class PostControllerTest {
                     updateMemoUseCase,
                     replaceGroupsUseCase,
                     connectPostPlaceUseCase,
+                    disconnectPostPlaceUseCase,
                     deleteSavedPostUseCase,
                 ),
             )
@@ -141,6 +145,22 @@ class PostControllerTest {
         }
 
         verify(connectPostPlaceUseCase)(command)
+    }
+
+    @Test
+    fun `disconnects a place from my saved post`() {
+        mockMvc.delete("/api/v1/posts/11/places/17").andExpect {
+            status { isOk() }
+            jsonPath("$.resultType") { value("SUCCESS") }
+        }
+
+        verify(disconnectPostPlaceUseCase)(
+            DisconnectPostPlaceUseCase.Command(
+                userId = TEST_USER_ID,
+                postId = 11,
+                placeId = 17,
+            ),
+        )
     }
 
     @Test

@@ -25,8 +25,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaReposito
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -46,7 +44,7 @@ class SavedPostQueryPersistenceAdapterTest {
     private val postRepository = mock(PostJpaRepository::class.java)
     private val mediaRepository = mock(PostMediaJpaRepository::class.java)
     private val hashtagRepository = mock(PostHashtagJpaRepository::class.java)
-    private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
+    private val savedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
@@ -59,7 +57,7 @@ class SavedPostQueryPersistenceAdapterTest {
         postRepository,
         mediaRepository,
         hashtagRepository,
-        postPlaceRepository,
+        savedPostPlaceRepository,
         placeRepository,
         bookmarkRepository,
         parsingJobRepository,
@@ -85,8 +83,8 @@ class SavedPostQueryPersistenceAdapterTest {
         )
         val firstMedia = PostMediaEntity(101, PostMedia.MediaType.IMAGE, "https://example.com/1.jpg", 0)
         val secondMedia = PostMediaEntity(101, PostMedia.MediaType.VIDEO, "https://example.com/2.mp4", 1)
-        val firstPlace = PostPlaceEntity(101, 201, 0)
-        val secondPlace = PostPlaceEntity(101, 202, 1)
+        val firstPlace = UserSavedPostPlaceEntity(11, 201, 0)
+        val secondPlace = UserSavedPostPlaceEntity(11, 202, 1)
         val placeOne = place(id = 201, name = "첫 장소")
         val placeTwo = place(id = 202, name = "둘째 장소")
         val bookmark = mock(UserPlaceBookmarkEntity::class.java)
@@ -103,7 +101,7 @@ class SavedPostQueryPersistenceAdapterTest {
             .thenReturn(listOf(firstMedia, secondMedia))
         `when`(hashtagRepository.findAllByPostIdOrderBySequenceAsc(101))
             .thenReturn(listOf(PostHashtagEntity(101, "첫태그", 0), PostHashtagEntity(101, "둘째태그", 1)))
-        `when`(postPlaceRepository.findAllByPostIdOrderBySequenceAsc(101))
+        `when`(savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11))
             .thenReturn(listOf(firstPlace, secondPlace))
         `when`(placeRepository.findAllById(listOf(201, 202))).thenReturn(listOf(placeTwo, placeOne))
         `when`(bookmarkRepository.findAllByUserIdAndPlaceIdIn(7, listOf(201, 202))).thenReturn(listOf(bookmark))
@@ -193,8 +191,16 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(postRepository.findAllById(listOf(101L, 102L))).thenReturn(listOf(firstPost, secondPost))
         `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
             .thenReturn(emptyList())
-        `when`(postPlaceRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
-            .thenReturn(listOf(PostPlaceEntity(101, 201, 0), PostPlaceEntity(101, 202, 1)))
+        `when`(
+            savedPostPlaceRepository.findAllByUserSavedPostIdInOrderByUserSavedPostIdAscSequenceAsc(
+                listOf(11L, 12L),
+            ),
+        ).thenReturn(
+            listOf(
+                UserSavedPostPlaceEntity(11, 201, 0),
+                UserSavedPostPlaceEntity(11, 202, 1),
+            ),
+        )
 
         val result = requireNotNull(adapter.findAll(userId = 7, groupId = 17, page = 0, size = 20))
 
@@ -202,7 +208,8 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf(2L, 0L), result.items.map { it.placeCount })
         assertEquals(2, result.totalElements)
         verify(memberRepository).findById(9)
-        verify(postPlaceRepository, times(2)).findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L))
+        verify(savedPostPlaceRepository, times(2))
+            .findAllByUserSavedPostIdInOrderByUserSavedPostIdAscSequenceAsc(listOf(11L, 12L))
         verify(savedPostRepository).findAllByUserIdAndGroupId(
             7,
             17,

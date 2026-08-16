@@ -31,8 +31,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaReposito
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -46,7 +44,7 @@ class SavedPostQueryPersistenceAdapter(
     private val postRepository: PostJpaRepository,
     private val mediaRepository: PostMediaJpaRepository,
     private val hashtagRepository: PostHashtagJpaRepository,
-    private val postPlaceRepository: PostPlaceJpaRepository,
+    private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val placeRepository: PlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
@@ -83,26 +81,22 @@ class SavedPostQueryPersistenceAdapter(
             pageable,
         )
         val savedPostPage = savedPosts.toPage()
-        val sourcePostIdBySavedPostId = savedPosts.content.associate {
-            requireNotNull(it.id) to it.postId
-        }
-        val sourcePostIds = sourcePostIdBySavedPostId.values.toList()
-        val placeCountsBySourcePostId = if (sourcePostIds.isEmpty()) {
+        val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
+        val placeCountsBySavedPostId = if (savedPostIds.isEmpty()) {
             emptyMap()
         } else {
-            postPlaceRepository
-                .findAllByPostIdInOrderByPostIdAscSequenceAsc(sourcePostIds)
-                .groupingBy { it.postId }
+            savedPostPlaceRepository
+                .findAllByUserSavedPostIdInOrderByUserSavedPostIdAscSequenceAsc(savedPostIds)
+                .groupingBy { it.userSavedPostId }
                 .eachCount()
         }
 
         return GroupPostPage(
             ownerNickname = owner.nickname,
             items = savedPostPage.items.map { post ->
-                val sourcePostId = requireNotNull(sourcePostIdBySavedPostId[post.postId])
                 GroupPostSummary(
                     post = post,
-                    placeCount = placeCountsBySourcePostId.getOrDefault(sourcePostId, 0).toLong(),
+                    placeCount = placeCountsBySavedPostId.getOrDefault(post.postId, 0).toLong(),
                 )
             },
             page = savedPostPage.page,
@@ -116,6 +110,7 @@ class SavedPostQueryPersistenceAdapter(
     private fun Page<UserSavedPostEntity>.toPage(): SavedPostPage {
         val savedPosts = this
         val sourcePostIds = savedPosts.content.map(UserSavedPostEntity::postId)
+        val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
         val postsById = if (sourcePostIds.isEmpty()) {
             emptyMap()
         } else {
@@ -129,7 +124,9 @@ class SavedPostQueryPersistenceAdapter(
                 .groupBy(PostMediaEntity::postId)
                 .mapValues { (_, media) -> media.first().toView() }
         }
-        val firstPlaceThumbnailByPostId = findFirstPlaceThumbnailByPostId(sourcePostIds)
+        val savedPostPlaces = findSavedPostPlaces(savedPostIds)
+        val savedPostIdsWithPlaces = savedPostPlaces.mapTo(mutableSetOf()) { it.userSavedPostId }
+        val firstPlaceThumbnailBySavedPostId = findFirstPlaceThumbnailBySavedPostId(savedPostPlaces)
         val contentJobByPostId = if (sourcePostIds.isEmpty()) {
             emptyMap()
         } else {
@@ -144,22 +141,20 @@ class SavedPostQueryPersistenceAdapter(
                 it.postId to it
             }
         }
-        val now = clock.instant()
-
         return SavedPostPage(
             items = savedPosts.content.mapNotNull { savedPost ->
                 val contentJob = contentJobByPostId[savedPost.postId]
                 val placeJob = placeJobByPostId[savedPost.postId]
                 val processing = PostProcessingView.from(
                     contentStatus = contentJob?.status ?: PostContentParsingStatus.COMPLETED,
-                    placeStatus = placeJob?.status,
+                    placeStatus = placeJob?.status.effectiveFor(savedPostIdsWithPlaces.contains(savedPost.id)),
                     contentStartedAt = contentJob?.processingStartedAt(),
                     placeStartedAt = placeJob?.processingStartedAt(),
-                    now = now,
+                    now = clock.instant(),
                 )
                 postsById[savedPost.postId]?.toSummary(
                     savedPost = savedPost,
-                    representativeMedia = firstPlaceThumbnailByPostId[savedPost.postId]
+                    representativeMedia = firstPlaceThumbnailBySavedPostId[savedPost.id]
                         ?.toSavedPostMedia()
                         ?: firstMediaByPostId[savedPost.postId],
                     processing = processing,
@@ -183,13 +178,13 @@ class SavedPostQueryPersistenceAdapter(
         val hashtags = hashtagRepository
             .findAllByPostIdOrderBySequenceAsc(savedPost.postId)
             .map { it.hashtag }
-        val postPlaces = postPlaceRepository.findAllByPostIdOrderBySequenceAsc(savedPost.postId)
-        val placesById = placeRepository.findAllById(postPlaces.map { it.placeId })
+        val savedPostPlaces = savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(postId)
+        val placesById = placeRepository.findAllById(savedPostPlaces.map { it.placeId })
             .associateBy { requireNotNull(it.id) }
-        val bookmarks = if (postPlaces.isEmpty()) {
+        val bookmarks = if (savedPostPlaces.isEmpty()) {
             emptyList()
         } else {
-            bookmarkRepository.findAllByUserIdAndPlaceIdIn(userId, postPlaces.map { it.placeId })
+            bookmarkRepository.findAllByUserIdAndPlaceIdIn(userId, savedPostPlaces.map { it.placeId })
         }
         val bookmarkedPlaceIds = bookmarks.mapTo(mutableSetOf()) { it.placeId }
         val memoByPlaceId = bookmarks.mapNotNull { bookmark -> bookmark.memo?.let { bookmark.placeId to it } }.toMap()
@@ -197,7 +192,7 @@ class SavedPostQueryPersistenceAdapter(
         val contentParsingJob = contentParsingJobRepository.findByPostId(savedPost.postId)
         val processing = PostProcessingView.from(
             contentStatus = contentParsingJob?.status ?: PostContentParsingStatus.COMPLETED,
-            placeStatus = parsingJob?.status,
+            placeStatus = parsingJob?.status.effectiveFor(savedPostPlaces.isNotEmpty()),
             contentStartedAt = contentParsingJob?.processingStartedAt(),
             placeStartedAt = parsingJob?.processingStartedAt(),
             now = clock.instant(),
@@ -216,17 +211,19 @@ class SavedPostQueryPersistenceAdapter(
             memo = savedPost.memo,
             savedAt = savedPost.createdAt,
             groups = groups,
-            placeParsingStatus = PlaceParsingStatusView.from(parsingJob?.status ?: PlaceParsingStatus.PENDING),
+            placeParsingStatus = PlaceParsingStatusView.from(
+                parsingJob?.status.effectiveFor(savedPostPlaces.isNotEmpty()) ?: PlaceParsingStatus.PENDING,
+            ),
             placeParsingFailureReason = parsingJob?.failureReason
-                .takeIf { parsingJob?.status == PlaceParsingStatus.FAILED },
-            places = postPlaces.toSavedPostPlaces(placesById, bookmarkedPlaceIds, memoByPlaceId),
+                .takeIf { parsingJob?.status == PlaceParsingStatus.FAILED && savedPostPlaces.isEmpty() },
+            places = savedPostPlaces.toSavedPostPlaces(placesById, bookmarkedPlaceIds, memoByPlaceId),
             processingStatus = processing.status,
             processingStage = processing.stage,
             processingPercent = processing.processingPercent,
         )
     }
 
-    private fun List<PostPlaceEntity>.toSavedPostPlaces(
+    private fun List<UserSavedPostPlaceEntity>.toSavedPostPlaces(
         placesById: Map<Long, PlaceEntity>,
         bookmarkedPlaceIds: Set<Long>,
         memoByPlaceId: Map<Long, String>,
@@ -306,12 +303,13 @@ class SavedPostQueryPersistenceAdapter(
     private fun String.toSavedPostMedia(): SavedPostMedia =
         SavedPostMedia(SavedPostMediaType.IMAGE, this, THUMBNAIL_SEQUENCE)
 
-    private fun findFirstPlaceThumbnailByPostId(sourcePostIds: List<Long>): Map<Long, String> {
-        if (sourcePostIds.isEmpty()) {
+    private fun findFirstPlaceThumbnailBySavedPostId(
+        savedPostPlaces: List<UserSavedPostPlaceEntity>,
+    ): Map<Long, String> {
+        if (savedPostPlaces.isEmpty()) {
             return emptyMap()
         }
-        val postPlaces = postPlaceRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(sourcePostIds)
-        val placeIds = postPlaces.mapTo(mutableSetOf()) { it.placeId }
+        val placeIds = savedPostPlaces.mapTo(mutableSetOf()) { it.placeId }
         if (placeIds.isEmpty()) {
             return emptyMap()
         }
@@ -319,14 +317,21 @@ class SavedPostQueryPersistenceAdapter(
             .mapNotNull { place -> place.thumbnailUrl?.let { requireNotNull(place.id) to it } }
             .toMap()
 
-        return postPlaces
+        return savedPostPlaces
             .asSequence()
-            .mapNotNull { postPlace ->
-                thumbnailByPlaceId[postPlace.placeId]?.let { postPlace.postId to it }
+            .mapNotNull { savedPostPlace ->
+                thumbnailByPlaceId[savedPostPlace.placeId]?.let { savedPostPlace.userSavedPostId to it }
             }
-            .distinctBy { (postId) -> postId }
+            .distinctBy { (savedPostId) -> savedPostId }
             .toMap()
     }
+
+    private fun findSavedPostPlaces(savedPostIds: List<Long>): List<UserSavedPostPlaceEntity> =
+        if (savedPostIds.isEmpty()) {
+            emptyList()
+        } else {
+            savedPostPlaceRepository.findAllByUserSavedPostIdInOrderByUserSavedPostIdAscSequenceAsc(savedPostIds)
+        }
 
     private companion object {
         const val THUMBNAIL_SEQUENCE = 0
@@ -338,3 +343,6 @@ private fun PostContentParsingJobEntity.processingStartedAt() =
 
 private fun PlaceParsingJobEntity.processingStartedAt() =
     if (status == PlaceParsingStatus.PROCESSING) updatedAt else null
+
+private fun PlaceParsingStatus?.effectiveFor(hasPlaces: Boolean): PlaceParsingStatus? =
+    if (hasPlaces) PlaceParsingStatus.COMPLETED else this
