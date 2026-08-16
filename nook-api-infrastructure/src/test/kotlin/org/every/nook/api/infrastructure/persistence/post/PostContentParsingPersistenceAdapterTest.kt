@@ -88,7 +88,14 @@ class PostContentParsingPersistenceAdapterTest {
         adapter.complete(
             postId = 101,
             post = post,
-            textPlaceClues = listOf(PlaceClue("성수 식당", "성수", listOf("성수 식당"))),
+            textPlaceClues = listOf(
+                PlaceClue(
+                    name = "성수 식당",
+                    region = "성수",
+                    queries = listOf("성수 식당"),
+                    addressHint = "서울 성동구 성수이로 11 4층",
+                ),
+            ),
         )
 
         assertEquals(PostContentParsingStatus.COMPLETED, job.status)
@@ -99,7 +106,8 @@ class PostContentParsingPersistenceAdapterTest {
         verify(placeJobRepository).save(placeJobCaptor.capture())
         assertEquals(PlaceParsingStatus.PENDING, placeJobCaptor.value.status)
         assertEquals(
-            """[{"name":"성수 식당","region":"성수","queries":["성수 식당"],"evidence":[]}]""",
+            """[{"name":"성수 식당","region":"성수","queries":["성수 식당"],"evidence":[],""" +
+                """"addressHint":"서울 성동구 성수이로 11 4층"}]""",
             placeJobCaptor.value.textPlaceClues,
         )
         val eventCaptor = ArgumentCaptor.forClass(Any::class.java)

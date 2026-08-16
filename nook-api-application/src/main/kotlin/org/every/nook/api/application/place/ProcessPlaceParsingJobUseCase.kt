@@ -183,7 +183,7 @@ class ProcessPlaceParsingJobUseCase(
         val candidates = searchCandidates(job, clue)
         logger.info {
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
-                "queries=${clue.queries}, candidateCount=${candidates.size}"
+                "addressHint=${clue.addressHint}, queries=${clue.searchQueries()}, candidateCount=${candidates.size}"
         }
         val matches = strictMatches(clue, candidates)
         logger.info {
@@ -238,7 +238,7 @@ class ProcessPlaceParsingJobUseCase(
         clue: PlaceClue,
     ): List<PlaceCandidateSelector.Candidate> {
         val candidatesById = linkedMapOf<Pair<String, String>, PlaceCandidateSelector.Candidate>()
-        clue.queries.asSequence()
+        clue.searchQueries().asSequence()
             .map(String::trim)
             .filter(String::isNotEmpty)
             .distinct()
@@ -424,9 +424,15 @@ private fun strictMatches(
     val normalizedRegion = clue.region?.normalize()?.takeIf(String::isNotEmpty)
     return candidates.filter { candidate ->
         candidate.place.name.normalize() == normalizedName &&
-            (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion))
+            (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion)) &&
+            PlaceAddressMatcher.isCompatible(clue.addressHint, candidate.place.address)
     }
 }
+
+internal fun PlaceClue.searchQueries(): List<String> = buildList {
+    addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address -> add("$name $address") }
+    addAll(queries)
+}.map(String::trim).filter(String::isNotEmpty).distinct().take(MAX_PLACE_QUERY_COUNT)
 
 private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)
 
@@ -435,17 +441,24 @@ private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrD
 private const val MIN_GROUNDING_KEY_LENGTH = 2
 private const val MIN_EXPECTED_PLACE_COUNT = 2
 private const val MAX_EXPECTED_PLACE_COUNT = 80
+private const val MAX_PLACE_QUERY_COUNT = 4
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
 
-private fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
-    if (evidence.isEmpty()) return true
+internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
     val candidateName = candidate.name.groundingKey()
     val clueName = name.groundingKey()
     val hasCompatibleName = candidateName == clueName ||
         candidateName.isCompatibleName(clueName) ||
         queries.asSequence().map(String::groundingKey).any(candidateName::isCompatibleName)
+    val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
+    if (explicitAddressHint != null) {
+        if (!PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address) || !hasCompatibleName) {
+            return false
+        }
+    }
+    if (evidence.isEmpty()) return true
     val candidateAddress = candidate.address.groundingKey()
-    val candidateAddressKeys = candidate.address.addressKeys()
+    val candidateAddressKeys = PlaceAddressMatcher.addressKeys(candidate.address)
     val hasCompatibleEvidence = evidence.asSequence()
         .map(PlaceClueEvidence::evidenceText)
         .any { evidenceText ->
@@ -455,7 +468,7 @@ private fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
             val containsAddress = candidateAddress.length >= MIN_ADDRESS_GROUNDING_KEY_LENGTH &&
                 normalizedEvidence.contains(candidateAddress)
             containsName || containsAddress ||
-                candidateAddressKeys.any { it in evidenceText.addressKeys() }
+                candidateAddressKeys.any { it in PlaceAddressMatcher.addressKeys(evidenceText) }
         }
     return hasCompatibleName || hasCompatibleEvidence
 }
@@ -464,12 +477,5 @@ private fun String.isCompatibleName(other: String): Boolean = length >= MIN_NAME
     other.length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
     (contains(other) || other.contains(this))
 
-private fun String.addressKeys(): Set<String> = ADDRESS_KEY_PATTERN.findAll(this).map { match ->
-    match.groupValues.drop(1).joinToString(separator = "").groundingKey()
-}.toSet()
-
 private const val MIN_NAME_COMPATIBILITY_KEY_LENGTH = 3
 private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6
-private val ADDRESS_KEY_PATTERN = Regex(
-    "([가-힣A-Za-z0-9]+(?:대로|로|길|동|읍|면|리))\\s*(\\d+(?:-\\d+)?)",
-)

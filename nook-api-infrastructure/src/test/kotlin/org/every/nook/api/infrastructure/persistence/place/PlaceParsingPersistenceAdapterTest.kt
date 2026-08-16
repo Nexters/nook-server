@@ -116,6 +116,7 @@ class PlaceParsingPersistenceAdapterTest {
         val claimed = requireNotNull(adapter.claim(11, Duration.ofMinutes(1)))
 
         assertEquals(listOf("성수 식당"), claimed.textClues?.map(PlaceClue::name))
+        assertEquals(null, claimed.textClues?.single()?.addressHint)
     }
 
     @Test
