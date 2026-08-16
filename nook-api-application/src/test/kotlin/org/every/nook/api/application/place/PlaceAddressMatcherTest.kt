@@ -169,11 +169,18 @@ class PlaceAddressMatcherTest {
         assertFalse(roomClue.isSupportedBy(candidate("세보가", "서울 종로구 삼일대로 437")))
 
         val basementClue = PlaceClue(
-            name = "도원",
+            name = "도원 Dowon",
             region = "서울 마포구",
-            queries = listOf("도원", "홍대 도원"),
+            queries = listOf("Dowon dowon.kr", "홍대입구역 Dowon"),
+            evidence = listOf(
+                PlaceClueEvidence(
+                    imageIndex = 1,
+                    evidenceText = "도원 @dowon.kr 홍대입구역 서울 마포구 동교로38길 27-19 지1층 좌측",
+                ),
+            ),
             addressHint = "서울 마포구 동교로38길 27-19 지1층 좌측",
         )
+        assertTrue(basementClue.isSupportedBy(candidate("도원", "서울 마포구 동교로38길 27-19")))
         assertFalse(basementClue.isSupportedBy(candidate("도원", "서울 마포구 월드컵북로5가길 34")))
     }
 
