@@ -52,6 +52,7 @@ class ProcessPlaceParsingJobUseCase(
         val imageResolution = resolveImageClues(job, textResolution.places.size, expectedPlaceCount)
         val places = (textResolution.places + imageResolution?.places.orEmpty())
             .distinctBy { it.provider to it.externalPlaceId }
+            .distinctLogicalPlaces()
         if (places.isEmpty()) {
             val failure = imageResolution?.failure ?: textResolution.failure
             terminalFailure(
@@ -183,33 +184,31 @@ class ProcessPlaceParsingJobUseCase(
         val candidates = searchCandidates(job, clue)
         logger.info {
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
-                "queries=${clue.queries}, candidateCount=${candidates.size}"
+                "addressHint=${clue.addressHint}, queries=${clue.searchQueries()}, candidateCount=${candidates.size}"
         }
-        val matches = strictMatches(clue, candidates)
+        val selectionCandidates = candidates.compatibleWith(clue)
+        val matches = strictMatches(clue, selectionCandidates)
+        val groundedMatches = selectionCandidates.filter { candidate -> clue.isSupportedBy(candidate.place) }
+        val candidateDescriptions = selectionCandidates.descriptions(CANDIDATE_LOG_LIMIT)
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
-                "candidateCount=${candidates.size}, matchCount=${matches.size}, " +
-                "candidates=${candidates.take(CANDIDATE_LOG_LIMIT).map { "${it.place.name}|${it.place.address}" }}"
+                "candidateCount=${candidates.size}, addressMatchCount=${selectionCandidates.size}, " +
+                "strictMatchCount=${matches.size}, groundedMatchCount=${groundedMatches.size}, " +
+                "candidates=$candidateDescriptions"
         }
 
-        val resolved = if (matches.size == 1) {
-            matches.single().place
-        } else {
-            if (candidates.isEmpty()) {
+        val selection = uniqueCandidate(matches, groundedMatches) ?: run {
+            if (selectionCandidates.isEmpty()) {
                 failResolution("No place candidate found: ${clue.name}")
             }
-            measure(job, SELECT_STAGE) {
-                candidateSelector.select(
-                    PlaceCandidateSelector.Request(
-                        clue = clue,
-                        candidates = candidates,
-                    ),
-                )
+            val selected = measure(job, SELECT_STAGE) {
+                candidateSelector.select(PlaceCandidateSelector.Request(clue = clue, candidates = selectionCandidates))
             } ?: failResolution(
                 "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
             )
+            CandidateSelection(selected, "openai")
         }
-        if (!clue.isSupportedBy(resolved)) {
+        if (!clue.isSupportedBy(selection.place)) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
         eventLogger.info(
@@ -218,19 +217,21 @@ class ProcessPlaceParsingJobUseCase(
                 SELECT_STAGE,
                 SUCCESS_OUTCOME,
                 fields = mapOf(
-                    "provider.name" to resolved.provider,
-                    "place.external_id" to resolved.externalPlaceId,
-                    "place.selection_method" to if (matches.size == 1) "strict_match" else "openai",
+                    "provider.name" to selection.place.provider,
+                    "place.external_id" to selection.place.externalPlaceId,
+                    "place.selection_method" to selection.method,
                     "place.candidate_count" to candidates.size,
                     "place.strict_match_count" to matches.size,
+                    "place.grounded_match_count" to groundedMatches.size,
                 ),
             ),
         )
         logger.info {
-            "Place resolved: provider=${resolved.provider}, externalPlaceId=${resolved.externalPlaceId}, " +
-                "name=${resolved.name}, address=${resolved.address}"
+            "Place resolved: provider=${selection.place.provider}, " +
+                "externalPlaceId=${selection.place.externalPlaceId}, " +
+                "name=${selection.place.name}, address=${selection.place.address}"
         }
-        return resolved
+        return selection.place
     }
 
     private fun searchCandidates(
@@ -238,7 +239,7 @@ class ProcessPlaceParsingJobUseCase(
         clue: PlaceClue,
     ): List<PlaceCandidateSelector.Candidate> {
         val candidatesById = linkedMapOf<Pair<String, String>, PlaceCandidateSelector.Candidate>()
-        clue.queries.asSequence()
+        clue.searchQueries().asSequence()
             .map(String::trim)
             .filter(String::isNotEmpty)
             .distinct()
@@ -364,6 +365,17 @@ class ProcessPlaceParsingJobUseCase(
     private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
 }
 
+private fun uniqueCandidate(
+    strictMatches: List<PlaceCandidateSelector.Candidate>,
+    groundedMatches: List<PlaceCandidateSelector.Candidate>,
+): CandidateSelection? = when {
+    strictMatches.size == 1 -> CandidateSelection(strictMatches.single().place, "strict_match")
+    groundedMatches.size == 1 -> CandidateSelection(groundedMatches.single().place, "grounded_match")
+    else -> null
+}
+
+private data class CandidateSelection(val place: PlaceCandidate, val method: String)
+
 private fun logOcrDecision(
     logger: org.slf4j.Logger,
     job: ClaimedPlaceParsingJob,
@@ -424,52 +436,30 @@ private fun strictMatches(
     val normalizedRegion = clue.region?.normalize()?.takeIf(String::isNotEmpty)
     return candidates.filter { candidate ->
         candidate.place.name.normalize() == normalizedName &&
-            (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion))
+            (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion)) &&
+            PlaceAddressMatcher.isCompatible(clue.addressHint, candidate.place.address)
     }
 }
+
+internal fun PlaceClue.searchQueries(): List<String> = buildList {
+    addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address -> add("$name $address") }
+    add(name)
+    region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion ->
+        name.split(Regex("\\s+"))
+            .map(String::trim)
+            .filter { it.length >= MIN_SEARCH_ALIAS_LENGTH }
+            .forEach { alias -> add("$placeRegion $alias") }
+    }
+    addAll(queries)
+}.map(String::trim).filter(String::isNotEmpty).distinct().take(MAX_PLACE_QUERY_COUNT)
 
 private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)
 
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private const val MIN_GROUNDING_KEY_LENGTH = 2
+private const val MIN_SEARCH_ALIAS_LENGTH = 2
 private const val MIN_EXPECTED_PLACE_COUNT = 2
 private const val MAX_EXPECTED_PLACE_COUNT = 80
+private const val MAX_PLACE_QUERY_COUNT = 4
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
-
-private fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
-    if (evidence.isEmpty()) return true
-    val candidateName = candidate.name.groundingKey()
-    val clueName = name.groundingKey()
-    val hasCompatibleName = candidateName == clueName ||
-        candidateName.isCompatibleName(clueName) ||
-        queries.asSequence().map(String::groundingKey).any(candidateName::isCompatibleName)
-    val candidateAddress = candidate.address.groundingKey()
-    val candidateAddressKeys = candidate.address.addressKeys()
-    val hasCompatibleEvidence = evidence.asSequence()
-        .map(PlaceClueEvidence::evidenceText)
-        .any { evidenceText ->
-            val normalizedEvidence = evidenceText.groundingKey()
-            val containsName = candidateName.length >= MIN_GROUNDING_KEY_LENGTH &&
-                normalizedEvidence.contains(candidateName)
-            val containsAddress = candidateAddress.length >= MIN_ADDRESS_GROUNDING_KEY_LENGTH &&
-                normalizedEvidence.contains(candidateAddress)
-            containsName || containsAddress ||
-                candidateAddressKeys.any { it in evidenceText.addressKeys() }
-        }
-    return hasCompatibleName || hasCompatibleEvidence
-}
-
-private fun String.isCompatibleName(other: String): Boolean = length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
-    other.length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
-    (contains(other) || other.contains(this))
-
-private fun String.addressKeys(): Set<String> = ADDRESS_KEY_PATTERN.findAll(this).map { match ->
-    match.groupValues.drop(1).joinToString(separator = "").groundingKey()
-}.toSet()
-
-private const val MIN_NAME_COMPATIBILITY_KEY_LENGTH = 3
-private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6
-private val ADDRESS_KEY_PATTERN = Regex(
-    "([가-힣A-Za-z0-9]+(?:대로|로|길|동|읍|면|리))\\s*(\\d+(?:-\\d+)?)",
-)
