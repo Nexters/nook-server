@@ -22,9 +22,24 @@ internal object PlaceAddressMatcher {
         }
     }
 
-    fun addressKeys(value: String): Set<String> = BASE_ADDRESS_PATTERN.findAll(value).map { match ->
-        match.groupValues.drop(1).joinToString(separator = "").groundingKey()
+    fun addressKeys(value: String): Set<String> = BASE_ADDRESS_PATTERN.findAll(value).flatMap { match ->
+        val roadName = match.groupValues[1].groundingKey()
+        val buildingNumber = match.groupValues[2].groundingKey()
+        val buildingNumbers = buildSet {
+            add(buildingNumber)
+            if (buildingNumber.length >= MIN_COMPACT_BUILDING_FLOOR_LENGTH && match.isFollowedByFloorSuffix(value)) {
+                add(buildingNumber.dropLast(1))
+            }
+        }
+        buildingNumbers.asSequence().flatMap { number ->
+            sequenceOf(
+                roadName + number,
+                roadName.removeSuffix(ROAD_SUFFIX) + number,
+            )
+        }
     }.toSet()
+
+    fun hasLocationDetail(value: String?): Boolean = value != null && locationDetails(value).isNotEmpty()
 
     private fun locationDetails(value: String): Set<LocationDetail> {
         val basementDetails = BASEMENT_PATTERN.findAll(value).map { match ->
@@ -34,11 +49,17 @@ internal object PlaceAddressMatcher {
         val floorDetails = FLOOR_PATTERN.findAll(aboveGroundSource).map { match ->
             LocationDetail(LocationDetailType.FLOOR, match.groupValues[1])
         }
+        val compactFloorDetails = COMPACT_BUILDING_FLOOR_PATTERN.findAll(aboveGroundSource).map { match ->
+            LocationDetail(LocationDetailType.FLOOR, match.groupValues[1])
+        }
         val roomDetails = ROOM_PATTERN.findAll(value).map { match ->
             LocationDetail(LocationDetailType.ROOM, match.groupValues[1])
         }
-        return basementDetails + floorDetails + roomDetails
+        return basementDetails + floorDetails + compactFloorDetails + roomDetails
     }
+
+    private fun MatchResult.isFollowedByFloorSuffix(source: String): Boolean =
+        source.substring(range.last + 1).trimStart().startsWith(FLOOR_SUFFIX)
 
     private fun MatchResult.firstCapturedValue(): String = groupValues.drop(1).first(String::isNotEmpty)
 
@@ -52,7 +73,8 @@ internal object PlaceAddressMatcher {
     private data class LocationDetail(val type: LocationDetailType, val value: String)
 
     private val BASE_ADDRESS_PATTERN = Regex(
-        "([가-힣A-Za-z0-9]+(?:대로|로|길|동|읍|면|리))\\s*(\\d+(?:-\\d+)?)",
+        "([가-힣A-Za-z]+(?:대로|로|길)(?:\\d+[가-힣]?(?:길)?)?|" +
+            "[가-힣A-Za-z0-9]+(?:동|읍|면|리))\\s+(\\d+(?:-\\d+)?)",
     )
     private val BASEMENT_PATTERN = Regex(
         "(?i)(?:\\bB\\s*-?\\s*(\\d+)|지(?:하)?\\s*(\\d+)\\s*층)",
@@ -60,7 +82,14 @@ internal object PlaceAddressMatcher {
     private val FLOOR_PATTERN = Regex(
         "(?i)(?<![-\\d])([1-9]\\d?)\\s*(?:층|F)(?=$|[^가-힣A-Za-z0-9])",
     )
+    private val COMPACT_BUILDING_FLOOR_PATTERN = Regex(
+        "(?<!\\d)\\d{2,}([1-9])\\s*층(?=$|[^가-힣A-Za-z0-9])",
+    )
     private val ROOM_PATTERN = Regex(
         "(?<![-\\d])([1-9]\\d{0,3})\\s*호(?=$|[^가-힣A-Za-z0-9])",
     )
+
+    private const val ROAD_SUFFIX = "길"
+    private const val FLOOR_SUFFIX = "층"
+    private const val MIN_COMPACT_BUILDING_FLOOR_LENGTH = 3
 }
