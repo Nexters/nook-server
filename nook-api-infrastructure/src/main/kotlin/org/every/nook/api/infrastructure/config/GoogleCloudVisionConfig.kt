@@ -4,6 +4,7 @@ import org.every.nook.api.infrastructure.vision.GoogleCloudVisionImageTextExtrac
 import org.every.nook.api.infrastructure.vision.GoogleCloudVisionProperties
 import org.every.nook.api.infrastructure.vision.VisionImageDownloader
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -36,6 +37,11 @@ class GoogleCloudVisionConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(
+        prefix = "place-parsing",
+        name = ["image-text-provider"],
+        havingValue = "google-cloud-vision",
+    )
     fun googleCloudVisionImageTextExtractor(
         @Qualifier("googleCloudVisionRestClient") restClient: RestClient,
         @Qualifier("googleCloudVisionImageRestClient") imageRestClient: RestClient,
