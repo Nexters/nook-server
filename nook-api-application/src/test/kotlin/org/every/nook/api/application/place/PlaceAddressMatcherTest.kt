@@ -94,8 +94,8 @@ class PlaceAddressMatcherTest {
             listOf(
                 "파티오피즈 서울 용산구 이태원로20가길 11 4층",
                 "파티오피즈",
+                "서울 용산구 파티오피즈",
                 "이태원 파티오피즈",
-                "patio fizz",
             ),
             clue.searchQueries(),
         )
@@ -119,8 +119,28 @@ class PlaceAddressMatcherTest {
             listOf(
                 "도원 서울 마포구 동교로38길 27-19 지1층 좌측",
                 "도원",
+                "홍대입구역 도원",
                 "dowon.kr 홍대입구역",
-                "도원 동교로38길 27-19 지1층",
+            ),
+            clue.searchQueries(),
+        )
+    }
+
+    @Test
+    fun `uses regional aliases before inferred queries for multilingual store names`() {
+        val clue = PlaceClue(
+            name = "라벤다 lavender",
+            region = "중곡역",
+            queries = listOf("lavender lavender_seoul", "라벤다 능동로50길 24 1층"),
+            addressHint = "서울 광진구 능동로50길 24 1층",
+        )
+
+        assertEquals(
+            listOf(
+                "라벤다 lavender 서울 광진구 능동로50길 24 1층",
+                "라벤다 lavender",
+                "중곡역 라벤다",
+                "중곡역 lavender",
             ),
             clue.searchQueries(),
         )
