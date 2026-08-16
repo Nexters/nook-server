@@ -442,6 +442,7 @@ private fun strictMatches(
 
 internal fun PlaceClue.searchQueries(): List<String> = buildList {
     addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address -> add("$name $address") }
+    add(name)
     addAll(queries)
 }.map(String::trim).filter(String::isNotEmpty).distinct().take(MAX_PLACE_QUERY_COUNT)
 
