@@ -52,6 +52,7 @@ class ProcessPlaceParsingJobUseCase(
         val imageResolution = resolveImageClues(job, textResolution.places.size, expectedPlaceCount)
         val places = (textResolution.places + imageResolution?.places.orEmpty())
             .distinctBy { it.provider to it.externalPlaceId }
+            .distinctLogicalPlaces()
         if (places.isEmpty()) {
             val failure = imageResolution?.failure ?: textResolution.failure
             terminalFailure(
@@ -443,6 +444,12 @@ private fun strictMatches(
 internal fun PlaceClue.searchQueries(): List<String> = buildList {
     addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address -> add("$name $address") }
     add(name)
+    region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion ->
+        name.split(Regex("\\s+"))
+            .map(String::trim)
+            .filter { it.length >= MIN_SEARCH_ALIAS_LENGTH }
+            .forEach { alias -> add("$placeRegion $alias") }
+    }
     addAll(queries)
 }.map(String::trim).filter(String::isNotEmpty).distinct().take(MAX_PLACE_QUERY_COUNT)
 
@@ -451,6 +458,7 @@ private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespac
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private const val MIN_GROUNDING_KEY_LENGTH = 2
+private const val MIN_SEARCH_ALIAS_LENGTH = 2
 private const val MIN_EXPECTED_PLACE_COUNT = 2
 private const val MAX_EXPECTED_PLACE_COUNT = 80
 private const val MAX_PLACE_QUERY_COUNT = 4
