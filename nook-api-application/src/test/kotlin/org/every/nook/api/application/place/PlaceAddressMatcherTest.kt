@@ -102,6 +102,31 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `keeps a bare store name after the detailed address query`() {
+        val clue = PlaceClue(
+            name = "도원",
+            region = "홍대입구역",
+            queries = listOf(
+                "dowon.kr 홍대입구역",
+                "도원 동교로38길 27-19 지1층",
+                "도원 홍대입구 1층",
+                "Dowon 홍대입구",
+            ),
+            addressHint = "서울 마포구 동교로38길 27-19 지1층 좌측",
+        )
+
+        assertEquals(
+            listOf(
+                "도원 서울 마포구 동교로38길 27-19 지1층 좌측",
+                "도원",
+                "dowon.kr 홍대입구역",
+                "도원 동교로38길 27-19 지1층",
+            ),
+            clue.searchQueries(),
+        )
+    }
+
+    @Test
     fun `limits candidate selection to addresses compatible with the explicit clue`() {
         val clue = PlaceClue(
             name = "도원",
