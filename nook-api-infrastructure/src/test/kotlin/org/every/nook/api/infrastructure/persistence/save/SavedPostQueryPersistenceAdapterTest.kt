@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
+import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
@@ -28,8 +29,8 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
@@ -165,11 +166,20 @@ class SavedPostQueryPersistenceAdapterTest {
     }
 
     @Test
-    fun `group list returns the actual owner nickname and batched place counts`() {
+    fun `group list uses the first Instagram media instead of a place thumbnail`() {
         val firstSavedPost = savedPost(id = 11, sourcePostId = 101)
         val secondSavedPost = savedPost(id = 12, sourcePostId = 102)
         val firstPost = sourcePost(id = 101, title = "첫 게시물")
         val secondPost = sourcePost(id = 102, title = "둘째 게시물")
+        val firstMedia = PostMediaEntity(
+            postId = 101,
+            mediaType = PostMedia.MediaType.VIDEO,
+            mediaUrl = "https://example.com/instagram-video.mp4",
+            sequence = 0,
+        )
+        val placeWithThumbnail = mock(PlaceEntity::class.java)
+        `when`(placeWithThumbnail.id).thenReturn(201)
+        `when`(placeWithThumbnail.thumbnailUrl).thenReturn("https://example.com/place-thumbnail.jpg")
         val group = mock(GroupEntity::class.java)
         val owner = mock(MemberEntity::class.java)
         val requestedPage = PageRequest.of(
@@ -192,17 +202,24 @@ class SavedPostQueryPersistenceAdapterTest {
             .thenReturn(PageImpl(listOf(firstSavedPost, secondSavedPost), requestedPage, 2))
         `when`(postRepository.findAllById(listOf(101L, 102L))).thenReturn(listOf(firstPost, secondPost))
         `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
-            .thenReturn(emptyList())
+            .thenReturn(listOf(firstMedia))
         `when`(postPlaceRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
             .thenReturn(listOf(PostPlaceEntity(101, 201, 0), PostPlaceEntity(101, 202, 1)))
+        `when`(placeRepository.findAllById(setOf(201L, 202L))).thenReturn(listOf(placeWithThumbnail))
 
         val result = requireNotNull(adapter.findAll(userId = 7, groupId = 17, page = 0, size = 20))
 
         assertEquals("Purr", result.ownerNickname)
         assertEquals(listOf(2L, 0L), result.items.map { it.placeCount })
+        assertEquals(SavedPostMediaType.VIDEO, result.items.first().post.representativeMedia?.type)
+        assertEquals(
+            "https://example.com/instagram-video.mp4",
+            result.items.first().post.representativeMedia?.url,
+        )
         assertEquals(2, result.totalElements)
         verify(memberRepository).findById(9)
-        verify(postPlaceRepository, times(2)).findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L))
+        verify(postPlaceRepository).findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L))
+        verifyNoInteractions(placeRepository)
         verify(savedPostRepository).findAllByUserIdAndGroupId(
             7,
             17,
