@@ -148,18 +148,25 @@ class PlaceAddressMatcherTest {
             ),
         )
 
-        val uniqueDetailedAddressClue = PlaceClue(
+        val differentlyNamedDetailedAddressClue = PlaceClue(
             name = "TOOL 3",
             region = "서울 중구",
             queries = listOf("TOOL 3", "마른내로6길 18-1 2층"),
             addressHint = "서울 중구 마른내로6길 18-1 2층",
         )
-        assertTrue(
-            uniqueDetailedAddressClue.isSupportedBy(
+        assertFalse(
+            differentlyNamedDetailedAddressClue.isSupportedBy(
                 candidate("툴3", "서울 중구 마른내로6길 18-1"),
-                allowDetailedAddressOnly = true,
             ),
         )
+
+        val roomClue = PlaceClue(
+            name = "KOZELNANT",
+            region = "서울 종로구",
+            queries = listOf("KOZELNANT", "삼일대로 437 인사관 407호"),
+            addressHint = "서울 종로구 삼일대로 437 인사관 407호",
+        )
+        assertFalse(roomClue.isSupportedBy(candidate("세보가", "서울 종로구 삼일대로 437")))
 
         val basementClue = PlaceClue(
             name = "도원",

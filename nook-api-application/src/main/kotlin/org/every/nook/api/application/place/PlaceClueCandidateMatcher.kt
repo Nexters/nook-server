@@ -7,14 +7,14 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.compatibleWith(
     return filter { candidate -> PlaceAddressMatcher.isCompatible(addressHint, candidate.place.address) }
 }
 
-internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate, allowDetailedAddressOnly: Boolean = false): Boolean {
+internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
     val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
     if (explicitAddressHint != null && !PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address)) {
         return false
     }
 
     val hasCompatibleName = hasCompatibleName(candidate)
-    if (explicitAddressHint != null && !hasCompatibleName && !allowDetailedAddressOnly) {
+    if (explicitAddressHint != null && !hasCompatibleName) {
         return false
     }
     return evidence.isEmpty() || hasCompatibleName || hasCompatibleEvidence(candidate)
