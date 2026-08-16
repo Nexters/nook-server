@@ -18,7 +18,9 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
-import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
+import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyList
@@ -43,7 +45,8 @@ class PlaceParsingPersistenceAdapterTest {
     private val mediaRepository = mock(PostMediaJpaRepository::class.java)
     private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
-    private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
+    private val userSavedPostLockRepository = mock(UserSavedPostLockJpaRepository::class.java)
+    private val userSavedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val postPlaceTagRepository = mock(PostPlaceTagJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
@@ -54,7 +57,8 @@ class PlaceParsingPersistenceAdapterTest {
         mediaRepository = mediaRepository,
         placeRepository = placeRepository,
         postPlaceRepository = postPlaceRepository,
-        userSavedPostRepository = userSavedPostRepository,
+        userSavedPostLockRepository = userSavedPostLockRepository,
+        userSavedPostPlaceRepository = userSavedPostPlaceRepository,
         userPlaceBookmarkRepository = bookmarkRepository,
         postPlaceTagRepository = postPlaceTagRepository,
         eventPublisher = eventPublisher,
@@ -185,7 +189,11 @@ class PlaceParsingPersistenceAdapterTest {
             savedPostWithMemo(userId = 7, memo = "내 메모"),
             savedPostWithMemo(userId = 8, memo = null),
         )
-        `when`(userSavedPostRepository.findAllByPostId(11)).thenReturn(savedPosts)
+        `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(savedPosts)
+        `when`(userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(21))
+            .thenReturn(listOf(UserSavedPostPlaceEntity(21, 17, 0)))
+        `when`(userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(22))
+            .thenReturn(listOf(UserSavedPostPlaceEntity(22, 17, 0)))
 
         adapter.complete(
             postId = 11,
@@ -204,6 +212,8 @@ class PlaceParsingPersistenceAdapterTest {
             ),
         )
 
+        verify(userSavedPostPlaceRepository).insertAllFromPost(21, 11)
+        verify(userSavedPostPlaceRepository).insertAllFromPost(22, 11)
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "내 메모")
         verify(bookmarkRepository).insertIgnoreWithMemo(8, 17, null)
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
@@ -217,7 +227,7 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(null)
         `when`(placeRepository.save(any(PlaceEntity::class.java))).thenReturn(savedPlace)
-        `when`(userSavedPostRepository.findAllByPostId(11)).thenReturn(emptyList())
+        `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(emptyList())
 
         adapter.complete(
             postId = 11,
@@ -273,6 +283,7 @@ class PlaceParsingPersistenceAdapterTest {
     }
     private fun savedPostWithMemo(userId: Long, memo: String?): UserSavedPostEntity {
         val savedPost = mock(UserSavedPostEntity::class.java)
+        `when`(savedPost.id).thenReturn(if (userId == 7L) 21 else 22)
         `when`(savedPost.userId).thenReturn(userId)
         `when`(savedPost.memo).thenReturn(memo)
         return savedPost

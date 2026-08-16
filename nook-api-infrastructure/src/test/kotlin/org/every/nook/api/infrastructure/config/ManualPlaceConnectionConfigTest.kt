@@ -5,6 +5,7 @@ import org.every.nook.api.application.place.PagedPlaceSearchProvider
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
+import org.every.nook.api.application.place.port.DisconnectPostPlacePort
 import org.every.nook.api.infrastructure.auth.JwtProperties
 import org.every.nook.api.infrastructure.place.KakaoPlaceSearchProvider
 import org.mockito.Mockito.mock
@@ -31,6 +32,10 @@ class ManualPlaceConnectionConfigTest {
         .withBean(
             ConnectPostPlacePort::class.java,
             Supplier { mock(ConnectPostPlacePort::class.java) },
+        )
+        .withBean(
+            DisconnectPostPlacePort::class.java,
+            Supplier { mock(DisconnectPostPlacePort::class.java) },
         )
         .withBean(PlaceThumbnailProvider::class.java, Supplier { NoOpPlaceThumbnailProvider })
 

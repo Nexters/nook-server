@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Positive
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
+import org.every.nook.api.application.place.DisconnectPostPlaceUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.DeleteSavedPostUseCase
 import org.every.nook.api.application.post.FindPostPlaceParsingUseCase
@@ -54,6 +55,7 @@ class PostController(
     private val updatePostMemoUseCase: UpdatePostMemoUseCase,
     private val replaceSavedPostGroupsUseCase: ReplaceSavedPostGroupsUseCase,
     private val connectPostPlaceUseCase: ConnectPostPlaceUseCase,
+    private val disconnectPostPlaceUseCase: DisconnectPostPlaceUseCase,
     private val deleteSavedPostUseCase: DeleteSavedPostUseCase,
 ) {
     @Operation(summary = "내 저장 게시물 삭제")
@@ -208,5 +210,28 @@ class PostController(
             ),
         )
         return ApiResponse.success(ConnectedPlaceResponse.from(result))
+    }
+
+    @Operation(summary = "저장 게시물의 장소 연결 삭제")
+    @DeleteMapping("/{postId}/places/{placeId}")
+    fun disconnectPlace(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "장소 연결을 삭제할 저장 게시물 식별자")
+        @PathVariable
+        @Positive
+        postId: Long,
+        @Parameter(description = "연결을 삭제할 장소 식별자")
+        @PathVariable
+        @Positive
+        placeId: Long,
+    ): ApiResponse<Unit> {
+        disconnectPostPlaceUseCase(
+            DisconnectPostPlaceUseCase.Command(
+                userId = userContext.userId,
+                postId = postId,
+                placeId = placeId,
+            ),
+        )
+        return ApiResponse.success(Unit)
     }
 }

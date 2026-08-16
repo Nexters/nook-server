@@ -20,8 +20,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobE
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
-import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -41,7 +39,7 @@ class PostPersistenceAdapterTest {
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
-    private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
+    private val userSavedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
@@ -50,8 +48,8 @@ class PostPersistenceAdapterTest {
         postJpaRepository = postRepository,
         postContentParsingJobJpaRepository = contentParsingJobRepository,
         userSavedPostJpaRepository = userSavedPostRepository,
+        userSavedPostPlaceJpaRepository = userSavedPostPlaceRepository,
         placeParsingJobJpaRepository = parsingJobRepository,
-        postPlaceJpaRepository = postPlaceRepository,
         placeJpaRepository = mock(PlaceJpaRepository::class.java),
         userPlaceBookmarkJpaRepository = bookmarkRepository,
         groupJpaRepository = groupRepository,
@@ -214,7 +212,7 @@ class PostPersistenceAdapterTest {
         val eventCaptor = ArgumentCaptor.forClass(PlaceParsingJobRequestedEvent::class.java)
         verify(eventPublisher).publishEvent(eventCaptor.capture())
         assertEquals(101, eventCaptor.value.postId)
-        verifyNoInteractions(postPlaceRepository, bookmarkRepository)
+        verifyNoInteractions(userSavedPostPlaceRepository, bookmarkRepository)
     }
 
     @Test
@@ -244,10 +242,10 @@ class PostPersistenceAdapterTest {
                 org.mockito.ArgumentMatchers.any(UserSavedPostEntity::class.java),
             ),
         ).thenReturn(savedPost)
-        `when`(postPlaceRepository.findAllByPostIdOrderBySequenceAsc(101)).thenReturn(
+        `when`(userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11)).thenReturn(
             listOf(
-                PostPlaceEntity(postId = 101, placeId = 201, sequence = 0),
-                PostPlaceEntity(postId = 101, placeId = 202, sequence = 1),
+                UserSavedPostPlaceEntity(userSavedPostId = 11, placeId = 201, sequence = 0),
+                UserSavedPostPlaceEntity(userSavedPostId = 11, placeId = 202, sequence = 1),
             ),
         )
 
@@ -260,6 +258,7 @@ class PostPersistenceAdapterTest {
 
         assertEquals(11, result.postId)
         assertEquals(PlaceParsingStatus.COMPLETED, result.placeParsingStatus)
+        verify(userSavedPostPlaceRepository).insertAllFromPost(11, 101)
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 201, "주말에 방문")
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 202, "주말에 방문")
     }
