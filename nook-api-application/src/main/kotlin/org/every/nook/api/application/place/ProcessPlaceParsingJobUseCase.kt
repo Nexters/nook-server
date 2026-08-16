@@ -187,33 +187,27 @@ class ProcessPlaceParsingJobUseCase(
         }
         val selectionCandidates = candidates.compatibleWith(clue)
         val matches = strictMatches(clue, selectionCandidates)
+        val groundedMatches = selectionCandidates.filter { candidate -> clue.isSupportedBy(candidate.place) }
         val candidateDescriptions = selectionCandidates.descriptions(CANDIDATE_LOG_LIMIT)
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
                 "candidateCount=${candidates.size}, addressMatchCount=${selectionCandidates.size}, " +
-                "matchCount=${matches.size}, candidates=$candidateDescriptions"
+                "strictMatchCount=${matches.size}, groundedMatchCount=${groundedMatches.size}, " +
+                "candidates=$candidateDescriptions"
         }
 
-        val resolved = if (matches.size == 1) {
-            matches.single().place
-        } else {
+        val selection = uniqueCandidate(matches, groundedMatches) ?: run {
             if (selectionCandidates.isEmpty()) {
                 failResolution("No place candidate found: ${clue.name}")
             }
-            measure(job, SELECT_STAGE) {
-                candidateSelector.select(
-                    PlaceCandidateSelector.Request(
-                        clue = clue,
-                        candidates = selectionCandidates,
-                    ),
-                )
+            val selected = measure(job, SELECT_STAGE) {
+                candidateSelector.select(PlaceCandidateSelector.Request(clue = clue, candidates = selectionCandidates))
             } ?: failResolution(
                 "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
             )
+            CandidateSelection(selected, "openai")
         }
-        val allowDetailedAddressOnly = selectionCandidates.size == 1 &&
-            PlaceAddressMatcher.hasLocationDetail(clue.addressHint)
-        if (!clue.isSupportedBy(resolved, allowDetailedAddressOnly)) {
+        if (!clue.isSupportedBy(selection.place)) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
         eventLogger.info(
@@ -222,19 +216,21 @@ class ProcessPlaceParsingJobUseCase(
                 SELECT_STAGE,
                 SUCCESS_OUTCOME,
                 fields = mapOf(
-                    "provider.name" to resolved.provider,
-                    "place.external_id" to resolved.externalPlaceId,
-                    "place.selection_method" to if (matches.size == 1) "strict_match" else "openai",
+                    "provider.name" to selection.place.provider,
+                    "place.external_id" to selection.place.externalPlaceId,
+                    "place.selection_method" to selection.method,
                     "place.candidate_count" to candidates.size,
                     "place.strict_match_count" to matches.size,
+                    "place.grounded_match_count" to groundedMatches.size,
                 ),
             ),
         )
         logger.info {
-            "Place resolved: provider=${resolved.provider}, externalPlaceId=${resolved.externalPlaceId}, " +
-                "name=${resolved.name}, address=${resolved.address}"
+            "Place resolved: provider=${selection.place.provider}, " +
+                "externalPlaceId=${selection.place.externalPlaceId}, " +
+                "name=${selection.place.name}, address=${selection.place.address}"
         }
-        return resolved
+        return selection.place
     }
 
     private fun searchCandidates(
@@ -367,6 +363,17 @@ class ProcessPlaceParsingJobUseCase(
 
     private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
 }
+
+private fun uniqueCandidate(
+    strictMatches: List<PlaceCandidateSelector.Candidate>,
+    groundedMatches: List<PlaceCandidateSelector.Candidate>,
+): CandidateSelection? = when {
+    strictMatches.size == 1 -> CandidateSelection(strictMatches.single().place, "strict_match")
+    groundedMatches.size == 1 -> CandidateSelection(groundedMatches.single().place, "grounded_match")
+    else -> null
+}
+
+private data class CandidateSelection(val place: PlaceCandidate, val method: String)
 
 private fun logOcrDecision(
     logger: org.slf4j.Logger,
