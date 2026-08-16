@@ -33,6 +33,33 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `accepts a road address when the source omits the final gil suffix`() {
+        assertTrue(
+            PlaceAddressMatcher.isCompatible(
+                "서울 용산구 이태원로20가 11 4층",
+                "서울특별시 용산구 이태원로20가길 11 4층",
+            ),
+        )
+        assertTrue(
+            PlaceAddressMatcher.isCompatible(
+                "서울 용산구 이태원로20가 11 4층",
+                "서울 용산구 이태원로20가길 11",
+            ),
+        )
+    }
+
+    @Test
+    fun `accepts a building number and floor concatenated by OCR`() {
+        assertTrue(
+            PlaceAddressMatcher.isCompatible(
+                "서울 중구 삼일대로 3018층",
+                "서울특별시 중구 삼일대로 301 8층",
+            ),
+        )
+        assertTrue(PlaceAddressMatcher.hasLocationDetail("서울 중구 삼일대로 3018층"))
+    }
+
+    @Test
     fun `rejects conflicting floor and room details when both addresses provide them`() {
         assertFalse(
             PlaceAddressMatcher.isCompatible(
@@ -75,6 +102,26 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `limits candidate selection to addresses compatible with the explicit clue`() {
+        val clue = PlaceClue(
+            name = "도원",
+            region = "서울 마포구",
+            queries = listOf("도원", "홍대 도원"),
+            addressHint = "서울 마포구 동교로38길 27-19 지1층 좌측",
+        )
+        val correct = candidate("도원", "서울 마포구 동교로38길 27-19")
+        val wrong = candidate("도원", "서울 마포구 월드컵북로5가길 34")
+
+        assertEquals(
+            listOf(correct),
+            listOf(correct, wrong)
+                .map { PlaceCandidateSelector.Candidate(it, listOf("도원")) }
+                .compatibleWith(clue)
+                .map(PlaceCandidateSelector.Candidate::place),
+        )
+    }
+
+    @Test
     fun `accepts matching store when provider omits floor but rejects wrong address or store`() {
         val clue = PlaceClue(
             name = "SHEET",
@@ -87,6 +134,32 @@ class PlaceAddressMatcherTest {
         assertFalse(clue.isSupportedBy(candidate("SHEET", "서울 중구 마른내로 51-4")))
         assertFalse(clue.isSupportedBy(candidate("고은손카드", "서울 중구 마른내로 55")))
         assertFalse(clue.isSupportedBy(candidate("SHEET", "서울 중구 마른내로 55 3층")))
+        assertTrue(clue.isSupportedBy(candidate("SHEEP", "서울 중구 마른내로 55")))
+
+        val transliteratedClue = PlaceClue(
+            name = "noob.store",
+            region = "서울 중구",
+            queries = listOf("noobstore", "을지로 noobstore"),
+            addressHint = "서울 중구 을지로18길 25-2 4층",
+        )
+        assertTrue(
+            transliteratedClue.isSupportedBy(
+                candidate("눕스토어", "서울 중구 을지로18길 25-2 4층 흰색 문 noobstore"),
+            ),
+        )
+
+        val uniqueDetailedAddressClue = PlaceClue(
+            name = "TOOL 3",
+            region = "서울 중구",
+            queries = listOf("TOOL 3", "마른내로6길 18-1 2층"),
+            addressHint = "서울 중구 마른내로6길 18-1 2층",
+        )
+        assertTrue(
+            uniqueDetailedAddressClue.isSupportedBy(
+                candidate("툴3", "서울 중구 마른내로6길 18-1"),
+                allowDetailedAddressOnly = true,
+            ),
+        )
 
         val basementClue = PlaceClue(
             name = "도원",

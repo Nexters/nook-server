@@ -185,31 +185,35 @@ class ProcessPlaceParsingJobUseCase(
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
                 "addressHint=${clue.addressHint}, queries=${clue.searchQueries()}, candidateCount=${candidates.size}"
         }
-        val matches = strictMatches(clue, candidates)
+        val selectionCandidates = candidates.compatibleWith(clue)
+        val matches = strictMatches(clue, selectionCandidates)
+        val candidateDescriptions = selectionCandidates.descriptions(CANDIDATE_LOG_LIMIT)
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
-                "candidateCount=${candidates.size}, matchCount=${matches.size}, " +
-                "candidates=${candidates.take(CANDIDATE_LOG_LIMIT).map { "${it.place.name}|${it.place.address}" }}"
+                "candidateCount=${candidates.size}, addressMatchCount=${selectionCandidates.size}, " +
+                "matchCount=${matches.size}, candidates=$candidateDescriptions"
         }
 
         val resolved = if (matches.size == 1) {
             matches.single().place
         } else {
-            if (candidates.isEmpty()) {
+            if (selectionCandidates.isEmpty()) {
                 failResolution("No place candidate found: ${clue.name}")
             }
             measure(job, SELECT_STAGE) {
                 candidateSelector.select(
                     PlaceCandidateSelector.Request(
                         clue = clue,
-                        candidates = candidates,
+                        candidates = selectionCandidates,
                     ),
                 )
             } ?: failResolution(
                 "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
             )
         }
-        if (!clue.isSupportedBy(resolved)) {
+        val allowDetailedAddressOnly = selectionCandidates.size == 1 &&
+            PlaceAddressMatcher.hasLocationDetail(clue.addressHint)
+        if (!clue.isSupportedBy(resolved, allowDetailedAddressOnly)) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
         eventLogger.info(
@@ -443,39 +447,3 @@ private const val MIN_EXPECTED_PLACE_COUNT = 2
 private const val MAX_EXPECTED_PLACE_COUNT = 80
 private const val MAX_PLACE_QUERY_COUNT = 4
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
-
-internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
-    val candidateName = candidate.name.groundingKey()
-    val clueName = name.groundingKey()
-    val hasCompatibleName = candidateName == clueName ||
-        candidateName.isCompatibleName(clueName) ||
-        queries.asSequence().map(String::groundingKey).any(candidateName::isCompatibleName)
-    val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
-    if (explicitAddressHint != null) {
-        if (!PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address) || !hasCompatibleName) {
-            return false
-        }
-    }
-    if (evidence.isEmpty()) return true
-    val candidateAddress = candidate.address.groundingKey()
-    val candidateAddressKeys = PlaceAddressMatcher.addressKeys(candidate.address)
-    val hasCompatibleEvidence = evidence.asSequence()
-        .map(PlaceClueEvidence::evidenceText)
-        .any { evidenceText ->
-            val normalizedEvidence = evidenceText.groundingKey()
-            val containsName = candidateName.length >= MIN_GROUNDING_KEY_LENGTH &&
-                normalizedEvidence.contains(candidateName)
-            val containsAddress = candidateAddress.length >= MIN_ADDRESS_GROUNDING_KEY_LENGTH &&
-                normalizedEvidence.contains(candidateAddress)
-            containsName || containsAddress ||
-                candidateAddressKeys.any { it in PlaceAddressMatcher.addressKeys(evidenceText) }
-        }
-    return hasCompatibleName || hasCompatibleEvidence
-}
-
-private fun String.isCompatibleName(other: String): Boolean = length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
-    other.length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
-    (contains(other) || other.contains(this))
-
-private const val MIN_NAME_COMPATIBILITY_KEY_LENGTH = 3
-private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6
