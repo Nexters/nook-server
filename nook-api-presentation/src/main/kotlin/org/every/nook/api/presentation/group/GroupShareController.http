@@ -1,0 +1,16 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+### 그룹 공유 링크 발급
+PUT {{baseUrl}}/api/v1/groups/1/share-link
+Authorization: Bearer replace-with-nook-access-token
+
+### 그룹 공유 링크 해제
+DELETE {{baseUrl}}/api/v1/groups/1/share-link
+Authorization: Bearer replace-with-nook-access-token

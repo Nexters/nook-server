@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.group
 import org.every.nook.api.application.group.GroupView
 import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.group.port.GroupPort
+import org.every.nook.api.application.group.port.GroupSharePort
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.springframework.stereotype.Component
@@ -16,14 +17,14 @@ class GroupPersistenceAdapter(
     private val groupPostRepository: GroupPostJpaRepository,
     private val savedPostRepository: UserSavedPostJpaRepository,
     private val clock: Clock = Clock.systemUTC(),
+    private val groupSharePort: GroupSharePort? = null,
 ) : GroupPort,
     GroupOwnershipPort {
     @Transactional(readOnly = true)
     override fun findAll(userId: Long): List<GroupView> {
         val summaries = groupRepository.findAllSummaries(userId)
-        if (summaries.isEmpty()) {
-            return emptyList()
-        }
+        val sharedGroups = groupSharePort?.findSubscribedGroups(userId).orEmpty()
+        if (summaries.isEmpty()) return sharedGroups
         val thumbnailUrlsByGroupId = groupRepository.findRecentThumbnailUrls(userId)
             .mapNotNull { thumbnail ->
                 (thumbnail.postMediaUrl ?: thumbnail.placeThumbnailUrl)?.let { thumbnail.groupId to it }
@@ -31,7 +32,7 @@ class GroupPersistenceAdapter(
             .groupBy(Pair<Long, String>::first, Pair<Long, String>::second)
         return summaries.map { projection ->
             projection.toView(thumbnailUrlsByGroupId.getOrDefault(projection.id, emptyList()))
-        }
+        } + sharedGroups
     }
 
     override fun create(userId: Long, name: String, color: GroupColor): GroupView {

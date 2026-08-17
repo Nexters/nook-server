@@ -16,10 +16,15 @@ import org.every.nook.api.member.MemberProfileResponse
 import org.every.nook.api.member.UpdateMemberProfileRequest
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.GroupController
+import org.every.nook.api.presentation.group.GroupShareController
+import org.every.nook.api.presentation.group.PublicGroupController
+import org.every.nook.api.presentation.group.SharedGroupSubscriptionController
 import org.every.nook.api.presentation.group.request.CreateGroupRequest
 import org.every.nook.api.presentation.group.request.UpdateGroupRequest
+import org.every.nook.api.presentation.group.response.GroupOwnerResponse
 import org.every.nook.api.presentation.group.response.GroupPostSummaryResponse
 import org.every.nook.api.presentation.group.response.GroupResponse
+import org.every.nook.api.presentation.group.response.GroupShareLinkResponse
 import org.every.nook.api.presentation.place.PlaceController
 import org.every.nook.api.presentation.place.request.UpdatePlaceBookmarkRequest
 import org.every.nook.api.presentation.place.response.MapPlaceResponse
@@ -199,6 +204,9 @@ class OpenApiDocumentationPolicyTest {
         val controllers = listOf(
             AuthController::class.java,
             GroupController::class.java,
+            GroupShareController::class.java,
+            PublicGroupController::class.java,
+            SharedGroupSubscriptionController::class.java,
             MemberController::class.java,
             PlaceController::class.java,
             PostController::class.java,
@@ -214,6 +222,8 @@ class OpenApiDocumentationPolicyTest {
             CreateGroupRequest::class.java,
             UpdateGroupRequest::class.java,
             GroupResponse::class.java,
+            GroupOwnerResponse::class.java,
+            GroupShareLinkResponse::class.java,
             UpdatePlaceBookmarkRequest::class.java,
             MapPlaceResponse::class.java,
             RecentPlaceSliceResponse::class.java,
