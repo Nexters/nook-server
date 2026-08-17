@@ -24,7 +24,7 @@ else
 fi
 
 docker compose pull
-docker compose up -d
+docker compose up -d --wait --wait-timeout 120
 docker compose ps
 curl -fsS http://127.0.0.1:8080/actuator/health
 REMOTE_SCRIPT
