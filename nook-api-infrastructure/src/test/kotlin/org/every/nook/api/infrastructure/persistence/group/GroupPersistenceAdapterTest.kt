@@ -32,7 +32,7 @@ class GroupPersistenceAdapterTest {
     )
 
     @Test
-    fun `lists groups with recent thumbnail urls in repository order`() {
+    fun `lists groups with Instagram images before place thumbnail fallbacks`() {
         val groupSummary = mock(GroupSummaryProjection::class.java)
         val firstThumbnail = mock(GroupThumbnailProjection::class.java)
         val secondThumbnail = mock(GroupThumbnailProjection::class.java)
@@ -41,16 +41,18 @@ class GroupPersistenceAdapterTest {
         `when`(groupSummary.color).thenReturn(GroupColor.YELLOW)
         `when`(groupSummary.postCount).thenReturn(4)
         `when`(firstThumbnail.groupId).thenReturn(17)
-        `when`(firstThumbnail.thumbnailUrl).thenReturn("https://example.com/latest.jpg")
+        `when`(firstThumbnail.postMediaUrl).thenReturn("https://example.com/instagram.jpg")
+        `when`(firstThumbnail.placeThumbnailUrl).thenReturn("https://example.com/place.jpg")
         `when`(secondThumbnail.groupId).thenReturn(17)
-        `when`(secondThumbnail.thumbnailUrl).thenReturn("https://example.com/second.jpg")
+        `when`(secondThumbnail.postMediaUrl).thenReturn(null)
+        `when`(secondThumbnail.placeThumbnailUrl).thenReturn("https://example.com/fallback.jpg")
         `when`(groupRepository.findAllSummaries(7)).thenReturn(listOf(groupSummary))
         `when`(groupRepository.findRecentThumbnailUrls(7)).thenReturn(listOf(firstThumbnail, secondThumbnail))
 
         val result = adapter.findAll(7)
 
         assertEquals(
-            listOf("https://example.com/latest.jpg", "https://example.com/second.jpg"),
+            listOf("https://example.com/instagram.jpg", "https://example.com/fallback.jpg"),
             result.single().thumbnailUrls,
         )
         verify(groupRepository).findRecentThumbnailUrls(7)
