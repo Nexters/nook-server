@@ -24,6 +24,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.effectiveThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
@@ -240,7 +241,7 @@ class SavedPostQueryPersistenceAdapter(
                 tags = place.representativeTags.map { it.displayName },
                 bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                 memo = memoByPlaceId[postPlace.placeId],
-                thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.thumbnailParsingStatus),
+                thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.effectiveThumbnailParsingStatus()),
                 sequence = postPlace.sequence,
             )
         }

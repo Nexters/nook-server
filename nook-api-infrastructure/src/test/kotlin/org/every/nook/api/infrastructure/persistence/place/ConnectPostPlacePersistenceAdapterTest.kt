@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
@@ -83,7 +84,10 @@ class ConnectPostPlacePersistenceAdapterTest {
             ),
         )
 
-        verify(place).updateSupplement(PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")))
+        verify(place).updateThumbnailParsing(
+            PlaceThumbnailParsingStatus.COMPLETED,
+            PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")),
+        )
         verify(placeRepository).insertIgnore(
             provider = "KAKAO",
             externalPlaceId = "1234",

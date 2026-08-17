@@ -67,7 +67,7 @@ class PlaceDetailQueryPersistenceAdapter(
             category = place.category,
             phoneNumber = place.phoneNumber,
             thumbnailUrl = place.thumbnailUrl,
-            thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.thumbnailParsingStatus),
+            thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.effectiveThumbnailParsingStatus()),
             photoUrls = place.photoUrls,
             openingHours = place.openingHours,
             openNow = place.openingHours?.isOpenAt(clock.instant()),
