@@ -9,11 +9,14 @@ import org.every.nook.api.application.group.ListSharedGroupPostsUseCase
 import org.every.nook.api.application.group.RevokeGroupShareLinkUseCase
 import org.every.nook.api.application.group.SubscribeSharedGroupUseCase
 import org.every.nook.api.application.group.UnsubscribeSharedGroupUseCase
+import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
 import org.every.nook.api.application.group.port.GroupPostQueryPort
 import org.every.nook.api.application.group.port.GroupSharePort
 import org.every.nook.api.application.group.port.SharedPostViewerQueryPort
 import org.every.nook.api.application.place.port.SharedPlaceDetailQueryPort
+import org.every.nook.api.application.post.SaveSharedPostUseCase
+import org.every.nook.api.application.post.port.SaveSharedPostPort
 import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -53,4 +56,11 @@ class GroupShareUseCaseConfig {
     @Bean
     fun getSharedPlaceDetailUseCase(port: GroupSharePort, queryPort: SharedPlaceDetailQueryPort) =
         GetSharedPlaceDetailUseCase(port, queryPort)
+
+    @Bean
+    fun saveSharedPostUseCase(
+        groupSharePort: GroupSharePort,
+        groupOwnershipPort: GroupOwnershipPort,
+        saveSharedPostPort: SaveSharedPostPort,
+    ) = SaveSharedPostUseCase(groupSharePort, groupOwnershipPort, saveSharedPostPort)
 }
