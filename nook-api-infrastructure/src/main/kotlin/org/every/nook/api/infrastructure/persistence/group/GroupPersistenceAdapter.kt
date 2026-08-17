@@ -25,7 +25,10 @@ class GroupPersistenceAdapter(
             return emptyList()
         }
         val thumbnailUrlsByGroupId = groupRepository.findRecentThumbnailUrls(userId)
-            .groupBy(GroupThumbnailProjection::groupId, GroupThumbnailProjection::thumbnailUrl)
+            .mapNotNull { thumbnail ->
+                (thumbnail.postMediaUrl ?: thumbnail.placeThumbnailUrl)?.let { thumbnail.groupId to it }
+            }
+            .groupBy(Pair<Long, String>::first, Pair<Long, String>::second)
         return summaries.map { projection ->
             projection.toView(thumbnailUrlsByGroupId.getOrDefault(projection.id, emptyList()))
         }
