@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
+import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.place.PlaceParsingStatus
@@ -20,6 +21,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkEntity
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
@@ -142,6 +144,41 @@ class SavedPostQueryPersistenceAdapterTest {
     }
 
     @Test
+    fun `detail returns saved content with empty places when place parsing failed`() {
+        val savedPost = savedPost(id = 11, sourcePostId = 101)
+        val sourcePost = PostEntity(
+            sourceType = "INSTAGRAM",
+            externalPostId = "FAILED_PLACE",
+            canonicalUrl = "https://www.instagram.com/p/FAILED_PLACE/",
+            authorIdentifier = "author",
+            title = "저장된 게시물",
+            body = "저장된 원문",
+        )
+        val placeJob = PlaceParsingJobEntity(
+            postId = 101,
+            status = PlaceParsingStatus.FAILED,
+            failureReason = "No place candidate found",
+        )
+
+        `when`(savedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
+        `when`(postRepository.findById(101)).thenReturn(Optional.of(sourcePost))
+        `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101))).thenReturn(emptyList())
+        `when`(hashtagRepository.findAllByPostIdOrderBySequenceAsc(101)).thenReturn(emptyList())
+        `when`(savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11)).thenReturn(emptyList())
+        `when`(parsingJobRepository.findByPostId(101)).thenReturn(placeJob)
+        `when`(groupPostRepository.findAllByUserSavedPostIdIn(listOf(11))).thenReturn(emptyList())
+
+        val detail = requireNotNull(adapter.findDetail(userId = 7, postId = 11))
+
+        assertEquals("저장된 게시물", detail.title)
+        assertEquals("저장된 원문", detail.body)
+        assertEquals("https://www.instagram.com/p/FAILED_PLACE/", detail.canonicalUrl)
+        assertEquals(PlaceParsingStatusView.FAILED, detail.placeParsingStatus)
+        assertEquals("No place candidate found", detail.placeParsingFailureReason)
+        assertEquals(emptyList(), detail.places)
+    }
+
+    @Test
     fun `list uses stable newest first pagination`() {
         val savedPost = mock(UserSavedPostEntity::class.java)
         `when`(savedPost.id).thenReturn(11)
@@ -172,7 +209,7 @@ class SavedPostQueryPersistenceAdapterTest {
     }
 
     @Test
-    fun `group list uses the first Instagram media instead of a place thumbnail`() {
+    fun `group list includes failed content posts and uses the first Instagram media`() {
         val firstSavedPost = savedPost(id = 11, sourcePostId = 101)
         val secondSavedPost = savedPost(id = 12, sourcePostId = 102)
         val firstPost = sourcePost(id = 101, title = "첫 게시물")
@@ -191,16 +228,10 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(owner.nickname).thenReturn("Purr")
         `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
         `when`(memberRepository.findById(9)).thenReturn(Optional.of(owner))
-        `when`(
-            savedPostRepository.findAllByUserIdAndGroupId(
-                7,
-                17,
-                PostContentParsingStatus.FAILED,
-                requestedPage,
-            ),
-        )
+        `when`(savedPostRepository.findAllByUserIdAndGroupId(7, 17, requestedPage))
             .thenReturn(PageImpl(listOf(firstSavedPost, secondSavedPost), requestedPage, 2))
         `when`(postRepository.findAllById(listOf(101L, 102L))).thenReturn(listOf(firstPost, secondPost))
+        stubGroupListParsingJobs()
         `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101L, 102L)))
             .thenReturn(listOf(firstMedia))
         `when`(
@@ -220,6 +251,8 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf(2L, 0L), result.items.map { it.placeCount })
         assertEquals(SavedPostMediaType.VIDEO, result.items.first().post.representativeMedia?.type)
         assertEquals("https://example.com/instagram-video.mp4", result.items.first().post.representativeMedia?.url)
+        assertEquals(PostProcessingStatusView.FAILED, result.items.first().post.processingStatus)
+        assertEquals(PostProcessingStatusView.COMPLETED, result.items.last().post.processingStatus)
         assertEquals(2, result.totalElements)
         verify(memberRepository).findById(9)
         verify(savedPostPlaceRepository, times(2))
@@ -228,7 +261,6 @@ class SavedPostQueryPersistenceAdapterTest {
         verify(savedPostRepository).findAllByUserIdAndGroupId(
             7,
             17,
-            PostContentParsingStatus.FAILED,
             requestedPage,
         )
     }
@@ -246,6 +278,19 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(savedPost.postId).thenReturn(sourcePostId)
         `when`(savedPost.createdAt).thenReturn(Instant.parse("2026-07-27T00:00:00Z"))
         return savedPost
+    }
+
+    private fun stubGroupListParsingJobs() {
+        val postIds = listOf(101L, 102L)
+        `when`(contentParsingJobRepository.findAllByPostIdIn(postIds)).thenReturn(
+            listOf(
+                PostContentParsingJobEntity(101, PostContentParsingStatus.FAILED),
+                PostContentParsingJobEntity(102, PostContentParsingStatus.COMPLETED),
+            ),
+        )
+        `when`(parsingJobRepository.findAllByPostIdIn(postIds)).thenReturn(
+            postIds.map { PlaceParsingJobEntity(it, PlaceParsingStatus.COMPLETED) },
+        )
     }
 
     private fun sourcePost(id: Long, title: String): PostEntity {
