@@ -13,16 +13,75 @@ concurrency:
 
 env:
   GABIA_PUBLIC_REGISTRY: everynook.cr.gabiacloud.com
-  IMAGE_REPOSITORY: nook/nook-api
+  API_IMAGE_REPOSITORY: nook/nook-api
+  ADMIN_WEB_IMAGE_REPOSITORY: nook/nook-admin-web
 
 jobs:
-  build:
-    name: Build and Push
+  changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    outputs:
+      api-changed: ${{ steps.detect.outputs.api-changed }}
+      admin-web-changed: ${{ steps.detect.outputs.admin-web-changed }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed deployment targets
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          before="${{ github.event.before }}"
+          zero_sha="0000000000000000000000000000000000000000"
+
+          if [[ "${before}" == "${zero_sha}" ]]; then
+            git diff-tree --no-commit-id --name-only -r "${GITHUB_SHA}" > changed-files.txt
+          else
+            git diff --name-only "${before}" "${GITHUB_SHA}" > changed-files.txt
+          fi
+
+          api_changed=false
+          admin_web_changed=false
+
+          while IFS= read -r path; do
+            case "${path}" in
+              nook-admin-web/*|ops/admin-web/*)
+                admin_web_changed=true
+                ;;
+              Dockerfile|Dockerfile.batch|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|config/*|nook-api-*/*|.github/scripts/deploy-dev.sh)
+                api_changed=true
+                ;;
+              .github/workflows/container-image.yml)
+                api_changed=true
+                admin_web_changed=true
+                ;;
+              .github/scripts/deploy-admin-web.sh)
+                admin_web_changed=true
+                ;;
+            esac
+          done < changed-files.txt
+
+          {
+            echo "api-changed=${api_changed}"
+            echo "admin-web-changed=${admin_web_changed}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build-api:
+    name: Build and Push API
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.api-changed == 'true'
     timeout-minutes: 30
 
     outputs:
-      dev-image: ${{ steps.image.outputs.dev-image }}
+      image: ${{ steps.image.outputs.image }}
 
     steps:
       - name: Check out repository
@@ -54,14 +113,14 @@ jobs:
             exit 1
           fi
 
-          public_image="${GABIA_PUBLIC_REGISTRY}/${IMAGE_REPOSITORY}"
+          public_image="${GABIA_PUBLIC_REGISTRY}/${API_IMAGE_REPOSITORY}"
 
           {
             echo "tags<<EOF"
             echo "${public_image}:${prefix}-${short_sha}"
             echo "${public_image}:${prefix}-latest"
             echo "EOF"
-            echo "dev-image=${public_image}:dev-${short_sha}"
+            echo "image=${public_image}:${prefix}-${short_sha}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Build and push API image
@@ -74,11 +133,71 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-dev:
-    name: Deploy Dev
+  build-admin-web:
+    name: Build and Push Admin Web
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.admin-web-changed == 'true'
+    timeout-minutes: 15
+
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Log in to Gabia Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ${{ env.GABIA_PUBLIC_REGISTRY }}
+          username: ${{ secrets.GABIA_REGISTRY_USERNAME }}
+          password: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
+
+      - name: Resolve image tags
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          short_sha="${GITHUB_SHA::12}"
+          if [[ "${GITHUB_REF_NAME}" == "develop" ]]; then
+            prefix="dev"
+          elif [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            prefix="prod"
+          else
+            echo "Unsupported branch: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+          public_image="${GABIA_PUBLIC_REGISTRY}/${ADMIN_WEB_IMAGE_REPOSITORY}"
+
+          {
+            echo "tags<<EOF"
+            echo "${public_image}:${prefix}-${short_sha}"
+            echo "${public_image}:${prefix}-latest"
+            echo "EOF"
+            echo "image=${public_image}:${prefix}-${short_sha}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push admin web image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: nook-admin-web
+          file: nook-admin-web/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+          cache-from: type=gha,scope=admin-web
+          cache-to: type=gha,mode=max,scope=admin-web
+
+  deploy-dev-api:
+    name: Deploy Dev API
     runs-on: [self-hosted, nook-server-dev]
-    needs: build
-    if: github.ref_name == 'develop'
+    needs: [changes, build-api]
+    if: github.ref_name == 'develop' && needs.changes.outputs.api-changed == 'true' && needs.build-api.result == 'success'
     timeout-minutes: 10
 
     steps:
@@ -87,8 +206,30 @@ jobs:
 
       - name: Deploy to dev VM
         env:
-          DEV_IMAGE: ${{ needs.build.outputs.dev-image }}
+          DEV_IMAGE: ${{ needs.build-api.outputs.image }}
           GABIA_PUBLIC_REGISTRY: ${{ env.GABIA_PUBLIC_REGISTRY }}
           GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
           GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
         run: .github/scripts/deploy-dev.sh
+
+  deploy-dev-admin-web:
+    name: Deploy Dev Admin Web
+    runs-on: [self-hosted, nook-server-dev]
+    needs: [changes, build-admin-web]
+    if: github.ref_name == 'develop' && needs.changes.outputs.admin-web-changed == 'true' && needs.build-admin-web.result == 'success'
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Deploy to ops VM
+        env:
+          ADMIN_ENV: dev
+          ADMIN_WEB_PORT: "8081"
+          ADMIN_WEB_IMAGE: ${{ needs.build-admin-web.outputs.image }}
+          ADMIN_OPS_SSH_TARGET: ${{ secrets.ADMIN_OPS_SSH_TARGET }}
+          GABIA_PUBLIC_REGISTRY: ${{ env.GABIA_PUBLIC_REGISTRY }}
+          GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
+          GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
+        run: .github/scripts/deploy-admin-web.sh

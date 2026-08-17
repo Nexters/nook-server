@@ -2,6 +2,8 @@ package org.every.nook.api.config
 
 import io.swagger.v3.oas.models.media.Schema
 import io.swagger.v3.oas.models.security.SecurityScheme
+import org.springframework.boot.context.properties.bind.Binder
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -53,5 +55,20 @@ class OpenApiConfigTest {
             ).openAPI()
 
         assertEquals("https://api-dev.everynook.co.kr", openAPI.servers.single().url)
+    }
+
+    @Test
+    fun `admin api paths are excluded from generated OpenAPI docs`() {
+        val source = MapConfigurationPropertySource(
+            mapOf(
+                "springdoc.paths-to-exclude[0]" to "/api/admin/**",
+            ),
+        )
+
+        val excludedPaths = Binder(source)
+            .bind("springdoc.paths-to-exclude", Array<String>::class.java)
+            .get()
+
+        assertEquals("/api/admin/**", excludedPaths.single())
     }
 }

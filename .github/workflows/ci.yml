@@ -34,3 +34,20 @@ jobs:
 
       - name: Run checks
         run: ./gradlew check
+
+  admin-web:
+    name: Build Admin Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Build admin web
+        run: |
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            -w /workspace/nook-admin-web \
+            node:24-alpine \
+            sh -c 'corepack enable && pnpm install --frozen-lockfile && pnpm build'

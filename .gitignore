@@ -29,6 +29,9 @@ replay_pid*
 .kotlin/
 .idea/
 **/build/
+**/dist/
+**/node_modules/
+*.tsbuildinfo
 __pycache__/
 *.iml
 .env
