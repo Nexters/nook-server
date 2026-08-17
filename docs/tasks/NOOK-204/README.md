@@ -12,6 +12,8 @@ OOM 위험을 줄입니다.
 - MySQL 컨테이너: memory 768MiB, reservation 512MiB, memory+swap 1GiB
 - MySQL: `max_connections=50`
 - dev VM: 2GiB `/swapfile`, `vm.swappiness=10`
+- overview dashboard: JVM heap 사용률과 used/committed/max 추이
+- alert: heap 85% 초과 10분 warning, 95% 초과 5분 critical
 
 MySQL은 변경 전 약 601MiB를 사용하고 기동 중 일시적으로 사용량이 증가하므로 640MiB 대신
 768MiB로 제한합니다. 변경 전 최대 동시 연결 이력은 20개이므로 dev의 연결 상한은 50개로
@@ -42,6 +44,7 @@ docker compose -f ops/dev-runtime/mysql/compose.yml config
 - MySQL `max_connections=50`
 - 2GiB swap 활성화와 `/etc/fstab` 등록
 - actuator health `UP` 및 OOM kill 없음
+- Grafana overview의 JVM heap 패널과 두 heap alert rule provision
 
 ## Rollback
 
