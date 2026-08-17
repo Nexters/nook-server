@@ -30,7 +30,7 @@ private const val MAX_PUBLIC_PAGE_SIZE = 100L
 @Tag(name = "Public Group")
 @Validated
 @RestController
-@RequestMapping("/api/v1/public/groups/{token}")
+@RequestMapping("/api/public/v1/groups/{token}")
 class PublicGroupController(
     private val getGroupUseCase: GetSharedGroupUseCase,
     private val listPostsUseCase: ListSharedGroupPostsUseCase,
