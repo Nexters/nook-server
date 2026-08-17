@@ -74,12 +74,7 @@ class SavedPostQueryPersistenceAdapter(
             size,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
         )
-        val savedPosts = savedPostRepository.findAllByUserIdAndGroupId(
-            userId,
-            groupId,
-            PostContentParsingStatus.FAILED,
-            pageable,
-        )
+        val savedPosts = savedPostRepository.findAllByUserIdAndGroupId(userId, groupId, pageable)
         val savedPostPage = savedPosts.toPage(usePlaceThumbnail = false)
         val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
         val placeCountsBySavedPostId = if (savedPostIds.isEmpty()) {
