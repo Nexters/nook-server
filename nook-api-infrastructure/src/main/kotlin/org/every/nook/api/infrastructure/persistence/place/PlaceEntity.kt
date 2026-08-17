@@ -140,3 +140,6 @@ class PlaceEntity(
         representativeTags = tags.take(MAX_REPRESENTATIVE_TAG_COUNT)
     }
 }
+
+internal fun PlaceEntity.effectiveThumbnailParsingStatus(): PlaceThumbnailParsingStatus =
+    if (thumbnailUrl.isNullOrBlank()) thumbnailParsingStatus else PlaceThumbnailParsingStatus.COMPLETED

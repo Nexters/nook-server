@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
@@ -63,6 +64,23 @@ class PlaceDetailQueryPersistenceAdapterTest {
         assertTrue(detail.posts.items.isEmpty())
         assertEquals(0L, detail.posts.totalElements)
         verifyNoInteractions(postRepository, mediaRepository, groupRepository, groupPostRepository)
+    }
+
+    @Test
+    fun `place detail completes a stale pending status when a thumbnail URL exists`() {
+        val pageable = expectedPageable(page = 0, size = 20)
+        val place = place(
+            thumbnailUrl = "https://cdn.example.com/place.jpg",
+            thumbnailParsingStatus = PlaceThumbnailParsingStatus.PENDING,
+        )
+        `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
+        `when`(savedPostRepository.findAllByUserIdAndPlaceId(7, 17, pageable))
+            .thenReturn(PageImpl(emptyList(), pageable, 0))
+        `when`(bookmarkRepository.findByUserIdAndPlaceId(7, 17)).thenReturn(bookmark(memo = null))
+
+        val detail = assertNotNull(adapter.find(userId = 7, placeId = 17, page = 0, size = 20))
+
+        assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, detail.thumbnailParsingStatus)
     }
 
     @Test
@@ -137,7 +155,10 @@ class PlaceDetailQueryPersistenceAdapterTest {
         Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
     )
 
-    private fun place(): PlaceEntity {
+    private fun place(
+        thumbnailUrl: String? = null,
+        thumbnailParsingStatus: PlaceThumbnailParsingStatus = PlaceThumbnailParsingStatus.COMPLETED,
+    ): PlaceEntity {
         val place = mock(PlaceEntity::class.java)
         `when`(place.id).thenReturn(17)
         `when`(place.provider).thenReturn("KAKAO")
@@ -146,7 +167,8 @@ class PlaceDetailQueryPersistenceAdapterTest {
         `when`(place.address).thenReturn("서울 용산구")
         `when`(place.latitude).thenReturn(BigDecimal("37.1"))
         `when`(place.longitude).thenReturn(BigDecimal("127.1"))
-        `when`(place.thumbnailParsingStatus).thenReturn(PlaceThumbnailParsingStatus.COMPLETED)
+        `when`(place.thumbnailUrl).thenReturn(thumbnailUrl)
+        `when`(place.thumbnailParsingStatus).thenReturn(thumbnailParsingStatus)
         return place
     }
 
