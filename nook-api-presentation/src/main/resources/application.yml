@@ -62,6 +62,7 @@ app:
         max-array-items: ${HTTP_LOG_BODY_MAX_ARRAY_ITEMS:10}
 
 place-parsing:
+  image-text-provider: ${PLACE_PARSING_IMAGE_TEXT_PROVIDER:openai}
   worker:
     retry-backoffs: ${PLACE_PARSING_RETRY_BACKOFFS:3s,3s,3s}
     processing-timeout: ${PLACE_PARSING_PROCESSING_TIMEOUT:1m}
@@ -76,6 +77,9 @@ parsing:
   dispatcher-interval: ${PARSING_DISPATCHER_INTERVAL:10s}
 
 external:
+  place-thumbnail:
+    provider: ${PLACE_THUMBNAIL_PROVIDER:fixed}
+    fixed-url: ${PLACE_THUMBNAIL_FIXED_URL:https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/3d/3dd7bb6919492e58a76fe9012b82c0a44e4bfdf7bf0784cddd90dc9bbbee17f9.jpg}
   openai:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com}
     api-key: ${OPENAI_API_KEY:}
