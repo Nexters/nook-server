@@ -1,7 +1,9 @@
 package org.every.nook.api.infrastructure.persistence.group
 
+import jakarta.persistence.LockModeType
 import org.every.nook.api.domain.group.GroupColor
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -94,6 +96,12 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
     fun findRecentThumbnailUrls(@Param("userId") userId: Long): List<GroupThumbnailProjection>
 
     fun findByIdAndUserId(id: Long, userId: Long): GroupEntity?
+
+    fun findAllByIdInAndUserId(ids: Collection<Long>, userId: Long): List<GroupEntity>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT userGroup FROM GroupEntity userGroup WHERE userGroup.id = :id AND userGroup.userId = :userId")
+    fun findByIdAndUserIdForUpdate(id: Long, userId: Long): GroupEntity?
 
     fun findAllByUserIdAndIdIn(userId: Long, ids: Set<Long>): List<GroupEntity>
 

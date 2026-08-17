@@ -7,6 +7,8 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface GroupPostJpaRepository : JpaRepository<GroupPostEntity, Long> {
+    fun existsByGroupIdAndUserSavedPostId(groupId: Long, userSavedPostId: Long): Boolean
+
     @Query(
         value = """
             SELECT COUNT(group_post.id)

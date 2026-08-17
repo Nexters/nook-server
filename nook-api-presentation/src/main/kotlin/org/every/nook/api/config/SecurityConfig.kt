@@ -29,6 +29,7 @@ class SecurityConfig {
             it.requestMatchers(
                 "/api/v1/auth/social",
                 "/api/v1/auth/token/refresh",
+                "/api/v1/public/**",
                 "/actuator/health/**",
                 "/actuator/info",
                 "/actuator/prometheus",

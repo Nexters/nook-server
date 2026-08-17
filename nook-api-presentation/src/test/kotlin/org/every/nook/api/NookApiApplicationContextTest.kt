@@ -68,7 +68,7 @@ class NookApiApplicationContextTest {
         val savedPostDetailRequired =
             schemas.path("SavedPostDetailResponse").path("required").values().map { it.asString() }.toSet()
 
-        assertEquals(setOf("id", "name", "color", "postCount", "thumbnailUrls"), groupRequired)
+        assertEquals(setOf("id", "name", "color", "postCount", "thumbnailUrls", "accessType"), groupRequired)
         assertTrue(savedPostDetailRequired.containsAll(setOf("postId", "canonicalUrl", "media", "groups", "places")))
         assertFalse(savedPostDetailRequired.contains("title"))
         assertFalse(savedPostDetailRequired.contains("publishedAt"))

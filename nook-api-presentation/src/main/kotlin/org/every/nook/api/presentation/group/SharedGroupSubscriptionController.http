@@ -1,0 +1,16 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+### 공유 그룹을 내 아카이브에 추가
+PUT {{baseUrl}}/api/v1/shared-groups/{{shareToken}}
+Authorization: Bearer replace-with-nook-access-token
+
+### 공유 그룹을 내 아카이브에서 제거
+DELETE {{baseUrl}}/api/v1/shared-groups/1
+Authorization: Bearer replace-with-nook-access-token
