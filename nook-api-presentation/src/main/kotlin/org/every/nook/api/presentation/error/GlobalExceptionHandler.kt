@@ -112,6 +112,7 @@ class GlobalExceptionHandler {
         ErrorType.UNAUTHORIZED -> HttpStatus.UNAUTHORIZED
         ErrorType.FORBIDDEN -> HttpStatus.FORBIDDEN
         ErrorType.NOT_FOUND -> HttpStatus.NOT_FOUND
+        ErrorType.GONE -> HttpStatus.GONE
         ErrorType.CONFLICT -> HttpStatus.CONFLICT
         ErrorType.BAD_GATEWAY -> HttpStatus.BAD_GATEWAY
         ErrorType.GATEWAY_TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT

@@ -5,6 +5,7 @@ enum class ErrorType {
     UNAUTHORIZED,
     FORBIDDEN,
     NOT_FOUND,
+    GONE,
     CONFLICT,
     BAD_GATEWAY,
     GATEWAY_TIMEOUT,

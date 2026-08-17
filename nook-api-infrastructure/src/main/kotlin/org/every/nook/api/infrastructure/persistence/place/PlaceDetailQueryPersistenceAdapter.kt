@@ -8,14 +8,17 @@ import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.port.PlaceDetailQueryPort
+import org.every.nook.api.application.place.port.SharedPlaceDetailQueryPort
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
+import org.every.nook.api.infrastructure.persistence.save.SharedGroupContentJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
+import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
@@ -32,16 +35,20 @@ class PlaceDetailQueryPersistenceAdapter(
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
     private val clock: Clock = Clock.systemUTC(),
-) : PlaceDetailQueryPort {
+    private val sharedContentRepository: SharedGroupContentJpaRepository? = null,
+) : PlaceDetailQueryPort,
+    SharedPlaceDetailQueryPort {
     @Transactional(readOnly = true)
-    override fun find(userId: Long, placeId: Long, page: Int, size: Int): PlaceDetailView? {
+    override fun find(userId: Long, placeId: Long, page: Int, size: Int): PlaceDetailView? =
+        findInternal(userId, groupId = null, placeId, page, size)
+
+    @Transactional(readOnly = true)
+    override fun findInGroup(userId: Long, groupId: Long, placeId: Long, page: Int, size: Int): PlaceDetailView? =
+        findInternal(userId, groupId, placeId, page, size)
+
+    private fun findInternal(userId: Long, groupId: Long?, placeId: Long, page: Int, size: Int): PlaceDetailView? {
         val place = placeRepository.findById(placeId).orElse(null) ?: return null
-        val pageable = PageRequest.of(
-            page,
-            size,
-            Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
-        )
-        val savedPosts = savedPostRepository.findAllByUserIdAndPlaceId(userId, placeId, pageable)
+        val savedPosts = findSavedPosts(userId, groupId, placeId, page, size)
         val bookmark = bookmarkRepository.findByUserIdAndPlaceId(userId, placeId)
         val bookmarked = bookmark != null
         if (!bookmarked && savedPosts.totalElements == 0L) {
@@ -55,7 +62,7 @@ class PlaceDetailQueryPersistenceAdapter(
         }
         val representativeMediaByPostId = findRepresentativeMedia(sourcePostIds)
         val savedPostIds = savedPosts.content.mapNotNull(UserSavedPostEntity::id)
-        val groupsBySavedPostId = findGroups(userId, savedPostIds)
+        val groupsBySavedPostId = findGroups(userId, savedPostIds, groupId)
         return PlaceDetailView(
             id = requireNotNull(place.id),
             provider = place.provider,
@@ -93,6 +100,26 @@ class PlaceDetailQueryPersistenceAdapter(
         )
     }
 
+    private fun findSavedPosts(
+        userId: Long,
+        groupId: Long?,
+        placeId: Long,
+        page: Int,
+        size: Int,
+    ): Page<UserSavedPostEntity> {
+        val pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
+        )
+        return if (groupId == null) {
+            savedPostRepository.findAllByUserIdAndPlaceId(userId, placeId, pageable)
+        } else {
+            requireNotNull(sharedContentRepository)
+                .findAllByUserIdAndGroupIdAndPlaceId(userId, groupId, placeId, pageable)
+        }
+    }
+
     private fun findRepresentativeMedia(postIds: List<Long>): Map<Long, PlacePostMediaView> = if (postIds.isEmpty()) {
         emptyMap()
     } else {
@@ -115,7 +142,11 @@ class PlaceDetailQueryPersistenceAdapter(
         groups = groups,
     )
 
-    private fun findGroups(userId: Long, savedPostIds: List<Long>): Map<Long, List<PlacePostGroupView>> {
+    private fun findGroups(
+        userId: Long,
+        savedPostIds: List<Long>,
+        requestedGroupId: Long? = null,
+    ): Map<Long, List<PlacePostGroupView>> {
         if (savedPostIds.isEmpty()) {
             return emptyMap()
         }
@@ -132,15 +163,17 @@ class PlaceDetailQueryPersistenceAdapter(
         }
 
         return savedPostIds.associateWith { savedPostId ->
-            groupPostsBySavedPostId[savedPostId].orEmpty().mapNotNull { groupPost ->
-                groupsById[groupPost.groupId]?.let { group ->
-                    PlacePostGroupView(
-                        id = requireNotNull(group.id),
-                        name = group.name,
-                        color = group.color.name,
-                    )
+            groupPostsBySavedPostId[savedPostId].orEmpty()
+                .filter { requestedGroupId == null || it.groupId == requestedGroupId }
+                .mapNotNull { groupPost ->
+                    groupsById[groupPost.groupId]?.let { group ->
+                        PlacePostGroupView(
+                            id = requireNotNull(group.id),
+                            name = group.name,
+                            color = group.color.name,
+                        )
+                    }
                 }
-            }
         }
     }
 

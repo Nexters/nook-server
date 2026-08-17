@@ -11,6 +11,7 @@ import org.every.nook.api.application.group.port.GroupPlaceQueryPort
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.application.group.port.GroupPostManagementPort
 import org.every.nook.api.application.group.port.GroupPostQueryPort
+import org.every.nook.api.application.group.port.GroupReadAccessPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -29,12 +30,16 @@ class GroupUseCaseConfig {
     fun deleteGroupUseCase(groupPort: GroupPort): DeleteGroupUseCase = DeleteGroupUseCase(groupPort)
 
     @Bean
-    fun listGroupPostsUseCase(groupPostQueryPort: GroupPostQueryPort): ListGroupPostsUseCase =
-        ListGroupPostsUseCase(groupPostQueryPort)
+    fun listGroupPostsUseCase(
+        groupPostQueryPort: GroupPostQueryPort,
+        groupReadAccessPort: GroupReadAccessPort,
+    ): ListGroupPostsUseCase = ListGroupPostsUseCase(groupPostQueryPort, groupReadAccessPort)
 
     @Bean
-    fun listGroupPlacesUseCase(groupPlaceQueryPort: GroupPlaceQueryPort): ListGroupPlacesUseCase =
-        ListGroupPlacesUseCase(groupPlaceQueryPort)
+    fun listGroupPlacesUseCase(
+        groupPlaceQueryPort: GroupPlaceQueryPort,
+        groupReadAccessPort: GroupReadAccessPort,
+    ): ListGroupPlacesUseCase = ListGroupPlacesUseCase(groupPlaceQueryPort, groupReadAccessPort)
 
     @Bean
     fun replaceSavedPostGroupsUseCase(

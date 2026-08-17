@@ -1,6 +1,8 @@
 package org.every.nook.api.presentation.group.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.every.nook.api.application.group.GroupAccessType
+import org.every.nook.api.application.group.GroupOwnerView
 import org.every.nook.api.application.group.GroupView
 
 data class GroupResponse(
@@ -17,6 +19,12 @@ data class GroupResponse(
         example = """["https://cdn.example.com/posts/1.jpg", "https://cdn.example.com/posts/2.jpg"]""",
     )
     val thumbnailUrls: List<String>,
+    @field:Schema(description = "그룹 접근 유형")
+    val accessType: GroupAccessType,
+    @field:Schema(description = "공유 그룹 소유자. 내 그룹이면 null", nullable = true)
+    val owner: GroupOwnerResponse?,
+    @field:Schema(description = "공유 그룹 접근 토큰. 내 그룹이면 null", nullable = true)
+    val shareToken: String?,
 ) {
     companion object {
         fun from(view: GroupView): GroupResponse = GroupResponse(
@@ -25,6 +33,20 @@ data class GroupResponse(
             color = view.color,
             postCount = view.postCount,
             thumbnailUrls = view.thumbnailUrls,
+            accessType = view.accessType,
+            owner = view.owner?.let(GroupOwnerResponse::from),
+            shareToken = view.shareToken,
         )
+    }
+}
+
+data class GroupOwnerResponse(
+    @field:Schema(description = "그룹 소유자 닉네임")
+    val nickname: String,
+    @field:Schema(description = "그룹 소유자 프로필 이미지 URL", nullable = true)
+    val profileImageUrl: String?,
+) {
+    companion object {
+        fun from(view: GroupOwnerView): GroupOwnerResponse = GroupOwnerResponse(view.nickname, view.profileImageUrl)
     }
 }
