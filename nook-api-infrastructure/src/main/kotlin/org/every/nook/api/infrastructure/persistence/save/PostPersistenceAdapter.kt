@@ -30,6 +30,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.effectiveThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
@@ -180,7 +181,7 @@ class PostPersistenceAdapter(
                         bookmarked = savedPostPlace.placeId in bookmarkedPlaceIds,
                         thumbnailUrl = placesById[savedPostPlace.placeId]?.thumbnailUrl,
                         thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
-                            placesById[savedPostPlace.placeId]?.thumbnailParsingStatus
+                            placesById[savedPostPlace.placeId]?.effectiveThumbnailParsingStatus()
                                 ?: error("Place must exist for postPlace"),
                         ),
                         tags = placesById[savedPostPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },

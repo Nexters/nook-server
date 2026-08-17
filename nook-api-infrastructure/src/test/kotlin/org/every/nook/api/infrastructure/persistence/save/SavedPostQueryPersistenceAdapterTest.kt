@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.save
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.domain.group.GroupColor
@@ -87,7 +88,12 @@ class SavedPostQueryPersistenceAdapterTest {
         val secondMedia = PostMediaEntity(101, PostMedia.MediaType.VIDEO, "https://example.com/2.mp4", 1)
         val firstPlace = UserSavedPostPlaceEntity(11, 201, 0)
         val secondPlace = UserSavedPostPlaceEntity(11, 202, 1)
-        val placeOne = place(id = 201, name = "첫 장소")
+        val placeOne = place(
+            id = 201,
+            name = "첫 장소",
+            thumbnailUrl = "https://cdn.example.com/place.jpg",
+            thumbnailParsingStatus = PlaceThumbnailParsingStatus.PENDING,
+        )
         val placeTwo = place(id = 202, name = "둘째 장소")
         val bookmark = mock(UserPlaceBookmarkEntity::class.java)
         val group = mock(GroupEntity::class.java)
@@ -120,6 +126,7 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf("첫 장소", "둘째 장소"), detail.places.map { it.name })
         assertEquals(listOf(false, true), detail.places.map { it.bookmarked })
         assertEquals(listOf(null, "둘째 장소 메모"), detail.places.map { it.memo })
+        assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, detail.places.first().thumbnailParsingStatus)
         assertEquals(PlaceParsingStatusView.COMPLETED, detail.placeParsingStatus)
         assertEquals("내 메모", detail.memo)
         assertEquals(listOf("맛집"), detail.groups.map { it.name })
@@ -248,7 +255,12 @@ class SavedPostQueryPersistenceAdapterTest {
         return post
     }
 
-    private fun place(id: Long, name: String): PlaceEntity {
+    private fun place(
+        id: Long,
+        name: String,
+        thumbnailUrl: String? = null,
+        thumbnailParsingStatus: PlaceThumbnailParsingStatus = PlaceThumbnailParsingStatus.COMPLETED,
+    ): PlaceEntity {
         val place = mock(PlaceEntity::class.java)
         `when`(place.id).thenReturn(id)
         `when`(place.provider).thenReturn("KAKAO")
@@ -257,7 +269,8 @@ class SavedPostQueryPersistenceAdapterTest {
         `when`(place.address).thenReturn("서울")
         `when`(place.latitude).thenReturn(BigDecimal("37.1"))
         `when`(place.longitude).thenReturn(BigDecimal("127.1"))
-        `when`(place.thumbnailParsingStatus).thenReturn(PlaceThumbnailParsingStatus.COMPLETED)
+        `when`(place.thumbnailUrl).thenReturn(thumbnailUrl)
+        `when`(place.thumbnailParsingStatus).thenReturn(thumbnailParsingStatus)
         return place
     }
 }

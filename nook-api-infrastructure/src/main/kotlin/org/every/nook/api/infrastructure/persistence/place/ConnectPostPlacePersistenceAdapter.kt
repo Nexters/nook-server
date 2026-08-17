@@ -5,6 +5,7 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
@@ -49,7 +50,9 @@ class ConnectPostPlacePersistenceAdapter(
         val place = requireNotNull(
             placeRepository.findByProviderAndExternalPlaceId(candidate.provider, candidate.externalPlaceId),
         )
-        supplement?.let(place::updateSupplement)
+        supplement?.let { resolvedSupplement ->
+            place.updateThumbnailParsing(PlaceThumbnailParsingStatus.COMPLETED, resolvedSupplement)
+        }
         val placeId = requireNotNull(place.id)
         val existingSavedPostPlace = savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(savedPostId, placeId)
         if (existingSavedPostPlace == null) {

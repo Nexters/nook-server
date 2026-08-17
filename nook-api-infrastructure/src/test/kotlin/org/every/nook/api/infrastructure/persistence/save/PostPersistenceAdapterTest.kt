@@ -3,8 +3,10 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.domain.post.PostSource
@@ -12,6 +14,7 @@ import org.every.nook.api.infrastructure.persistence.group.GroupEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
@@ -26,6 +29,7 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -38,6 +42,7 @@ class PostPersistenceAdapterTest {
     private val postRepository = mock(PostJpaRepository::class.java)
     private val userSavedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
+    private val placeRepository = mock(PlaceJpaRepository::class.java)
     private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
     private val userSavedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
@@ -50,7 +55,7 @@ class PostPersistenceAdapterTest {
         userSavedPostJpaRepository = userSavedPostRepository,
         userSavedPostPlaceJpaRepository = userSavedPostPlaceRepository,
         placeParsingJobJpaRepository = parsingJobRepository,
-        placeJpaRepository = mock(PlaceJpaRepository::class.java),
+        placeJpaRepository = placeRepository,
         userPlaceBookmarkJpaRepository = bookmarkRepository,
         groupJpaRepository = groupRepository,
         groupPostJpaRepository = groupPostRepository,
@@ -293,6 +298,33 @@ class PostPersistenceAdapterTest {
 
         assertEquals(PlaceParsingStatus.PENDING, result.placeParsingStatus)
         assertTrue(result.places.isEmpty())
+    }
+
+    @Test
+    fun `place parsing response completes a stale pending thumbnail status when URL exists`() {
+        val savedPost = mock(UserSavedPostEntity::class.java)
+        val place = mock(PlaceEntity::class.java)
+        `when`(savedPost.postId).thenReturn(101)
+        `when`(place.id).thenReturn(17)
+        `when`(place.provider).thenReturn("KAKAO")
+        `when`(place.externalPlaceId).thenReturn("1234")
+        `when`(place.name).thenReturn("악토버베이커리")
+        `when`(place.address).thenReturn("서울 서대문구 이화여대길 20")
+        `when`(place.latitude).thenReturn(BigDecimal("37.5577597"))
+        `when`(place.longitude).thenReturn(BigDecimal("126.9460690"))
+        `when`(place.thumbnailUrl).thenReturn("https://cdn.example.com/place.jpg")
+        `when`(place.thumbnailParsingStatus).thenReturn(PlaceThumbnailParsingStatus.PENDING)
+        `when`(userSavedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
+        `when`(parsingJobRepository.findByPostId(101))
+            .thenReturn(PlaceParsingJobEntity(101, PlaceParsingStatus.COMPLETED))
+        `when`(userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11))
+            .thenReturn(listOf(UserSavedPostPlaceEntity(11, 17, 0)))
+        `when`(bookmarkRepository.findAllByUserIdAndPlaceIdIn(7, listOf(17))).thenReturn(emptyList())
+        `when`(placeRepository.findAllById(listOf(17))).thenReturn(listOf(place))
+
+        val result = assertNotNull(adapter.find(userId = 7, postId = 11))
+
+        assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.places.single().thumbnailParsingStatus)
     }
 
     @Test
