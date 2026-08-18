@@ -10,6 +10,7 @@ import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.admin.PostPlaceReviewJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
@@ -24,6 +25,7 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaR
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.context.ApplicationEventPublisher
 import tools.jackson.module.kotlin.jacksonObjectMapper
@@ -48,6 +50,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val userSavedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val postPlaceTagRepository = mock(PostPlaceTagJpaRepository::class.java)
+    private val postPlaceReviewRepository = mock(PostPlaceReviewJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = PlaceParsingPersistenceAdapter(
         jobRepository = jobRepository,
@@ -61,10 +64,23 @@ class PlaceParsingPersistenceAdapterTest {
         userSavedPostPlaceRepository = userSavedPostPlaceRepository,
         userPlaceBookmarkRepository = bookmarkRepository,
         postPlaceTagRepository = postPlaceTagRepository,
+        postPlaceReviewRepository = postPlaceReviewRepository,
         eventPublisher = eventPublisher,
         objectMapper = jacksonObjectMapper(),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
+
+    @Test
+    fun `does not overwrite an administrator reviewed mapping`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+        `when`(postPlaceReviewRepository.existsByPostId(11)).thenReturn(true)
+
+        adapter.complete(11, emptyList())
+
+        assertEquals(PlaceParsingStatus.COMPLETED, job.status)
+        verifyNoInteractions(placeRepository, postPlaceRepository)
+    }
 
     @Test
     fun `claims an available pending job and increments its attempt`() {

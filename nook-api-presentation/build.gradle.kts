@@ -16,6 +16,7 @@ dependencies {
     implementation("org.springframework:spring-tx")
     implementation("net.javacrumbs.shedlock:shedlock-spring:7.7.0")
     implementation("org.springframework.security:spring-security-oauth2-resource-server")
+    implementation("org.springframework.security:spring-security-oauth2-jose")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("tools.jackson.module:jackson-module-kotlin")
     runtimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")

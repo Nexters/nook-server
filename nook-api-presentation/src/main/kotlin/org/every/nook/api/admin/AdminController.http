@@ -1,0 +1,33 @@
+# Cloudflare Access 로그인은 브라우저에서 admin 호스트 접근 시 수행됩니다.
+# HTTP Client에서는 유효한 Access application JWT를 직접 입력합니다.
+@accessJwt = replace-with-cloudflare-access-jwt
+
+### 현재 운영자
+GET {{baseUrl}}/api/admin/v1/me
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 게시글 목록
+GET {{baseUrl}}/api/admin/v1/posts?offset=0&limit=20
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 게시글 상세
+GET {{baseUrl}}/api/admin/v1/posts/1
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 장소 검색
+GET {{baseUrl}}/api/admin/v1/places?query=성수&limit=20
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 공용 장소 매핑 교정
+PUT {{baseUrl}}/api/admin/v1/posts/1/places
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "placeIds": [1, 2],
+  "reason": "잘못 파싱된 장소를 확인하여 교정"
+}
+
+### 감사 로그
+GET {{baseUrl}}/api/admin/v1/audit-logs?targetType=POST&targetId=1&offset=0&limit=20
+Cf-Access-Jwt-Assertion: {{accessJwt}}

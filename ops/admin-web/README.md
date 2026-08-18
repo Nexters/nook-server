@@ -35,12 +35,32 @@ Point the admin hostname to the local service on the ops VM:
 
 ```yaml
 ingress:
+  # `/api/admin/v1/**` must reach nook-api before the static-web catch-all.
+  - hostname: dev-admin.example.com
+    path: /api/admin/v1/*
+    service: https://dev-api.example.com
   - hostname: dev-admin.example.com
     service: http://localhost:8081
+  - hostname: admin.example.com
+    path: /api/admin/v1/*
+    service: https://api.example.com
   - hostname: admin.example.com
     service: http://localhost:8082
   - service: http_status:404
 ```
 
 Keep Cloudflare Access enabled for the admin hostname. Server-side admin API
-authorization must still be enforced separately under `/api/admin/v1/**`.
+authorization is enforced separately under `/api/admin/v1/**`. Configure the
+admin hostname and its `/api/admin/v1/*` route in the same Access application so
+the origin receives the same `Cf-Access-Jwt-Assertion` token.
+
+Configure the API process with the Access application values:
+
+```shell
+ADMIN_ACCESS_ENABLED=true
+ADMIN_ACCESS_TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+ADMIN_ACCESS_AUDIENCE=your-access-application-aud-tag
+```
+
+The admin web calls `/api/admin/v1/**` on its own origin. The path-specific
+Tunnel rule therefore has to appear before the static admin-web rule.
