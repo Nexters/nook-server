@@ -23,7 +23,7 @@ interface SharedGroupContentJpaRepository : JpaRepository<UserSavedPostEntity, L
         """,
         nativeQuery = true,
     )
-    fun existsPlaceInGroup(userId: Long, groupId: Long, placeId: Long): Boolean
+    fun existsPlaceInGroup(userId: Long, groupId: Long, placeId: Long): Long
 
     @Query(
         """
