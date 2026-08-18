@@ -45,7 +45,9 @@ class GooglePlacePhotoProvider(
                     "Google place photo search started: provider=${place.provider}, " +
                         "externalPlaceId=${place.externalPlaceId}, name=${place.name}"
                 }
-                val googlePlace = searchPlace(place)
+                val googlePlace = searchPlace(place)?.let { matchedPlace ->
+                    matchedPlace.placeId()?.let(::getPlace) ?: matchedPlace
+                }
                 if (googlePlace == null) {
                     logger.info {
                         "Google place supplement skipped: reason=place_not_matched, provider=${place.provider}, " +
@@ -56,7 +58,7 @@ class GooglePlacePhotoProvider(
                     val availablePhotos = googlePlace.photos.orEmpty()
                         .mapNotNull(GooglePhoto::name)
                         .distinct()
-                        .take(PlaceSupplement.MAX_PHOTO_COUNT)
+                        .take(MAX_GOOGLE_PHOTO_COUNT)
                     eventLogger.logGooglePhotoList(place, googlePlace.photos.orEmpty().size, availablePhotos.size)
                     val photoUrls = availablePhotos
                         .mapIndexedNotNull { sequence, photoName -> storePhoto(photoName, sequence, place) }
@@ -78,9 +80,8 @@ class GooglePlacePhotoProvider(
     }
 
     private fun searchPlace(place: PlaceCandidate): GooglePlace? {
-        place.googlePlaceId?.let { return getPlace(it) }
+        place.googlePlaceId?.let { return GooglePlace(id = it) }
         val startedAt = System.nanoTime()
-        val queries = place.searchQueries()
         val nearbyCandidates = searchNearby(place).map { candidate ->
             RankedGooglePlace(
                 place = candidate,
@@ -89,7 +90,9 @@ class GooglePlacePhotoProvider(
                 photoCount = candidate.photos.orEmpty().size,
             )
         }.filter { it.place.isEligibleNearbyCandidate(place) }
-        val textCandidates = queries.flatMap { query ->
+        val nearbyMatch = nearbyCandidates.bestMatch()
+        val query = place.searchQuery()
+        val textCandidates = if (nearbyMatch == null) {
             searchText(query, place).map { candidate ->
                 RankedGooglePlace(
                     place = candidate,
@@ -98,15 +101,11 @@ class GooglePlacePhotoProvider(
                     photoCount = candidate.photos.orEmpty().size,
                 )
             }
+        } else {
+            emptyList()
         }
-        val allCandidates = nearbyCandidates + textCandidates
-        val matched = allCandidates
-            .filter { it.score >= MIN_MATCH_SCORE }
-            .maxWithOrNull(
-                compareBy<RankedGooglePlace> { it.photoCount > 0 }
-                    .thenBy { it.score }
-                    .thenBy { it.photoCount },
-            )
+        val allCandidates = if (nearbyMatch == null) nearbyCandidates + textCandidates else nearbyCandidates
+        val matched = nearbyMatch ?: textCandidates.bestMatch()
         eventLogger.info(
             place.event(
                 "google.place.match.completed",
@@ -115,8 +114,8 @@ class GooglePlacePhotoProvider(
                 mapOf(
                     "event.duration_ms" to elapsedMillis(startedAt),
                     "google.place_nearby_candidate_count" to nearbyCandidates.size,
-                    "google.place_query_count" to queries.size,
-                    "google.place_queries" to queries,
+                    "google.place_query_count" to if (nearbyMatch == null) 1 else 0,
+                    "google.place_queries" to if (nearbyMatch == null) listOf(query) else emptyList<String>(),
                     "google.place_candidate_count" to allCandidates.size,
                     "google.place_matched" to (matched != null),
                     "google.place_candidate_scores" to allCandidates.map {
@@ -135,6 +134,13 @@ class GooglePlacePhotoProvider(
         }
         return matched?.place
     }
+
+    private fun List<RankedGooglePlace>.bestMatch(): RankedGooglePlace? = filter { it.score >= MIN_MATCH_SCORE }
+        .maxWithOrNull(
+            compareBy<RankedGooglePlace> { it.photoCount > 0 }
+                .thenBy { it.score }
+                .thenBy { it.photoCount },
+        )
 
     private fun searchNearby(place: PlaceCandidate): List<GooglePlace> {
         val includedTypes = place.nearbyTypes()
@@ -291,16 +297,7 @@ class GooglePlacePhotoProvider(
         }
     }
 
-    private fun PlaceCandidate.searchQueries(): List<String> {
-        val queries = buildList {
-            add("$name $address")
-            categoryKeyword()?.let { add("$name $it") }
-            city?.let { add("$name $it") }
-            addressTokens().take(2).joinToString(" ").takeIf(String::isNotBlank)?.let { add("$name $it") }
-            add(name)
-        }
-        return queries.map(String::trim).filter(String::isNotBlank).distinct()
-    }
+    private fun PlaceCandidate.searchQuery(): String = "$name $address".trim()
 
     private fun PlaceCandidate.categoryKeyword(): String? = category
         ?.substringAfterLast(">")
@@ -327,10 +324,6 @@ class GooglePlacePhotoProvider(
             if (isEmpty() && provider == "KAKAO") add("restaurant")
         }.distinct()
     }
-
-    private fun PlaceCandidate.addressTokens(): List<String> = address
-        .split(Regex("\\s+"))
-        .filter { token -> token.length >= MIN_ADDRESS_TOKEN_LENGTH }
 
     private fun String.containsCity(city: String?): Boolean = city != null && contains(city, ignoreCase = true)
     private fun String?.matchesCategory(candidate: PlaceCandidate): Boolean {
@@ -523,8 +516,8 @@ class GooglePlacePhotoProvider(
             "id,name,displayName,formattedAddress,primaryType,location,timeZone,regularOpeningHours,photos.name"
         const val SEARCH_FIELD_MASK =
             "places.id,places.name,places.displayName,places.formattedAddress,places.primaryType," +
-                "places.location,places.timeZone," +
-                "places.regularOpeningHours,places.photos.name"
+                "places.location,places.photos.name"
+        const val MAX_GOOGLE_PHOTO_COUNT = 3
         const val PLACE_RESOURCE_PREFIX = "places/"
         const val PHOTO_RESOURCE_SEPARATOR = "/photos/"
         const val SEARCH_PAGE_SIZE = 5
@@ -544,7 +537,6 @@ class GooglePlacePhotoProvider(
         const val CLOSE_MATCH_DISTANCE_METERS = 100.0
         const val REGION_MISMATCH_DISTANCE_METERS = 20_000.0
         const val REGION_MISMATCH_PENALTY = 60
-        const val MIN_ADDRESS_TOKEN_LENGTH = 2
         const val NEARBY_QUERY_LABEL = "__nearby__"
         const val EARTH_RADIUS_METERS = 6_371_000.0
         const val SEARCH_STAGE = "google-place-match"
