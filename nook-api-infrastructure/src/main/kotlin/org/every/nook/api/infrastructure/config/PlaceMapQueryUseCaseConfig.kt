@@ -2,7 +2,9 @@ package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
+import org.every.nook.api.application.place.SearchSavedPlacesUseCase
 import org.every.nook.api.application.place.port.PlaceMapQueryPort
+import org.every.nook.api.application.place.port.SavedPlaceSearchPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -15,4 +17,8 @@ class PlaceMapQueryUseCaseConfig {
     @Bean
     fun getRecentPlacesUseCase(placeMapQueryPort: PlaceMapQueryPort): GetRecentPlacesUseCase =
         GetRecentPlacesUseCase(placeMapQueryPort)
+
+    @Bean
+    fun searchSavedPlacesUseCase(savedPlaceSearchPort: SavedPlaceSearchPort): SearchSavedPlacesUseCase =
+        SearchSavedPlacesUseCase(savedPlaceSearchPort)
 }

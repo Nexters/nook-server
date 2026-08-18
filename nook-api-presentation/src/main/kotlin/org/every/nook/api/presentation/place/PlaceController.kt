@@ -8,11 +8,14 @@ import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
+import jakarta.validation.constraints.Size
 import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
 import org.every.nook.api.application.place.SearchPlacesUseCase
+import org.every.nook.api.application.place.SearchSavedPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.application.place.UpdatePlaceMemoUseCase
 import org.every.nook.api.presentation.auth.UserContext
@@ -22,6 +25,7 @@ import org.every.nook.api.presentation.place.response.MapPlaceResponse
 import org.every.nook.api.presentation.place.response.PlaceDetailResponse
 import org.every.nook.api.presentation.place.response.PlaceSearchSliceResponse
 import org.every.nook.api.presentation.place.response.RecentPlaceSliceResponse
+import org.every.nook.api.presentation.place.response.SavedPlaceSearchPageResponse
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
@@ -37,6 +41,7 @@ private const val MAX_PLACE_POST_PAGE_SIZE = 100L
 private const val MAX_RECENT_PLACE_PAGE_SIZE = 100L
 private const val MAX_PLACE_SEARCH_PAGE = 44L
 private const val MAX_PLACE_SEARCH_PAGE_SIZE = 15L
+private const val MAX_SAVED_PLACE_SEARCH_PAGE_SIZE = 100L
 
 @Tag(name = "Place")
 @Validated
@@ -49,6 +54,7 @@ class PlaceController(
     private val getMapPlacesUseCase: GetMapPlacesUseCase,
     private val getRecentPlacesUseCase: GetRecentPlacesUseCase,
     private val searchPlacesUseCase: SearchPlacesUseCase,
+    private val searchSavedPlacesUseCase: SearchSavedPlacesUseCase,
 ) {
     @Operation(summary = "지도 영역의 북마크 장소 조회")
     @GetMapping("/map")
@@ -108,6 +114,36 @@ class PlaceController(
             ),
         )
         return ApiResponse.success(RecentPlaceSliceResponse.from(places))
+    }
+
+    @Operation(summary = "내 저장 장소 검색")
+    @GetMapping("/saved/search")
+    fun searchSavedPlaces(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "장소명, 주소 또는 카테고리 검색 문자열")
+        @RequestParam
+        @NotBlank
+        @Size(max = SearchSavedPlacesUseCase.MAX_QUERY_LENGTH)
+        query: String,
+        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
+        @RequestParam(defaultValue = "0")
+        @Min(0)
+        page: Int,
+        @Parameter(description = "페이지당 장소 수")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(MAX_SAVED_PLACE_SEARCH_PAGE_SIZE)
+        size: Int,
+    ): ApiResponse<SavedPlaceSearchPageResponse> {
+        val result = searchSavedPlacesUseCase(
+            SearchSavedPlacesUseCase.Query(
+                userId = userContext.userId,
+                keyword = query,
+                page = page,
+                size = size,
+            ),
+        )
+        return ApiResponse.success(SavedPlaceSearchPageResponse.from(result))
     }
 
     @Operation(summary = "직접 연결할 장소 검색")
