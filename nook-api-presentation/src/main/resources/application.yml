@@ -55,6 +55,11 @@ logging:
     org.every.nook.api.logging.RequestLoggingFilter: info
 
 app:
+  admin:
+    access:
+      enabled: ${ADMIN_ACCESS_ENABLED:false}
+      team-domain: ${ADMIN_ACCESS_TEAM_DOMAIN:}
+      audience: ${ADMIN_ACCESS_AUDIENCE:}
   logging:
     http:
       body:

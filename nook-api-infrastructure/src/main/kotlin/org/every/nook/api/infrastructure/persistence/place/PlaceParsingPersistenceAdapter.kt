@@ -17,6 +17,7 @@ import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.admin.PostPlaceReviewJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
@@ -45,6 +46,7 @@ class PlaceParsingPersistenceAdapter(
     private val userSavedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val userPlaceBookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val postPlaceTagRepository: PostPlaceTagJpaRepository,
+    private val postPlaceReviewRepository: PostPlaceReviewJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
@@ -103,6 +105,11 @@ class PlaceParsingPersistenceAdapter(
     override fun complete(postId: Long, places: List<PlaceCandidate>) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
+        if (postPlaceReviewRepository.existsByPostId(postId)) {
+            job.status = PlaceParsingStatus.COMPLETED
+            job.failureReason = null
+            return
+        }
         val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
         val resolvedPlaces = distinctPlaces.map { candidate ->
             val place = placeRepository.findByProviderAndExternalPlaceId(

@@ -15,6 +15,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework:spring-tx")
     implementation("org.springframework.security:spring-security-oauth2-resource-server")
+    implementation("org.springframework.security:spring-security-oauth2-jose")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("tools.jackson.module:jackson-module-kotlin")
     runtimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
