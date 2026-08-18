@@ -134,5 +134,5 @@ class GroupSharePersistenceAdapter(
 
     @Transactional(readOnly = true)
     override fun containsPlace(access: SharedGroupAccess, placeId: Long): Boolean =
-        sharedContentRepository.existsPlaceInGroup(access.ownerId, access.groupId, placeId)
+        sharedContentRepository.existsPlaceInGroup(access.ownerId, access.groupId, placeId) > 0
 }
