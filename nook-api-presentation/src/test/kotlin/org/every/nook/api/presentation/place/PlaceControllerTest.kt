@@ -17,6 +17,7 @@ import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
+import org.every.nook.api.application.place.SavedPlaceSearchGroupView
 import org.every.nook.api.application.place.SavedPlaceSearchItemView
 import org.every.nook.api.application.place.SavedPlaceSearchPageView
 import org.every.nook.api.application.place.SearchPlacesUseCase
@@ -290,6 +291,7 @@ class PlaceControllerTest {
             keyword = "카페",
             page = 0,
             size = 20,
+            groupId = 3,
         )
         `when`(searchSavedPlacesUseCase(query)).thenReturn(
             SavedPlaceSearchPageView(
@@ -301,6 +303,14 @@ class PlaceControllerTest {
                         category = "카페",
                     ),
                 ),
+                groups = listOf(
+                    SavedPlaceSearchGroupView(
+                        id = 3,
+                        name = "서울 카페",
+                        color = "YELLOW",
+                        matchedPlaceCount = 1,
+                    ),
+                ),
                 page = 0,
                 size = 20,
                 totalElements = 1,
@@ -309,13 +319,17 @@ class PlaceControllerTest {
             ),
         )
 
-        mockMvc.get("/api/v1/places/saved/search?query=카페&page=0&size=20")
+        mockMvc.get("/api/v1/places/saved/search?query=카페&groupId=3&page=0&size=20")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.success.items[0].name") { value("카페 누크") }
                 jsonPath("$.success.items[0].address") { value("서울 성동구 연무장길 1") }
                 jsonPath("$.success.items[0].category") { value("카페") }
                 jsonPath("$.success.items[0].id") { value(17) }
+                jsonPath("$.success.groups[0].id") { value(3) }
+                jsonPath("$.success.groups[0].name") { value("서울 카페") }
+                jsonPath("$.success.groups[0].color") { value("YELLOW") }
+                jsonPath("$.success.groups[0].matchedPlaceCount") { value(1) }
                 jsonPath("$.success.totalElements") { value(1) }
                 jsonPath("$.success.hasNext") { value(false) }
             }

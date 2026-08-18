@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
 import org.every.nook.api.application.place.SearchSavedPlacesUseCase
@@ -19,6 +20,8 @@ class PlaceMapQueryUseCaseConfig {
         GetRecentPlacesUseCase(placeMapQueryPort)
 
     @Bean
-    fun searchSavedPlacesUseCase(savedPlaceSearchPort: SavedPlaceSearchPort): SearchSavedPlacesUseCase =
-        SearchSavedPlacesUseCase(savedPlaceSearchPort)
+    fun searchSavedPlacesUseCase(
+        savedPlaceSearchPort: SavedPlaceSearchPort,
+        groupOwnershipPort: GroupOwnershipPort,
+    ): SearchSavedPlacesUseCase = SearchSavedPlacesUseCase(savedPlaceSearchPort, groupOwnershipPort)
 }
