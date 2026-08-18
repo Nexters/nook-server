@@ -204,6 +204,19 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
                     AND uspp.place_id = p.id
+                    AND (
+                        :groupId IS NULL
+                        OR EXISTS (
+                            SELECT 1
+                            FROM group_posts group_post
+                            INNER JOIN user_groups user_group ON user_group.id = group_post.group_id
+                            WHERE group_post.user_saved_post_id = usp.id
+                              AND group_post.group_id = :groupId
+                              AND group_post.deleted_at IS NULL
+                              AND user_group.user_id = upb.user_id
+                              AND user_group.deleted_at IS NULL
+                        )
+                    )
               )
               AND (
                   p.name LIKE :pattern ESCAPE '!'
@@ -231,6 +244,19 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
                     AND uspp.place_id = p.id
+                    AND (
+                        :groupId IS NULL
+                        OR EXISTS (
+                            SELECT 1
+                            FROM group_posts group_post
+                            INNER JOIN user_groups user_group ON user_group.id = group_post.group_id
+                            WHERE group_post.user_saved_post_id = usp.id
+                              AND group_post.group_id = :groupId
+                              AND group_post.deleted_at IS NULL
+                              AND user_group.user_id = upb.user_id
+                              AND user_group.deleted_at IS NULL
+                        )
+                    )
               )
               AND (
                   p.name LIKE :pattern ESCAPE '!'
@@ -243,8 +269,47 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
     fun searchSavedPlaces(
         @Param("userId") userId: Long,
         @Param("pattern") pattern: String,
+        @Param("groupId") groupId: Long?,
         pageable: Pageable,
     ): Page<SavedPlaceSearchProjection>
+
+    @Query(
+        value = """
+            SELECT
+                user_group.id AS id,
+                user_group.name AS name,
+                user_group.color AS color,
+                COUNT(DISTINCT p.id) AS matchedPlaceCount
+            FROM user_groups user_group
+            INNER JOIN group_posts group_post
+                ON group_post.group_id = user_group.id
+               AND group_post.deleted_at IS NULL
+            INNER JOIN user_saved_posts saved_post
+                ON saved_post.id = group_post.user_saved_post_id
+               AND saved_post.user_id = user_group.user_id
+               AND saved_post.deleted_at IS NULL
+            INNER JOIN user_saved_post_places saved_post_place
+                ON saved_post_place.user_saved_post_id = saved_post.id
+            INNER JOIN places p ON p.id = saved_post_place.place_id
+            INNER JOIN user_place_bookmarks bookmark
+                ON bookmark.place_id = p.id
+               AND bookmark.user_id = user_group.user_id
+            WHERE user_group.user_id = :userId
+              AND user_group.deleted_at IS NULL
+              AND (
+                  p.name LIKE :pattern ESCAPE '!'
+                  OR p.address LIKE :pattern ESCAPE '!'
+                  OR p.category LIKE :pattern ESCAPE '!'
+              )
+            GROUP BY user_group.id, user_group.name, user_group.color
+            ORDER BY user_group.id ASC
+        """,
+        nativeQuery = true,
+    )
+    fun findSavedPlaceSearchGroups(
+        @Param("userId") userId: Long,
+        @Param("pattern") pattern: String,
+    ): List<SavedPlaceSearchGroupProjection>
 }
 
 interface MapPlaceProjection {
@@ -278,4 +343,11 @@ interface SavedPlaceSearchProjection {
     val name: String
     val address: String
     val category: String?
+}
+
+interface SavedPlaceSearchGroupProjection {
+    val id: Long
+    val name: String
+    val color: String
+    val matchedPlaceCount: Long
 }
