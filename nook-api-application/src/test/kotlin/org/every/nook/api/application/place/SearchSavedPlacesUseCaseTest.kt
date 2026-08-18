@@ -11,7 +11,15 @@ class SearchSavedPlacesUseCaseTest {
     @Test
     fun `trims keyword and searches only the requested users places`() {
         val expected = SavedPlaceSearchPageView(
-            items = listOf(SavedPlaceSearchItemView(17, "카페 누크", "서울 성동구", "카페")),
+            items = listOf(
+                SavedPlaceSearchItemView(
+                    id = 17,
+                    name = "카페 누크",
+                    address = "서울 성동구",
+                    category = "카페",
+                    thumbnailUrl = "https://cdn.example.com/place.jpg",
+                ),
+            ),
             groups = listOf(SavedPlaceSearchGroupView(3, "서울 카페", "YELLOW", 1)),
             page = 0,
             size = 20,

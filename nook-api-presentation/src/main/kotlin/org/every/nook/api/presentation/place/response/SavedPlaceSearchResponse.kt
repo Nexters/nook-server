@@ -61,6 +61,8 @@ data class SavedPlaceSearchItemResponse(
     val address: String,
     @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
+    val thumbnailUrl: String?,
     @field:Schema(description = "장소 식별자")
     val id: Long,
 ) {
@@ -69,6 +71,7 @@ data class SavedPlaceSearchItemResponse(
             name = view.name,
             address = view.address,
             category = view.category,
+            thumbnailUrl = view.thumbnailUrl,
             id = view.id,
         )
     }

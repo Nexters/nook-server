@@ -301,6 +301,7 @@ class PlaceControllerTest {
                         name = "카페 누크",
                         address = "서울 성동구 연무장길 1",
                         category = "카페",
+                        thumbnailUrl = "https://cdn.example.com/place.jpg",
                     ),
                 ),
                 groups = listOf(
@@ -325,6 +326,7 @@ class PlaceControllerTest {
                 jsonPath("$.success.items[0].name") { value("카페 누크") }
                 jsonPath("$.success.items[0].address") { value("서울 성동구 연무장길 1") }
                 jsonPath("$.success.items[0].category") { value("카페") }
+                jsonPath("$.success.items[0].thumbnailUrl") { value("https://cdn.example.com/place.jpg") }
                 jsonPath("$.success.items[0].id") { value(17) }
                 jsonPath("$.success.groups[0].id") { value(3) }
                 jsonPath("$.success.groups[0].name") { value("서울 카페") }

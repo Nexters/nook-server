@@ -27,6 +27,7 @@ class SavedPlaceSearchPersistenceAdapter(private val bookmarkRepository: UserPla
                     name = row.name,
                     address = row.address,
                     category = row.category,
+                    thumbnailUrl = row.thumbnailUrl,
                 )
             },
             groups = bookmarkRepository.findSavedPlaceSearchGroups(userId, pattern).map { row ->

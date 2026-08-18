@@ -193,7 +193,41 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.id AS id,
                 p.name AS name,
                 p.address AS address,
-                p.category AS category
+                p.category AS category,
+                COALESCE(
+                    p.thumbnail_url,
+                    (
+                        SELECT post_media.media_url
+                        FROM user_saved_posts thumbnail_saved_post
+                        INNER JOIN user_saved_post_places thumbnail_saved_post_place
+                            ON thumbnail_saved_post_place.user_saved_post_id = thumbnail_saved_post.id
+                        INNER JOIN post_media post_media
+                            ON post_media.post_id = thumbnail_saved_post.post_id
+                        WHERE thumbnail_saved_post.user_id = upb.user_id
+                          AND thumbnail_saved_post.deleted_at IS NULL
+                          AND thumbnail_saved_post_place.place_id = p.id
+                          AND post_media.media_type = 'IMAGE'
+                          AND (
+                              :groupId IS NULL
+                              OR EXISTS (
+                                  SELECT 1
+                                  FROM group_posts thumbnail_group_post
+                                  INNER JOIN user_groups thumbnail_group
+                                      ON thumbnail_group.id = thumbnail_group_post.group_id
+                                  WHERE thumbnail_group_post.user_saved_post_id = thumbnail_saved_post.id
+                                    AND thumbnail_group_post.group_id = :groupId
+                                    AND thumbnail_group_post.deleted_at IS NULL
+                                    AND thumbnail_group.user_id = upb.user_id
+                                    AND thumbnail_group.deleted_at IS NULL
+                              )
+                          )
+                        ORDER BY
+                            thumbnail_saved_post.created_at DESC,
+                            thumbnail_saved_post.id DESC,
+                            post_media.display_order ASC
+                        LIMIT 1
+                    )
+                ) AS thumbnailUrl
             FROM user_place_bookmarks upb
             INNER JOIN places p ON p.id = upb.place_id
             WHERE upb.user_id = :userId
@@ -343,6 +377,7 @@ interface SavedPlaceSearchProjection {
     val name: String
     val address: String
     val category: String?
+    val thumbnailUrl: String?
 }
 
 interface SavedPlaceSearchGroupProjection {
