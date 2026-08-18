@@ -1,5 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -184,6 +186,65 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
         @Param("cursorBookmarkId") cursorBookmarkId: Long?,
         @Param("limit") limit: Int,
     ): List<RecentPlaceProjection>
+
+    @Query(
+        value = """
+            SELECT
+                p.id AS id,
+                p.name AS name,
+                p.address AS address,
+                p.category AS category
+            FROM user_place_bookmarks upb
+            INNER JOIN places p ON p.id = upb.place_id
+            WHERE upb.user_id = :userId
+              AND EXISTS (
+                  SELECT 1
+                  FROM user_saved_posts usp
+                  INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
+                  WHERE usp.user_id = upb.user_id
+                    AND usp.deleted_at IS NULL
+                    AND uspp.place_id = p.id
+              )
+              AND (
+                  p.name LIKE :pattern ESCAPE '!'
+                  OR p.address LIKE :pattern ESCAPE '!'
+                  OR p.category LIKE :pattern ESCAPE '!'
+              )
+            ORDER BY
+                CASE
+                    WHEN p.name LIKE :pattern ESCAPE '!' THEN 0
+                    WHEN p.address LIKE :pattern ESCAPE '!' THEN 1
+                    ELSE 2
+                END,
+                p.name ASC,
+                p.id ASC
+        """,
+        countQuery = """
+            SELECT COUNT(*)
+            FROM user_place_bookmarks upb
+            INNER JOIN places p ON p.id = upb.place_id
+            WHERE upb.user_id = :userId
+              AND EXISTS (
+                  SELECT 1
+                  FROM user_saved_posts usp
+                  INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
+                  WHERE usp.user_id = upb.user_id
+                    AND usp.deleted_at IS NULL
+                    AND uspp.place_id = p.id
+              )
+              AND (
+                  p.name LIKE :pattern ESCAPE '!'
+                  OR p.address LIKE :pattern ESCAPE '!'
+                  OR p.category LIKE :pattern ESCAPE '!'
+              )
+        """,
+        nativeQuery = true,
+    )
+    fun searchSavedPlaces(
+        @Param("userId") userId: Long,
+        @Param("pattern") pattern: String,
+        pageable: Pageable,
+    ): Page<SavedPlaceSearchProjection>
 }
 
 interface MapPlaceProjection {
@@ -210,4 +271,11 @@ interface RecentPlaceProjection {
     val longitude: BigDecimal
     val thumbnailUrl: String?
     val representativeTags: String?
+}
+
+interface SavedPlaceSearchProjection {
+    val id: Long
+    val name: String
+    val address: String
+    val category: String?
 }

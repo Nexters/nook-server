@@ -17,7 +17,10 @@ import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
+import org.every.nook.api.application.place.SavedPlaceSearchItemView
+import org.every.nook.api.application.place.SavedPlaceSearchPageView
 import org.every.nook.api.application.place.SearchPlacesUseCase
+import org.every.nook.api.application.place.SearchSavedPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
 import org.every.nook.api.application.place.UpdatePlaceMemoUseCase
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
@@ -46,6 +49,7 @@ class PlaceControllerTest {
     private lateinit var getMapPlacesUseCase: GetMapPlacesUseCase
     private lateinit var getRecentPlacesUseCase: GetRecentPlacesUseCase
     private lateinit var searchPlacesUseCase: SearchPlacesUseCase
+    private lateinit var searchSavedPlacesUseCase: SearchSavedPlacesUseCase
 
     @BeforeTest
     fun setUp() {
@@ -56,6 +60,7 @@ class PlaceControllerTest {
         getMapPlacesUseCase = mock(GetMapPlacesUseCase::class.java)
         getRecentPlacesUseCase = mock(GetRecentPlacesUseCase::class.java)
         searchPlacesUseCase = mock(SearchPlacesUseCase::class.java)
+        searchSavedPlacesUseCase = mock(SearchSavedPlacesUseCase::class.java)
         updatePlaceMemoUseCase = mock(UpdatePlaceMemoUseCase::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
@@ -66,6 +71,7 @@ class PlaceControllerTest {
                     getMapPlacesUseCase,
                     getRecentPlacesUseCase,
                     searchPlacesUseCase,
+                    searchSavedPlacesUseCase,
                 ),
             )
             .setCustomArgumentResolvers(UserContextArgumentResolver())
@@ -275,6 +281,46 @@ class PlaceControllerTest {
         }
 
         verify(searchPlacesUseCase)(query)
+    }
+
+    @Test
+    fun `returns matching places from the current users saved places`() {
+        val query = SearchSavedPlacesUseCase.Query(
+            userId = TEST_USER_ID,
+            keyword = "카페",
+            page = 0,
+            size = 20,
+        )
+        `when`(searchSavedPlacesUseCase(query)).thenReturn(
+            SavedPlaceSearchPageView(
+                items = listOf(
+                    SavedPlaceSearchItemView(
+                        id = 17,
+                        name = "카페 누크",
+                        address = "서울 성동구 연무장길 1",
+                        category = "카페",
+                    ),
+                ),
+                page = 0,
+                size = 20,
+                totalElements = 1,
+                totalPages = 1,
+                hasNext = false,
+            ),
+        )
+
+        mockMvc.get("/api/v1/places/saved/search?query=카페&page=0&size=20")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success.items[0].name") { value("카페 누크") }
+                jsonPath("$.success.items[0].address") { value("서울 성동구 연무장길 1") }
+                jsonPath("$.success.items[0].category") { value("카페") }
+                jsonPath("$.success.items[0].id") { value(17) }
+                jsonPath("$.success.totalElements") { value(1) }
+                jsonPath("$.success.hasNext") { value(false) }
+            }
+
+        verify(searchSavedPlacesUseCase)(query)
     }
 
     @Test
