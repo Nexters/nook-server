@@ -17,6 +17,9 @@ GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&south
 # 장소별 tags(최대 4개)가 포함됩니다.
 GET {{baseUrl}}/api/v1/places/recent?size=20
 
+### 내 저장 장소 검색
+GET {{baseUrl}}/api/v1/places/saved/search?query=카페&page=0&size=20
+
 ### 직접 연결할 장소 검색
 GET {{baseUrl}}/api/v1/places/search?query=퍼머넌트해비탯&page=0&size=15&latitude=37.5665&longitude=126.9780
 
