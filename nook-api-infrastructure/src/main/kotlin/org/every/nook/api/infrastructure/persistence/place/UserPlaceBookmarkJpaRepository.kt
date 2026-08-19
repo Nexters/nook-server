@@ -193,7 +193,41 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.id AS id,
                 p.name AS name,
                 p.address AS address,
-                p.category AS category
+                p.category AS category,
+                COALESCE(
+                    p.thumbnail_url,
+                    (
+                        SELECT post_media.media_url
+                        FROM user_saved_posts thumbnail_saved_post
+                        INNER JOIN user_saved_post_places thumbnail_saved_post_place
+                            ON thumbnail_saved_post_place.user_saved_post_id = thumbnail_saved_post.id
+                        INNER JOIN post_media post_media
+                            ON post_media.post_id = thumbnail_saved_post.post_id
+                        WHERE thumbnail_saved_post.user_id = upb.user_id
+                          AND thumbnail_saved_post.deleted_at IS NULL
+                          AND thumbnail_saved_post_place.place_id = p.id
+                          AND post_media.media_type = 'IMAGE'
+                          AND (
+                              :groupId IS NULL
+                              OR EXISTS (
+                                  SELECT 1
+                                  FROM group_posts thumbnail_group_post
+                                  INNER JOIN user_groups thumbnail_group
+                                      ON thumbnail_group.id = thumbnail_group_post.group_id
+                                  WHERE thumbnail_group_post.user_saved_post_id = thumbnail_saved_post.id
+                                    AND thumbnail_group_post.group_id = :groupId
+                                    AND thumbnail_group_post.deleted_at IS NULL
+                                    AND thumbnail_group.user_id = upb.user_id
+                                    AND thumbnail_group.deleted_at IS NULL
+                              )
+                          )
+                        ORDER BY
+                            thumbnail_saved_post.created_at DESC,
+                            thumbnail_saved_post.id DESC,
+                            post_media.display_order ASC
+                        LIMIT 1
+                    )
+                ) AS thumbnailUrl
             FROM user_place_bookmarks upb
             INNER JOIN places p ON p.id = upb.place_id
             WHERE upb.user_id = :userId
@@ -204,6 +238,19 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
                     AND uspp.place_id = p.id
+                    AND (
+                        :groupId IS NULL
+                        OR EXISTS (
+                            SELECT 1
+                            FROM group_posts group_post
+                            INNER JOIN user_groups user_group ON user_group.id = group_post.group_id
+                            WHERE group_post.user_saved_post_id = usp.id
+                              AND group_post.group_id = :groupId
+                              AND group_post.deleted_at IS NULL
+                              AND user_group.user_id = upb.user_id
+                              AND user_group.deleted_at IS NULL
+                        )
+                    )
               )
               AND (
                   p.name LIKE :pattern ESCAPE '!'
@@ -231,6 +278,19 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
                     AND uspp.place_id = p.id
+                    AND (
+                        :groupId IS NULL
+                        OR EXISTS (
+                            SELECT 1
+                            FROM group_posts group_post
+                            INNER JOIN user_groups user_group ON user_group.id = group_post.group_id
+                            WHERE group_post.user_saved_post_id = usp.id
+                              AND group_post.group_id = :groupId
+                              AND group_post.deleted_at IS NULL
+                              AND user_group.user_id = upb.user_id
+                              AND user_group.deleted_at IS NULL
+                        )
+                    )
               )
               AND (
                   p.name LIKE :pattern ESCAPE '!'
@@ -243,8 +303,47 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
     fun searchSavedPlaces(
         @Param("userId") userId: Long,
         @Param("pattern") pattern: String,
+        @Param("groupId") groupId: Long?,
         pageable: Pageable,
     ): Page<SavedPlaceSearchProjection>
+
+    @Query(
+        value = """
+            SELECT
+                user_group.id AS id,
+                user_group.name AS name,
+                user_group.color AS color,
+                COUNT(DISTINCT p.id) AS matchedPlaceCount
+            FROM user_groups user_group
+            INNER JOIN group_posts group_post
+                ON group_post.group_id = user_group.id
+               AND group_post.deleted_at IS NULL
+            INNER JOIN user_saved_posts saved_post
+                ON saved_post.id = group_post.user_saved_post_id
+               AND saved_post.user_id = user_group.user_id
+               AND saved_post.deleted_at IS NULL
+            INNER JOIN user_saved_post_places saved_post_place
+                ON saved_post_place.user_saved_post_id = saved_post.id
+            INNER JOIN places p ON p.id = saved_post_place.place_id
+            INNER JOIN user_place_bookmarks bookmark
+                ON bookmark.place_id = p.id
+               AND bookmark.user_id = user_group.user_id
+            WHERE user_group.user_id = :userId
+              AND user_group.deleted_at IS NULL
+              AND (
+                  p.name LIKE :pattern ESCAPE '!'
+                  OR p.address LIKE :pattern ESCAPE '!'
+                  OR p.category LIKE :pattern ESCAPE '!'
+              )
+            GROUP BY user_group.id, user_group.name, user_group.color
+            ORDER BY user_group.id ASC
+        """,
+        nativeQuery = true,
+    )
+    fun findSavedPlaceSearchGroups(
+        @Param("userId") userId: Long,
+        @Param("pattern") pattern: String,
+    ): List<SavedPlaceSearchGroupProjection>
 }
 
 interface MapPlaceProjection {
@@ -278,4 +377,12 @@ interface SavedPlaceSearchProjection {
     val name: String
     val address: String
     val category: String?
+    val thumbnailUrl: String?
+}
+
+interface SavedPlaceSearchGroupProjection {
+    val id: Long
+    val name: String
+    val color: String
+    val matchedPlaceCount: Long
 }

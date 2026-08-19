@@ -125,6 +125,10 @@ class PlaceController(
         @NotBlank
         @Size(max = SearchSavedPlacesUseCase.MAX_QUERY_LENGTH)
         query: String,
+        @Parameter(description = "검색 결과를 제한할 내 그룹 식별자")
+        @RequestParam(required = false)
+        @Positive
+        groupId: Long?,
         @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
         @RequestParam(defaultValue = "0")
         @Min(0)
@@ -141,6 +145,7 @@ class PlaceController(
                 keyword = query,
                 page = page,
                 size = size,
+                groupId = groupId,
             ),
         )
         return ApiResponse.success(SavedPlaceSearchPageResponse.from(result))
