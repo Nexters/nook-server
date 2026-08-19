@@ -2,6 +2,7 @@ package org.every.nook.api.presentation.place.response
 
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
 import org.every.nook.api.presentation.place.RecentPlaceCursorCodec
@@ -24,6 +25,8 @@ data class MapPlaceResponse(
     val color: String,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
+    @field:Schema(description = "장소 썸네일 파싱 상태")
+    val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     @field:Schema(description = "장소 대표 태그 목록(최대 4개)")
     val tags: List<String>,
 ) {
@@ -37,6 +40,7 @@ data class MapPlaceResponse(
             longitude = view.longitude,
             color = view.color,
             thumbnailUrl = view.thumbnailUrl,
+            thumbnailParsingStatus = view.thumbnailParsingStatus,
             tags = view.tags,
         )
     }
@@ -76,6 +80,8 @@ data class RecentPlaceResponse(
     val longitude: BigDecimal,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
+    @field:Schema(description = "장소 썸네일 파싱 상태")
+    val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     @field:Schema(description = "장소 대표 태그 목록(최대 4개)")
     val tags: List<String>,
 ) {
@@ -89,6 +95,7 @@ data class RecentPlaceResponse(
             latitude = view.latitude,
             longitude = view.longitude,
             thumbnailUrl = view.thumbnailUrl,
+            thumbnailParsingStatus = view.thumbnailParsingStatus,
             tags = view.tags,
         )
     }

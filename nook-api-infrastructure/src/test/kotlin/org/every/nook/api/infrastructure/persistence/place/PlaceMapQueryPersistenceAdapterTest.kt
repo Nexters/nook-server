@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.domain.place.GeoBounds
 import org.mockito.Mockito.mock
@@ -30,6 +31,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         `when`(row.latitude).thenReturn(BigDecimal("37.5"))
         `when`(row.longitude).thenReturn(BigDecimal("127.0"))
         `when`(row.color).thenReturn("BLUE")
+        `when`(row.thumbnailParsingStatus).thenReturn("PROCESSING")
         `when`(
             repository.findMapPlaces(
                 userId = 7,
@@ -48,6 +50,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         assertEquals("음식점", result.single().category)
         assertEquals(BigDecimal("37.5"), result.single().latitude)
         assertEquals("BLUE", result.single().color)
+        assertEquals(PlaceThumbnailParsingStatusView.PROCESSING, result.single().thumbnailParsingStatus)
     }
 
     @Test
@@ -77,6 +80,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         val result = adapter.findInBounds(7, bounds)
 
         assertEquals("YELLOW", result.single().color)
+        assertEquals(PlaceThumbnailParsingStatusView.PENDING, result.single().thumbnailParsingStatus)
     }
 
     @Test
@@ -94,6 +98,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         `when`(row.latitude).thenReturn(BigDecimal("37.5"))
         `when`(row.longitude).thenReturn(BigDecimal("127.0"))
         `when`(row.thumbnailUrl).thenReturn("https://example.com/place.jpg")
+        `when`(row.thumbnailParsingStatus).thenReturn("PROCESSING")
         `when`(
             repository.findRecentPlaces(
                 userId = 7,
@@ -108,6 +113,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         assertEquals(17, result.single().id)
         assertEquals("용인", result.single().city)
         assertEquals("https://example.com/place.jpg", result.single().thumbnailUrl)
+        assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.single().thumbnailParsingStatus)
         verify(repository).findRecentPlaces(7, cursor.bookmarkedAt, cursor.bookmarkId, 21)
     }
 }
