@@ -14,6 +14,7 @@ type Envelope<T> = { success?: T; error?: { reason?: string } };
 type Page<T> = { items: T[]; total: number };
 type Place = { id: number; name: string; address: string; provider: string; externalPlaceId: string };
 type PostDetail = { id: number; canonicalUrl: string; authorIdentifier?: string; title?: string; body?: string; contentParsingStatus: string; contentParsingFailureReason?: string; placeParsingStatus?: string; placeParsingFailureReason?: string; savedUserCount: number; mappingReviewed: boolean; places: Array<Place & { sequence: number }> };
+type ManagedPlace = Place & { linkedPostCount: number; affectedUserCount: number; posts: Array<{ id: number; title?: string; authorIdentifier?: string; canonicalUrl: string; createdAt: string }> };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}/api/admin/v1${path}`, { credentials: "include", ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
@@ -28,7 +29,8 @@ const dataProvider: DataProvider = {
     const offset = ((params.pagination?.page ?? 1) - 1) * limit;
     const search = new URLSearchParams({ offset: String(offset), limit: String(limit) });
     Object.entries(params.filter ?? {}).forEach(([key, value]) => value && search.set(key, String(value)));
-    const result = await api<Page<Record<string, unknown>>>(`/${resource}?${search}`);
+    const path = resource === "places" ? `/places/manage?${search}` : `/${resource}?${search}`;
+    const result = await api<Page<Record<string, unknown>>>(path);
     return { data: result.items as never[], total: result.total };
   },
   getOne: async (resource, params) => ({ data: await api(`/${resource}/${params.id}`) }),
@@ -38,9 +40,9 @@ const dataProvider: DataProvider = {
 
 const theme = createTheme({ palette: { primary: { main: "#1f2937" }, secondary: { main: "#b7791f" }, background: { default: "#f5f7fa" } }, shape: { borderRadius: 8 }, typography: { fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' } });
 
-function App() { return <Admin dashboard={Dashboard} dataProvider={dataProvider} disableTelemetry layout={AdminLayout} theme={theme} title="Nook Admin"><Resource name="posts" options={{ label: "게시글 검수" }} icon={PlaceIcon} list={PostList} show={PostShow} /><Resource name="audit-logs" options={{ label: "감사 로그" }} icon={AssignmentTurnedInIcon} list={AuditLogList} /></Admin>; }
+function App() { return <Admin dashboard={Dashboard} dataProvider={dataProvider} disableTelemetry layout={AdminLayout} theme={theme} title="Nook Admin"><Resource name="posts" options={{ label: "게시글 관리" }} icon={AssignmentTurnedInIcon} list={PostList} show={PostShow} /><Resource name="places" options={{ label: "장소 관리" }} icon={PlaceIcon} list={PlaceList} show={PlaceShow} /><Resource name="audit-logs" options={{ label: "감사 로그" }} icon={AssignmentTurnedInIcon} list={AuditLogList} /></Admin>; }
 function AdminLayout(props: LayoutProps) { return <Layout {...props} menu={AdminMenu} />; }
-function AdminMenu() { return <Menu><Menu.DashboardItem leftIcon={<DashboardIcon />} /><Menu.ResourceItem name="posts" /><Menu.ResourceItem name="audit-logs" /></Menu>; }
+function AdminMenu() { return <Menu><Menu.DashboardItem leftIcon={<DashboardIcon />} /><Menu.ResourceItem name="posts" /><Menu.ResourceItem name="places" /><Menu.ResourceItem name="audit-logs" /></Menu>; }
 
 function Dashboard() {
   const [email, setEmail] = useState<string>();
@@ -63,6 +65,18 @@ function MappingDialog({ open, post, onClose }: { open: boolean; post: PostDetai
   useEffect(() => { if (query.trim().length < 2) return; const timer = window.setTimeout(() => api<Place[]>(`/places?query=${encodeURIComponent(query)}`).then((items) => setOptions([...selected, ...items].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index))), 250); return () => window.clearTimeout(timer); }, [query, selected]);
   const save = async () => { setSaving(true); try { await api(`/posts/${post.id}/places`, { method: "PUT", body: JSON.stringify({ placeIds: selected.map((place) => place.id), reason }) }); notify("매핑을 교정하고 감사 로그를 남겼습니다.", { type: "success" }); refresh(); onClose(); } catch (error) { notify(error instanceof Error ? error.message : "교정에 실패했습니다.", { type: "error" }); } finally { setSaving(false); } };
   return <Dialog open={open} onClose={onClose} fullWidth maxWidth="md"><DialogTitle>공용 장소 매핑 교정</DialogTitle><DialogContent><Stack spacing={2} sx={{ mt: 1 }}><Alert severity="info">기존 사용자 {post.savedUserCount}명의 저장 장소는 유지되고 이후 저장 건에만 적용됩니다. 장소를 모두 제거하는 교정도 가능합니다.</Alert><Autocomplete multiple options={options} value={selected} onChange={(_, value) => setSelected(value)} onInputChange={(_, value) => setQuery(value)} getOptionLabel={(place) => `${place.name} · ${place.address}`} isOptionEqualToValue={(a, b) => a.id === b.id} renderInput={(params) => <TextField {...params} label="장소 검색" helperText="두 글자 이상 입력하세요." />} /><TextField label="수정 사유" required multiline minRows={3} value={reason} onChange={(event) => setReason(event.target.value)} /></Stack></DialogContent><DialogActions><Button onClick={onClose}>취소</Button><Button variant="contained" disabled={saving || !reason.trim()} onClick={save}>{saving ? <CircularProgress size={20} /> : "교정 저장"}</Button></DialogActions></Dialog>;
+}
+
+function PlaceList() { return <List filters={[<TextInput key="query" source="query" label="장소명·주소·외부 ID 검색" alwaysOn />]}><Datagrid rowClick="show" bulkActionButtons={false}><RaTextField source="id" label="ID" /><RaTextField source="name" label="장소명" /><RaTextField source="address" label="주소" /><RaTextField source="provider" label="Provider" /><RaTextField source="externalPlaceId" label="외부 ID" /><RaTextField source="linkedPostCount" label="연결 게시글" /><RaTextField source="affectedUserCount" label="영향 사용자" /></Datagrid></List>; }
+function PlaceShow() { return <Show><SimpleShowLayout><PlacePanel /></SimpleShowLayout></Show>; }
+function PlacePanel() {
+  const record = useRecordContext<ManagedPlace>(); const [open, setOpen] = useState(false); if (!record) return null;
+  return <Stack spacing={3}><Alert severity="warning">이 장소는 게시글 {record.linkedPostCount}개와 저장 사용자 {record.affectedUserCount}명에게 노출됩니다. 장소명·주소 수정은 기존 사용자 화면에도 즉시 반영됩니다.</Alert><Box><Typography variant="h5" sx={{ fontWeight: 800 }}>{record.name}</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>{record.address}</Typography><Typography variant="caption">{record.provider} · {record.externalPlaceId}</Typography></Box><Box><Button variant="contained" onClick={() => setOpen(true)}>장소 정보 수정</Button></Box><Box><Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>연결 게시글</Typography><Stack spacing={1}>{record.posts.map((post) => <Card variant="outlined" key={post.id}><CardContent><Typography sx={{ fontWeight: 700 }}>{post.title ?? "제목 없음"}</Typography><Typography color="text.secondary">{post.authorIdentifier ?? "작성자 미상"}</Typography><Button size="small" href={`#/posts/${post.id}/show`}>게시글 관리에서 보기</Button><Button size="small" href={post.canonicalUrl} target="_blank" endIcon={<OpenInNewIcon />}>원문</Button></CardContent></Card>)}</Stack></Box><PlaceEditDialog open={open} place={record} onClose={() => setOpen(false)} /></Stack>;
+}
+function PlaceEditDialog({ open, place, onClose }: { open: boolean; place: ManagedPlace; onClose: () => void }) {
+  const [name, setName] = useState(place.name); const [address, setAddress] = useState(place.address); const [reason, setReason] = useState(""); const [saving, setSaving] = useState(false); const notify = useNotify(); const refresh = useRefresh();
+  const save = async () => { setSaving(true); try { await api(`/places/${place.id}`, { method: "PUT", body: JSON.stringify({ name, address, reason }) }); notify("장소 정보를 수정하고 감사 로그를 남겼습니다.", { type: "success" }); refresh(); onClose(); } catch (error) { notify(error instanceof Error ? error.message : "수정에 실패했습니다.", { type: "error" }); } finally { setSaving(false); } };
+  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>공용 장소 정보 수정</DialogTitle><DialogContent><Stack spacing={2} sx={{ mt: 1 }}><Alert severity="warning">게시글 {place.linkedPostCount}개와 저장 사용자 {place.affectedUserCount}명의 화면에 변경된 정보가 표시됩니다.</Alert><TextField label="장소명" required value={name} onChange={(event) => setName(event.target.value)} /><TextField label="주소" required value={address} onChange={(event) => setAddress(event.target.value)} /><TextField label="수정 사유" required multiline minRows={3} value={reason} onChange={(event) => setReason(event.target.value)} /></Stack></DialogContent><DialogActions><Button onClick={onClose}>취소</Button><Button variant="contained" disabled={saving || !name.trim() || !address.trim() || !reason.trim()} onClick={save}>{saving ? <CircularProgress size={20} /> : "수정 저장"}</Button></DialogActions></Dialog>;
 }
 
 function AuditLogList() { return <List filters={[<TextInput key="targetType" source="targetType" label="대상 유형" />, <TextInput key="targetId" source="targetId" label="대상 ID" />]}><Datagrid bulkActionButtons={false} expand={<AuditDetails />}><DateField source="createdAt" label="시각" showTime /><RaTextField source="actorEmail" label="운영자" /><RaTextField source="action" label="동작" /><RaTextField source="targetType" label="대상" /><RaTextField source="targetId" label="대상 ID" /><RaTextField source="reason" label="사유" /><RaTextField source="requestId" label="Request ID" /></Datagrid></List>; }

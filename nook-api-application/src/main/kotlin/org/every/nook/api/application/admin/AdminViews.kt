@@ -48,6 +48,27 @@ data class AdminPlaceSummary(
     val address: String,
     val provider: String,
     val externalPlaceId: String,
+    val linkedPostCount: Long,
+    val affectedUserCount: Long,
+)
+
+data class AdminPlaceDetail(
+    val id: Long,
+    val name: String,
+    val address: String,
+    val provider: String,
+    val externalPlaceId: String,
+    val linkedPostCount: Long,
+    val affectedUserCount: Long,
+    val posts: List<AdminLinkedPost>,
+)
+
+data class AdminLinkedPost(
+    val id: Long,
+    val title: String?,
+    val authorIdentifier: String?,
+    val canonicalUrl: String,
+    val createdAt: Instant,
 )
 
 data class AdminAuditLog(
