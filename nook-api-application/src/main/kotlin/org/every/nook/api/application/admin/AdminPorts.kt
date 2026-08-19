@@ -8,6 +8,23 @@ interface AdminPostQueryPort {
 
 interface AdminPlaceQueryPort {
     fun search(query: String, limit: Int): List<AdminPlaceSummary>
+
+    fun listPlaces(query: String?, offset: Int, limit: Int): AdminPage<AdminPlaceSummary>
+
+    fun findPlace(placeId: Long): AdminPlaceDetail?
+}
+
+interface AdminPlaceCorrectionPort {
+    fun update(command: UpdateCommand): AdminPlaceDetail?
+
+    data class UpdateCommand(
+        val placeId: Long,
+        val name: String,
+        val address: String,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
 }
 
 interface AdminPostPlaceCorrectionPort {

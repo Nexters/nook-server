@@ -8,4 +8,6 @@ interface PostPlaceJpaRepository : JpaRepository<PostPlaceEntity, Long> {
     fun findAllByPostIdOrderBySequenceAsc(postId: Long): List<PostPlaceEntity>
 
     fun findAllByPostIdInOrderByPostIdAscSequenceAsc(postIds: Collection<Long>): List<PostPlaceEntity>
+
+    fun findAllByPlaceId(placeId: Long): List<PostPlaceEntity>
 }

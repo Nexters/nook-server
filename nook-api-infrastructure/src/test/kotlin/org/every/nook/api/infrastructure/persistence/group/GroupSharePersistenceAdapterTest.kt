@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.SharedGroupAccess
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.SharedPlaceBookmarkSyncJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.SharedGroupContentJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.mockito.Mockito.mock
@@ -19,6 +20,7 @@ class GroupSharePersistenceAdapterTest {
     private val savedPostRepository = mock(UserSavedPostJpaRepository::class.java)
     private val sharedContentRepository = mock(SharedGroupContentJpaRepository::class.java)
     private val memberRepository = mock(MemberJpaRepository::class.java)
+    private val bookmarkRepository = mock(SharedPlaceBookmarkSyncJpaRepository::class.java)
     private val adapter = GroupSharePersistenceAdapter(
         shareLinkRepository,
         subscriptionRepository,
@@ -27,7 +29,17 @@ class GroupSharePersistenceAdapterTest {
         savedPostRepository,
         sharedContentRepository,
         memberRepository,
+        bookmarkRepository,
     )
+
+    @Test
+    fun `subscription creates bookmarks for current shared group places`() {
+        `when`(subscriptionRepository.existsByMemberIdAndShareLinkId(10, 1)).thenReturn(false)
+
+        assertTrue(adapter.subscribe(memberId = 10, access = ACCESS))
+
+        verify(bookmarkRepository).insertAllFromSharedGroup(memberId = 10, groupId = 17)
+    }
 
     @Test
     fun `place belongs to the shared group when native exists returns one`() {

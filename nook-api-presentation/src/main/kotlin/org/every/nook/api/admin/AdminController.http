@@ -18,6 +18,25 @@ Cf-Access-Jwt-Assertion: {{accessJwt}}
 GET {{baseUrl}}/api/admin/v1/places?query=성수&limit=20
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 
+### 장소 관리 목록
+GET {{baseUrl}}/api/admin/v1/places/manage?query=성수&offset=0&limit=20
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 장소 관리 상세
+GET {{baseUrl}}/api/admin/v1/places/1
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 장소 기본 정보 수정
+PUT {{baseUrl}}/api/admin/v1/places/1
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "name": "수정된 장소명",
+  "address": "서울특별시 성동구 수정로 1",
+  "reason": "운영자 확인 결과 주소 오기 정정"
+}
+
 ### 공용 장소 매핑 교정
 PUT {{baseUrl}}/api/admin/v1/posts/1/places
 Cf-Access-Jwt-Assertion: {{accessJwt}}

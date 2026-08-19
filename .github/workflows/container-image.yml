@@ -285,3 +285,26 @@ jobs:
           GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
           GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
         run: .github/scripts/deploy-admin-web.sh
+
+  deploy-live-admin-web:
+    name: Deploy Live Admin Web
+    runs-on: [self-hosted, nook-ops]
+    needs: [changes, build-admin-web]
+    if: github.ref_name == 'main' && needs.changes.outputs.admin-web-changed == 'true' && needs.build-admin-web.result == 'success'
+    environment: live
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Deploy to ops VM
+        env:
+          ADMIN_ENV: live
+          ADMIN_WEB_PORT: "8082"
+          ADMIN_WEB_IMAGE: ${{ needs.build-admin-web.outputs.image }}
+          ADMIN_DEPLOY_LOCAL: "true"
+          GABIA_PUBLIC_REGISTRY: ${{ env.GABIA_PUBLIC_REGISTRY }}
+          GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
+          GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
+        run: .github/scripts/deploy-admin-web.sh

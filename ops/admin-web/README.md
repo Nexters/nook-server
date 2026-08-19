@@ -13,8 +13,8 @@ This deploys the static admin frontend to the ops VM as an nginx container.
   ops/admin-web/
 ```
 
-The dev container binds to `127.0.0.1:8081`. The future live container should
-bind to `127.0.0.1:8082`. Both are intended to be exposed through Cloudflare
+The dev container binds to `127.0.0.1:8081`. The live container binds to
+`127.0.0.1:8082`. Both are intended to be exposed through Cloudflare
 Tunnel without opening a public inbound port.
 
 ## Deploy
@@ -36,15 +36,18 @@ Point the admin hostname to the local service on the ops VM:
 ```yaml
 ingress:
   # `/api/admin/v1/**` must reach nook-api before the static-web catch-all.
-  - hostname: dev-admin.example.com
-    path: /api/admin/v1/*
-    service: https://dev-api.example.com
-  - hostname: dev-admin.example.com
+  - hostname: dev-admin.everynook.co.kr
+    path: ^/api/admin/v1(?:/.*)?$
+    service: http://192.168.0.102:8080
+  - hostname: dev-admin.everynook.co.kr
     service: http://localhost:8081
-  - hostname: admin.example.com
-    path: /api/admin/v1/*
-    service: https://api.example.com
-  - hostname: admin.example.com
+  - hostname: admin.everynook.co.kr
+    path: ^/api/admin/v1(?:/.*)?$
+    service: https://192.168.0.216:443
+    originRequest:
+      originServerName: api.everynook.co.kr
+      httpHostHeader: api.everynook.co.kr
+  - hostname: admin.everynook.co.kr
     service: http://localhost:8082
   - service: http_status:404
 ```

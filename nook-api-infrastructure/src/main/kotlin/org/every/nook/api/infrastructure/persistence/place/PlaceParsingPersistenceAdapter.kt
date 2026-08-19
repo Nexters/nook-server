@@ -47,6 +47,7 @@ class PlaceParsingPersistenceAdapter(
     private val userSavedPostLockRepository: UserSavedPostLockJpaRepository,
     private val userSavedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val userPlaceBookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val sharedBookmarkSyncRepository: SharedPlaceBookmarkSyncJpaRepository,
     private val postPlaceTagRepository: PostPlaceTagJpaRepository,
     private val postPlaceReviewRepository: PostPlaceReviewJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
@@ -134,6 +135,10 @@ class PlaceParsingPersistenceAdapter(
                     userId = savedPost.userId,
                     placeId = place.placeId,
                     memo = savedPost.memo,
+                )
+                sharedBookmarkSyncRepository.insertForActiveSubscribers(
+                    savedPostId = savedPostId,
+                    placeId = place.placeId,
                 )
             }
         }

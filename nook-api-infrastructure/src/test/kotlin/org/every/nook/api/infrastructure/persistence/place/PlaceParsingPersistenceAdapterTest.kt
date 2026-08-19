@@ -49,6 +49,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val userSavedPostLockRepository = mock(UserSavedPostLockJpaRepository::class.java)
     private val userSavedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
+    private val sharedBookmarkSyncRepository = mock(SharedPlaceBookmarkSyncJpaRepository::class.java)
     private val postPlaceTagRepository = mock(PostPlaceTagJpaRepository::class.java)
     private val postPlaceReviewRepository = mock(PostPlaceReviewJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
@@ -63,6 +64,7 @@ class PlaceParsingPersistenceAdapterTest {
         userSavedPostLockRepository = userSavedPostLockRepository,
         userSavedPostPlaceRepository = userSavedPostPlaceRepository,
         userPlaceBookmarkRepository = bookmarkRepository,
+        sharedBookmarkSyncRepository = sharedBookmarkSyncRepository,
         postPlaceTagRepository = postPlaceTagRepository,
         postPlaceReviewRepository = postPlaceReviewRepository,
         eventPublisher = eventPublisher,

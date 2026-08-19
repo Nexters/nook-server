@@ -9,6 +9,7 @@ import org.every.nook.api.application.group.SharedGroupView
 import org.every.nook.api.application.group.port.GroupReadAccessPort
 import org.every.nook.api.application.group.port.GroupSharePort
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.SharedPlaceBookmarkSyncJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.SharedGroupContentJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.springframework.stereotype.Component
@@ -25,6 +26,7 @@ class GroupSharePersistenceAdapter(
     private val savedPostRepository: UserSavedPostJpaRepository,
     private val sharedContentRepository: SharedGroupContentJpaRepository,
     private val memberRepository: MemberJpaRepository,
+    private val bookmarkRepository: SharedPlaceBookmarkSyncJpaRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) : GroupSharePort,
     GroupReadAccessPort {
@@ -109,6 +111,7 @@ class GroupSharePersistenceAdapter(
     override fun subscribe(memberId: Long, access: SharedGroupAccess): Boolean {
         if (subscriptionRepository.existsByMemberIdAndShareLinkId(memberId, access.shareLinkId)) return false
         subscriptionRepository.save(SharedGroupSubscriptionEntity(memberId, access.shareLinkId))
+        bookmarkRepository.insertAllFromSharedGroup(memberId, access.groupId)
         return true
     }
 
