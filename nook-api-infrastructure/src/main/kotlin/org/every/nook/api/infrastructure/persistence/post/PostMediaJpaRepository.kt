@@ -10,6 +10,8 @@ interface PostMediaJpaRepository : JpaRepository<PostMediaEntity, Long> {
 
     fun findAllByPostIdInOrderByPostIdAscSequenceAsc(postIds: Collection<Long>): List<PostMediaEntity>
 
+    fun findAllByPostIdOrderBySequenceAsc(postId: Long): List<PostMediaEntity>
+
     fun findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(
         postId: Long,
         mediaType: PostMedia.MediaType,

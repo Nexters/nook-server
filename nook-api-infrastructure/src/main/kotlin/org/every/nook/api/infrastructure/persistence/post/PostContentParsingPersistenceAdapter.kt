@@ -66,28 +66,30 @@ class PostContentParsingPersistenceAdapter(
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PostContentParsingStatus.PROCESSING)
         val entity = postRepository.findById(postId).orElseThrow()
-        entity.updateContent(post)
-        mediaRepository.deleteAllByPostId(postId)
-        hashtagRepository.deleteAllByPostId(postId)
-        mediaRepository.saveAll(
-            post.media.map { media ->
-                PostMediaEntity(
-                    postId = postId,
-                    mediaType = media.type,
-                    mediaUrl = media.url,
-                    sequence = media.sequence,
-                )
-            },
-        )
-        hashtagRepository.saveAll(
-            post.hashtags.mapIndexed { sequence, hashtag ->
-                PostHashtagEntity(
-                    postId = postId,
-                    hashtag = hashtag,
-                    sequence = sequence,
-                )
-            },
-        )
+        if (!entity.contentManuallyOverridden) {
+            entity.updateContent(post)
+            mediaRepository.deleteAllByPostId(postId)
+            hashtagRepository.deleteAllByPostId(postId)
+            mediaRepository.saveAll(
+                post.media.map { media ->
+                    PostMediaEntity(
+                        postId = postId,
+                        mediaType = media.type,
+                        mediaUrl = media.url,
+                        sequence = media.sequence,
+                    )
+                },
+            )
+            hashtagRepository.saveAll(
+                post.hashtags.mapIndexed { sequence, hashtag ->
+                    PostHashtagEntity(
+                        postId = postId,
+                        hashtag = hashtag,
+                        sequence = sequence,
+                    )
+                },
+            )
+        }
         job.status = PostContentParsingStatus.COMPLETED
         job.failureReason = null
 
@@ -102,16 +104,18 @@ class PostContentParsingPersistenceAdapter(
             )
             eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId, clock.instant()))
         }
-        post.media.forEach { media ->
-            eventPublisher.publishEvent(
-                PostMediaStorageRequestedEvent(
-                    postId = postId,
-                    mediaType = media.type.name,
-                    sourceUrl = media.url,
-                    sequence = media.sequence,
-                    availableAt = clock.instant(),
-                ),
-            )
+        if (!entity.contentManuallyOverridden) {
+            post.media.forEach { media ->
+                eventPublisher.publishEvent(
+                    PostMediaStorageRequestedEvent(
+                        postId = postId,
+                        mediaType = media.type.name,
+                        sourceUrl = media.url,
+                        sequence = media.sequence,
+                        availableAt = clock.instant(),
+                    ),
+                )
+            }
         }
     }
 

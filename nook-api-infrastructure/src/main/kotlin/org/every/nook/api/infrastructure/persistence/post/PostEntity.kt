@@ -53,6 +53,8 @@ class PostEntity(
         length = Post.MAX_SOURCE_LOCATION_TAG_LENGTH,
     )
     var sourceLocationTag: String? = null,
+    @Column(name = "content_manually_overridden", nullable = false)
+    var contentManuallyOverridden: Boolean = false,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,10 +63,19 @@ class PostEntity(
         protected set
 
     fun updateContent(post: Post) {
+        if (contentManuallyOverridden) return
         authorIdentifier = post.authorIdentifier
         title = post.title
         body = post.body
         publishedAt = post.publishedAt
         sourceLocationTag = post.sourceLocationTag
+    }
+
+    fun updateFromAdmin(authorIdentifier: String?, title: String?, body: String?, sourceLocationTag: String?) {
+        this.authorIdentifier = authorIdentifier
+        this.title = title
+        this.body = body
+        this.sourceLocationTag = sourceLocationTag
+        contentManuallyOverridden = true
     }
 }

@@ -6,6 +6,23 @@ interface AdminPostQueryPort {
     fun find(postId: Long): AdminPostDetail?
 }
 
+interface AdminPostCorrectionPort {
+    fun update(command: UpdateCommand): AdminPostDetail?
+
+    data class UpdateCommand(
+        val postId: Long,
+        val authorIdentifier: String?,
+        val title: String?,
+        val body: String?,
+        val sourceLocationTag: String?,
+        val hashtags: List<String>,
+        val media: List<AdminPostMedia>,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+}
+
 interface AdminPlaceQueryPort {
     fun search(query: String, limit: Int): List<AdminPlaceSummary>
 
@@ -24,6 +41,13 @@ interface AdminPlaceCorrectionPort {
         val actor: AdminActor,
         val reason: String,
         val requestId: String?,
+        val city: String? = null,
+        val category: String? = null,
+        val phoneNumber: String? = null,
+        val thumbnailUrl: String? = null,
+        val photoUrls: List<String> = emptyList(),
+        val representativeTags: List<String> = emptyList(),
+        val openingHours: org.every.nook.api.application.place.PlaceOpeningHours? = null,
     )
 }
 

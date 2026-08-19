@@ -51,15 +51,15 @@ class PlaceEntity(
     @Column(name = "address", nullable = false, length = Place.MAX_ADDRESS_LENGTH)
     var address: String,
     @Column(name = "city", nullable = true, length = Place.MAX_CITY_LENGTH)
-    val city: String? = null,
+    var city: String? = null,
     @Column(name = "latitude", nullable = false, precision = COORDINATE_PRECISION, scale = COORDINATE_SCALE)
     val latitude: BigDecimal,
     @Column(name = "longitude", nullable = false, precision = COORDINATE_PRECISION, scale = COORDINATE_SCALE)
     val longitude: BigDecimal,
     @Column(name = "category", nullable = true, length = Place.MAX_CATEGORY_LENGTH)
-    val category: String? = null,
+    var category: String? = null,
     @Column(name = "phone_number", nullable = true, length = Place.MAX_PHONE_NUMBER_LENGTH)
-    val phoneNumber: String? = null,
+    var phoneNumber: String? = null,
     @Column(name = "google_place_id", nullable = true, length = GOOGLE_PLACE_ID_MAX_LENGTH)
     var googlePlaceId: String? = null,
     @Column(name = "thumbnail_url", nullable = true, length = THUMBNAIL_URL_MAX_LENGTH)
@@ -146,6 +146,27 @@ class PlaceEntity(
         require(address.isNotBlank() && address.length <= Place.MAX_ADDRESS_LENGTH)
         this.name = name
         this.address = address
+    }
+
+    fun updateFromAdmin(
+        name: String,
+        address: String,
+        city: String?,
+        category: String?,
+        phoneNumber: String?,
+        thumbnailUrl: String?,
+        photoUrls: List<String>,
+        representativeTags: List<PlaceTag>,
+        openingHours: PlaceOpeningHours?,
+    ) {
+        updateBasicInformation(name, address)
+        this.city = city
+        this.category = category
+        this.phoneNumber = phoneNumber
+        this.thumbnailUrl = thumbnailUrl
+        this.photoUrls = photoUrls
+        this.representativeTags = representativeTags.take(MAX_REPRESENTATIVE_TAG_COUNT)
+        this.openingHours = openingHours
     }
 }
 
