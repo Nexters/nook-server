@@ -1,31 +1,45 @@
 package org.every.nook.api.infrastructure.openai
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
+import org.every.nook.api.infrastructure.billing.SettledUsage
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import java.math.BigDecimal
 
 class OpenAiImageTextExtractor(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : ImageTextExtractor {
     override fun extract(request: ImageTextExtractor.Request): List<ImageTranscript> {
         val startedAt = System.nanoTime()
         require(request.images.isNotEmpty()) { "At least one image is required" }
         require(request.images.size <= MAX_BATCH_SIZE) { "Too many images in transcript request" }
         require(properties.apiKey.isNotBlank()) { "OpenAI API key is not configured" }
-        val response = restClient.post()
-            .uri("/v1/responses")
-            .header("Authorization", "Bearer ${properties.apiKey}")
-            .body(request.toOpenAiRequest())
-            .retrieve()
-            .body(String::class.java)
-            ?: error("OpenAI returned an empty response")
+        val response = callMeter.measure(
+            provider = "openai",
+            sku = properties.model,
+            feature = "image-transcript",
+            estimatedUnits = BigDecimal.valueOf(MAX_OUTPUT_TOKENS.toLong()),
+            metadata = mapOf("model" to properties.model, "imageCount" to request.images.size.toString()),
+            usage = ::openAiUsage,
+        ) {
+            restClient.post()
+                .uri("/v1/responses")
+                .header("Authorization", "Bearer ${properties.apiKey}")
+                .body(request.toOpenAiRequest())
+                .retrieve()
+                .body(String::class.java)
+                ?: error("OpenAI returned an empty response")
+        }
         val root = objectMapper.readTree(response)
         val content = root.path("output").flatMap { it.path("content").toList() }
         if (content.any { it.path("type").asText() == "refusal" }) {
@@ -58,6 +72,19 @@ class OpenAiImageTextExtractor(
                 ),
             )
         }
+    }
+
+    private fun openAiUsage(response: String): SettledUsage {
+        val usage = objectMapper.readTree(response).path("usage")
+        val inputTokens = usage.path("input_tokens").asLong(0)
+        val cachedTokens = usage.path("input_tokens_details").path("cached_tokens").asLong(0)
+        val outputTokens = usage.path("output_tokens").asLong(0)
+        return SettledUsage(
+            units = BigDecimal.valueOf(inputTokens + outputTokens),
+            inputTokens = inputTokens,
+            cachedInputTokens = cachedTokens,
+            outputTokens = outputTokens,
+        )
     }
 
     private fun ImageTextExtractor.Request.toOpenAiRequest(): Map<String, Any> = mapOf(

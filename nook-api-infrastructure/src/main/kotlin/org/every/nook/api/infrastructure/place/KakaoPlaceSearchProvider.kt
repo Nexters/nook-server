@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.place
 
 import mu.KotlinLogging
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.PagedPlaceSearchProvider
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceCandidatePage
@@ -9,6 +10,7 @@ import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
@@ -21,6 +23,7 @@ class KakaoPlaceSearchProvider(
     private val objectMapper: ObjectMapper,
     private val properties: KakaoPlaceProperties,
     private val mapper: KakaoPlaceMapper,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : PlaceSearchProvider,
     PagedPlaceSearchProvider {
     override fun search(request: PlaceSearchProvider.Request): List<PlaceCandidate> =
@@ -30,20 +33,7 @@ class KakaoPlaceSearchProvider(
         val startedAt = System.nanoTime()
         ensureConfigured()
         val responseBody = try {
-            restClient.get()
-                .uri { builder ->
-                    builder.path(SEARCH_PATH)
-                        .queryParam(QUERY, request.query)
-                        .queryParam(PAGE, request.page)
-                        .queryParam(SIZE, request.size)
-                    request.longitude?.let { builder.queryParam(LONGITUDE, it) }
-                    request.latitude?.let { builder.queryParam(LATITUDE, it) }
-                    request.radius?.let { builder.queryParam(RADIUS, it) }
-                    builder.build()
-                }
-                .header(AUTHORIZATION, "$AUTHORIZATION_PREFIX${properties.restApiKey}")
-                .retrieve()
-                .body(String::class.java)
+            requestPlaceSearch(request)
         } catch (exception: RestClientResponseException) {
             providerFailure(exception)
         } catch (exception: ResourceAccessException) {
@@ -86,6 +76,24 @@ class KakaoPlaceSearchProvider(
             providerFailure(exception)
         }
     }
+
+    private fun requestPlaceSearch(request: PlaceSearchProvider.Request): String? =
+        callMeter.measure("kakao-local", "keyword-search", "place-search") {
+            restClient.get()
+                .uri { builder ->
+                    builder.path(SEARCH_PATH)
+                        .queryParam(QUERY, request.query)
+                        .queryParam(PAGE, request.page)
+                        .queryParam(SIZE, request.size)
+                    request.longitude?.let { builder.queryParam(LONGITUDE, it) }
+                    request.latitude?.let { builder.queryParam(LATITUDE, it) }
+                    request.radius?.let { builder.queryParam(RADIUS, it) }
+                    builder.build()
+                }
+                .header(AUTHORIZATION, "$AUTHORIZATION_PREFIX${properties.restApiKey}")
+                .retrieve()
+                .body(String::class.java)
+        }
 
     private fun ensureConfigured() {
         if (properties.restApiKey.isBlank()) {

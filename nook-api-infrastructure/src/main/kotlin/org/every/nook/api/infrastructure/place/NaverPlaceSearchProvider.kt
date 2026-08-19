@@ -1,12 +1,14 @@
 package org.every.nook.api.infrastructure.place
 
 import mu.KotlinLogging
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSearchProviderException
 import org.every.nook.api.application.place.PlaceSearchProviderTimeoutException
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.web.client.ResourceAccessException
@@ -20,24 +22,27 @@ class NaverPlaceSearchProvider(
     private val objectMapper: ObjectMapper,
     private val properties: NaverPlaceProperties,
     private val mapper: NaverPlaceMapper,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : PlaceSearchProvider {
     override fun search(request: PlaceSearchProvider.Request): List<PlaceCandidate> {
         val startedAt = System.nanoTime()
         ensureConfigured()
         val responseBody = try {
-            restClient.get()
-                .uri { builder ->
-                    builder.path(SEARCH_PATH)
-                        .queryParam(QUERY, request.query)
-                        .queryParam(DISPLAY, request.size.coerceIn(1, MAX_DISPLAY))
-                        .queryParam(START, 1)
-                        .build()
-                }
-                .header(CLIENT_ID, properties.clientId)
-                .header(CLIENT_SECRET, properties.clientSecret)
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .body(String::class.java)
+            callMeter.measure("naver-local", "local-search", "place-search") {
+                restClient.get()
+                    .uri { builder ->
+                        builder.path(SEARCH_PATH)
+                            .queryParam(QUERY, request.query)
+                            .queryParam(DISPLAY, request.size.coerceIn(1, MAX_DISPLAY))
+                            .queryParam(START, 1)
+                            .build()
+                    }
+                    .header(CLIENT_ID, properties.clientId)
+                    .header(CLIENT_SECRET, properties.clientSecret)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(String::class.java)
+            }
         } catch (exception: RestClientResponseException) {
             providerFailure(exception)
         } catch (exception: ResourceAccessException) {

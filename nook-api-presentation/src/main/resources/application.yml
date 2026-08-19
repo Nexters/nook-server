@@ -1,3 +1,11 @@
+admin:
+  security:
+    allowed-user-ids: ${ADMIN_ALLOWED_USER_IDS:}
+
+external-api-pricing:
+  enabled: ${EXTERNAL_API_OFFICIAL_PRICING_ENABLED:true}
+  usd-krw-rate: ${EXTERNAL_API_USD_KRW_RATE:1450}
+
 spring:
   application:
     name: nook-api

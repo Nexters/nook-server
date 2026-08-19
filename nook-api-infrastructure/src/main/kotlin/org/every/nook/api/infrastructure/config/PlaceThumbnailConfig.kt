@@ -1,9 +1,11 @@
 package org.every.nook.api.infrastructure.config
 
 import mu.KotlinLogging
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.NoOpPlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.place.FixedPlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.GooglePlacePhotoProperties
@@ -43,6 +45,7 @@ class PlaceThumbnailConfig {
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
         mediaRepository: ObjectProvider<PostMediaJpaRepository>,
         mediaStorageProperties: ObjectProvider<MediaStorageProperties>,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): PlaceThumbnailProvider = when (thumbnailProperties.provider) {
         PlaceThumbnailProperties.Provider.POST_MEDIA -> postMediaProvider(
             thumbnailProperties = thumbnailProperties,
@@ -60,6 +63,7 @@ class PlaceThumbnailConfig {
             googlePlacePhotoRestClient,
             googleProperties,
             mediaStorage,
+            callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
         )
 
         PlaceThumbnailProperties.Provider.DISABLED -> {
@@ -93,6 +97,7 @@ class PlaceThumbnailConfig {
         restClient: RestClient,
         properties: GooglePlacePhotoProperties,
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
+        callMeter: ExternalApiCallMeter,
     ): PlaceThumbnailProvider {
         if (!properties.enabled) {
             logger.warn { "Place thumbnail provider disabled: reason=google_place_photo_disabled" }
@@ -106,7 +111,7 @@ class PlaceThumbnailConfig {
             "Google place photo provider enabled: baseUrl=${properties.baseUrl}, " +
                 "maxWidthPx=${properties.maxWidthPx}"
         }
-        return GooglePlacePhotoProvider(restClient, properties, storage)
+        return GooglePlacePhotoProvider(restClient, properties, storage, callMeter)
     }
 
     private companion object {

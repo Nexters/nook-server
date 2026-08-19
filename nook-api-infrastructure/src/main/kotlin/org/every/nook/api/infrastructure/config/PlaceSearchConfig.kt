@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
@@ -8,6 +9,7 @@ import org.every.nook.api.application.place.UpdatePlaceMemoUseCase
 import org.every.nook.api.application.place.port.PlaceDetailQueryPort
 import org.every.nook.api.application.place.port.UpdatePlaceBookmarkPort
 import org.every.nook.api.application.place.port.UpdatePlaceMemoPort
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.place.KakaoPlaceMapper
 import org.every.nook.api.infrastructure.place.KakaoPlaceProperties
 import org.every.nook.api.infrastructure.place.KakaoPlaceSearchProvider
@@ -15,6 +17,7 @@ import org.every.nook.api.infrastructure.place.NaverPlaceMapper
 import org.every.nook.api.infrastructure.place.NaverPlaceProperties
 import org.every.nook.api.infrastructure.place.NaverPlaceSearchProvider
 import org.every.nook.api.infrastructure.place.PrioritizedPlaceSearchProvider
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -62,11 +65,13 @@ class PlaceSearchConfig {
         @Qualifier("kakaoPlaceRestClient") restClient: RestClient,
         properties: KakaoPlaceProperties,
         mapper: KakaoPlaceMapper,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): KakaoPlaceSearchProvider = KakaoPlaceSearchProvider(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
         mapper = mapper,
+        callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     )
 
     @Bean("naverPlaceSearchProvider")
@@ -74,11 +79,13 @@ class PlaceSearchConfig {
         @Qualifier("naverPlaceRestClient") restClient: RestClient,
         properties: NaverPlaceProperties,
         mapper: NaverPlaceMapper,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): PlaceSearchProvider = NaverPlaceSearchProvider(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
         mapper = mapper,
+        callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     )
 
     @Bean

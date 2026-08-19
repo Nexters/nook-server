@@ -1,8 +1,11 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.vision.GoogleCloudVisionImageTextExtractor
 import org.every.nook.api.infrastructure.vision.GoogleCloudVisionProperties
 import org.every.nook.api.infrastructure.vision.VisionImageDownloader
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -46,10 +49,12 @@ class GoogleCloudVisionConfig {
         @Qualifier("googleCloudVisionRestClient") restClient: RestClient,
         @Qualifier("googleCloudVisionImageRestClient") imageRestClient: RestClient,
         properties: GoogleCloudVisionProperties,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): GoogleCloudVisionImageTextExtractor = GoogleCloudVisionImageTextExtractor(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
         imageDownloader = VisionImageDownloader(imageRestClient, properties.maxImageBytes),
+        callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     )
 }
