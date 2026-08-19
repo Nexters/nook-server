@@ -1,6 +1,9 @@
+@import url("https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/variable/woff2/SUIT-Variable.css");
+@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600&display=swap");
+
 :root {
-  color: #17202a;
-  background: #f5f7fa;
+  color: #1f1f1f;
+  background: #f4f5f7;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -9,6 +12,118 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at 78% -10%, rgb(85 142 255 / 10%), transparent 30rem),
+    #f4f5f7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.nook-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  margin: 4px 8px 12px;
+  padding: 0 12px;
+}
+
+.nook-brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: #558eff;
+  box-shadow: 0 8px 20px rgb(85 142 255 / 30%);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.nook-brand-copy {
+  display: grid;
+  gap: 1px;
+}
+
+.nook-brand-title {
+  color: #1f1f1f;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.nook-brand-caption {
+  color: #848b96;
+  font-family: "Roboto Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.RaLayout-content {
+  padding: 28px !important;
+}
+
+.RaSidebar-fixed {
+  border-right: 1px solid #e4e6e9;
+  background: rgb(255 255 255 / 92%);
+  backdrop-filter: blur(18px);
+}
+
+.RaMenu-open {
+  padding: 4px 8px !important;
+}
+
+.RaMenuItemLink-root {
+  min-height: 44px !important;
+  margin: 4px 0 !important;
+  border-radius: 12px !important;
+  color: #67707d !important;
+}
+
+.RaMenuItemLink-root.RaMenuItemLink-active {
+  color: #356fe5 !important;
+  background: #edf3ff !important;
+  font-weight: 700 !important;
+}
+
+.RaList-main,
+.RaShow-main {
+  overflow: hidden;
+  border: 1px solid #e4e6e9;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 12px 36px rgb(53 60 70 / 7%);
+}
+
+.RaList-content,
+.RaShow-card {
+  box-shadow: none !important;
+}
+
+.RaDatagrid-headerCell {
+  border-bottom: 1px solid #e4e6e9 !important;
+  color: #67707d !important;
+  background: #fafbfc !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.RaDatagrid-rowCell {
+  border-bottom-color: #f0f1f3 !important;
+}
+
+.RaDatagrid-row:hover {
+  background: #f6f9ff !important;
+}
+
+.mono-text {
+  font-family: "Roboto Mono", monospace !important;
+  letter-spacing: -0.02em;
 }
 
 .summary-icon {
@@ -16,7 +131,7 @@ body {
   width: 40px;
   height: 40px;
   place-items: center;
-  border-radius: 8px;
-  color: #384252;
-  background: #eef2f7;
+  border-radius: 12px;
+  color: #356fe5;
+  background: #edf3ff;
 }
