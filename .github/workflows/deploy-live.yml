@@ -1,0 +1,117 @@
+name: Deploy Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment receiving the existing immutable image
+        required: true
+        type: choice
+        options:
+          - dev
+          - live
+      image_tag:
+        description: Immutable dev/prod version tag; new tags use <environment>-<sequence>-<SHA8>
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-version-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate environment and image tag
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          case "${DEPLOY_ENV}" in
+            dev) expected='^dev-([0-9]+-[0-9a-f]{8}|[0-9a-f]{12,40})$' ;;
+            live) expected='^prod-([0-9]+-[0-9a-f]{8}|[0-9a-f]{12,40})$' ;;
+            *) echo "Unsupported environment: ${DEPLOY_ENV}" >&2; exit 1 ;;
+          esac
+          if [[ ! "${IMAGE_TAG}" =~ ${expected} ]]; then
+            echo "${DEPLOY_ENV} does not accept image tag: ${IMAGE_TAG}" >&2
+            exit 1
+          fi
+
+  deploy-dev:
+    name: Deploy Dev Version
+    if: inputs.environment == 'dev'
+    runs-on: [self-hosted, nook-ops]
+    needs: validate
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Deploy requested version to dev
+        env:
+          DEV_IMAGE: everynook.cr.gabiacloud.com/nook/nook-api:${{ inputs.image_tag }}
+          DEV_SSH_TARGET: ${{ secrets.DEV_SSH_TARGET }}
+          GABIA_PUBLIC_REGISTRY: everynook.cr.gabiacloud.com
+          GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
+          GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
+        run: .github/scripts/deploy-dev.sh
+
+  deploy-live:
+    name: Deploy Live Version
+    if: inputs.environment == 'live'
+    runs-on: [self-hosted, nook-ops]
+    needs: validate
+    environment: live
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Configure SSH
+        id: ssh
+        shell: bash
+        env:
+          LIVE_SSH_PRIVATE_KEY: ${{ secrets.LIVE_SSH_PRIVATE_KEY }}
+          LIVE_SSH_KNOWN_HOSTS: ${{ secrets.LIVE_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          key_file="${RUNNER_TEMP}/nook-live-key"
+          install -m 0600 /dev/null "${key_file}"
+          printf '%s\n' "${LIVE_SSH_PRIVATE_KEY}" > "${key_file}"
+          printf '%s\n' "${LIVE_SSH_KNOWN_HOSTS}" > "${RUNNER_TEMP}/nook-live-known-hosts"
+          chmod 0600 "${RUNNER_TEMP}/nook-live-known-hosts"
+          echo "key-file=${key_file}" >> "${GITHUB_OUTPUT}"
+          echo "HOME=${RUNNER_TEMP}" >> "${GITHUB_ENV}"
+          mkdir -p "${RUNNER_TEMP}/.ssh"
+          cp "${RUNNER_TEMP}/nook-live-known-hosts" "${RUNNER_TEMP}/.ssh/known_hosts"
+
+      - name: Log in to registry on live VM
+        env:
+          LIVE_SSH_TARGET: ${{ secrets.LIVE_SSH_TARGET }}
+          LIVE_SSH_KEY: ${{ steps.ssh.outputs.key-file }}
+          GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
+          GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
+        run: |
+          printf '%s' "${GABIA_REGISTRY_PASSWORD}" | \
+            ssh -i "${LIVE_SSH_KEY}" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+              "${LIVE_SSH_TARGET}" \
+              "docker login 'everynook.cr.gabiacloud.com' -u '${GABIA_REGISTRY_USERNAME}' --password-stdin"
+
+      - name: Deploy requested version with Blue Green
+        env:
+          LIVE_ACTION: deploy
+          LIVE_IMAGE: everynook.cr.gabiacloud.com/nook/nook-api:${{ inputs.image_tag }}
+          LIVE_SSH_TARGET: ${{ secrets.LIVE_SSH_TARGET }}
+          LIVE_SSH_KEY: ${{ steps.ssh.outputs.key-file }}
+        run: .github/scripts/deploy-live.sh
