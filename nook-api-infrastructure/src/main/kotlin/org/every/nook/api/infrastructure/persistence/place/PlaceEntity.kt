@@ -47,9 +47,9 @@ class PlaceEntity(
     )
     val externalPlaceId: String,
     @Column(name = "name", nullable = false, length = Place.MAX_NAME_LENGTH)
-    val name: String,
+    var name: String,
     @Column(name = "address", nullable = false, length = Place.MAX_ADDRESS_LENGTH)
-    val address: String,
+    var address: String,
     @Column(name = "city", nullable = true, length = Place.MAX_CITY_LENGTH)
     val city: String? = null,
     @Column(name = "latitude", nullable = false, precision = COORDINATE_PRECISION, scale = COORDINATE_SCALE)
@@ -139,6 +139,13 @@ class PlaceEntity(
 
     fun updateRepresentativeTags(tags: List<PlaceTag>) {
         representativeTags = tags.take(MAX_REPRESENTATIVE_TAG_COUNT)
+    }
+
+    fun updateBasicInformation(name: String, address: String) {
+        require(name.isNotBlank() && name.length <= Place.MAX_NAME_LENGTH)
+        require(address.isNotBlank() && address.length <= Place.MAX_ADDRESS_LENGTH)
+        this.name = name
+        this.address = address
     }
 }
 

@@ -4,8 +4,6 @@ import org.every.nook.api.application.admin.AdminAuditLog
 import org.every.nook.api.application.admin.AdminAuditLogPort
 import org.every.nook.api.application.admin.AdminMappedPlace
 import org.every.nook.api.application.admin.AdminPage
-import org.every.nook.api.application.admin.AdminPlaceQueryPort
-import org.every.nook.api.application.admin.AdminPlaceSummary
 import org.every.nook.api.application.admin.AdminPostDetail
 import org.every.nook.api.application.admin.AdminPostPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPostQueryPort
@@ -34,7 +32,6 @@ class AdminPersistenceAdapter(
     private val auditRepository: AdminAuditLogJpaRepository,
     private val objectMapper: ObjectMapper,
 ) : AdminPostQueryPort,
-    AdminPlaceQueryPort,
     AdminPostPlaceCorrectionPort,
     AdminAuditLogPort {
     @Transactional(readOnly = true)
@@ -104,20 +101,6 @@ class AdminPersistenceAdapter(
             places = places,
         )
     }
-
-    @Transactional(readOnly = true)
-    override fun search(query: String, limit: Int): List<AdminPlaceSummary> = placeRepository.findAll().asSequence()
-        .filter { it.name.contains(query, true) || it.address.contains(query, true) }
-        .take(limit)
-        .map { place ->
-            AdminPlaceSummary(
-                id = requireNotNull(place.id),
-                name = place.name,
-                address = place.address,
-                provider = place.provider,
-                externalPlaceId = place.externalPlaceId,
-            )
-        }.toList()
 
     @Transactional
     override fun replace(command: AdminPostPlaceCorrectionPort.ReplaceCommand): AdminPostDetail? {
