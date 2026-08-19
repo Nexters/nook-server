@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class ConnectPostPlacePersistenceAdapter(
     private val savedPostLockRepository: UserSavedPostLockJpaRepository,
-    private val placeRepository: PlaceJpaRepository,
+    private val placeIdentityResolver: PlaceIdentityResolver,
     private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
@@ -36,20 +36,7 @@ class ConnectPostPlacePersistenceAdapter(
             return ConnectPostPlacePort.Result.ParsingInProgress
         }
 
-        placeRepository.insertIgnore(
-            provider = candidate.provider,
-            externalPlaceId = candidate.externalPlaceId,
-            name = candidate.name,
-            address = candidate.address,
-            city = candidate.city,
-            latitude = candidate.latitude,
-            longitude = candidate.longitude,
-            category = candidate.category,
-            phoneNumber = candidate.phoneNumber,
-        )
-        val place = requireNotNull(
-            placeRepository.findByProviderAndExternalPlaceId(candidate.provider, candidate.externalPlaceId),
-        )
+        val place = placeIdentityResolver.resolve(candidate)
         supplement?.let { resolvedSupplement ->
             place.updateThumbnailParsing(PlaceThumbnailParsingStatus.COMPLETED, resolvedSupplement)
         }

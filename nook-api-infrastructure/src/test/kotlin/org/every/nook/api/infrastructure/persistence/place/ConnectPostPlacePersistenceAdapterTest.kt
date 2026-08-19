@@ -22,14 +22,14 @@ import kotlin.test.assertEquals
 
 class ConnectPostPlacePersistenceAdapterTest {
     private val savedPostRepository = mock(UserSavedPostLockJpaRepository::class.java)
-    private val placeRepository = mock(PlaceJpaRepository::class.java)
+    private val placeIdentityResolver = mock(PlaceIdentityResolver::class.java)
     private val savedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = ConnectPostPlacePersistenceAdapter(
         savedPostRepository,
-        placeRepository,
+        placeIdentityResolver,
         savedPostPlaceRepository,
         bookmarkRepository,
         parsingJobRepository,
@@ -44,7 +44,7 @@ class ConnectPostPlacePersistenceAdapterTest {
             ConnectPostPlacePort.Result.PostNotFound,
             adapter.connect(7, 11, candidate(), null),
         )
-        verifyNoInteractions(placeRepository, savedPostPlaceRepository, bookmarkRepository)
+        verifyNoInteractions(placeIdentityResolver, savedPostPlaceRepository, bookmarkRepository)
     }
 
     @Test
@@ -58,7 +58,7 @@ class ConnectPostPlacePersistenceAdapterTest {
             ConnectPostPlacePort.Result.ParsingInProgress,
             adapter.connect(7, 11, candidate(), null),
         )
-        verifyNoInteractions(placeRepository, savedPostPlaceRepository, bookmarkRepository)
+        verifyNoInteractions(placeIdentityResolver, savedPostPlaceRepository, bookmarkRepository)
     }
 
     @Test
@@ -69,7 +69,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         `when`(place.id).thenReturn(17)
         `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
         `when`(parsingJobRepository.findByPostId(101)).thenReturn(job)
-        `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "1234")).thenReturn(place)
+        `when`(placeIdentityResolver.resolve(candidate())).thenReturn(place)
         `when`(savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(11, 17)).thenReturn(null)
         `when`(savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11))
             .thenReturn(listOf(UserSavedPostPlaceEntity(11, 16, 0)))
@@ -88,17 +88,7 @@ class ConnectPostPlacePersistenceAdapterTest {
             PlaceThumbnailParsingStatus.COMPLETED,
             PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")),
         )
-        verify(placeRepository).insertIgnore(
-            provider = "KAKAO",
-            externalPlaceId = "1234",
-            name = "퍼머넌트해비탯",
-            address = "경기 용인시",
-            city = "용인",
-            latitude = BigDecimal("37.5"),
-            longitude = BigDecimal("127.0"),
-            category = "카페",
-            phoneNumber = null,
-        )
+        verify(placeIdentityResolver).resolve(candidate())
         val captor = ArgumentCaptor.forClass(UserSavedPostPlaceEntity::class.java)
         verify(savedPostPlaceRepository).save(captor.capture())
         assertEquals(11, captor.value.userSavedPostId)
@@ -117,7 +107,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         `when`(place.id).thenReturn(17)
         `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
         `when`(parsingJobRepository.findByPostId(101)).thenReturn(job)
-        `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "1234")).thenReturn(place)
+        `when`(placeIdentityResolver.resolve(candidate())).thenReturn(place)
         `when`(savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(11, 17))
             .thenReturn(UserSavedPostPlaceEntity(11, 17, 0))
 

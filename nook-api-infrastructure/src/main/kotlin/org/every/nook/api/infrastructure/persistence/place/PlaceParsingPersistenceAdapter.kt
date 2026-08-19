@@ -41,6 +41,7 @@ class PlaceParsingPersistenceAdapter(
     private val hashtagRepository: PostHashtagJpaRepository,
     private val mediaRepository: PostMediaJpaRepository,
     private val placeRepository: PlaceJpaRepository,
+    private val placeIdentityResolver: PlaceIdentityResolver,
     private val postPlaceRepository: PostPlaceJpaRepository,
     private val userSavedPostLockRepository: UserSavedPostLockJpaRepository,
     private val userSavedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
@@ -112,10 +113,7 @@ class PlaceParsingPersistenceAdapter(
         }
         val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
         val resolvedPlaces = distinctPlaces.map { candidate ->
-            val place = placeRepository.findByProviderAndExternalPlaceId(
-                candidate.provider,
-                candidate.externalPlaceId,
-            ) ?: placeRepository.save(candidate.toEntity())
+            val place = placeIdentityResolver.resolve(candidate)
             candidate.copy(googlePlaceId = place.googlePlaceId) to place
         }
         val postPlaces = resolvedPlaces.mapIndexed { sequence, (candidate, place) ->
@@ -160,7 +158,7 @@ class PlaceParsingPersistenceAdapter(
         status: PlaceThumbnailParsingStatus,
         supplement: PlaceSupplement?,
     ) {
-        placeRepository.findByProviderAndExternalPlaceId(provider, externalPlaceId)
+        placeIdentityResolver.find(provider, externalPlaceId)
             ?.updateThumbnailParsing(status, supplement)
     }
 
@@ -217,19 +215,6 @@ class PlaceParsingPersistenceAdapter(
         PlaceParsingStatus.FAILED,
         -> false
     }
-
-    private fun PlaceCandidate.toEntity(): PlaceEntity = PlaceEntity(
-        provider = provider,
-        externalPlaceId = externalPlaceId,
-        name = name,
-        address = address,
-        city = city,
-        latitude = latitude,
-        longitude = longitude,
-        category = category,
-        phoneNumber = phoneNumber,
-        googlePlaceId = googlePlaceId,
-    )
 
     private companion object {
         val OUTSTANDING_STATUSES = listOf(PlaceParsingStatus.PENDING, PlaceParsingStatus.PROCESSING)
