@@ -153,8 +153,8 @@ class GooglePlacePhotoProviderTest {
     }
 
     @Test
-    fun `disabled provider does not call Google`() {
-        val fixture = providerFixture(properties = GooglePlacePhotoProperties(enabled = false, apiKey = "google-key"))
+    fun `missing API key does not call Google`() {
+        val fixture = providerFixture(properties = GooglePlacePhotoProperties(apiKey = ""))
 
         assertNull(fixture.provider.fetch(candidate()))
     }
@@ -393,7 +393,6 @@ class GooglePlacePhotoProviderTest {
 
     private fun providerFixture(
         properties: GooglePlacePhotoProperties = GooglePlacePhotoProperties(
-            enabled = true,
             baseUrl = "https://places.google.test",
             apiKey = "google-key",
             maxWidthPx = 640,

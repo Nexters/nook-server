@@ -5,7 +5,6 @@ import java.time.Duration
 
 @ConfigurationProperties("external.google-place-photo")
 data class GooglePlacePhotoProperties(
-    val enabled: Boolean = false,
     val baseUrl: String = "https://places.googleapis.com",
     val apiKey: String = "",
     val maxWidthPx: Int = DEFAULT_MAX_WIDTH_PX,
