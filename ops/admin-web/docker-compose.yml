@@ -1,3 +1,5 @@
+name: nook-${ADMIN_ENV:-dev}-admin-web
+
 services:
   admin-web:
     image: ${ADMIN_WEB_IMAGE:-nook-admin-web:latest}
