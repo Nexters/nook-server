@@ -128,7 +128,7 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf("첫 장소", "둘째 장소"), detail.places.map { it.name })
         assertEquals(listOf(false, true), detail.places.map { it.bookmarked })
         assertEquals(listOf(null, "둘째 장소 메모"), detail.places.map { it.memo })
-        assertEquals("https://cdn.example.com/current-post-place.jpg", detail.places.first().thumbnailUrl)
+        assertEquals("https://cdn.example.com/place.jpg", detail.places.first().thumbnailUrl)
         assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, detail.places.first().thumbnailParsingStatus)
         assertEquals(PlaceParsingStatusView.COMPLETED, detail.placeParsingStatus)
         assertEquals("내 메모", detail.memo)

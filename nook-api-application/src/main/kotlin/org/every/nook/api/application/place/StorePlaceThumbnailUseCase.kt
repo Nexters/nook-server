@@ -33,28 +33,7 @@ class StorePlaceThumbnailUseCase(
             }
             require(supplements.size == requests.size) { "thumbnail provider returned an invalid result count" }
             requests.zip(supplements).forEach { (request, supplement) ->
-                metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
-                    updatePort.update(
-                        request.place.provider,
-                        request.place.externalPlaceId,
-                        PlaceThumbnailParsingStatus.COMPLETED,
-                        supplement,
-                    )
-                }
-                logger.info(
-                    event(
-                        postId,
-                        request.place,
-                        "place.thumbnail.completed",
-                        COMPLETE_STAGE,
-                        "success",
-                        startedAt,
-                        mapOf(
-                            "place.photo_count" to supplement?.photoUrls?.size,
-                            "place.opening_hours_found" to (supplement?.openingHours != null),
-                        ),
-                    ),
-                )
+                complete(postId, request, supplement, startedAt)
             }
         }.getOrElse { exception ->
             requests.forEach { request ->
@@ -72,6 +51,41 @@ class StorePlaceThumbnailUseCase(
             }
             throw exception
         }
+    }
+
+    private fun complete(
+        postId: Long,
+        request: PlaceThumbnailProvider.Request,
+        supplement: PlaceSupplement?,
+        startedAt: Long,
+    ) {
+        val status = if (supplement?.photoUrls.isNullOrEmpty()) {
+            PlaceThumbnailParsingStatus.FAILED
+        } else {
+            PlaceThumbnailParsingStatus.COMPLETED
+        }
+        metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
+            updatePort.update(request.place.provider, request.place.externalPlaceId, status, supplement)
+        }
+        val action = if (status == PlaceThumbnailParsingStatus.COMPLETED) {
+            "place.thumbnail.completed"
+        } else {
+            "place.thumbnail.empty"
+        }
+        logger.info(
+            event(
+                postId,
+                request.place,
+                action,
+                COMPLETE_STAGE,
+                status.name.lowercase(),
+                startedAt,
+                mapOf(
+                    "place.photo_count" to supplement?.photoUrls?.size,
+                    "place.opening_hours_found" to (supplement?.openingHours != null),
+                ),
+            ),
+        )
     }
 
     private fun event(

@@ -37,6 +37,19 @@ class PlaceSupplementUpdateTest {
         assertEquals(EXISTING_PLACE_URL, place.thumbnailUrl)
     }
 
+    @Test
+    fun `keeps Google place id when thumbnail parsing has no photo`() {
+        val place = place(EXISTING_PLACE_URL)
+
+        place.updateThumbnailParsing(
+            PlaceThumbnailParsingStatus.FAILED,
+            PlaceSupplement(openingHours = null, photoUrls = emptyList(), googlePlaceId = "google-123"),
+        )
+
+        assertEquals("google-123", place.googlePlaceId)
+        assertEquals(PlaceThumbnailParsingStatus.FAILED, place.thumbnailParsingStatus)
+    }
+
     private fun place(thumbnailUrl: String) = PlaceEntity(
         provider = "KAKAO",
         externalPlaceId = "123",

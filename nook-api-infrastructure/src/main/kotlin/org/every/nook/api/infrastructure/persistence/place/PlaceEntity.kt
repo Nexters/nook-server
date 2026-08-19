@@ -133,9 +133,7 @@ class PlaceEntity(
     }
 
     fun updateThumbnailParsing(status: PlaceThumbnailParsingStatus, supplement: PlaceSupplement?) {
-        if (status == PlaceThumbnailParsingStatus.COMPLETED) {
-            supplement?.let(::updateSupplement)
-        }
+        supplement?.let(::updateSupplement)
         thumbnailParsingStatus = status
     }
 
