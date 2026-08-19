@@ -9,6 +9,13 @@ import java.math.BigDecimal
 interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
     fun findByProviderAndExternalPlaceId(provider: String, externalPlaceId: String): PlaceEntity?
 
+    fun findAllByLatitudeBetweenAndLongitudeBetween(
+        minimumLatitude: BigDecimal,
+        maximumLatitude: BigDecimal,
+        minimumLongitude: BigDecimal,
+        maximumLongitude: BigDecimal,
+    ): List<PlaceEntity>
+
     @Modifying
     @Query(
         value = """

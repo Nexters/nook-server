@@ -21,8 +21,6 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
-import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
@@ -44,6 +42,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val hashtagRepository = mock(PostHashtagJpaRepository::class.java)
     private val mediaRepository = mock(PostMediaJpaRepository::class.java)
     private val placeRepository = mock(PlaceJpaRepository::class.java)
+    private val placeIdentityResolver = mock(PlaceIdentityResolver::class.java)
     private val postPlaceRepository = mock(PostPlaceJpaRepository::class.java)
     private val userSavedPostLockRepository = mock(UserSavedPostLockJpaRepository::class.java)
     private val userSavedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
@@ -56,6 +55,7 @@ class PlaceParsingPersistenceAdapterTest {
         hashtagRepository = hashtagRepository,
         mediaRepository = mediaRepository,
         placeRepository = placeRepository,
+        placeIdentityResolver = placeIdentityResolver,
         postPlaceRepository = postPlaceRepository,
         userSavedPostLockRepository = userSavedPostLockRepository,
         userSavedPostPlaceRepository = userSavedPostPlaceRepository,
@@ -184,9 +184,21 @@ class PlaceParsingPersistenceAdapterTest {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         val place = mock(PlaceEntity::class.java)
         val storedPostPlaces = mutableListOf<PostPlaceEntity>()
+        val candidate = PlaceCandidate(
+            provider = "KAKAO",
+            externalPlaceId = "123",
+            name = "Nook Cafe",
+            address = "Seoul",
+            latitude = BigDecimal("37.1"),
+            longitude = BigDecimal("127.1"),
+            category = null,
+            phoneNumber = null,
+            providerUrl = null,
+            sourceMediaSequence = 4,
+        )
         `when`(place.id).thenReturn(17)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
-        `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(place)
+        `when`(placeIdentityResolver.resolve(candidate)).thenReturn(place)
         `when`(postPlaceRepository.saveAll(anyList<PostPlaceEntity>())).thenAnswer { invocation ->
             invocation.getArgument<List<PostPlaceEntity>>(0).also(storedPostPlaces::addAll)
         }
@@ -202,20 +214,7 @@ class PlaceParsingPersistenceAdapterTest {
 
         adapter.complete(
             postId = 11,
-            places = listOf(
-                PlaceCandidate(
-                    provider = "KAKAO",
-                    externalPlaceId = "123",
-                    name = "Nook Cafe",
-                    address = "Seoul",
-                    latitude = BigDecimal("37.1"),
-                    longitude = BigDecimal("127.1"),
-                    category = null,
-                    phoneNumber = null,
-                    providerUrl = null,
-                    sourceMediaSequence = 4,
-                ),
-            ),
+            places = listOf(candidate),
         )
 
         assertEquals(0, storedPostPlaces.single().sequence)
@@ -228,41 +227,38 @@ class PlaceParsingPersistenceAdapterTest {
     }
 
     @Test
-    fun `stores an extracted city when a parsed place is new`() {
+    fun `passes an extracted city to the place identity resolver`() {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         val savedPlace = mock(PlaceEntity::class.java)
+        val candidate = PlaceCandidate(
+            provider = "KAKAO",
+            externalPlaceId = "123",
+            name = "누크 카페",
+            address = "경기도 성남시 분당구 판교역로 1",
+            latitude = BigDecimal("37.1"),
+            longitude = BigDecimal("127.1"),
+            category = "카페",
+            phoneNumber = null,
+            providerUrl = null,
+        )
         `when`(savedPlace.id).thenReturn(17)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
-        `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(null)
-        `when`(placeRepository.save(any(PlaceEntity::class.java))).thenReturn(savedPlace)
+        `when`(placeIdentityResolver.resolve(candidate)).thenReturn(savedPlace)
         `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(emptyList())
 
         adapter.complete(
             postId = 11,
-            places = listOf(
-                PlaceCandidate(
-                    provider = "KAKAO",
-                    externalPlaceId = "123",
-                    name = "누크 카페",
-                    address = "경기도 성남시 분당구 판교역로 1",
-                    latitude = BigDecimal("37.1"),
-                    longitude = BigDecimal("127.1"),
-                    category = "카페",
-                    phoneNumber = null,
-                    providerUrl = null,
-                ),
-            ),
+            places = listOf(candidate),
         )
 
-        val captor = ArgumentCaptor.forClass(PlaceEntity::class.java)
-        verify(placeRepository).save(captor.capture())
-        assertEquals("성남", captor.value.city)
+        verify(placeIdentityResolver).resolve(candidate)
+        assertEquals("성남", candidate.city)
     }
 
     @Test
     fun `updates a place thumbnail independently after parsing completes`() {
         val place = mock(PlaceEntity::class.java)
-        `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(place)
+        `when`(placeIdentityResolver.find("KAKAO", "123")).thenReturn(place)
 
         val supplement = PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg"))
         adapter.update("KAKAO", "123", PlaceThumbnailParsingStatus.COMPLETED, supplement)
