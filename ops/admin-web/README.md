@@ -43,7 +43,10 @@ ingress:
     service: http://localhost:8081
   - hostname: admin.everynook.co.kr
     path: ^/api/admin/v1(?:/.*)?$
-    service: https://api.everynook.co.kr
+    service: https://192.168.0.216:443
+    originRequest:
+      originServerName: api.everynook.co.kr
+      httpHostHeader: api.everynook.co.kr
   - hostname: admin.everynook.co.kr
     service: http://localhost:8082
   - service: http_status:404

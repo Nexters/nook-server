@@ -48,5 +48,7 @@ curl -fsS http://127.0.0.1:8082/health
 - ops VM의 Dev Admin(`8081`)과 Live Admin(`8082`) health check가 성공했습니다.
 - Cloudflare Access에는 `admin.everynook.co.kr` self-hosted application과 allow 정책이 있습니다.
 - `nook-ops` Tunnel은 healthy 상태입니다.
-- 다만 `admin.everynook.co.kr` DNS 레코드와 Tunnel의 Live Admin ingress 규칙은 아직 없습니다.
-  외부 접근을 활성화하려면 API path 규칙과 `localhost:8082` catch-all 규칙을 추가해야 합니다.
+- `admin.everynook.co.kr` proxied CNAME을 `nook-ops` Tunnel에 연결했습니다.
+- Tunnel에 Live Admin API path 규칙과 `localhost:8082` catch-all 규칙을 추가했습니다.
+- Live API의 Access audience가 `admin.everynook.co.kr` Access application과 일치합니다.
+- 외부 루트와 Admin API 요청이 모두 Cloudflare Access 로그인으로 이동하는 것을 확인했습니다.
