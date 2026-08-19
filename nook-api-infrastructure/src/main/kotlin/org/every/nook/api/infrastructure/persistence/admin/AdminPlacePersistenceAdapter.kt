@@ -60,6 +60,15 @@ class AdminPlacePersistenceAdapter(
             address = place.address,
             provider = place.provider,
             externalPlaceId = place.externalPlaceId,
+            city = place.city,
+            latitude = place.latitude.toPlainString(),
+            longitude = place.longitude.toPlainString(),
+            category = place.category,
+            phoneNumber = place.phoneNumber,
+            thumbnailUrl = place.thumbnailUrl,
+            photoUrls = place.photoUrls,
+            representativeTags = place.representativeTags.map { it.name },
+            openingHours = place.openingHours,
             linkedPostCount = mappings.map { it.postId }.distinct().size.toLong(),
             affectedUserCount = savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId),
             posts = mappings.distinctBy { it.postId }.mapNotNull { mapping ->
@@ -79,9 +88,19 @@ class AdminPlacePersistenceAdapter(
     @Transactional
     override fun update(command: AdminPlaceCorrectionPort.UpdateCommand): AdminPlaceDetail? {
         val place = placeRepository.findByIdForUpdate(command.placeId) ?: return null
-        val before = mapOf("name" to place.name, "address" to place.address)
-        place.updateBasicInformation(command.name, command.address)
-        val after = mapOf("name" to place.name, "address" to place.address)
+        val before = editableValue(place)
+        place.updateFromAdmin(
+            command.name,
+            command.address,
+            command.city,
+            command.category,
+            command.phoneNumber,
+            command.thumbnailUrl,
+            command.photoUrls,
+            command.representativeTags.map(org.every.nook.api.domain.place.PlaceTag::valueOf),
+            command.openingHours,
+        )
+        val after = editableValue(place)
         auditLogPort.append(
             AdminAuditLogPort.Entry(
                 actor = command.actor,
@@ -105,6 +124,8 @@ class AdminPlacePersistenceAdapter(
             address = address,
             provider = provider,
             externalPlaceId = externalPlaceId,
+            thumbnailUrl = thumbnailUrl,
+            representativeTags = representativeTags.map { it.name },
             linkedPostCount = if (includeImpact) linkedPostCount(placeId) else 0,
             affectedUserCount = if (includeImpact) {
                 savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId)
@@ -116,4 +137,16 @@ class AdminPlacePersistenceAdapter(
 
     private fun linkedPostCount(placeId: Long): Long =
         postPlaceRepository.findAllByPlaceId(placeId).map { it.postId }.distinct().size.toLong()
+
+    private fun editableValue(place: PlaceEntity) = mapOf(
+        "name" to place.name,
+        "address" to place.address,
+        "city" to place.city,
+        "category" to place.category,
+        "phoneNumber" to place.phoneNumber,
+        "thumbnailUrl" to place.thumbnailUrl,
+        "photoUrls" to place.photoUrls,
+        "representativeTags" to place.representativeTags,
+        "openingHours" to place.openingHours,
+    )
 }
