@@ -5,6 +5,7 @@ import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.place.NoOpPlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.place.ApifyNaverPlaceProperties
 import org.every.nook.api.infrastructure.place.ApifyNaverPlaceThumbnailProvider
@@ -69,6 +70,7 @@ class PlaceThumbnailConfig {
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
         mediaRepository: ObjectProvider<PostMediaJpaRepository>,
         mediaStorageProperties: ObjectProvider<MediaStorageProperties>,
+        responseCache: ObjectProvider<ScrapingProviderResponseCache>,
     ): PlaceThumbnailProvider {
         val providers = mapOf(
             PlaceThumbnailProviderType.POST_MEDIA to postMediaProvider(
@@ -81,6 +83,7 @@ class PlaceThumbnailConfig {
                 apifyNaverPlaceRestClient,
                 apifyProperties,
                 mediaStorage,
+                responseCache.ifAvailable,
             ),
             PlaceThumbnailProviderType.GOOGLE to googleProvider(
                 googlePlacePhotoRestClient,
@@ -144,6 +147,7 @@ class PlaceThumbnailConfig {
         restClient: RestClient,
         properties: ApifyNaverPlaceProperties,
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
+        responseCache: ScrapingProviderResponseCache?,
     ): PlaceThumbnailProvider {
         val storage = mediaStorage.ifAvailable ?: run {
             logger.warn { "Apify Naver place provider disabled: reason=missing_media_storage" }
@@ -154,6 +158,7 @@ class PlaceThumbnailConfig {
             objectMapper = jacksonObjectMapper(),
             properties = properties,
             mediaStorage = storage,
+            responseCache = responseCache,
         )
     }
 

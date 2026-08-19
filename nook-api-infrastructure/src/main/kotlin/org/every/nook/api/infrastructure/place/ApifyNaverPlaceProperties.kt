@@ -8,6 +8,7 @@ data class ApifyNaverPlaceProperties(
     val baseUrl: String = "https://api.apify.com",
     val apiToken: String = "",
     val actorId: String = "delicious_zebu~naver-map-search-results-scraper",
+    val photoActorId: String = "oxygenated_quagmire~naver-place-photos",
     val maxResults: Int = DEFAULT_MAX_RESULTS,
     val batchSize: Int = DEFAULT_BATCH_SIZE,
     val connectTimeout: Duration = Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS),

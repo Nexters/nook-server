@@ -5,6 +5,7 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
@@ -21,6 +22,7 @@ class ApifyNaverPlaceThumbnailProvider(
     private val objectMapper: ObjectMapper,
     private val properties: ApifyNaverPlaceProperties,
     private val mediaStorage: PostMediaStoragePort,
+    private val responseCache: ScrapingProviderResponseCache? = null,
 ) : PlaceThumbnailProvider {
     override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = fetchAll(listOf(request)).single()
 
@@ -34,7 +36,7 @@ class ApifyNaverPlaceThumbnailProvider(
     }
 
     private fun fetchBatch(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> {
-        val searchItems = runActor(
+        val searchItems = runPlaceActor(
             mapOf(
                 "keywords" to requests.map { it.place.searchQuery() },
                 "scrapePlaceDetails" to false,
@@ -48,19 +50,21 @@ class ApifyNaverPlaceThumbnailProvider(
         }
         val detailUrls = matches.mapNotNull { it?.naverMapUrl }.distinct()
         if (detailUrls.isEmpty()) return List(requests.size) { null }
-        val detailItems = runActor(
+        val photoItems = runPhotoActor(
             mapOf(
-                "urls" to detailUrls,
-                "scrapePlaceDetails" to true,
+                "placeUrls" to detailUrls.map { mapOf("url" to it) },
+                "maxPhotos" to MAX_PHOTO_COUNT,
+                "filterBy" to "all",
+                "includeFilters" to false,
             ),
         )
         return requests.zip(matches).map { (request, match) ->
-            val detail = match?.let { matched -> detailItems.matching(matched) } ?: return@map null
-            storePhotos(request, detail.imageUrls)
+            val placeId = match?.placeId ?: return@map null
+            storePhotos(request, photoItems.filter { it.placeId == placeId }.map(ApifyPhoto::originalUrl))
         }
     }
 
-    private fun runActor(input: Map<String, Any>): List<ApifyPlace> {
+    private fun runPlaceActor(input: Map<String, Any>): List<ApifyPlace> {
         val response = restClient.post()
             .uri("/v2/acts/{actorId}/run-sync-get-dataset-items?format=json&clean=true", properties.actorId)
             .contentType(MediaType.APPLICATION_JSON)
@@ -68,7 +72,26 @@ class ApifyNaverPlaceThumbnailProvider(
             .body(input)
             .retrieve()
             .body(String::class.java)
+        response?.let { responseCache?.save(PROVIDER, PLACE_SEARCH_SOURCE_TYPE, input.hashCode().toString(), it) }
         return parseItems(response)
+    }
+
+    private fun runPhotoActor(input: Map<String, Any>): List<ApifyPhoto> {
+        val response = restClient.post()
+            .uri("/v2/acts/{actorId}/run-sync-get-dataset-items?format=json&clean=true", properties.photoActorId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
+            .body(input)
+            .retrieve()
+            .body(String::class.java)
+        response?.let { responseCache?.save(PROVIDER, PLACE_PHOTO_SOURCE_TYPE, input.hashCode().toString(), it) }
+        val root = response?.let(objectMapper::readTree) ?: return emptyList()
+        if (!root.isArray) return emptyList()
+        return root.mapNotNull { node ->
+            val placeId = node.text("placeId", "PlaceId") ?: return@mapNotNull null
+            val originalUrl = node.text("originalUrl", "OriginalUrl") ?: return@mapNotNull null
+            ApifyPhoto(placeId, originalUrl)
+        }
     }
 
     private fun storePhotos(request: PlaceThumbnailProvider.Request, imageUrls: List<String>): PlaceSupplement? {
@@ -91,17 +114,6 @@ class ApifyNaverPlaceThumbnailProvider(
 
     private fun List<ApifyPlace>.forQuery(query: String): List<ApifyPlace> =
         filter { it.searchKeyword == query }.ifEmpty { this }
-
-    private fun List<ApifyPlace>.matching(match: ApifyPlace): ApifyPlace? = firstOrNull { detail ->
-        when {
-            match.placeId != null && detail.placeId != null -> match.placeId == detail.placeId
-
-            match.naverMapUrl != null && detail.naverMapUrl != null -> match.naverMapUrl == detail.naverMapUrl
-
-            else -> normalize(detail.name) == normalize(match.name) &&
-                normalize(detail.address).contains(normalize(match.address))
-        }
-    }
 
     private fun parseItems(body: String?): List<ApifyPlace> {
         val root = body?.let(objectMapper::readTree) ?: return emptyList()
@@ -155,9 +167,14 @@ class ApifyNaverPlaceThumbnailProvider(
         }
     }
 
+    private data class ApifyPhoto(val placeId: String, val originalUrl: String)
+
     private companion object {
         val logger = LoggerFactory.getLogger(ApifyNaverPlaceThumbnailProvider::class.java)
         const val AUTHORIZATION = "Authorization"
+        const val PROVIDER = "APIFY_NAVER"
+        const val PLACE_SEARCH_SOURCE_TYPE = "NAVER_PLACE_MATCH"
+        const val PLACE_PHOTO_SOURCE_TYPE = "NAVER_PLACE_PHOTO"
         const val MAX_PHOTO_COUNT = 6
         const val MAX_MATCH_DISTANCE_METERS = 300.0
         const val EARTH_RADIUS_METERS = 6_371_000.0
