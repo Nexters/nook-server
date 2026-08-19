@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -18,7 +19,8 @@ import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(CorsProperties::class)
+@EnableMethodSecurity
+@EnableConfigurationProperties(CorsProperties::class, AdminSecurityProperties::class)
 class SecurityConfig {
     @Bean
     fun securityFilterChain(http: HttpSecurity, objectMapper: ObjectMapper): SecurityFilterChain {

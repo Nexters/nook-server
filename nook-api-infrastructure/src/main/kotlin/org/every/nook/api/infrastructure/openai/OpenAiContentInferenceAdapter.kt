@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.openai
 
 import mu.KotlinLogging
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClue
@@ -12,15 +13,19 @@ import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
+import org.every.nook.api.infrastructure.billing.SettledUsage
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import java.math.BigDecimal
 
 class OpenAiContentInferenceAdapter(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : PostContentInference,
     PlaceClueExtractor,
     PlaceCandidateSelector,
@@ -133,13 +138,22 @@ class OpenAiContentInferenceAdapter(
                 ),
             ),
         )
-        val response = restClient.post()
-            .uri("/v1/responses")
-            .header("Authorization", "Bearer ${properties.apiKey}")
-            .body(request)
-            .retrieve()
-            .body(String::class.java)
-            ?: error("OpenAI returned an empty response")
+        val response = callMeter.measure(
+            provider = "openai",
+            sku = properties.model,
+            feature = name,
+            estimatedUnits = BigDecimal.valueOf(maxOutputTokens.toLong()),
+            metadata = mapOf("model" to properties.model),
+            usage = ::openAiUsage,
+        ) {
+            restClient.post()
+                .uri("/v1/responses")
+                .header("Authorization", "Bearer ${properties.apiKey}")
+                .body(request)
+                .retrieve()
+                .body(String::class.java)
+                ?: error("OpenAI returned an empty response")
+        }
         val root = objectMapper.readTree(response)
         val content = root.path("output")
             .flatMap { it.path("content").toList() }
@@ -163,6 +177,19 @@ class OpenAiContentInferenceAdapter(
                 ),
             )
         }
+    }
+
+    private fun openAiUsage(response: String): SettledUsage {
+        val usage = objectMapper.readTree(response).path("usage")
+        val inputTokens = usage.path("input_tokens").asLong(0)
+        val cachedTokens = usage.path("input_tokens_details").path("cached_tokens").asLong(0)
+        val outputTokens = usage.path("output_tokens").asLong(0)
+        return SettledUsage(
+            units = BigDecimal.valueOf(inputTokens + outputTokens),
+            inputTokens = inputTokens,
+            cachedInputTokens = cachedTokens,
+            outputTokens = outputTokens,
+        )
     }
 
     private fun PostContentInference.Request.toInput(): String =
