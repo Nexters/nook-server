@@ -301,7 +301,7 @@ class PostPersistenceAdapterTest {
     }
 
     @Test
-    fun `place parsing response completes a stale pending thumbnail status when URL exists`() {
+    fun `place parsing response ignores saved post source image as place thumbnail`() {
         val savedPost = mock(UserSavedPostEntity::class.java)
         val place = mock(PlaceEntity::class.java)
         `when`(savedPost.postId).thenReturn(101)
@@ -333,8 +333,8 @@ class PostPersistenceAdapterTest {
 
         val result = assertNotNull(adapter.find(userId = 7, postId = 11))
 
-        assertEquals("https://cdn.example.com/current-post-place.jpg", result.places.single().thumbnailUrl)
-        assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.places.single().thumbnailParsingStatus)
+        assertNull(result.places.single().thumbnailUrl)
+        assertEquals(PlaceThumbnailParsingStatusView.PENDING, result.places.single().thumbnailParsingStatus)
     }
 
     @Test

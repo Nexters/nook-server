@@ -1,0 +1,1 @@
+-- 기존 thumbnail_url이 장소 사진인지 게시글 source media인지 구분할 원본 이력이 없어 자동 복원하지 않는다.

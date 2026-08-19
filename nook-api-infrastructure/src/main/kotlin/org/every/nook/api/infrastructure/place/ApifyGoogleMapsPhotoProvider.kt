@@ -54,7 +54,9 @@ class ApifyGoogleMapsPhotoProvider(
         response?.let { responseCache?.save(PROVIDER, SOURCE_TYPE, input.hashCode().toString(), it) }
         val places = parsePlaces(response)
         return requests.map { request ->
-            places.bestMatch(request.place)?.let { match -> storePhotos(request, match.imageUrls) }
+            places.bestMatch(request.place)?.let { match ->
+                storePhotos(request, match.imageUrls, match.placeId)
+            }
         }
     }
 
@@ -80,15 +82,22 @@ class ApifyGoogleMapsPhotoProvider(
         place.googlePlaceId?.let { googlePlaceId ->
             firstOrNull { it.placeId == googlePlaceId }?.let { return it }
         }
-        return filter { it.name.matches(place.name) }
-            .filter { candidate ->
-                candidate.address.matches(place.address) ||
-                    candidate.distanceMeters(place) <= MAX_DISTANCE_METERS
-            }
-            .minByOrNull { it.distanceMeters(place) }
+        return filter { candidate -> candidate.matchesAddressOrLocation(place) }
+            .minWithOrNull(
+                compareByDescending<GoogleMapsPlace> { it.name.matches(place.name) }
+                    .thenByDescending { it.address.matches(place.address) }
+                    .thenBy { it.distanceMeters(place) },
+            )
     }
 
-    private fun storePhotos(request: PlaceThumbnailProvider.Request, imageUrls: List<String>): PlaceSupplement? {
+    private fun GoogleMapsPlace.matchesAddressOrLocation(place: PlaceCandidate): Boolean =
+        address.matches(place.address) || distanceMeters(place) <= MAX_DISTANCE_METERS
+
+    private fun storePhotos(
+        request: PlaceThumbnailProvider.Request,
+        imageUrls: List<String>,
+        googlePlaceId: String?,
+    ): PlaceSupplement {
         val storedUrls = imageUrls.distinct().take(MAX_PHOTO_COUNT).mapIndexedNotNull { sequence, url ->
             runCatching {
                 mediaStorage.store(PostMedia(PostMedia.MediaType.IMAGE, url, sequence)).url
@@ -101,9 +110,7 @@ class ApifyGoogleMapsPhotoProvider(
                 )
             }.getOrNull()
         }
-        return storedUrls.takeIf(List<String>::isNotEmpty)?.let {
-            PlaceSupplement(openingHours = null, photoUrls = it)
-        }
+        return PlaceSupplement(openingHours = null, photoUrls = storedUrls, googlePlaceId = googlePlaceId)
     }
 
     private fun PlaceCandidate.actorQuery(): String = googlePlaceId?.let { "place_id:$it" } ?: "$name $address"
@@ -111,6 +118,7 @@ class ApifyGoogleMapsPhotoProvider(
     private fun String.matches(other: String): Boolean {
         val left = normalize()
         val right = other.normalize()
+        if (left.isEmpty() || right.isEmpty()) return false
         return left == right || left.contains(right) || right.contains(left)
     }
 

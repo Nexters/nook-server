@@ -42,7 +42,9 @@ class StorePlaceThumbnailUseCaseTest {
         val statuses = mutableListOf<PlaceThumbnailParsingStatus>()
         val place = place()
         val useCase = StorePlaceThumbnailUseCase(
-            thumbnailProvider = PlaceThumbnailProvider { PlaceSupplement(null, emptyList()) },
+            thumbnailProvider = PlaceThumbnailProvider {
+                PlaceSupplement(null, listOf("https://cdn.example.com/place.jpg"))
+            },
             updatePort = object : PlaceThumbnailUpdatePort {
                 override fun update(
                     provider: String,
@@ -68,6 +70,33 @@ class StorePlaceThumbnailUseCaseTest {
             ),
             statuses,
         )
+    }
+
+    @Test
+    fun `marks thumbnail as failed when all providers return no photo`() {
+        val statuses = mutableListOf<PlaceThumbnailParsingStatus>()
+        val supplements = mutableListOf<PlaceSupplement?>()
+        val useCase = StorePlaceThumbnailUseCase(
+            thumbnailProvider = PlaceThumbnailProvider {
+                PlaceSupplement(null, emptyList(), googlePlaceId = "google-123")
+            },
+            updatePort = object : PlaceThumbnailUpdatePort {
+                override fun update(
+                    provider: String,
+                    externalPlaceId: String,
+                    status: PlaceThumbnailParsingStatus,
+                    supplement: PlaceSupplement?,
+                ) {
+                    statuses += status
+                    supplements += supplement
+                }
+            },
+        )
+
+        useCase(11, listOf(PlaceThumbnailProvider.Request(place())))
+
+        assertEquals(listOf(PlaceThumbnailParsingStatus.PROCESSING, PlaceThumbnailParsingStatus.FAILED), statuses)
+        assertEquals("google-123", supplements.last()?.googlePlaceId)
     }
 
     private fun place() = PlaceCandidate(
