@@ -1,0 +1,25 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+### 내 기기 푸시 토큰 등록
+PUT {{baseUrl}}/api/v1/me/push-tokens
+Content-Type: application/json
+
+{
+  "token": "replace-with-fcm-registration-token",
+  "platform": "IOS"
+}
+
+### 내 기기 푸시 토큰 삭제
+DELETE {{baseUrl}}/api/v1/me/push-tokens
+Content-Type: application/json
+
+{
+  "token": "replace-with-fcm-registration-token"
+}

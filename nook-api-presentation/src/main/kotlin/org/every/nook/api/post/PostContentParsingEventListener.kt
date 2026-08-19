@@ -10,6 +10,7 @@ import org.every.nook.api.application.post.StorePostMediaUseCase
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.withProcessingLogContext
+import org.every.nook.api.application.push.SendPostProcessingPushUseCase
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -30,6 +31,7 @@ class PostContentParsingEventListener(
     private val processPostContentParsingJob: ProcessPostContentParsingJobUseCase,
     private val findOutstandingJobs: FindOutstandingPostContentParsingJobsUseCase,
     private val storePostMedia: StorePostMediaUseCase,
+    private val sendPostProcessingPush: SendPostProcessingPushUseCase,
     private val eventPublisher: ApplicationEventPublisher,
     @Qualifier("parsingRetryTaskScheduler") private val retryTaskScheduler: TaskScheduler,
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
@@ -94,8 +96,10 @@ class PostContentParsingEventListener(
                     PostContentParsingJobRequestedEvent(event.postId, result.nextAttemptAt),
                 )
 
-                ProcessPostContentParsingJobUseCase.Result.Completed,
-                ProcessPostContentParsingJobUseCase.Result.Failed,
+                ProcessPostContentParsingJobUseCase.Result.Completed -> Unit
+
+                ProcessPostContentParsingJobUseCase.Result.Failed -> sendPush(event.postId)
+
                 ProcessPostContentParsingJobUseCase.Result.Skipped,
                 -> Unit
             }
@@ -165,6 +169,19 @@ class PostContentParsingEventListener(
                 duration = delay,
             ),
         )
+    }
+
+    private fun sendPush(postId: Long) {
+        runCatching {
+            sendPostProcessingPush(
+                SendPostProcessingPushUseCase.Command(
+                    postId = postId,
+                    outcome = SendPostProcessingPushUseCase.Outcome.FAILED,
+                ),
+            )
+        }.onFailure { exception ->
+            logger.warn(exception) { "Post content failure push failed: postId=$postId" }
+        }
     }
 
     private companion object {
