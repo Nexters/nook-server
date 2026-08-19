@@ -17,6 +17,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     implementation("org.springframework.security:spring-security-oauth2-jose")
+    implementation("com.google.firebase:firebase-admin:9.10.0")
     implementation("net.javacrumbs.shedlock:shedlock-spring:7.7.0")
     implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.7.0")
     implementation(platform("software.amazon.awssdk:bom:2.49.3"))
