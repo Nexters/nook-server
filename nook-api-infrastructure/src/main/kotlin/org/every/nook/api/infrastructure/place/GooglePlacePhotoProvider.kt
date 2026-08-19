@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.place
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import mu.KotlinLogging
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceOpeningHours
 import org.every.nook.api.application.place.PlaceOpeningPeriod
@@ -13,6 +14,7 @@ import org.every.nook.api.application.processing.debug
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.warn
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
@@ -43,6 +45,7 @@ class GooglePlacePhotoProvider(
     private val restClient: RestClient,
     private val properties: GooglePlacePhotoProperties,
     private val mediaStorage: PostMediaStoragePort,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : PlaceThumbnailProvider {
     fun fetch(place: PlaceCandidate): PlaceSupplement? = fetch(PlaceThumbnailProvider.Request(place))
 
@@ -162,59 +165,67 @@ class GooglePlacePhotoProvider(
     private fun searchNearby(place: PlaceCandidate): List<GooglePlace> {
         val includedTypes = place.nearbyTypes()
         if (includedTypes.isEmpty()) return emptyList()
-        return restClient.post()
-            .uri("/v1/places:searchNearby")
-            .contentType(MediaType.APPLICATION_JSON)
-            .header(API_KEY_HEADER, properties.apiKey)
-            .header(FIELD_MASK_HEADER, SEARCH_FIELD_MASK)
-            .body(
-                NearbySearchRequest(
-                    includedTypes = includedTypes,
-                    maxResultCount = NEARBY_SEARCH_RESULT_SIZE,
-                    locationRestriction = LocationRestriction(
-                        Circle(
-                            center = GoogleLocation(place.latitude.toDouble(), place.longitude.toDouble()),
-                            radius = NEARBY_SEARCH_RADIUS_METERS,
+        return callMeter.measure("google-places", "nearby-search", "place-supplement") {
+            restClient.post()
+                .uri("/v1/places:searchNearby")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(API_KEY_HEADER, properties.apiKey)
+                .header(FIELD_MASK_HEADER, SEARCH_FIELD_MASK)
+                .body(
+                    NearbySearchRequest(
+                        includedTypes = includedTypes,
+                        maxResultCount = NEARBY_SEARCH_RESULT_SIZE,
+                        locationRestriction = LocationRestriction(
+                            Circle(
+                                center = GoogleLocation(place.latitude.toDouble(), place.longitude.toDouble()),
+                                radius = NEARBY_SEARCH_RADIUS_METERS,
+                            ),
                         ),
                     ),
-                ),
-            )
-            .retrieve()
-            .body(TextSearchResponse::class.java)
-            ?.places
-            .orEmpty()
+                )
+                .retrieve()
+                .body(TextSearchResponse::class.java)
+                ?.places
+                .orEmpty()
+        }
     }
 
-    private fun searchText(query: String, place: PlaceCandidate): List<GooglePlace> = restClient.post()
-        .uri("/v1/places:searchText")
-        .contentType(MediaType.APPLICATION_JSON)
-        .header(API_KEY_HEADER, properties.apiKey)
-        .header(FIELD_MASK_HEADER, SEARCH_FIELD_MASK)
-        .body(
-            TextSearchRequest(
-                textQuery = query,
-                languageCode = "ko",
-                regionCode = "KR",
-                pageSize = SEARCH_PAGE_SIZE,
-                locationBias = LocationBias(
-                    Circle(
-                        center = GoogleLocation(place.latitude.toDouble(), place.longitude.toDouble()),
-                        radius = LOCATION_BIAS_RADIUS_METERS,
+    private fun searchText(query: String, place: PlaceCandidate): List<GooglePlace> =
+        callMeter.measure("google-places", "text-search-pro", "place-supplement") {
+            restClient.post()
+                .uri("/v1/places:searchText")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(API_KEY_HEADER, properties.apiKey)
+                .header(FIELD_MASK_HEADER, SEARCH_FIELD_MASK)
+                .body(
+                    TextSearchRequest(
+                        textQuery = query,
+                        languageCode = "ko",
+                        regionCode = "KR",
+                        pageSize = SEARCH_PAGE_SIZE,
+                        locationBias = LocationBias(
+                            Circle(
+                                center = GoogleLocation(place.latitude.toDouble(), place.longitude.toDouble()),
+                                radius = LOCATION_BIAS_RADIUS_METERS,
+                            ),
+                        ),
                     ),
-                ),
-            ),
-        )
-        .retrieve()
-        .body(TextSearchResponse::class.java)
-        ?.places
-        .orEmpty()
+                )
+                .retrieve()
+                .body(TextSearchResponse::class.java)
+                ?.places
+                .orEmpty()
+        }
 
-    private fun getPlace(googlePlaceId: String): GooglePlace? = restClient.get()
-        .uri("/v1/places/{placeId}", googlePlaceId)
-        .header(API_KEY_HEADER, properties.apiKey)
-        .header(FIELD_MASK_HEADER, DETAIL_FIELD_MASK)
-        .retrieve()
-        .body(GooglePlace::class.java)
+    private fun getPlace(googlePlaceId: String): GooglePlace? =
+        callMeter.measure("google-places", "place-details", "place-supplement") {
+            restClient.get()
+                .uri("/v1/places/{placeId}", googlePlaceId)
+                .header(API_KEY_HEADER, properties.apiKey)
+                .header(FIELD_MASK_HEADER, DETAIL_FIELD_MASK)
+                .retrieve()
+                .body(GooglePlace::class.java)
+        }
 
     @Suppress("CyclomaticComplexMethod")
     private fun GooglePlace.matchScore(candidate: PlaceCandidate): Int {
@@ -419,18 +430,20 @@ class GooglePlacePhotoProvider(
 
     private fun fetchPhotoUri(photoName: String, sequence: Int, place: PlaceCandidate): String? {
         val startedAt = System.nanoTime()
-        val photoUri = restClient.get()
-            .uri { builder ->
-                builder
-                    .path("/v1/$photoName/media")
-                    .queryParam("maxWidthPx", properties.maxWidthPx)
-                    .queryParam("skipHttpRedirect", true)
-                    .build()
-            }
-            .header(API_KEY_HEADER, properties.apiKey)
-            .retrieve()
-            .body(PhotoMediaResponse::class.java)
-            ?.photoUri
+        val photoUri = callMeter.measure("google-places", "place-photo", "place-thumbnail") {
+            restClient.get()
+                .uri { builder ->
+                    builder
+                        .path("/v1/$photoName/media")
+                        .queryParam("maxWidthPx", properties.maxWidthPx)
+                        .queryParam("skipHttpRedirect", true)
+                        .build()
+                }
+                .header(API_KEY_HEADER, properties.apiKey)
+                .retrieve()
+                .body(PhotoMediaResponse::class.java)
+                ?.photoUri
+        }
         eventLogger.debug(
             place.event(
                 "google.photo.media.completed",

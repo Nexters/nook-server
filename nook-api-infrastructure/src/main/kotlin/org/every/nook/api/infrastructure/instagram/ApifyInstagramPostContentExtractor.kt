@@ -1,10 +1,12 @@
 package org.every.nook.api.infrastructure.instagram
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -21,6 +23,7 @@ class ApifyInstagramPostContentExtractor(
     private val properties: ApifyProperties,
     private val mapper: ApifyInstagramMapper,
     private val responseCache: ScrapingProviderResponseCache,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : PostContentExtractor {
     override fun supports(url: String): Boolean = InstagramContentUrl.supports(url)
 
@@ -36,24 +39,26 @@ class ApifyInstagramPostContentExtractor(
         }
         val responseBody = try {
             logger.logProviderRequestStarted(PROVIDER)
-            restClient.post()
-                .uri { builder ->
-                    builder.path(RUN_SYNC_PATH)
-                        .queryParam(FORMAT, JSON_FORMAT)
-                        .queryParam(CLEAN, true)
-                        .build(properties.actorId)
-                }
-                .contentType(MediaType.APPLICATION_JSON)
-                .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
-                .body(
-                    mapOf(
-                        DIRECT_URLS to listOf(instagramUrl.canonicalUrl),
-                        RESULTS_TYPE to resultsType(instagramUrl),
-                        RESULTS_LIMIT to 1,
-                    ),
-                )
-                .retrieve()
-                .body(String::class.java)
+            callMeter.measure("apify", "actor-run", "instagram-scraping") {
+                restClient.post()
+                    .uri { builder ->
+                        builder.path(RUN_SYNC_PATH)
+                            .queryParam(FORMAT, JSON_FORMAT)
+                            .queryParam(CLEAN, true)
+                            .build(properties.actorId)
+                    }
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
+                    .body(
+                        mapOf(
+                            DIRECT_URLS to listOf(instagramUrl.canonicalUrl),
+                            RESULTS_TYPE to resultsType(instagramUrl),
+                            RESULTS_LIMIT to 1,
+                        ),
+                    )
+                    .retrieve()
+                    .body(String::class.java)
+            }
         } catch (exception: RestClientResponseException) {
             logger.logProviderRequestFailed(PROVIDER, startedAt, exception, exception.statusCode.value())
             if (exception.statusCode.value() in TIMEOUT_STATUSES) {

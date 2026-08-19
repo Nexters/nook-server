@@ -31,6 +31,7 @@ import kotlin.test.assertTrue
         "auth.jwt.access-secret=01234567890123456789012345678901",
         "auth.jwt.refresh-secret=01234567890123456789012345678901",
         "parsing.dispatcher-interval=1h",
+        "external-api-pricing.enabled=false",
     ],
 )
 class NookApiApplicationContextTest {

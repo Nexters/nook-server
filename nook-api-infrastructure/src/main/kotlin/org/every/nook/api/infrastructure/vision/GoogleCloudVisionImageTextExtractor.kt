@@ -1,13 +1,16 @@
 package org.every.nook.api.infrastructure.vision
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import java.math.BigDecimal
 import java.util.Base64
 
 class GoogleCloudVisionImageTextExtractor(
@@ -15,6 +18,7 @@ class GoogleCloudVisionImageTextExtractor(
     private val objectMapper: ObjectMapper,
     private val properties: GoogleCloudVisionProperties,
     private val imageDownloader: VisionImageDownloader,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : ImageTextExtractor {
     override fun extract(request: ImageTextExtractor.Request): List<ImageTranscript> {
         val startedAt = System.nanoTime()
@@ -26,12 +30,19 @@ class GoogleCloudVisionImageTextExtractor(
         check(totalBytes <= properties.maxRequestBytes) {
             "Cloud Vision request is too large: $totalBytes bytes, limit ${properties.maxRequestBytes}"
         }
-        val response = restClient.post()
-            .uri { builder -> builder.path("/v1/images:annotate").queryParam("key", properties.apiKey).build() }
-            .body(payloads.toVisionRequest())
-            .retrieve()
-            .body(String::class.java)
-            ?: error("Google Cloud Vision returned an empty response")
+        val response = callMeter.measure(
+            provider = "google-cloud-vision",
+            sku = properties.featureType,
+            feature = "image-transcript",
+            estimatedUnits = BigDecimal.valueOf(request.images.size.toLong()),
+        ) {
+            restClient.post()
+                .uri { builder -> builder.path("/v1/images:annotate").queryParam("key", properties.apiKey).build() }
+                .body(payloads.toVisionRequest())
+                .retrieve()
+                .body(String::class.java)
+                ?: error("Google Cloud Vision returned an empty response")
+        }
         val transcripts = objectMapper.readTree(response)
             .path("responses")
             .toList()

@@ -1,11 +1,14 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.openai.OpenAiContentInferenceAdapter
 import org.every.nook.api.infrastructure.openai.OpenAiCoverTitleExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiImageTextExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiPostTitleSelector
 import org.every.nook.api.infrastructure.openai.OpenAiProperties
 import org.every.nook.api.infrastructure.openai.OpenAiRateLimitInterceptor
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -39,10 +42,12 @@ class OpenAiConfig {
     fun openAiContentInferenceAdapter(
         @Qualifier("openAiRestClient") restClient: RestClient,
         properties: OpenAiProperties,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): OpenAiContentInferenceAdapter = OpenAiContentInferenceAdapter(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
+        callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     )
 
     @Bean
@@ -69,9 +74,11 @@ class OpenAiConfig {
     fun openAiImageTextExtractor(
         @Qualifier("openAiRestClient") restClient: RestClient,
         properties: OpenAiProperties,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): OpenAiImageTextExtractor = OpenAiImageTextExtractor(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
+        callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     )
 }

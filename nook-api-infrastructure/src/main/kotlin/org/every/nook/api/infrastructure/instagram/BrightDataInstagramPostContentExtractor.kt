@@ -1,10 +1,12 @@
 package org.every.nook.api.infrastructure.instagram
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -21,6 +23,7 @@ class BrightDataInstagramPostContentExtractor(
     private val properties: BrightDataProperties,
     private val mapper: BrightDataInstagramMapper,
     private val responseCache: ScrapingProviderResponseCache,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : PostContentExtractor {
     override fun supports(url: String): Boolean = InstagramContentUrl.supports(url)
 
@@ -36,18 +39,20 @@ class BrightDataInstagramPostContentExtractor(
         }
         val responseBody = try {
             logger.logProviderRequestStarted(PROVIDER)
-            restClient.post()
-                .uri { builder ->
-                    builder.path(SCRAPE_PATH)
-                        .queryParam(DATASET_ID, datasetId(instagramUrl))
-                        .queryParam(FORMAT, JSON_FORMAT)
-                        .build()
-                }
-                .contentType(MediaType.APPLICATION_JSON)
-                .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
-                .body(listOf(mapOf(URL to instagramUrl.canonicalUrl)))
-                .retrieve()
-                .body(String::class.java)
+            callMeter.measure("bright-data", "dataset-scrape", "instagram-scraping") {
+                restClient.post()
+                    .uri { builder ->
+                        builder.path(SCRAPE_PATH)
+                            .queryParam(DATASET_ID, datasetId(instagramUrl))
+                            .queryParam(FORMAT, JSON_FORMAT)
+                            .build()
+                    }
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
+                    .body(listOf(mapOf(URL to instagramUrl.canonicalUrl)))
+                    .retrieve()
+                    .body(String::class.java)
+            }
         } catch (exception: RestClientResponseException) {
             logger.logProviderRequestFailed(PROVIDER, startedAt, exception, exception.statusCode.value())
             handleResponseException(exception)

@@ -1,8 +1,10 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostSourceResolver
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.instagram.ApifyInstagramMapper
 import org.every.nook.api.infrastructure.instagram.ApifyInstagramPostContentExtractor
 import org.every.nook.api.infrastructure.instagram.ApifyProperties
@@ -12,6 +14,7 @@ import org.every.nook.api.infrastructure.instagram.BrightDataProperties
 import org.every.nook.api.infrastructure.instagram.InstagramPostContentExtractor
 import org.every.nook.api.infrastructure.instagram.InstagramPostSourceResolver
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -68,6 +71,7 @@ class InstagramContentConfig {
         apifyMapper: ApifyInstagramMapper,
         responseCache: ScrapingProviderResponseCache,
         configurationReader: RuntimeConfigurationReader,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): PostContentExtractor {
         val objectMapper = jacksonObjectMapper()
         return InstagramPostContentExtractor(
@@ -77,6 +81,7 @@ class InstagramContentConfig {
                 properties = brightDataProperties,
                 mapper = brightDataMapper,
                 responseCache = responseCache,
+                callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
             ),
             apifyExtractor = ApifyInstagramPostContentExtractor(
                 restClient = apifyRestClient,
@@ -84,6 +89,7 @@ class InstagramContentConfig {
                 properties = apifyProperties,
                 mapper = apifyMapper,
                 responseCache = responseCache,
+                callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
             ),
             configurationReader = configurationReader,
         )
