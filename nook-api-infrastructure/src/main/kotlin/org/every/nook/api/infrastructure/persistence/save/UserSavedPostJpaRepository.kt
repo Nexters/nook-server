@@ -44,30 +44,8 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
                 p.category AS category,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
-                COALESCE(
-                    p.thumbnail_url,
-                    (
-                        SELECT post_media.media_url
-                        FROM group_posts thumbnail_group_post
-                        INNER JOIN user_saved_posts thumbnail_saved_post
-                            ON thumbnail_saved_post.id = thumbnail_group_post.user_saved_post_id
-                        INNER JOIN user_saved_post_places thumbnail_saved_post_place
-                            ON thumbnail_saved_post_place.user_saved_post_id = thumbnail_saved_post.id
-                        INNER JOIN post_media post_media
-                            ON post_media.post_id = thumbnail_saved_post.post_id
-                        WHERE thumbnail_group_post.group_id = :groupId
-                          AND thumbnail_group_post.deleted_at IS NULL
-                          AND thumbnail_saved_post.user_id = :userId
-                          AND thumbnail_saved_post.deleted_at IS NULL
-                          AND thumbnail_saved_post_place.place_id = p.id
-                          AND post_media.media_type = 'IMAGE'
-                        ORDER BY
-                            thumbnail_saved_post.created_at DESC,
-                            thumbnail_saved_post.id DESC,
-                            post_media.display_order ASC
-                        LIMIT 1
-                    )
-                ) AS thumbnailUrl,
+                p.thumbnail_url AS thumbnailUrl,
+                p.thumbnail_parsing_status AS thumbnailParsingStatus,
                 CAST(p.representative_tags AS CHAR) AS representativeTags
             FROM user_groups user_group
             INNER JOIN group_posts group_post ON group_post.group_id = user_group.id
@@ -90,6 +68,7 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
                 p.latitude,
                 p.longitude,
                 p.thumbnail_url,
+                p.thumbnail_parsing_status,
                 CAST(p.representative_tags AS CHAR)
             ORDER BY MAX(saved_post.created_at) DESC, MAX(saved_post.id) DESC, p.id DESC
         """,
@@ -160,5 +139,6 @@ interface GroupPlaceProjection {
     val latitude: java.math.BigDecimal
     val longitude: java.math.BigDecimal
     val thumbnailUrl: String?
+    val thumbnailParsingStatus: String?
     val representativeTags: String?
 }

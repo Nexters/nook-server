@@ -11,6 +11,7 @@ import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -164,6 +165,7 @@ class GroupControllerTest {
                         latitude = BigDecimal("37.5"),
                         longitude = BigDecimal("127.0"),
                         thumbnailUrl = "https://example.com/place.jpg",
+                        thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
                         tags = listOf("작업하기 좋은"),
                     ),
                 ),
@@ -182,6 +184,7 @@ class GroupControllerTest {
             jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
             jsonPath("$.success.items[0].city") { value("서울") }
             jsonPath("$.success.items[0].thumbnailUrl") { value("https://example.com/place.jpg") }
+            jsonPath("$.success.items[0].thumbnailParsingStatus") { value("COMPLETED") }
             jsonPath("$.success.items[0].tags[0]") { value("작업하기 좋은") }
             jsonPath("$.success.totalElements") { value(1) }
         }

@@ -143,4 +143,13 @@ class PlaceEntity(
 }
 
 internal fun PlaceEntity.effectiveThumbnailParsingStatus(): PlaceThumbnailParsingStatus =
-    if (thumbnailUrl.isNullOrBlank()) thumbnailParsingStatus else PlaceThumbnailParsingStatus.COMPLETED
+    effectiveThumbnailParsingStatus(thumbnailUrl, thumbnailParsingStatus)
+
+internal fun effectiveThumbnailParsingStatus(
+    thumbnailUrl: String?,
+    status: PlaceThumbnailParsingStatus?,
+): PlaceThumbnailParsingStatus = if (thumbnailUrl.isNullOrBlank()) {
+    status ?: PlaceThumbnailParsingStatus.PENDING
+} else {
+    PlaceThumbnailParsingStatus.COMPLETED
+}

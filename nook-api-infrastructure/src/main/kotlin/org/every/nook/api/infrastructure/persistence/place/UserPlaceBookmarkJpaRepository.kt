@@ -71,6 +71,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 p.thumbnail_url AS thumbnailUrl,
+                p.thumbnail_parsing_status AS thumbnailParsingStatus,
                 CAST(p.representative_tags AS CHAR) AS representativeTags,
                 COALESCE(
                     (
@@ -143,22 +144,8 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 CAST(p.representative_tags AS CHAR) AS representativeTags,
-                COALESCE(
-                    p.thumbnail_url,
-                    (
-                    SELECT pm.media_url
-                    FROM user_saved_posts usp_image
-                    INNER JOIN user_saved_post_places uspp_image
-                        ON uspp_image.user_saved_post_id = usp_image.id
-                    INNER JOIN post_media pm ON pm.post_id = usp_image.post_id
-                    WHERE usp_image.user_id = upb.user_id
-                      AND usp_image.deleted_at IS NULL
-                      AND uspp_image.place_id = p.id
-                      AND pm.media_type = 'IMAGE'
-                    ORDER BY usp_image.created_at DESC, usp_image.id DESC, pm.display_order ASC
-                    LIMIT 1
-                    )
-                ) AS thumbnailUrl
+                p.thumbnail_url AS thumbnailUrl,
+                p.thumbnail_parsing_status AS thumbnailParsingStatus
             FROM user_place_bookmarks upb
             INNER JOIN places p ON p.id = upb.place_id
             WHERE upb.user_id = :userId
@@ -355,6 +342,7 @@ interface MapPlaceProjection {
     val longitude: BigDecimal
     val color: String
     val thumbnailUrl: String?
+    val thumbnailParsingStatus: String?
     val representativeTags: String?
 }
 
@@ -369,6 +357,7 @@ interface RecentPlaceProjection {
     val latitude: BigDecimal
     val longitude: BigDecimal
     val thumbnailUrl: String?
+    val thumbnailParsingStatus: String?
     val representativeTags: String?
 }
 

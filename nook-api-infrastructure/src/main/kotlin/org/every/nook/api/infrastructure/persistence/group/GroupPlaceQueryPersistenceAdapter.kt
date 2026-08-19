@@ -3,8 +3,11 @@ package org.every.nook.api.infrastructure.persistence.group
 import org.every.nook.api.application.group.GroupPlacePage
 import org.every.nook.api.application.group.GroupPlaceSummary
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.effectiveThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
@@ -38,6 +41,12 @@ class GroupPlaceQueryPersistenceAdapter(
                     latitude = projection.latitude,
                     longitude = projection.longitude,
                     thumbnailUrl = projection.thumbnailUrl,
+                    thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
+                        effectiveThumbnailParsingStatus(
+                            projection.thumbnailUrl,
+                            projection.thumbnailParsingStatus?.let(PlaceThumbnailParsingStatus::valueOf),
+                        ),
+                    ),
                     tags = projection.representativeTags.toDisplayTags(),
                 )
             },

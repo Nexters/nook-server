@@ -1,11 +1,13 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceView
 import org.every.nook.api.application.place.port.PlaceMapQueryPort
 import org.every.nook.api.domain.place.GeoBounds
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -34,6 +36,12 @@ class PlaceMapQueryPersistenceAdapter(
                 longitude = row.longitude,
                 color = row.color,
                 thumbnailUrl = row.thumbnailUrl,
+                thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
+                    effectiveThumbnailParsingStatus(
+                        row.thumbnailUrl,
+                        row.thumbnailParsingStatus?.let(PlaceThumbnailParsingStatus::valueOf),
+                    ),
+                ),
                 tags = row.representativeTags.toDisplayTags(),
             )
         }
@@ -57,6 +65,12 @@ class PlaceMapQueryPersistenceAdapter(
                 latitude = row.latitude,
                 longitude = row.longitude,
                 thumbnailUrl = row.thumbnailUrl,
+                thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
+                    effectiveThumbnailParsingStatus(
+                        row.thumbnailUrl,
+                        row.thumbnailParsingStatus?.let(PlaceThumbnailParsingStatus::valueOf),
+                    ),
+                ),
                 tags = row.representativeTags.toDisplayTags(),
             )
         }
