@@ -25,6 +25,8 @@ import kotlin.test.assertTrue
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.sql.init.mode=always",
+        "spring.sql.init.schema-locations=classpath:shedlock-test-schema.sql",
         "spring.jpa.hibernate.ddl-auto=none",
         "auth.jwt.access-secret=01234567890123456789012345678901",
         "auth.jwt.refresh-secret=01234567890123456789012345678901",

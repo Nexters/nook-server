@@ -22,6 +22,21 @@ scrape_configs:
           env: dev
           service: nook-api
 
+  - job_name: nook-api-live
+    metrics_path: /actuator/prometheus
+    scheme: https
+    tls_config:
+      server_name: api.everynook.co.kr
+    relabel_configs:
+      - target_label: job
+        replacement: nook-api
+    static_configs:
+      - targets:
+          - 192.168.0.216:443
+        labels:
+          env: live
+          service: nook-api
+
   - job_name: node
     static_configs:
       - targets:
@@ -29,6 +44,11 @@ scrape_configs:
         labels:
           env: dev
           service: nook-dev
+      - targets:
+          - 192.168.0.216:9100
+        labels:
+          env: live
+          service: nook-live
 
   - job_name: mysql
     static_configs:
@@ -37,4 +57,3 @@ scrape_configs:
         labels:
           env: dev
           service: nook-mysql
-

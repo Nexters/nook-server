@@ -1,0 +1,27 @@
+services:
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: nook-live-node-exporter
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=192.168.0.216:9100
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: nook-live-promtail
+    command:
+      - -config.file=/etc/promtail/promtail.yml
+      - -config.expand-env=true
+    environment:
+      LOKI_PUSH_URL: ${LOKI_PUSH_URL:-http://127.0.0.1:3100/loki/api/v1/push}
+    network_mode: host
+    volumes:
+      - ./promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

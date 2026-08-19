@@ -55,7 +55,7 @@ jobs:
               nook-admin-web/*|ops/admin-web/*)
                 admin_web_changed=true
                 ;;
-              Dockerfile|Dockerfile.batch|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|config/*|nook-api-*/*|.github/scripts/deploy-dev.sh)
+              Dockerfile|Dockerfile.batch|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|config/*|nook-api-*/*|.github/scripts/deploy-dev.sh|.github/scripts/deploy-live.sh|ops/live-runtime/*)
                 api_changed=true
                 ;;
               .github/workflows/container-image.yml)
@@ -103,11 +103,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          short_sha="${GITHUB_SHA::12}"
           if [[ "${GITHUB_REF_NAME}" == "develop" ]]; then
-            prefix="dev"
+            version="dev-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::8}"
+            latest_tag="dev-latest"
           elif [[ "${GITHUB_REF_NAME}" == "main" ]]; then
-            prefix="prod"
+            version="prod-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::8}"
+            latest_tag="prod-latest"
           else
             echo "Unsupported branch: ${GITHUB_REF_NAME}" >&2
             exit 1
@@ -117,10 +118,10 @@ jobs:
 
           {
             echo "tags<<EOF"
-            echo "${public_image}:${prefix}-${short_sha}"
-            echo "${public_image}:${prefix}-latest"
+            echo "${public_image}:${version}"
+            echo "${public_image}:${latest_tag}"
             echo "EOF"
-            echo "image=${public_image}:${prefix}-${short_sha}"
+            echo "image=${public_image}:${version}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Build and push API image
@@ -212,6 +213,56 @@ jobs:
           GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
           GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
         run: .github/scripts/deploy-dev.sh
+
+  deploy-live-api:
+    name: Deploy Live API
+    runs-on: [self-hosted, nook-ops]
+    needs: [changes, build-api]
+    if: github.ref_name == 'main' && needs.changes.outputs.api-changed == 'true' && needs.build-api.result == 'success'
+    environment: live
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Configure SSH
+        id: ssh
+        shell: bash
+        env:
+          LIVE_SSH_PRIVATE_KEY: ${{ secrets.LIVE_SSH_PRIVATE_KEY }}
+          LIVE_SSH_KNOWN_HOSTS: ${{ secrets.LIVE_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          key_file="${RUNNER_TEMP}/nook-live-key"
+          install -m 0600 /dev/null "${key_file}"
+          printf '%s\n' "${LIVE_SSH_PRIVATE_KEY}" > "${key_file}"
+          printf '%s\n' "${LIVE_SSH_KNOWN_HOSTS}" > "${RUNNER_TEMP}/nook-live-known-hosts"
+          chmod 0600 "${RUNNER_TEMP}/nook-live-known-hosts"
+          echo "key-file=${key_file}" >> "${GITHUB_OUTPUT}"
+          echo "HOME=${RUNNER_TEMP}" >> "${GITHUB_ENV}"
+          mkdir -p "${RUNNER_TEMP}/.ssh"
+          cp "${RUNNER_TEMP}/nook-live-known-hosts" "${RUNNER_TEMP}/.ssh/known_hosts"
+
+      - name: Log in to registry on live VM
+        env:
+          LIVE_SSH_TARGET: ${{ secrets.LIVE_SSH_TARGET }}
+          LIVE_SSH_KEY: ${{ steps.ssh.outputs.key-file }}
+          GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
+          GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
+        run: |
+          printf '%s' "${GABIA_REGISTRY_PASSWORD}" | \
+            ssh -i "${LIVE_SSH_KEY}" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+              "${LIVE_SSH_TARGET}" \
+              "docker login '${GABIA_PUBLIC_REGISTRY}' -u '${GABIA_REGISTRY_USERNAME}' --password-stdin"
+
+      - name: Deploy with Blue Green
+        env:
+          LIVE_ACTION: deploy
+          LIVE_IMAGE: ${{ needs.build-api.outputs.image }}
+          LIVE_SSH_TARGET: ${{ secrets.LIVE_SSH_TARGET }}
+          LIVE_SSH_KEY: ${{ steps.ssh.outputs.key-file }}
+        run: .github/scripts/deploy-live.sh
 
   deploy-dev-admin-web:
     name: Deploy Dev Admin Web

@@ -1,6 +1,7 @@
 package org.every.nook.api.post
 
 import mu.KotlinLogging
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobsUseCase
 import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
@@ -37,6 +38,11 @@ class PostContentParsingEventListener(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @EventListener(ApplicationReadyEvent::class)
+    @SchedulerLock(
+        name = "postContentParsing.recoverOutstandingJobs",
+        lockAtMostFor = "1m",
+        lockAtLeastFor = "10s",
+    )
     fun recoverOutstandingJobs() {
         val jobs = findOutstandingJobs()
         logger.info { "Recovering outstanding post content parsing jobs: jobCount=${jobs.size}" }
@@ -51,6 +57,11 @@ class PostContentParsingEventListener(
     }
 
     @Scheduled(fixedDelayString = "\${parsing.dispatcher-interval:10s}")
+    @SchedulerLock(
+        name = "postContentParsing.dispatchOutstandingJobs",
+        lockAtMostFor = "30s",
+        lockAtLeastFor = "9s",
+    )
     fun dispatchOutstandingJobs() {
         val now = clock.instant()
         val jobs = findOutstandingJobs().filterNot { it.availableAt.isAfter(now) }
