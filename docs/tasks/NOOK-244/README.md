@@ -32,4 +32,3 @@
 - `pnpm build`
 - `./gradlew check`
 - dev Chrome에서 목록과 게시글·장소 상세 및 수정 다이얼로그 확인
-
