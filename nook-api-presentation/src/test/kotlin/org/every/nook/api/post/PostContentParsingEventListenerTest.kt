@@ -6,6 +6,7 @@ import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
 import org.every.nook.api.application.post.ProcessPostContentParsingJobUseCase
 import org.every.nook.api.application.post.StorePostMediaUseCase
+import org.every.nook.api.application.push.SendPostProcessingPushUseCase
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
@@ -24,12 +25,14 @@ class PostContentParsingEventListenerTest {
     private val processUseCase = mock(ProcessPostContentParsingJobUseCase::class.java)
     private val findOutstandingUseCase = mock(FindOutstandingPostContentParsingJobsUseCase::class.java)
     private val storePostMedia = mock(StorePostMediaUseCase::class.java)
+    private val sendPostProcessingPush = mock(SendPostProcessingPushUseCase::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val retryTaskScheduler = mock(TaskScheduler::class.java)
     private val listener = PostContentParsingEventListener(
         processPostContentParsingJob = processUseCase,
         findOutstandingJobs = findOutstandingUseCase,
         storePostMedia = storePostMedia,
+        sendPostProcessingPush = sendPostProcessingPush,
         eventPublisher = eventPublisher,
         retryTaskScheduler = retryTaskScheduler,
         clock = CLOCK,
@@ -42,6 +45,20 @@ class PostContentParsingEventListenerTest {
         listener.process(PostContentParsingJobRequestedEvent(postId = 11))
 
         verify(processUseCase).invoke(11)
+    }
+
+    @Test
+    fun `sends a failed push when content parsing fails permanently`() {
+        `when`(processUseCase(11)).thenReturn(ProcessPostContentParsingJobUseCase.Result.Failed)
+
+        listener.process(PostContentParsingJobRequestedEvent(postId = 11))
+
+        verify(sendPostProcessingPush).invoke(
+            SendPostProcessingPushUseCase.Command(
+                postId = 11,
+                outcome = SendPostProcessingPushUseCase.Outcome.FAILED,
+            ),
+        )
     }
 
     @Test
