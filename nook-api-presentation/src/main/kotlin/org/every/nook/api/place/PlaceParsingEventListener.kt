@@ -1,6 +1,7 @@
 package org.every.nook.api.place
 
 import mu.KotlinLogging
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
@@ -37,6 +38,11 @@ class PlaceParsingEventListener(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @EventListener(ApplicationReadyEvent::class)
+    @SchedulerLock(
+        name = "placeParsing.recoverOutstandingJobs",
+        lockAtMostFor = "1m",
+        lockAtLeastFor = "10s",
+    )
     fun recoverOutstandingJobs() {
         val jobs = findOutstandingJobs()
         logger.info { "Recovering outstanding place parsing jobs: jobCount=${jobs.size}" }
@@ -51,6 +57,11 @@ class PlaceParsingEventListener(
     }
 
     @Scheduled(fixedDelayString = "\${parsing.dispatcher-interval:10s}")
+    @SchedulerLock(
+        name = "placeParsing.dispatchOutstandingJobs",
+        lockAtMostFor = "30s",
+        lockAtLeastFor = "9s",
+    )
     fun dispatchOutstandingJobs() {
         val now = clock.instant()
         val jobs = findOutstandingJobs().filterNot { it.availableAt.isAfter(now) }
