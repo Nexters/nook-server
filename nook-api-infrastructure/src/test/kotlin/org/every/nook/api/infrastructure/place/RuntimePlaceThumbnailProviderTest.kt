@@ -15,12 +15,12 @@ class RuntimePlaceThumbnailProviderTest {
     fun `uses configured providers in order and stops after photos`() {
         val calls = mutableListOf<String>()
         val provider = provider(
-            value = "GOOGLE, APIFY_NAVER, FIXED",
+            value = "GOOGLE, APIFY_GOOGLE, FIXED",
             delegates = mapOf(
                 PlaceThumbnailProviderType.GOOGLE to recording(calls, "GOOGLE", null),
-                PlaceThumbnailProviderType.APIFY_NAVER to recording(
+                PlaceThumbnailProviderType.APIFY_GOOGLE to recording(
                     calls,
-                    "APIFY_NAVER",
+                    "APIFY_GOOGLE",
                     PlaceSupplement(null, listOf("https://cdn.example/naver.jpg")),
                 ),
                 PlaceThumbnailProviderType.FIXED to recording(
@@ -33,7 +33,7 @@ class RuntimePlaceThumbnailProviderTest {
 
         val result = provider.fetch(REQUEST)
 
-        assertEquals(listOf("GOOGLE", "APIFY_NAVER"), calls)
+        assertEquals(listOf("GOOGLE", "APIFY_GOOGLE"), calls)
         assertEquals(listOf("https://cdn.example/naver.jpg"), result?.photoUrls)
     }
 
@@ -75,10 +75,10 @@ class RuntimePlaceThumbnailProviderTest {
     fun `continues with next provider when a provider fails`() {
         val calls = mutableListOf<String>()
         val provider = provider(
-            value = "APIFY_NAVER,FIXED",
+            value = "APIFY_GOOGLE,FIXED",
             delegates = mapOf(
-                PlaceThumbnailProviderType.APIFY_NAVER to PlaceThumbnailProvider {
-                    calls += "APIFY_NAVER"
+                PlaceThumbnailProviderType.APIFY_GOOGLE to PlaceThumbnailProvider {
+                    calls += "APIFY_GOOGLE"
                     error("provider failed")
                 },
                 PlaceThumbnailProviderType.FIXED to recording(
@@ -91,7 +91,7 @@ class RuntimePlaceThumbnailProviderTest {
 
         val result = provider.fetch(REQUEST)
 
-        assertEquals(listOf("APIFY_NAVER", "FIXED"), calls)
+        assertEquals(listOf("APIFY_GOOGLE", "FIXED"), calls)
         assertEquals(listOf("https://cdn.example/fixed.jpg"), result?.photoUrls)
     }
 
