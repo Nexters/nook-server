@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.port.GroupPostManagementPort
+import org.every.nook.api.infrastructure.persistence.place.SharedPlaceBookmarkSyncJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -11,6 +12,7 @@ class GroupPostManagementAdapter(
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
     private val savedPostRepository: UserSavedPostJpaRepository,
+    private val bookmarkRepository: SharedPlaceBookmarkSyncJpaRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) : GroupPostManagementPort {
     @Transactional
@@ -32,6 +34,9 @@ class GroupPostManagementAdapter(
                 )
             },
         )
+        if (groupIds.isNotEmpty()) {
+            bookmarkRepository.insertAllForActiveSubscribers(savedPostId, groupIds)
+        }
         return GroupPostManagementPort.ReplaceResult.Updated
     }
 
