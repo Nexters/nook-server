@@ -22,7 +22,7 @@ import kotlin.test.assertNull
 
 class ApifyNaverPlaceThumbnailProviderTest {
     @Test
-    fun `stores up to three photos from matching Naver place`() {
+    fun `requests place details and stores up to six photos from matching Naver place`() {
         val fixture = fixture()
         fixture.server.expect(requestTo(containsString("/v2/acts/test-actor/run-sync-get-dataset-items")))
             .andExpect(method(HttpMethod.POST))
@@ -32,7 +32,7 @@ class ApifyNaverPlaceThumbnailProviderTest {
                     """
                     {
                       "keywords": ["누크 카페 서울 강남구 테헤란로 1"],
-                      "scrapePlaceDetails": false,
+                      "scrapePlaceDetails": true,
                       "maxResultsPerKeyword": 5
                     }
                     """.trimIndent(),
@@ -50,7 +50,10 @@ class ApifyNaverPlaceThumbnailProviderTest {
                         "https://naver.example/1.jpg",
                         {"url": "https://naver.example/2.jpg"},
                         "https://naver.example/3.jpg",
-                        "https://naver.example/4.jpg"
+                        "https://naver.example/4.jpg",
+                        "https://naver.example/5.jpg",
+                        "https://naver.example/6.jpg",
+                        "https://naver.example/7.jpg"
                       ]
                     }]
                     """.trimIndent(),
@@ -60,8 +63,8 @@ class ApifyNaverPlaceThumbnailProviderTest {
 
         val result = fixture.provider.fetch(REQUEST)
 
-        assertEquals(3, result?.photoUrls?.size)
-        assertEquals(listOf(0, 1, 2), fixture.storage.stored.map(PostMedia::sequence))
+        assertEquals(6, result?.photoUrls?.size)
+        assertEquals(listOf(0, 1, 2, 3, 4, 5), fixture.storage.stored.map(PostMedia::sequence))
         fixture.server.verify()
     }
 

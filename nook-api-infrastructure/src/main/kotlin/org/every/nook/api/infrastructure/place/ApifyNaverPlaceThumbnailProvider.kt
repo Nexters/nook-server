@@ -34,7 +34,7 @@ class ApifyNaverPlaceThumbnailProvider(
             .body(
                 mapOf(
                     "keywords" to listOf(request.place.searchQuery()),
-                    "scrapePlaceDetails" to false,
+                    "scrapePlaceDetails" to true,
                     "maxResultsPerKeyword" to properties.maxResults,
                 ),
             )
@@ -126,7 +126,7 @@ class ApifyNaverPlaceThumbnailProvider(
     private companion object {
         val logger = LoggerFactory.getLogger(ApifyNaverPlaceThumbnailProvider::class.java)
         const val AUTHORIZATION = "Authorization"
-        const val MAX_PHOTO_COUNT = 3
+        const val MAX_PHOTO_COUNT = 6
         const val MAX_MATCH_DISTANCE_METERS = 300.0
         const val EARTH_RADIUS_METERS = 6_371_000.0
 
