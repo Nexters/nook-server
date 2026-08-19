@@ -30,7 +30,7 @@ class StorePlaceThumbnailUseCaseTest {
             updatePort = FakeThumbnailUpdatePort(updates),
         )
 
-        useCase(11, place, sourceMediaSequence = 1)
+        useCase(11, listOf(PlaceThumbnailProvider.Request(place, sourcePostId = 11, sourceMediaSequence = 1)))
 
         assertEquals(11, requests.single().sourcePostId)
         assertEquals(1, requests.single().sourceMediaSequence)
@@ -56,7 +56,9 @@ class StorePlaceThumbnailUseCaseTest {
             },
         )
 
-        assertFailsWith<IllegalStateException> { useCase(11, place, sourceMediaSequence = 1) }
+        assertFailsWith<IllegalStateException> {
+            useCase(11, listOf(PlaceThumbnailProvider.Request(place, sourcePostId = 11, sourceMediaSequence = 1)))
+        }
 
         assertEquals(
             listOf(

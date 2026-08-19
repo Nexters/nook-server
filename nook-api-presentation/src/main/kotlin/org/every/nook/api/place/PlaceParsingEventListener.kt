@@ -5,7 +5,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
-import org.every.nook.api.application.place.PlaceThumbnailRequestedEvent
+import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
 import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
@@ -104,14 +104,13 @@ class PlaceParsingEventListener(
 
     @Async("placeSupplementTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    fun storeThumbnail(event: PlaceThumbnailRequestedEvent) {
+    fun storeThumbnail(event: PlaceThumbnailsRequestedEvent) {
         withProcessingLogContext(event.postId, THUMBNAIL_FLOW) {
             runCatching {
-                storePlaceThumbnail(event.postId, event.place, event.sourceMediaSequence)
+                storePlaceThumbnail(event.postId, event.requests)
             }.onFailure { exception ->
                 logger.warn(exception) {
-                    "Place thumbnail storage failed: postId=${event.postId}, provider=${event.place.provider}, " +
-                        "externalPlaceId=${event.place.externalPlaceId}"
+                    "Place thumbnail storage failed: postId=${event.postId}, placeCount=${event.requests.size}"
                 }
             }
         }

@@ -1,15 +1,20 @@
 package org.every.nook.api.infrastructure.config
 
 import mu.KotlinLogging
+import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.place.NoOpPlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
+import org.every.nook.api.infrastructure.place.ApifyNaverPlaceProperties
+import org.every.nook.api.infrastructure.place.ApifyNaverPlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.FixedPlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.GooglePlacePhotoProperties
 import org.every.nook.api.infrastructure.place.GooglePlacePhotoProvider
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProperties
+import org.every.nook.api.infrastructure.place.PlaceThumbnailProviderType
 import org.every.nook.api.infrastructure.place.PostMediaPlaceThumbnailProvider
+import org.every.nook.api.infrastructure.place.RuntimePlaceThumbnailProvider
 import org.every.nook.api.infrastructure.storage.MediaStorageProperties
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
@@ -18,12 +23,29 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 @Configuration
-@EnableConfigurationProperties(GooglePlacePhotoProperties::class, PlaceThumbnailProperties::class)
+@EnableConfigurationProperties(
+    GooglePlacePhotoProperties::class,
+    PlaceThumbnailProperties::class,
+    ApifyNaverPlaceProperties::class,
+)
 class PlaceThumbnailConfig {
     @Bean("googlePlacePhotoRestClient")
     fun googlePlacePhotoRestClient(properties: GooglePlacePhotoProperties): RestClient {
+        val requestFactory = SimpleClientHttpRequestFactory().apply {
+            setConnectTimeout(properties.connectTimeout)
+            setReadTimeout(properties.readTimeout)
+        }
+        return RestClient.builder()
+            .baseUrl(properties.baseUrl)
+            .requestFactory(requestFactory)
+            .build()
+    }
+
+    @Bean("apifyNaverPlaceRestClient")
+    fun apifyNaverPlaceRestClient(properties: ApifyNaverPlaceProperties): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
@@ -38,34 +60,47 @@ class PlaceThumbnailConfig {
     fun placeThumbnailProvider(
         @Qualifier("googlePlacePhotoRestClient")
         googlePlacePhotoRestClient: RestClient,
+        @Qualifier("apifyNaverPlaceRestClient")
+        apifyNaverPlaceRestClient: RestClient,
         googleProperties: GooglePlacePhotoProperties,
+        apifyProperties: ApifyNaverPlaceProperties,
         thumbnailProperties: PlaceThumbnailProperties,
+        configurationReader: RuntimeConfigurationReader,
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
         mediaRepository: ObjectProvider<PostMediaJpaRepository>,
         mediaStorageProperties: ObjectProvider<MediaStorageProperties>,
-    ): PlaceThumbnailProvider = when (thumbnailProperties.provider) {
-        PlaceThumbnailProperties.Provider.POST_MEDIA -> postMediaProvider(
-            thumbnailProperties = thumbnailProperties,
-            mediaStorage = mediaStorage,
-            mediaRepository = mediaRepository,
-            mediaStorageProperties = mediaStorageProperties,
+    ): PlaceThumbnailProvider {
+        val providers = mapOf(
+            PlaceThumbnailProviderType.POST_MEDIA to postMediaProvider(
+                thumbnailProperties = thumbnailProperties,
+                mediaStorage = mediaStorage,
+                mediaRepository = mediaRepository,
+                mediaStorageProperties = mediaStorageProperties,
+            ),
+            PlaceThumbnailProviderType.APIFY_NAVER to apifyProvider(
+                apifyNaverPlaceRestClient,
+                apifyProperties,
+                mediaStorage,
+            ),
+            PlaceThumbnailProviderType.GOOGLE to googleProvider(
+                googlePlacePhotoRestClient,
+                googleProperties,
+                mediaStorage,
+            ),
+            PlaceThumbnailProviderType.FIXED to FixedPlaceThumbnailProvider(thumbnailProperties.fixedUrl),
         )
-
-        PlaceThumbnailProperties.Provider.FIXED -> {
-            logger.info { "Place thumbnail provider selected: provider=fixed" }
-            FixedPlaceThumbnailProvider(thumbnailProperties.fixedUrl)
-        }
-
-        PlaceThumbnailProperties.Provider.GOOGLE -> googleProvider(
-            googlePlacePhotoRestClient,
-            googleProperties,
-            mediaStorage,
+        return RuntimePlaceThumbnailProvider(
+            providers = providers,
+            configurationReader = configurationReader,
+            legacyChain = thumbnailProperties.provider.toChain(),
         )
+    }
 
-        PlaceThumbnailProperties.Provider.DISABLED -> {
-            logger.info { "Place thumbnail provider disabled: reason=provider_disabled" }
-            NoOpPlaceThumbnailProvider
-        }
+    private fun PlaceThumbnailProperties.Provider.toChain(): List<PlaceThumbnailProviderType> = when (this) {
+        PlaceThumbnailProperties.Provider.POST_MEDIA -> listOf(PlaceThumbnailProviderType.POST_MEDIA)
+        PlaceThumbnailProperties.Provider.FIXED -> listOf(PlaceThumbnailProviderType.FIXED)
+        PlaceThumbnailProperties.Provider.GOOGLE -> listOf(PlaceThumbnailProviderType.GOOGLE)
+        PlaceThumbnailProperties.Provider.DISABLED -> emptyList()
     }
 
     private fun postMediaProvider(
@@ -94,10 +129,6 @@ class PlaceThumbnailConfig {
         properties: GooglePlacePhotoProperties,
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
     ): PlaceThumbnailProvider {
-        if (!properties.enabled) {
-            logger.warn { "Place thumbnail provider disabled: reason=google_place_photo_disabled" }
-            return NoOpPlaceThumbnailProvider
-        }
         val storage = mediaStorage.ifAvailable ?: run {
             logger.warn { "Place thumbnail provider disabled: reason=missing_media_storage" }
             return NoOpPlaceThumbnailProvider
@@ -107,6 +138,23 @@ class PlaceThumbnailConfig {
                 "maxWidthPx=${properties.maxWidthPx}"
         }
         return GooglePlacePhotoProvider(restClient, properties, storage)
+    }
+
+    private fun apifyProvider(
+        restClient: RestClient,
+        properties: ApifyNaverPlaceProperties,
+        mediaStorage: ObjectProvider<PostMediaStoragePort>,
+    ): PlaceThumbnailProvider {
+        val storage = mediaStorage.ifAvailable ?: run {
+            logger.warn { "Apify Naver place provider disabled: reason=missing_media_storage" }
+            return NoOpPlaceThumbnailProvider
+        }
+        return ApifyNaverPlaceThumbnailProvider(
+            restClient = restClient,
+            objectMapper = jacksonObjectMapper(),
+            properties = properties,
+            mediaStorage = storage,
+        )
     }
 
     private companion object {
