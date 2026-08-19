@@ -13,6 +13,7 @@ import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.measure
 import org.every.nook.api.application.processing.warn
 import org.every.nook.api.domain.post.Post
+import org.every.nook.api.domain.post.PostMedia
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Duration
@@ -24,6 +25,7 @@ class ProcessPostContentParsingJobUseCase(
     private val contentInference: PostContentInference,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
+    private val coverTitleExtractor: CoverTitleExtractor = CoverTitleExtractor { null },
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -41,6 +43,17 @@ class ProcessPostContentParsingJobUseCase(
                 sourceLocationTag = extracted.toSourceLocationTag(),
                 hashtags = extracted.hashtags.toPersistentHashtags(),
             )
+            val coverTitle = providedPost.coverImageUrl()?.let { imageUrl ->
+                measure(job, COVER_TITLE_STAGE) {
+                    runCatching {
+                        coverTitleExtractor.extract(CoverTitleExtractor.Request(imageUrl))
+                    }.onFailure { exception ->
+                        logger.warn(exception) {
+                            "Cover title extraction failed; falling back to text title: postId=${job.postId}"
+                        }
+                    }.getOrNull()
+                }
+            }
             val inference = measure(job, INFERENCE_STAGE) {
                 contentInference.infer(
                     PostContentInference.Request(
@@ -51,7 +64,7 @@ class ProcessPostContentParsingJobUseCase(
                 )
             }
             val completedPost = providedPost.copy(
-                title = groundedPostTitle(providedPost.body, inference.title),
+                title = coverTitle ?: groundedPostTitle(providedPost.body, inference.title),
             )
             measure(job, COMPLETE_STAGE) {
                 jobPort.complete(job.postId, completedPost, inference.placeClues)
@@ -140,6 +153,12 @@ class ProcessPostContentParsingJobUseCase(
         .map(String::trim)
         .firstOrNull { it.isNotEmpty() && it.length <= Post.MAX_SOURCE_LOCATION_TAG_LENGTH }
 
+    private fun Post.coverImageUrl(): String? = media
+        .asSequence()
+        .filter { it.type == PostMedia.MediaType.IMAGE }
+        .minByOrNull(PostMedia::sequence)
+        ?.url
+
     private fun List<String>.toPersistentHashtags(): List<String> = asSequence()
         .map(String::trim)
         .map { it.removePrefix("#").trim() }
@@ -177,6 +196,7 @@ class ProcessPostContentParsingJobUseCase(
         const val DEFAULT_FAILURE_REASON = "Post content parsing failed"
         const val CONTENT_FLOW = "post-content"
         const val EXTRACT_STAGE = "extract"
+        const val COVER_TITLE_STAGE = "cover-title"
         const val INFERENCE_STAGE = "inference"
         const val COMPLETE_STAGE = "complete"
         const val JOB_STAGE = "job"

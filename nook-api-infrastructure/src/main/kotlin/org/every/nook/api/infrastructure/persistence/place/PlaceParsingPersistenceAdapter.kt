@@ -111,11 +111,12 @@ class PlaceParsingPersistenceAdapter(
             ) ?: placeRepository.save(candidate.toEntity())
             candidate.copy(googlePlaceId = place.googlePlaceId) to place
         }
-        val postPlaces = resolvedPlaces.mapIndexed { sequence, (_, place) ->
+        val postPlaces = resolvedPlaces.mapIndexed { sequence, (candidate, place) ->
             PostPlaceEntity(
                 postId = postId,
                 placeId = requireNotNull(place.id),
                 sequence = sequence,
+                sourceMediaSequence = candidate.sourceMediaSequence,
             )
         }
         postPlaceRepository.saveAll(postPlaces)
@@ -133,7 +134,14 @@ class PlaceParsingPersistenceAdapter(
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
         resolvedPlaces.map { it.first }.zip(postPlaces).forEach { (place, postPlace) ->
-            eventPublisher.publishEvent(PlaceThumbnailRequestedEvent(postId, place, clock.instant()))
+            eventPublisher.publishEvent(
+                PlaceThumbnailRequestedEvent(
+                    postId = postId,
+                    place = place,
+                    sourceMediaSequence = postPlace.sourceMediaSequence ?: postPlace.sequence,
+                    availableAt = clock.instant(),
+                ),
+            )
             eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, postPlace.placeId, place))
         }
     }

@@ -4,10 +4,13 @@ import mu.KotlinLogging
 import org.every.nook.api.application.place.NoOpPlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.place.FixedPlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.GooglePlacePhotoProperties
 import org.every.nook.api.infrastructure.place.GooglePlacePhotoProvider
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProperties
+import org.every.nook.api.infrastructure.place.PostMediaPlaceThumbnailProvider
+import org.every.nook.api.infrastructure.storage.MediaStorageProperties
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -38,7 +41,16 @@ class PlaceThumbnailConfig {
         googleProperties: GooglePlacePhotoProperties,
         thumbnailProperties: PlaceThumbnailProperties,
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
+        mediaRepository: ObjectProvider<PostMediaJpaRepository>,
+        mediaStorageProperties: ObjectProvider<MediaStorageProperties>,
     ): PlaceThumbnailProvider = when (thumbnailProperties.provider) {
+        PlaceThumbnailProperties.Provider.POST_MEDIA -> postMediaProvider(
+            thumbnailProperties = thumbnailProperties,
+            mediaStorage = mediaStorage,
+            mediaRepository = mediaRepository,
+            mediaStorageProperties = mediaStorageProperties,
+        )
+
         PlaceThumbnailProperties.Provider.FIXED -> {
             logger.info { "Place thumbnail provider selected: provider=fixed" }
             FixedPlaceThumbnailProvider(thumbnailProperties.fixedUrl)
@@ -54,6 +66,27 @@ class PlaceThumbnailConfig {
             logger.info { "Place thumbnail provider disabled: reason=provider_disabled" }
             NoOpPlaceThumbnailProvider
         }
+    }
+
+    private fun postMediaProvider(
+        thumbnailProperties: PlaceThumbnailProperties,
+        mediaStorage: ObjectProvider<PostMediaStoragePort>,
+        mediaRepository: ObjectProvider<PostMediaJpaRepository>,
+        mediaStorageProperties: ObjectProvider<MediaStorageProperties>,
+    ): PlaceThumbnailProvider {
+        val storage = mediaStorage.ifAvailable
+        val repository = mediaRepository.ifAvailable
+        if (storage == null || repository == null) {
+            logger.warn { "Post media place thumbnail provider disabled: reason=missing_dependency" }
+            return NoOpPlaceThumbnailProvider
+        }
+        logger.info { "Place thumbnail provider selected: provider=post_media" }
+        return PostMediaPlaceThumbnailProvider(
+            mediaRepository = repository,
+            mediaStorage = storage,
+            storedMediaBaseUrl = mediaStorageProperties.ifAvailable?.cloudFrontBaseUrl,
+            obsoleteFixedThumbnailUrl = thumbnailProperties.fixedUrl,
+        )
     }
 
     private fun googleProvider(

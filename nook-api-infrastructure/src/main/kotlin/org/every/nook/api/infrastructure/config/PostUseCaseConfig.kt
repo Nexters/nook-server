@@ -4,6 +4,7 @@ import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.group.port.GroupOwnershipPort
+import org.every.nook.api.application.post.CoverTitleExtractor
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.DeleteSavedPostUseCase
 import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobsUseCase
@@ -58,12 +59,14 @@ class PostUseCaseConfig {
         jobPort: PostContentParsingJobPort,
         extractPostContentUseCase: ExtractPostContentUseCase,
         postContentInference: PostContentInference,
+        coverTitleExtractor: CoverTitleExtractor,
         processingMetrics: ObjectProvider<ProcessingMetrics>,
         properties: PostContentParsingProperties,
     ): ProcessPostContentParsingJobUseCase = ProcessPostContentParsingJobUseCase(
         jobPort = jobPort,
         extractPostContent = extractPostContentUseCase,
         contentInference = postContentInference,
+        coverTitleExtractor = coverTitleExtractor,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
         metrics = processingMetrics.ifAvailable ?: NoOpProcessingMetrics,

@@ -52,15 +52,20 @@ class ProcessPostContentParsingJobUseCaseTest {
                     placeClues = listOf(PlaceClue("성수 식당", "성수", listOf("성수 식당"))),
                 )
             },
+            coverTitleExtractor = CoverTitleExtractor { request ->
+                calls += "cover-title"
+                assertEquals("https://source/image.jpg", request.imageUrl)
+                "6월 2주차 요즘 뜨고 있는 금주의 신상스폿"
+            },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),
             clock = CLOCK,
         )
 
         assertIs<ProcessPostContentParsingJobUseCase.Result.Completed>(useCase(101))
-        assertEquals(listOf("claim", "extract", "inference", "complete"), calls)
+        assertEquals(listOf("claim", "extract", "cover-title", "inference", "complete"), calls)
         val completed = requireNotNull(port.completedPost)
-        assertEquals("성수 맛집", completed.title)
+        assertEquals("6월 2주차 요즘 뜨고 있는 금주의 신상스폿", completed.title)
         assertEquals("성수", completed.sourceLocationTag)
         assertEquals(listOf("맛집", "서울"), completed.hashtags)
         assertEquals("https://source/image.jpg", completed.media.single().url)

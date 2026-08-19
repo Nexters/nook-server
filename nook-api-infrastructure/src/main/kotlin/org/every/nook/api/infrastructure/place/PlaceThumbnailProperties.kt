@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties("external.place-thumbnail")
 data class PlaceThumbnailProperties(
-    val provider: Provider = Provider.FIXED,
+    val provider: Provider = Provider.POST_MEDIA,
     val fixedUrl: String = DEFAULT_FIXED_URL,
 ) {
     init {
@@ -14,6 +14,7 @@ data class PlaceThumbnailProperties(
     }
 
     enum class Provider {
+        POST_MEDIA,
         FIXED,
         GOOGLE,
         DISABLED,

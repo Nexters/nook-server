@@ -1,9 +1,11 @@
 package org.every.nook.api.application.place
 
 fun interface PlaceThumbnailProvider {
-    fun fetch(place: PlaceCandidate): PlaceSupplement?
+    fun fetch(request: Request): PlaceSupplement?
+
+    data class Request(val place: PlaceCandidate, val sourcePostId: Long? = null, val sourceMediaSequence: Int? = null)
 }
 
 object NoOpPlaceThumbnailProvider : PlaceThumbnailProvider {
-    override fun fetch(place: PlaceCandidate): PlaceSupplement? = null
+    override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = null
 }

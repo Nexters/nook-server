@@ -26,6 +26,8 @@ class PostPlaceEntity(
     val placeId: Long,
     @Column(name = "display_order", nullable = false)
     val sequence: Int,
+    @Column(name = "source_media_sequence", nullable = true)
+    val sourceMediaSequence: Int? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

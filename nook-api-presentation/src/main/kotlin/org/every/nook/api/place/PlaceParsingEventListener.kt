@@ -107,7 +107,7 @@ class PlaceParsingEventListener(
     fun storeThumbnail(event: PlaceThumbnailRequestedEvent) {
         withProcessingLogContext(event.postId, THUMBNAIL_FLOW) {
             runCatching {
-                storePlaceThumbnail(event.postId, event.place)
+                storePlaceThumbnail(event.postId, event.place, event.sourceMediaSequence)
             }.onFailure { exception ->
                 logger.warn(exception) {
                     "Place thumbnail storage failed: postId=${event.postId}, provider=${event.place.provider}, " +

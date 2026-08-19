@@ -28,7 +28,10 @@ class GooglePlacePhotoProvider(
     private val properties: GooglePlacePhotoProperties,
     private val mediaStorage: PostMediaStoragePort,
 ) : PlaceThumbnailProvider {
-    override fun fetch(place: PlaceCandidate): PlaceSupplement? {
+    fun fetch(place: PlaceCandidate): PlaceSupplement? = fetch(PlaceThumbnailProvider.Request(place))
+
+    override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? {
+        val place = request.place
         val shouldSkip = !properties.enabled ||
             properties.apiKey.isBlank()
         return if (shouldSkip) {
