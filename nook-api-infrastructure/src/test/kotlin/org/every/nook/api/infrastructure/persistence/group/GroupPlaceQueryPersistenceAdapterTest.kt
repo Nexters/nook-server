@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.group
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.infrastructure.persistence.member.MemberEntity
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.GroupPlaceProjection
@@ -41,6 +42,7 @@ class GroupPlaceQueryPersistenceAdapterTest {
         `when`(place.latitude).thenReturn(BigDecimal("37.5"))
         `when`(place.longitude).thenReturn(BigDecimal("127.0"))
         `when`(place.thumbnailUrl).thenReturn("https://example.com/place.jpg")
+        `when`(place.thumbnailParsingStatus).thenReturn("PROCESSING")
         `when`(place.representativeTags).thenReturn("""["QUIET","COZY"]""")
         `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
         `when`(memberRepository.findById(9)).thenReturn(Optional.of(owner))
@@ -53,6 +55,7 @@ class GroupPlaceQueryPersistenceAdapterTest {
         assertEquals(31, result.items.single().id)
         assertEquals("서울", result.items.single().city)
         assertEquals(listOf("조용한", "아늑한"), result.items.single().tags)
+        assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.items.single().thumbnailParsingStatus)
         assertEquals(1, result.totalElements)
         verify(savedPostRepository).findDistinctPlacesByUserIdAndGroupId(7, 17, requestedPage)
     }

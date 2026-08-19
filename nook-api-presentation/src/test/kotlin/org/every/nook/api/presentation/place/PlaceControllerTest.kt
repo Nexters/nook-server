@@ -169,6 +169,7 @@ class PlaceControllerTest {
                     longitude = BigDecimal("127.0"),
                     color = "BLUE",
                     thumbnailUrl = "https://example.com/map-place.jpg",
+                    thumbnailParsingStatus = PlaceThumbnailParsingStatusView.COMPLETED,
                 ),
             ),
         )
@@ -186,6 +187,7 @@ class PlaceControllerTest {
             jsonPath("$.success[0].longitude") { value(127.0) }
             jsonPath("$.success[0].color") { value("BLUE") }
             jsonPath("$.success[0].thumbnailUrl") { value("https://example.com/map-place.jpg") }
+            jsonPath("$.success[0].thumbnailParsingStatus") { value("COMPLETED") }
         }
 
         verify(getMapPlacesUseCase)(query)
@@ -216,6 +218,7 @@ class PlaceControllerTest {
                         latitude = BigDecimal("37.5"),
                         longitude = BigDecimal("127.0"),
                         thumbnailUrl = "https://example.com/place.jpg",
+                        thumbnailParsingStatus = PlaceThumbnailParsingStatusView.PROCESSING,
                     ),
                 ),
                 nextCursor = RecentPlaceCursor(bookmarkedAt, 31),
@@ -230,6 +233,7 @@ class PlaceControllerTest {
                 jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
                 jsonPath("$.success.items[0].city") { value("용인") }
                 jsonPath("$.success.items[0].thumbnailUrl") { value("https://example.com/place.jpg") }
+                jsonPath("$.success.items[0].thumbnailParsingStatus") { value("PROCESSING") }
                 jsonPath("$.success.nextCursor") { isNotEmpty() }
                 jsonPath("$.success.hasNext") { value(true) }
             }

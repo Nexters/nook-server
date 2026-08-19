@@ -1,5 +1,6 @@
 package org.every.nook.api.application.group
 
+import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import java.math.BigDecimal
 
 data class GroupPlacePage(
@@ -21,5 +22,6 @@ data class GroupPlaceSummary(
     val latitude: BigDecimal,
     val longitude: BigDecimal,
     val thumbnailUrl: String?,
+    val thumbnailParsingStatus: PlaceThumbnailParsingStatusView = PlaceThumbnailParsingStatusView.PENDING,
     val tags: List<String> = emptyList(),
 )
