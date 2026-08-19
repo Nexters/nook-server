@@ -2,7 +2,7 @@ package org.every.nook.api.infrastructure.place
 
 enum class PlaceThumbnailProviderType {
     POST_MEDIA,
-    APIFY_NAVER,
+    APIFY_GOOGLE,
     GOOGLE,
     FIXED,
     DISABLED,
