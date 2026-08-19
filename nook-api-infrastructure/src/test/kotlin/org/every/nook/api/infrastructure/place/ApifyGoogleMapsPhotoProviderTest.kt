@@ -33,8 +33,22 @@ class ApifyGoogleMapsPhotoProviderTest {
         val results = fixture.provider.fetchAll(listOf(request("google-1"), request(null, "다른 카페")))
 
         assertEquals(6, results[0]?.photoUrls?.size)
+        assertEquals("google-1", results[0]?.googlePlaceId)
         assertEquals(1, results[1]?.photoUrls?.size)
         assertEquals(7, fixture.storage.stored.size)
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `matches a differently named place by nearby coordinates and keeps Google place id`() {
+        val fixture = fixture()
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(NOVEMBER_RESPONSE, MediaType.APPLICATION_JSON))
+
+        val result = fixture.provider.fetch(novemberRequest())
+
+        assertEquals(6, result?.photoUrls?.size)
+        assertEquals("google-november", result?.googlePlaceId)
         fixture.server.verify()
     }
 
@@ -43,6 +57,16 @@ class ApifyGoogleMapsPhotoProviderTest {
         val fixture = fixture()
         fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
             .andRespond(withSuccess(UNRELATED_RESPONSE, MediaType.APPLICATION_JSON))
+
+        assertNull(fixture.provider.fetch(request(null)))
+        assertEquals(emptyList(), fixture.storage.stored)
+    }
+
+    @Test
+    fun `does not treat an empty Actor address as an address match`() {
+        val fixture = fixture()
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(EMPTY_ADDRESS_FAR_RESPONSE, MediaType.APPLICATION_JSON))
 
         assertNull(fixture.provider.fetch(request(null)))
         assertEquals(emptyList(), fixture.storage.stored)
@@ -94,6 +118,20 @@ class ApifyGoogleMapsPhotoProviderTest {
         ),
     )
 
+    private fun novemberRequest() = PlaceThumbnailProvider.Request(
+        place = PlaceCandidate(
+            provider = "KAKAO",
+            externalPlaceId = "1362430493",
+            name = "더노벰버라운지 강남역KG타워점",
+            address = "서울 강남구 테헤란로5길 7",
+            latitude = BigDecimal("37.4992654"),
+            longitude = BigDecimal("127.0292786"),
+            category = null,
+            phoneNumber = null,
+            providerUrl = null,
+        ),
+    )
+
     private class FakeStorage : PostMediaStoragePort {
         val stored = mutableListOf<PostMedia>()
 
@@ -127,6 +165,18 @@ class ApifyGoogleMapsPhotoProviderTest {
         val UNRELATED_RESPONSE = """
             [{"placeId":"wrong","title":"부산 식당","address":"부산 해운대구 해운대로 1",
             "location":{"lat":35.1587,"lng":129.1604},"imageUrls":["https://google.example/wrong.jpg"]}]
+        """.trimIndent()
+        val EMPTY_ADDRESS_FAR_RESPONSE = """
+            [{"placeId":"wrong","title":"누크 카페","address":"",
+            "location":{"lat":35.1587,"lng":129.1604},"imageUrls":["https://google.example/wrong.jpg"]}]
+        """.trimIndent()
+        val NOVEMBER_RESPONSE = """
+            [{"placeId":"google-november","title":"The november 라운지 강남역 KG타워점",
+            "address":"대한민국 서울특별시 강남구 테헤란로5길 7",
+            "location":{"lat":37.4992654,"lng":127.0292786},
+            "imageUrls":["https://google.example/1.jpg","https://google.example/2.jpg",
+            "https://google.example/3.jpg","https://google.example/4.jpg",
+            "https://google.example/5.jpg","https://google.example/6.jpg"]}]
         """.trimIndent()
     }
 }

@@ -15,7 +15,6 @@ import org.every.nook.api.application.post.model.SavedPostPlace
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
-import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
@@ -233,12 +232,12 @@ class SavedPostQueryPersistenceAdapter(
                 longitude = place.longitude,
                 category = place.category,
                 phoneNumber = place.phoneNumber,
-                thumbnailUrl = postPlace.thumbnailUrl ?: place.thumbnailUrl,
+                thumbnailUrl = place.thumbnailUrl,
                 tags = place.representativeTags.map { it.displayName },
                 bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                 memo = memoByPlaceId[postPlace.placeId],
                 thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
-                    postPlace.thumbnailUrl.effectiveThumbnailParsingStatus(place),
+                    place.effectiveThumbnailParsingStatus(),
                 ),
                 sequence = postPlace.sequence,
             )
@@ -349,6 +348,3 @@ private fun PlaceParsingJobEntity.processingStartedAt() =
 
 private fun PlaceParsingStatus?.effectiveFor(hasPlaces: Boolean): PlaceParsingStatus? =
     if (hasPlaces) PlaceParsingStatus.COMPLETED else this
-
-private fun String?.effectiveThumbnailParsingStatus(place: PlaceEntity) =
-    if (isNullOrBlank()) place.effectiveThumbnailParsingStatus() else PlaceThumbnailParsingStatus.COMPLETED
