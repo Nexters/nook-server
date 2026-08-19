@@ -199,9 +199,13 @@ class PlaceParsingPersistenceAdapterTest {
     fun `completed places are bookmarked on by default for every user who saved the post`() {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         val place = mock(PlaceEntity::class.java)
+        val storedPostPlaces = mutableListOf<PostPlaceEntity>()
         `when`(place.id).thenReturn(17)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(placeRepository.findByProviderAndExternalPlaceId("KAKAO", "123")).thenReturn(place)
+        `when`(postPlaceRepository.saveAll(anyList<PostPlaceEntity>())).thenAnswer { invocation ->
+            invocation.getArgument<List<PostPlaceEntity>>(0).also(storedPostPlaces::addAll)
+        }
         val savedPosts = listOf(
             savedPostWithMemo(userId = 7, memo = "내 메모"),
             savedPostWithMemo(userId = 8, memo = null),
@@ -225,10 +229,13 @@ class PlaceParsingPersistenceAdapterTest {
                     category = null,
                     phoneNumber = null,
                     providerUrl = null,
+                    sourceMediaSequence = 4,
                 ),
             ),
         )
 
+        assertEquals(0, storedPostPlaces.single().sequence)
+        assertEquals(4, storedPostPlaces.single().sourceMediaSequence)
         verify(userSavedPostPlaceRepository).insertAllFromPost(21, 11)
         verify(userSavedPostPlaceRepository).insertAllFromPost(22, 11)
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "내 메모")

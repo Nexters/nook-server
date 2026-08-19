@@ -7,6 +7,7 @@ data class PlaceSupplement(
     val openingHours: PlaceOpeningHours?,
     val photoUrls: List<String>,
     val googlePlaceId: String? = null,
+    val replaceThumbnailUrl: String? = null,
 ) {
     init {
         require(photoUrls.size <= MAX_PHOTO_COUNT) { "Place photos must not exceed $MAX_PHOTO_COUNT" }

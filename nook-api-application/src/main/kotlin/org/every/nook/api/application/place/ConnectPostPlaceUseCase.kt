@@ -22,7 +22,7 @@ class ConnectPostPlaceUseCase(
     }
 
     private fun fetchSupplement(command: Command, candidate: PlaceCandidate): PlaceSupplement? = runCatching {
-        thumbnailProvider.fetch(candidate)
+        thumbnailProvider.fetch(PlaceThumbnailProvider.Request(candidate))
     }.onFailure { exception ->
         logger.warn(exception) {
             "Manual place thumbnail skipped: userId=${command.userId}, postId=${command.postId}, " +

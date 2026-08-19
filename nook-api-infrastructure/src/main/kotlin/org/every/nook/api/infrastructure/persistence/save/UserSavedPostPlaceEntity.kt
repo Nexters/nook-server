@@ -32,10 +32,16 @@ class UserSavedPostPlaceEntity(
     val placeId: Long,
     @Column(name = "display_order", nullable = false)
     val sequence: Int,
+    @Column(name = "thumbnail_url", nullable = true, length = THUMBNAIL_URL_MAX_LENGTH)
+    val thumbnailUrl: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     var id: Long? = null
         protected set
+
+    private companion object {
+        const val THUMBNAIL_URL_MAX_LENGTH = 2048
+    }
 }

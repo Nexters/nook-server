@@ -87,7 +87,7 @@ parsing:
 
 external:
   place-thumbnail:
-    provider: ${PLACE_THUMBNAIL_PROVIDER:fixed}
+    provider: ${PLACE_THUMBNAIL_PROVIDER:post_media}
     fixed-url: ${PLACE_THUMBNAIL_FIXED_URL:https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/3d/3dd7bb6919492e58a76fe9012b82c0a44e4bfdf7bf0784cddd90dc9bbbee17f9.jpg}
   openai:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com}

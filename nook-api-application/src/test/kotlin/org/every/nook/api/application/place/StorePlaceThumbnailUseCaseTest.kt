@@ -10,6 +10,7 @@ class StorePlaceThumbnailUseCaseTest {
     @Test
     fun `fetches and updates a thumbnail after place parsing`() {
         val updates = mutableListOf<String>()
+        val requests = mutableListOf<PlaceThumbnailProvider.Request>()
         val place = PlaceCandidate(
             provider = "KAKAO",
             externalPlaceId = "123",
@@ -22,14 +23,17 @@ class StorePlaceThumbnailUseCaseTest {
             providerUrl = null,
         )
         val useCase = StorePlaceThumbnailUseCase(
-            thumbnailProvider = PlaceThumbnailProvider {
+            thumbnailProvider = PlaceThumbnailProvider { request ->
+                requests += request
                 PlaceSupplement(null, listOf("https://cdn.example.com/place.jpg"))
             },
             updatePort = FakeThumbnailUpdatePort(updates),
         )
 
-        useCase(11, place)
+        useCase(11, place, sourceMediaSequence = 1)
 
+        assertEquals(11, requests.single().sourcePostId)
+        assertEquals(1, requests.single().sourceMediaSequence)
         assertEquals(listOf("KAKAO:123:https://cdn.example.com/place.jpg"), updates)
     }
 
@@ -52,7 +56,7 @@ class StorePlaceThumbnailUseCaseTest {
             },
         )
 
-        assertFailsWith<IllegalStateException> { useCase(11, place) }
+        assertFailsWith<IllegalStateException> { useCase(11, place, sourceMediaSequence = 1) }
 
         assertEquals(
             listOf(

@@ -8,6 +8,7 @@ import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceClueEvidence
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceTagExtractor
+import org.every.nook.api.application.post.CoverTitleExtractor
 import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.domain.place.PlaceTag
 import org.hamcrest.Matchers.containsString
@@ -69,6 +70,8 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(header("Authorization", "Bearer test-key"))
             .andExpect(content().string(containsString("post_content_inference")))
             .andExpect(content().string(containsString("홍보성")))
+            .andExpect(content().string(containsString("방문해보기 좋은 곳")))
+            .andExpect(content().string(not(containsString("홍별감네"))))
             .andExpect(content().string(containsString("\"maxLength\":25")))
             .andExpect(content().string(containsString("\"maxItems\":60")))
             .andRespond(
@@ -96,6 +99,35 @@ class OpenAiContentInferenceAdapterTest {
 
         assertEquals("용산 미나리 삼겹살", inference.title)
         assertEquals(listOf("원동미나리삼겹살"), inference.placeClues.map(PlaceClue::name))
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `extracts an exact title and date label from a cover image`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("\"type\":\"input_image\"")))
+            .andExpect(content().string(containsString(TEST_IMAGE_URLS.first())))
+            .andExpect(content().string(containsString("\"detail\":\"high\"")))
+            .andExpect(content().string(containsString("post_cover_title")))
+            .andExpect(content().string(containsString("titleLabel")))
+            .andExpect(content().string(containsString("계정명·로고")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {"titleLabel":"6월 2주차","title":"요즘 뜨고 있는 금주의 신상스폿"}
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val title = fixture.coverTitleExtractor.extract(
+            CoverTitleExtractor.Request(TEST_IMAGE_URLS.first()),
+        )
+
+        assertEquals("6월 2주차 요즘 뜨고 있는 금주의 신상스폿", title)
         fixture.server.verify()
     }
 
@@ -371,6 +403,7 @@ class OpenAiContentInferenceAdapterTest {
                 objectMapper = objectMapper,
                 properties = properties,
             ),
+            coverTitleExtractor = OpenAiCoverTitleExtractor(restClient, objectMapper, properties),
             imageTextExtractor = OpenAiImageTextExtractor(restClient, objectMapper, properties),
             server = server,
         )
@@ -390,6 +423,7 @@ class OpenAiContentInferenceAdapterTest {
 
     private data class AdapterFixture(
         val adapter: OpenAiContentInferenceAdapter,
+        val coverTitleExtractor: OpenAiCoverTitleExtractor,
         val imageTextExtractor: OpenAiImageTextExtractor,
         val server: MockRestServiceServer,
     )

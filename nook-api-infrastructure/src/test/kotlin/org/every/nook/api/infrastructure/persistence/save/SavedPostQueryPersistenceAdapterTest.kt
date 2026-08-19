@@ -88,7 +88,7 @@ class SavedPostQueryPersistenceAdapterTest {
         )
         val firstMedia = PostMediaEntity(101, PostMedia.MediaType.IMAGE, "https://example.com/1.jpg", 0)
         val secondMedia = PostMediaEntity(101, PostMedia.MediaType.VIDEO, "https://example.com/2.mp4", 1)
-        val firstPlace = UserSavedPostPlaceEntity(11, 201, 0)
+        val firstPlace = UserSavedPostPlaceEntity(11, 201, 0, "https://cdn.example.com/current-post-place.jpg")
         val secondPlace = UserSavedPostPlaceEntity(11, 202, 1)
         val placeOne = place(
             id = 201,
@@ -128,6 +128,7 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals(listOf("첫 장소", "둘째 장소"), detail.places.map { it.name })
         assertEquals(listOf(false, true), detail.places.map { it.bookmarked })
         assertEquals(listOf(null, "둘째 장소 메모"), detail.places.map { it.memo })
+        assertEquals("https://cdn.example.com/current-post-place.jpg", detail.places.first().thumbnailUrl)
         assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, detail.places.first().thumbnailParsingStatus)
         assertEquals(PlaceParsingStatusView.COMPLETED, detail.placeParsingStatus)
         assertEquals("내 메모", detail.memo)
