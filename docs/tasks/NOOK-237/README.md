@@ -10,7 +10,7 @@ Cloudflare Access에서 허용된 Gmail 계정이 Grafana 로컬 로그인 화�
 - Cloudflare Access에 Grafana OIDC SaaS 애플리케이션을 구성합니다.
 - 기존 `Nook Ops Allow List`와 같은 정책으로 OIDC 로그인을 제한합니다.
 - Grafana Generic OAuth와 자동 로그인을 활성화합니다.
-- 신규 SSO 사용자의 기본 조직 역할은 `Viewer`로 제한합니다.
+- allowlist에 포함된 SSO 사용자의 조직 역할을 `Editor`로 동기화합니다.
 - OAuth client secret은 ops VM의 `/opt/nook/monitoring/.env`에만 저장합니다.
 - 기존 Grafana 로컬 관리자 계정은 장애 복구용으로 유지합니다.
 
@@ -25,7 +25,7 @@ Cloudflare Access에서 허용된 Gmail 계정이 Grafana 로컬 로그인 화�
 
 - 허용된 Gmail 사용자는 Grafana 비밀번호 입력 없이 사용자별 계정으로 진입합니다.
 - 허용되지 않은 사용자는 Cloudflare Access에서 차단됩니다.
-- 신규 SSO 사용자는 기본 `Viewer` 권한을 받습니다.
+- allowlist에 포함된 SSO 사용자는 로그인 시 `Editor` 권한을 받습니다.
 - 기존 로컬 관리자 복구 경로가 유지됩니다.
 - Grafana health와 기존 datasource 및 dashboard provisioning이 정상입니다.
 - Grafana origin의 `127.0.0.1:3000` 바인딩이 유지됩니다.
@@ -35,7 +35,8 @@ Cloudflare Access에서 허용된 Gmail 계정이 Grafana 로컬 로그인 화�
 Grafana는 Cloudflare Access를 Generic OAuth provider로 사용합니다. 브라우저가 Grafana의
 `/login/generic_oauth`로 이동하면 Cloudflare Access가 기존 인증 세션과 allowlist 정책을
 확인하고 OIDC authorization code를 발급합니다. Grafana는 `email` claim으로 사용자 계정을
-생성하며 로그인 화면을 표시하지 않습니다.
+생성하며 로그인 화면을 표시하지 않습니다. Generic OAuth role mapping은 모든 허용 사용자를
+`Editor`로 평가하고 로그인할 때 기존 사용자 역할도 동기화합니다.
 
 Cloudflare에서 발급한 client ID와 client secret은 다음 환경변수로 주입합니다.
 
