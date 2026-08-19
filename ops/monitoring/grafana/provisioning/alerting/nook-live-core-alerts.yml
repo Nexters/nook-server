@@ -1,0 +1,766 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: nook-live-core-alerts
+    folder: Nook
+    interval: 1m
+    rules:
+      - uid: nook_live_api_down
+        title: Live API down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'up{job="nook-api", env="live"}'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: KeepLast
+        for: 2m
+        annotations:
+          summary: live API target이 응답하지 않습니다.
+          description: Prometheus가 2분 동안 nook-api target을 정상적으로 scrape하지 못했습니다.
+        labels:
+          env: live
+          service: nook-api
+          severity: critical
+        isPaused: false
+
+      - uid: nook_live_node_exporter_down
+        title: Live node exporter down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'up{job="node", env="live"}'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: KeepLast
+        for: 5m
+        annotations:
+          summary: live node exporter target이 응답하지 않습니다.
+          description: Prometheus가 5분 동안 node-exporter target을 정상적으로 scrape하지 못했습니다.
+        labels:
+          env: live
+          service: nook-live-vm
+          severity: warning
+        isPaused: false
+
+      - uid: nook_live_http_5xx
+        title: Live HTTP 5xx increase
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'sum(increase(http_server_requests_seconds_count{job="nook-api", env="live", status=~"5.."}[5m])) >= 5 or (sum(increase(http_server_requests_seconds_count{job="nook-api", env="live"}[5m])) >= 20 and sum(increase(http_server_requests_seconds_count{job="nook-api", env="live", status=~"5.."}[5m])) / clamp_min(sum(increase(http_server_requests_seconds_count{job="nook-api", env="live"}[5m])), 1) >= 0.05)'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 5m
+        annotations:
+          summary: live API의 HTTP 5xx 응답이 증가했습니다.
+          description: 최근 5분간 5xx가 5건 이상이거나, 요청이 20건 이상인 상태에서 5xx 비율이 5% 이상으로 5분간 지속됐습니다.
+        labels:
+          env: live
+          service: nook-api
+          severity: warning
+        isPaused: false
+
+      - uid: nook_live_http_latency_p95
+        title: Live HTTP latency p95 high
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="nook-api", env="live"}[10m]))) >= 1 and sum(increase(http_server_requests_seconds_count{job="nook-api", env="live"}[10m])) >= 20'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 10m
+        annotations:
+          summary: live API의 HTTP p95 latency가 높습니다.
+          description: 최근 10분간 요청이 20건 이상인 상태에서 p95 latency가 1초 이상으로 10분간 지속됐습니다.
+        labels:
+          env: live
+          service: nook-api
+          severity: warning
+        isPaused: false
+
+      - uid: nook_live_disk_warning
+        title: Live VM disk usage high
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: '1 - (node_filesystem_avail_bytes{job="node", env="live", mountpoint="/", fstype!="rootfs"} / node_filesystem_size_bytes{job="node", env="live", mountpoint="/", fstype!="rootfs"})'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.8
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 15m
+        annotations:
+          summary: live VM 루트 디스크 사용률이 80%를 넘었습니다.
+          description: 루트 파일시스템 사용률이 15분 동안 80%를 초과했습니다. 불필요한 파일과 Docker 데이터를 확인하세요.
+        labels:
+          env: live
+          service: nook-live-vm
+          severity: warning
+        isPaused: false
+
+      - uid: nook_live_disk_critical
+        title: Live VM disk usage critical
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: '1 - (node_filesystem_avail_bytes{job="node", env="live", mountpoint="/", fstype!="rootfs"} / node_filesystem_size_bytes{job="node", env="live", mountpoint="/", fstype!="rootfs"})'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.9
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 5m
+        annotations:
+          summary: live VM 루트 디스크 사용률이 90%를 넘었습니다.
+          description: 루트 파일시스템 사용률이 5분 동안 90%를 초과했습니다. 즉시 디스크 공간을 확보하세요.
+        labels:
+          env: live
+          service: nook-live-vm
+          severity: critical
+        isPaused: false
+
+      - uid: nook_live_memory_warning
+        title: Live VM memory usage high
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: '1 - (node_memory_MemAvailable_bytes{job="node", env="live"} / node_memory_MemTotal_bytes{job="node", env="live"})'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.9
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 10m
+        annotations:
+          summary: live VM 메모리 사용률이 90%를 넘었습니다.
+          description: MemAvailable 기준 메모리 사용률이 10분 동안 90%를 초과했습니다.
+        labels:
+          env: live
+          service: nook-live-vm
+          severity: warning
+        isPaused: false
+
+      - uid: nook_live_jvm_heap_warning
+        title: Live JVM heap usage high
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'sum(jvm_memory_used_bytes{job="nook-api", env="live", area="heap"}) / clamp_min(sum(jvm_memory_max_bytes{job="nook-api", env="live", area="heap"}), 1)'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 10m
+        annotations:
+          summary: live API JVM heap 사용률이 85%를 넘었습니다.
+          description: JVM heap 사용률이 10분 동안 85%를 초과했습니다. GC 추이와 OOM 위험을 확인하세요.
+        labels:
+          env: live
+          service: nook-api
+          severity: warning
+        isPaused: false
+
+      - uid: nook_live_jvm_heap_critical
+        title: Live JVM heap usage critical
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'sum(jvm_memory_used_bytes{job="nook-api", env="live", area="heap"}) / clamp_min(sum(jvm_memory_max_bytes{job="nook-api", env="live", area="heap"}), 1)'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.95
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 5m
+        annotations:
+          summary: live API JVM heap 사용률이 95%를 넘었습니다.
+          description: JVM heap 사용률이 5분 동안 95%를 초과했습니다. OOM 발생 전에 heap 제한과 메모리 사용 원인을 확인하세요.
+        labels:
+          env: live
+          service: nook-api
+          severity: critical
+        isPaused: false
+
+      - uid: nook_live_hikari_exhausted
+        title: Live DB connection pool exhausted
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'hikaricp_connections_pending{job="nook-api", env="live"} > 0 or hikaricp_connections_active{job="nook-api", env="live"} / clamp_min(hikaricp_connections_max{job="nook-api", env="live"}, 1) >= 0.9'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 3m
+        annotations:
+          summary: live API의 DB connection pool이 고갈되고 있습니다.
+          description: Hikari pending connection이 발생했거나 pool 사용률이 3분 동안 90% 이상으로 유지됐습니다.
+        labels:
+          env: live
+          service: nook-api
+          severity: critical
+        isPaused: false
+
+      - uid: nook_live_hikari_timeout
+        title: Live DB connection acquisition timeout
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'increase(hikaricp_connections_timeout_total{job="nook-api", env="live"}[5m]) > 0'
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 0s
+        annotations:
+          summary: live API에서 DB connection 획득 timeout이 발생했습니다.
+          description: 최근 5분 동안 Hikari connection 획득 timeout이 한 번 이상 발생했습니다.
+        labels:
+          env: live
+          service: nook-api
+          severity: critical
+        isPaused: false
