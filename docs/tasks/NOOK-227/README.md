@@ -32,9 +32,9 @@ APIFY_NAVER,GOOGLE
 
 - Actor: `delicious_zebu/naver-map-search-results-scraper`
 - API: `POST /v2/acts/{actorId}/run-sync-get-dataset-items`
-- 입력: 장소명과 주소 keyword, 상세 조회 비활성, 최대 5건
+- 입력: 장소명과 주소 keyword, 상세 조회 활성, 최대 5건
 - 후보 검증: 정규화된 장소명 일치와 주소 호환 또는 좌표 300m 이내
-- 저장: 검증된 후보 이미지 중 최대 3장을 Nook media storage에 복사
+- 저장: 검증된 후보 이미지 중 최대 6장을 Nook media storage에 복사
 
 필수 비밀값은 `APIFY_API_TOKEN`이며 DB에 저장하지 않습니다. 다음 배포 설정을 선택적으로 재정의합니다.
 
@@ -72,7 +72,7 @@ Google은 chain에 `GOOGLE`이 포함되고 `GOOGLE_MAPS_API_KEY`가 설정된 �
 - 사진을 반환한 provider 뒤의 provider는 호출하지 않습니다.
 - 빈 결과와 provider 오류는 다음 provider로 fallback합니다.
 - Google 영업시간 같은 사진 외 보강 정보가 fallback 중 유실되지 않습니다.
-- Apify 후보 검증을 통과한 이미지 최대 3장만 Nook storage URL로 저장됩니다.
+- Apify 후보 검증을 통과한 이미지 최대 6장만 Nook storage URL로 저장됩니다.
 - 설정 DML 적용 전에는 기존 환경 변수 동작을 유지합니다.
 - API 및 batch 애플리케이션이 같은 chain을 사용합니다.
 - 기존 API와 오류 의미를 유지합니다.
