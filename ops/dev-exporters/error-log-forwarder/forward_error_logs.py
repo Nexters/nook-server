@@ -61,6 +61,41 @@ def read_json_log_line(raw_line: str) -> str:
         return raw_line
 
 
+def parse_log_entry(line: str) -> tuple[str | None, str]:
+    try:
+        entry = json.loads(line)
+    except json.JSONDecodeError:
+        match = LOG_LEVEL_PATTERN.search(line)
+        return (match.group("level") if match else None, line)
+
+    if not isinstance(entry, dict):
+        return None, line
+
+    level = entry.get("level")
+    if not isinstance(level, str):
+        return None, line
+
+    header_parts = [
+        str(value)
+        for value in (
+            entry.get("@timestamp"),
+            level,
+            entry.get("logger_name"),
+        )
+        if value
+    ]
+    message = entry.get("message")
+    body = " ".join(header_parts)
+    if message:
+        body = f"{body} - {message}" if body else str(message)
+
+    stack_trace = entry.get("stack_trace")
+    if stack_trace:
+        body = f"{body}\n{stack_trace}" if body else str(stack_trace)
+
+    return level, f"{body.rstrip()}\n" if body else line
+
+
 def follow(log_path: Path):
     with log_path.open() as fp:
         fp.seek(0, os.SEEK_END)
@@ -84,13 +119,13 @@ def main() -> None:
                 post_to_slack(buffer)
                 buffer = []
             continue
-        match = LOG_LEVEL_PATTERN.search(line)
-        if match:
+        level, formatted_line = parse_log_entry(line)
+        if level:
             if buffer:
                 post_to_slack(buffer)
                 buffer = []
-            if match.group("level") == "ERROR":
-                buffer = [line]
+            if level == "ERROR":
+                buffer = [formatted_line]
                 last_append_at = time.monotonic()
             continue
         if buffer:
