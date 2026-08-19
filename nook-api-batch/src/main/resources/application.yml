@@ -43,6 +43,7 @@ external:
     base-url: ${APIFY_NAVER_PLACE_BASE_URL:https://api.apify.com}
     api-token: ${APIFY_API_TOKEN:}
     actor-id: ${APIFY_NAVER_PLACE_ACTOR_ID:delicious_zebu~naver-map-search-results-scraper}
+    photo-actor-id: ${APIFY_NAVER_PLACE_PHOTO_ACTOR_ID:oxygenated_quagmire~naver-place-photos}
     max-results: ${APIFY_NAVER_PLACE_MAX_RESULTS:5}
     batch-size: ${APIFY_NAVER_PLACE_BATCH_SIZE:20}
     connect-timeout: ${APIFY_NAVER_PLACE_CONNECT_TIMEOUT:3s}

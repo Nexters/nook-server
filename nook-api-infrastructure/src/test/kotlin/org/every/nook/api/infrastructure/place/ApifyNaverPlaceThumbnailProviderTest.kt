@@ -126,14 +126,18 @@ class ApifyNaverPlaceThumbnailProviderTest {
             "NaverMapUrl":"https://map.naver.com/p/entry/place/123",
             "SearchKeyword":"누크 카페 서울 강남구 테헤란로 1"}]
         """.trimIndent()
-        const val DETAIL_INPUT =
-            """{"urls":["https://map.naver.com/p/entry/place/123"],"scrapePlaceDetails":true}"""
+        const val DETAIL_INPUT = """
+            {"placeUrls":[{"url":"https://map.naver.com/p/entry/place/123"}],
+            "maxPhotos":6,"filterBy":"all","includeFilters":false}
+        """
         val DETAIL_RESPONSE = """
-            [{"Name":"누크 카페","FullAddress":"서울특별시 강남구 테헤란로 1","PlaceId":"123",
-            "NaverMapUrl":"https://map.naver.com/p/entry/place/123","Images":[
-            "https://naver.example/1.jpg",{"url":"https://naver.example/2.jpg"},
-            "https://naver.example/3.jpg","https://naver.example/4.jpg","https://naver.example/5.jpg",
-            "https://naver.example/6.jpg","https://naver.example/7.jpg"]}]
+            [{"placeId":"123","originalUrl":"https://naver.example/1.jpg"},
+            {"placeId":"123","originalUrl":"https://naver.example/2.jpg"},
+            {"placeId":"123","originalUrl":"https://naver.example/3.jpg"},
+            {"placeId":"123","originalUrl":"https://naver.example/4.jpg"},
+            {"placeId":"123","originalUrl":"https://naver.example/5.jpg"},
+            {"placeId":"123","originalUrl":"https://naver.example/6.jpg"},
+            {"placeId":"123","originalUrl":"https://naver.example/7.jpg"}]
         """.trimIndent()
         val REQUEST = PlaceThumbnailProvider.Request(
             place = PlaceCandidate(
