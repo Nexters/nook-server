@@ -112,8 +112,9 @@ external:
     api-token: ${APIFY_API_TOKEN:}
     actor-id: ${APIFY_NAVER_PLACE_ACTOR_ID:delicious_zebu~naver-map-search-results-scraper}
     max-results: ${APIFY_NAVER_PLACE_MAX_RESULTS:5}
+    batch-size: ${APIFY_NAVER_PLACE_BATCH_SIZE:20}
     connect-timeout: ${APIFY_NAVER_PLACE_CONNECT_TIMEOUT:3s}
-    read-timeout: ${APIFY_NAVER_PLACE_READ_TIMEOUT:120s}
+    read-timeout: ${APIFY_NAVER_PLACE_READ_TIMEOUT:300s}
   google-cloud-vision:
     base-url: ${GOOGLE_CLOUD_VISION_BASE_URL:https://vision.googleapis.com}
     api-key: ${GOOGLE_CLOUD_VISION_API_KEY:${GOOGLE_MAPS_API_KEY:}}

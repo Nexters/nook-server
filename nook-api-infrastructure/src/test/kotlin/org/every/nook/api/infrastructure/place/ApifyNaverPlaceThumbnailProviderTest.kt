@@ -24,48 +24,28 @@ class ApifyNaverPlaceThumbnailProviderTest {
     @Test
     fun `requests place details and stores up to six photos from matching Naver place`() {
         val fixture = fixture()
-        fixture.server.expect(requestTo(containsString("/v2/acts/test-actor/run-sync-get-dataset-items")))
-            .andExpect(method(HttpMethod.POST))
-            .andExpect(header("Authorization", "Bearer test-token"))
-            .andExpect(
-                content().json(
-                    """
-                    {
-                      "keywords": ["누크 카페 서울 강남구 테헤란로 1"],
-                      "scrapePlaceDetails": true,
-                      "maxResultsPerKeyword": 5
-                    }
-                    """.trimIndent(),
-                ),
-            )
-            .andRespond(
-                withSuccess(
-                    """
-                    [{
-                      "Name": "누크 카페",
-                      "FullAddress": "서울특별시 강남구 테헤란로 1",
-                      "Latitude": "37.5001",
-                      "Longitude": "127.0001",
-                      "Images": [
-                        "https://naver.example/1.jpg",
-                        {"url": "https://naver.example/2.jpg"},
-                        "https://naver.example/3.jpg",
-                        "https://naver.example/4.jpg",
-                        "https://naver.example/5.jpg",
-                        "https://naver.example/6.jpg",
-                        "https://naver.example/7.jpg"
-                      ]
-                    }]
-                    """.trimIndent(),
-                    MediaType.APPLICATION_JSON,
-                ),
-            )
-
+        expectSearch(fixture.server)
+        expectDetails(fixture.server)
         val result = fixture.provider.fetch(REQUEST)
 
         assertEquals(6, result?.photoUrls?.size)
         assertEquals(listOf(0, 1, 2, 3, 4, 5), fixture.storage.stored.map(PostMedia::sequence))
         fixture.server.verify()
+    }
+
+    private fun expectSearch(server: MockRestServiceServer) {
+        server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header("Authorization", "Bearer test-token"))
+            .andExpect(content().json(SEARCH_INPUT))
+            .andRespond(withSuccess(SEARCH_RESPONSE, MediaType.APPLICATION_JSON))
+    }
+
+    private fun expectDetails(server: MockRestServiceServer) {
+        server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(content().json(DETAIL_INPUT))
+            .andRespond(withSuccess(DETAIL_RESPONSE, MediaType.APPLICATION_JSON))
     }
 
     @Test
@@ -138,6 +118,23 @@ class ApifyNaverPlaceThumbnailProviderTest {
     )
 
     private companion object {
+        const val SEARCH_INPUT =
+            """{"keywords":["누크 카페 서울 강남구 테헤란로 1"],"scrapePlaceDetails":false,"maxResultsPerKeyword":5}"""
+        val SEARCH_RESPONSE = """
+            [{"Name":"누크 카페","FullAddress":"서울특별시 강남구 테헤란로 1",
+            "Latitude":"37.5001","Longitude":"127.0001","PlaceId":"123",
+            "NaverMapUrl":"https://map.naver.com/p/entry/place/123",
+            "SearchKeyword":"누크 카페 서울 강남구 테헤란로 1"}]
+        """.trimIndent()
+        const val DETAIL_INPUT =
+            """{"urls":["https://map.naver.com/p/entry/place/123"],"scrapePlaceDetails":true}"""
+        val DETAIL_RESPONSE = """
+            [{"Name":"누크 카페","FullAddress":"서울특별시 강남구 테헤란로 1","PlaceId":"123",
+            "NaverMapUrl":"https://map.naver.com/p/entry/place/123","Images":[
+            "https://naver.example/1.jpg",{"url":"https://naver.example/2.jpg"},
+            "https://naver.example/3.jpg","https://naver.example/4.jpg","https://naver.example/5.jpg",
+            "https://naver.example/6.jpg","https://naver.example/7.jpg"]}]
+        """.trimIndent()
         val REQUEST = PlaceThumbnailProvider.Request(
             place = PlaceCandidate(
                 provider = "NAVER",
