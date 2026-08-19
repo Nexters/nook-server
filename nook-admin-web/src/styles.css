@@ -64,6 +64,21 @@ body {
   text-transform: uppercase;
 }
 
+.RaSidebar-closed .nook-brand {
+  justify-content: center;
+  margin-inline: 4px;
+  padding: 0;
+}
+
+.RaSidebar-closed .nook-brand-copy {
+  display: none;
+}
+
+.RaSidebar-closed .nook-brand-mark {
+  width: 32px;
+  height: 32px;
+}
+
 .RaLayout-content {
   padding: 28px !important;
 }
