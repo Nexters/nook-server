@@ -32,13 +32,11 @@ class GooglePlacePhotoProvider(
 
     override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? {
         val place = request.place
-        val shouldSkip = !properties.enabled ||
-            properties.apiKey.isBlank()
+        val shouldSkip = properties.apiKey.isBlank()
         return if (shouldSkip) {
             eventLogger.logGoogleSkipped(place)
             logger.warn {
-                "Google place photo skipped: reason=invalid_configuration, enabled=${properties.enabled}, " +
-                    "apiKeyConfigured=${properties.apiKey.isNotBlank()}"
+                "Google place photo skipped: reason=missing_api_key"
             }
             null
         } else {
