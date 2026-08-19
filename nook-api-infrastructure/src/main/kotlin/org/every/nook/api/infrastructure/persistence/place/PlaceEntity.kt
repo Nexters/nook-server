@@ -125,6 +125,9 @@ class PlaceEntity(
         supplement.openingHours?.let { openingHours = it }
         if (supplement.photoUrls.isNotEmpty()) {
             photoUrls = supplement.photoUrls
+            if (supplement.replaceThumbnailUrl != null && thumbnailUrl == supplement.replaceThumbnailUrl) {
+                thumbnailUrl = null
+            }
             updateThumbnailUrlIfAbsent(supplement.photoUrls.first())
         }
     }

@@ -16,13 +16,19 @@ class StorePlaceThumbnailUseCase(
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    operator fun invoke(postId: Long, place: PlaceCandidate) {
+    operator fun invoke(postId: Long, place: PlaceCandidate, sourceMediaSequence: Int) {
         val startedAt = clock.millis()
         logger.info(event(postId, place, "place.thumbnail.started", FETCH_STAGE, "started"))
         runCatching {
             updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.PROCESSING)
             val supplement = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
-                thumbnailProvider.fetch(place)
+                thumbnailProvider.fetch(
+                    PlaceThumbnailProvider.Request(
+                        place = place,
+                        sourcePostId = postId,
+                        sourceMediaSequence = sourceMediaSequence,
+                    ),
+                )
             }
             metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
                 updatePort.update(

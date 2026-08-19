@@ -312,18 +312,28 @@ class PostPersistenceAdapterTest {
         `when`(place.address).thenReturn("서울 서대문구 이화여대길 20")
         `when`(place.latitude).thenReturn(BigDecimal("37.5577597"))
         `when`(place.longitude).thenReturn(BigDecimal("126.9460690"))
-        `when`(place.thumbnailUrl).thenReturn("https://cdn.example.com/place.jpg")
+        `when`(place.thumbnailUrl).thenReturn(null)
         `when`(place.thumbnailParsingStatus).thenReturn(PlaceThumbnailParsingStatus.PENDING)
         `when`(userSavedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
         `when`(parsingJobRepository.findByPostId(101))
             .thenReturn(PlaceParsingJobEntity(101, PlaceParsingStatus.COMPLETED))
         `when`(userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11))
-            .thenReturn(listOf(UserSavedPostPlaceEntity(11, 17, 0)))
+            .thenReturn(
+                listOf(
+                    UserSavedPostPlaceEntity(
+                        userSavedPostId = 11,
+                        placeId = 17,
+                        sequence = 0,
+                        thumbnailUrl = "https://cdn.example.com/current-post-place.jpg",
+                    ),
+                ),
+            )
         `when`(bookmarkRepository.findAllByUserIdAndPlaceIdIn(7, listOf(17))).thenReturn(emptyList())
         `when`(placeRepository.findAllById(listOf(17))).thenReturn(listOf(place))
 
         val result = assertNotNull(adapter.find(userId = 7, postId = 11))
 
+        assertEquals("https://cdn.example.com/current-post-place.jpg", result.places.single().thumbnailUrl)
         assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.places.single().thumbnailParsingStatus)
     }
 

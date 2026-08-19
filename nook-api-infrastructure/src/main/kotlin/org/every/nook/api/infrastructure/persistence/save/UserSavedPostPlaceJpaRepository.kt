@@ -23,6 +23,7 @@ interface UserSavedPostPlaceJpaRepository : JpaRepository<UserSavedPostPlaceEnti
                 user_saved_post_id,
                 place_id,
                 display_order,
+                thumbnail_url,
                 created_at,
                 updated_at
             )
@@ -31,9 +32,14 @@ interface UserSavedPostPlaceJpaRepository : JpaRepository<UserSavedPostPlaceEnti
                 post_place.place_id,
                 existing_order.max_display_order +
                     ROW_NUMBER() OVER (ORDER BY post_place.display_order, post_place.id),
+                source_media.media_url,
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
             FROM post_places post_place
+            LEFT JOIN post_media source_media
+                ON source_media.post_id = post_place.post_id
+                AND source_media.media_type = 'IMAGE'
+                AND source_media.display_order = post_place.source_media_sequence
             CROSS JOIN (
                 SELECT COALESCE(MAX(saved_post_place.display_order), -1) AS max_display_order
                 FROM user_saved_post_places saved_post_place

@@ -47,9 +47,14 @@ class ProcessPlaceParsingJobUseCase(
                 }
             }
         }
-        val textResolution = resolveClues(job, textClues)
-        logOcrDecision(eventLogger, job, textResolution.places.size, expectedPlaceCount)
-        val imageResolution = resolveImageClues(job, textResolution.places.size, expectedPlaceCount)
+        val textResolution = resolveClues(job, textClues, expectedPlaceCount, useEvidenceImageSequence = false)
+        logOcrDecision(eventLogger, job, textClues.size, textResolution.places.size, expectedPlaceCount)
+        val imageResolution = resolveImageClues(
+            job = job,
+            textClueCount = textClues.size,
+            textResolvedCount = textResolution.places.size,
+            expectedPlaceCount = expectedPlaceCount,
+        )
         val places = (textResolution.places + imageResolution?.places.orEmpty())
             .distinctBy { it.provider to it.externalPlaceId }
             .distinctLogicalPlaces()
@@ -85,13 +90,14 @@ class ProcessPlaceParsingJobUseCase(
 
     private fun resolveImageClues(
         job: ClaimedPlaceParsingJob,
-        textPlaceCount: Int,
+        textClueCount: Int,
+        textResolvedCount: Int,
         expectedPlaceCount: Int?,
     ): ClueResolution? {
         val images = job.imageUrls.take(MAX_IMAGE_COUNT).mapIndexed { index, imageUrl ->
             ImageTextExtractor.ImageInput(imageIndex = index + 1, imageUrl = imageUrl)
         }
-        if (images.isEmpty() || !requiresImageAnalysis(textPlaceCount, expectedPlaceCount)) {
+        if (images.isEmpty() || !requiresImageAnalysis(textClueCount, textResolvedCount, expectedPlaceCount)) {
             return null
         }
         if (!imageReadinessPort.areImageUrlsReadyForOcr(job.postId)) {
@@ -103,7 +109,7 @@ class ProcessPlaceParsingJobUseCase(
         }
         logger.info {
             "Place parsing image fallback started: postId=${job.postId}, attempt=${job.attempt}, " +
-                "imageCount=${images.size}, textPlaceCount=$textPlaceCount, " +
+                "imageCount=${images.size}, textClueCount=$textClueCount, textResolvedCount=$textResolvedCount, " +
                 "expectedPlaceCount=$expectedPlaceCount"
         }
         val transcripts = job.imageTranscripts ?: measure(job, IMAGE_TRANSCRIPT_STAGE) {
@@ -132,12 +138,12 @@ class ProcessPlaceParsingJobUseCase(
                 images = images,
                 transcripts = transcripts,
                 primaryClues = primaryImageClues,
-                knownPlaceCount = textPlaceCount,
+                knownPlaceCount = textClueCount,
                 expectedPlaceCount = expectedPlaceCount,
             ),
         ).filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = true)
         val imageClues = primaryImageClues + recoveredImageClues
-        return resolveClues(job, imageClues)
+        return resolveClues(job, imageClues, expectedPlaceCount, useEvidenceImageSequence = true)
     }
 
     private fun extractClues(
@@ -160,11 +166,23 @@ class ProcessPlaceParsingJobUseCase(
         }
     }
 
-    private fun resolveClues(job: ClaimedPlaceParsingJob, clues: List<PlaceClue>): ClueResolution {
+    private fun resolveClues(
+        job: ClaimedPlaceParsingJob,
+        clues: List<PlaceClue>,
+        expectedPlaceCount: Int?,
+        useEvidenceImageSequence: Boolean,
+    ): ClueResolution {
         var lastFailure: PlaceResolutionException? = null
-        val places = clues.mapNotNull { clue ->
+        val places = clues.mapIndexedNotNull { clueSequence, clue ->
             try {
-                resolve(job, clue)
+                resolve(job, clue).copy(
+                    sourceMediaSequence = clue.sourceMediaSequence(
+                        clueSequence = clueSequence,
+                        imageCount = job.imageUrls.size,
+                        sourcePlaceCount = expectedPlaceCount ?: clues.size,
+                        useEvidenceImageSequence = useEvidenceImageSequence,
+                    ),
+                )
             } catch (exception: PlaceResolutionException) {
                 lastFailure = exception
                 logger.warn {
@@ -365,6 +383,19 @@ class ProcessPlaceParsingJobUseCase(
     private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
 }
 
+internal fun PlaceClue.sourceMediaSequence(
+    clueSequence: Int,
+    imageCount: Int,
+    sourcePlaceCount: Int,
+    useEvidenceImageSequence: Boolean,
+): Int {
+    if (useEvidenceImageSequence) {
+        evidence.minOfOrNull(PlaceClueEvidence::imageIndex)?.let { return (it - 1).coerceAtLeast(0) }
+    }
+    val coverOffset = if (imageCount == sourcePlaceCount + 1) 1 else 0
+    return clueSequence + coverOffset
+}
+
 private fun uniqueCandidate(
     strictMatches: List<PlaceCandidateSelector.Candidate>,
     groundedMatches: List<PlaceCandidateSelector.Candidate>,
@@ -379,7 +410,8 @@ private data class CandidateSelection(val place: PlaceCandidate, val method: Str
 private fun logOcrDecision(
     logger: org.slf4j.Logger,
     job: ClaimedPlaceParsingJob,
-    textPlaceCount: Int,
+    textClueCount: Int,
+    textResolvedCount: Int,
     expectedPlaceCount: Int?,
 ) {
     logger.info(
@@ -388,9 +420,15 @@ private fun logOcrDecision(
             "ocr",
             "success",
             fields = mapOf(
-                "ocr.required" to requiresImageAnalysis(textPlaceCount, expectedPlaceCount),
-                "ocr.reason" to ocrReason(textPlaceCount, expectedPlaceCount, job.imageUrls.isEmpty()),
-                "place.text_resolved_count" to textPlaceCount,
+                "ocr.required" to requiresImageAnalysis(textClueCount, textResolvedCount, expectedPlaceCount),
+                "ocr.reason" to ocrReason(
+                    textClueCount,
+                    textResolvedCount,
+                    expectedPlaceCount,
+                    job.imageUrls.isEmpty(),
+                ),
+                "place.text_clue_count" to textClueCount,
+                "place.text_resolved_count" to textResolvedCount,
                 "place.expected_count" to expectedPlaceCount,
                 "content.image_count" to job.imageUrls.size,
             ),
@@ -411,14 +449,20 @@ private fun PlaceClue.isGroundedIn(job: ClaimedPlaceParsingJob): Boolean {
         .any { clueText -> sources.any { source -> source.contains(clueText) } }
 }
 
-private fun requiresImageAnalysis(textPlaceCount: Int, expectedPlaceCount: Int?): Boolean =
-    textPlaceCount == 0 || expectedPlaceCount?.let { textPlaceCount < it } == true
+internal fun requiresImageAnalysis(textClueCount: Int, textResolvedCount: Int, expectedPlaceCount: Int?): Boolean =
+    textClueCount == 0 || textResolvedCount == 0 || expectedPlaceCount?.let { textClueCount < it } == true
 
-private fun ocrReason(textPlaceCount: Int, expectedPlaceCount: Int?, imagesEmpty: Boolean): String = when {
+private fun ocrReason(
+    textClueCount: Int,
+    textResolvedCount: Int,
+    expectedPlaceCount: Int?,
+    imagesEmpty: Boolean,
+): String = when {
     imagesEmpty -> "no_images"
-    textPlaceCount == 0 -> "no_text_place_resolved"
-    expectedPlaceCount != null && textPlaceCount < expectedPlaceCount -> "expected_place_count_shortfall"
-    else -> "text_places_sufficient"
+    textClueCount == 0 -> "no_text_place_clue"
+    textResolvedCount == 0 -> "no_text_place_resolved"
+    expectedPlaceCount != null && textClueCount < expectedPlaceCount -> "expected_place_clue_shortfall"
+    else -> "text_place_clues_sufficient"
 }
 
 private fun expectedPlaceCount(body: String?): Int? = body?.let { content ->

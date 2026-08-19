@@ -19,6 +19,7 @@ import org.every.nook.api.domain.place.GeoPoint
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceProviderReference
+import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.domain.post.PostSource
@@ -179,10 +180,15 @@ class PostPersistenceAdapter(
                     PostPlaceParsingSnapshot.RelatedPlace(
                         place = place,
                         bookmarked = savedPostPlace.placeId in bookmarkedPlaceIds,
-                        thumbnailUrl = placesById[savedPostPlace.placeId]?.thumbnailUrl,
+                        thumbnailUrl = savedPostPlace.thumbnailUrl
+                            ?: placesById[savedPostPlace.placeId]?.thumbnailUrl,
                         thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(
-                            placesById[savedPostPlace.placeId]?.effectiveThumbnailParsingStatus()
-                                ?: error("Place must exist for postPlace"),
+                            if (savedPostPlace.thumbnailUrl.isNullOrBlank()) {
+                                placesById[savedPostPlace.placeId]?.effectiveThumbnailParsingStatus()
+                                    ?: error("Place must exist for postPlace")
+                            } else {
+                                PlaceThumbnailParsingStatus.COMPLETED
+                            },
                         ),
                         tags = placesById[savedPostPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },
                         memo = memoByPlaceId[savedPostPlace.placeId],
