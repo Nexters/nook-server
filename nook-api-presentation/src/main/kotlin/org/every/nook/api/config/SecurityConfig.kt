@@ -1,15 +1,20 @@
 package org.every.nook.api.config
 
 import jakarta.servlet.http.HttpServletResponse
+import org.every.nook.api.admin.AdminAccessAuthenticationFilter
+import org.every.nook.api.admin.AdminAccessProperties
+import org.every.nook.api.admin.CloudflareAdminAccessTokenVerifier
 import org.every.nook.api.presentation.response.ApiError
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.annotation.Order
 import org.springframework.http.MediaType
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
@@ -18,9 +23,29 @@ import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(CorsProperties::class)
+@EnableConfigurationProperties(CorsProperties::class, AdminAccessProperties::class)
 class SecurityConfig {
     @Bean
+    @Order(1)
+    fun adminSecurityFilterChain(
+        http: HttpSecurity,
+        adminAccessProperties: AdminAccessProperties,
+    ): SecurityFilterChain {
+        http.securityMatcher("/api/admin/v1/**")
+        http.cors { }
+        http.csrf { it.disable() }
+        http.sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+        val authenticationFilter = AdminAccessAuthenticationFilter(
+            adminAccessProperties,
+            CloudflareAdminAccessTokenVerifier(adminAccessProperties),
+        )
+        http.addFilterBefore(authenticationFilter, BearerTokenAuthenticationFilter::class.java)
+        http.authorizeHttpRequests { it.anyRequest().authenticated() }
+        return http.build()
+    }
+
+    @Bean
+    @Order(2)
     fun securityFilterChain(http: HttpSecurity, objectMapper: ObjectMapper): SecurityFilterChain {
         http.cors { }
         http.csrf { it.disable() }
