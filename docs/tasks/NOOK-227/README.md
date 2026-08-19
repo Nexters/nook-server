@@ -32,7 +32,8 @@ APIFY_NAVER,GOOGLE
 
 - Actor: `delicious_zebu/naver-map-search-results-scraper`
 - API: `POST /v2/acts/{actorId}/run-sync-get-dataset-items`
-- 입력: 장소명과 주소 keyword, 상세 조회 활성, 최대 5건
+- 입력: 게시물 내 장소를 최대 20개씩 묶어 keyword 검색 후, 검증된 Naver Map URL들을 한 번에 상세 조회
+- 호출 수: 장소 1~20개는 검색 1회 + 상세 1회로 통상 2회이며, 이후 20개 단위로 2회씩 증가
 - 후보 검증: 정규화된 장소명 일치와 주소 호환 또는 좌표 300m 이내
 - 저장: 검증된 후보 이미지 중 최대 6장을 Nook media storage에 복사
 
@@ -41,8 +42,9 @@ APIFY_NAVER,GOOGLE
 - `APIFY_NAVER_PLACE_BASE_URL`
 - `APIFY_NAVER_PLACE_ACTOR_ID`
 - `APIFY_NAVER_PLACE_MAX_RESULTS`
+- `APIFY_NAVER_PLACE_BATCH_SIZE` (기본값 및 최대값 20)
 - `APIFY_NAVER_PLACE_CONNECT_TIMEOUT`
-- `APIFY_NAVER_PLACE_READ_TIMEOUT`
+- `APIFY_NAVER_PLACE_READ_TIMEOUT` (기본값 300초)
 
 Google은 chain에 `GOOGLE`이 포함되고 `GOOGLE_MAPS_API_KEY`가 설정된 경우 활성화됩니다. 기존
 `GOOGLE_PLACE_PHOTO_ENABLED` 이중 스위치는 사용하지 않습니다.
@@ -52,6 +54,7 @@ Google은 chain에 `GOOGLE`이 포함되고 `GOOGLE_MAPS_API_KEY`가 설정된 �
 - runtime provider-chain 파싱과 순차 routing
 - 기존 `POST_MEDIA`, `GOOGLE`, `FIXED` provider 조합
 - Apify 네이버 플레이스 provider와 사진 저장
+- 게시물 단위 Apify 검색/상세 배치 호출
 - provider 선택 및 fallback 구조화 로그
 - API와 batch의 동일 설정
 - 운영 설정 DML과 회귀 테스트
@@ -73,6 +76,7 @@ Google은 chain에 `GOOGLE`이 포함되고 `GOOGLE_MAPS_API_KEY`가 설정된 �
 - 빈 결과와 provider 오류는 다음 provider로 fallback합니다.
 - Google 영업시간 같은 사진 외 보강 정보가 fallback 중 유실되지 않습니다.
 - Apify 후보 검증을 통과한 이미지 최대 6장만 Nook storage URL로 저장됩니다.
+- 게시물 내 장소가 20개 이하이면 Apify Actor 호출은 통상 2회로 제한됩니다.
 - 설정 DML 적용 전에는 기존 환경 변수 동작을 유지합니다.
 - API 및 batch 애플리케이션이 같은 chain을 사용합니다.
 - 기존 API와 오류 의미를 유지합니다.

@@ -16,52 +16,60 @@ class StorePlaceThumbnailUseCase(
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    operator fun invoke(postId: Long, place: PlaceCandidate, sourceMediaSequence: Int) {
+    operator fun invoke(postId: Long, requests: List<PlaceThumbnailProvider.Request>) {
+        require(requests.isNotEmpty()) { "thumbnail requests must not be empty" }
         val startedAt = clock.millis()
-        logger.info(event(postId, place, "place.thumbnail.started", FETCH_STAGE, "started"))
+        requests.forEach { logger.info(event(postId, it.place, "place.thumbnail.started", FETCH_STAGE, "started")) }
         runCatching {
-            updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.PROCESSING)
-            val supplement = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
-                thumbnailProvider.fetch(
-                    PlaceThumbnailProvider.Request(
-                        place = place,
-                        sourcePostId = postId,
-                        sourceMediaSequence = sourceMediaSequence,
-                    ),
-                )
-            }
-            metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
+            requests.forEach { request ->
                 updatePort.update(
-                    place.provider,
-                    place.externalPlaceId,
-                    PlaceThumbnailParsingStatus.COMPLETED,
-                    supplement,
+                    request.place.provider,
+                    request.place.externalPlaceId,
+                    PlaceThumbnailParsingStatus.PROCESSING,
                 )
             }
-            logger.info(
-                event(
-                    postId,
-                    place,
-                    "place.thumbnail.completed",
-                    COMPLETE_STAGE,
-                    "success",
-                    startedAt,
-                    mapOf(
-                        "place.photo_count" to supplement?.photoUrls?.size,
-                        "place.opening_hours_found" to (supplement?.openingHours != null),
-                    ),
-                ),
-            )
-        }.getOrElse { exception ->
-            runCatching {
-                updatePort.update(place.provider, place.externalPlaceId, PlaceThumbnailParsingStatus.FAILED)
-            }.onFailure { statusException ->
-                exception.addSuppressed(statusException)
+            val supplements = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
+                thumbnailProvider.fetchAll(requests)
             }
-            logger.error(
-                event(postId, place, "place.thumbnail.failed", FETCH_STAGE, "failure", startedAt),
-                exception,
-            )
+            require(supplements.size == requests.size) { "thumbnail provider returned an invalid result count" }
+            requests.zip(supplements).forEach { (request, supplement) ->
+                metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
+                    updatePort.update(
+                        request.place.provider,
+                        request.place.externalPlaceId,
+                        PlaceThumbnailParsingStatus.COMPLETED,
+                        supplement,
+                    )
+                }
+                logger.info(
+                    event(
+                        postId,
+                        request.place,
+                        "place.thumbnail.completed",
+                        COMPLETE_STAGE,
+                        "success",
+                        startedAt,
+                        mapOf(
+                            "place.photo_count" to supplement?.photoUrls?.size,
+                            "place.opening_hours_found" to (supplement?.openingHours != null),
+                        ),
+                    ),
+                )
+            }
+        }.getOrElse { exception ->
+            requests.forEach { request ->
+                runCatching {
+                    updatePort.update(
+                        request.place.provider,
+                        request.place.externalPlaceId,
+                        PlaceThumbnailParsingStatus.FAILED,
+                    )
+                }.onFailure { statusException -> exception.addSuppressed(statusException) }
+                logger.error(
+                    event(postId, request.place, "place.thumbnail.failed", FETCH_STAGE, "failure", startedAt),
+                    exception,
+                )
+            }
             throw exception
         }
     }

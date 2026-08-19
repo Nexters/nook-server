@@ -12,8 +12,9 @@ import org.every.nook.api.application.place.PlaceTagSource
 import org.every.nook.api.application.place.PlaceTagSourcePort
 import org.every.nook.api.application.place.PlaceTagUpdatePort
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
-import org.every.nook.api.application.place.PlaceThumbnailRequestedEvent
+import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
+import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
@@ -138,15 +139,23 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
-        resolvedPlaces.map { it.first }.zip(postPlaces).forEach { (place, postPlace) ->
+        val placeThumbnailRequests = resolvedPlaces.map { it.first }.zip(postPlaces).map { (place, postPlace) ->
+            PlaceThumbnailProvider.Request(
+                place = place,
+                sourcePostId = postId,
+                sourceMediaSequence = postPlace.sourceMediaSequence ?: postPlace.sequence,
+            )
+        }
+        if (placeThumbnailRequests.isNotEmpty()) {
             eventPublisher.publishEvent(
-                PlaceThumbnailRequestedEvent(
+                PlaceThumbnailsRequestedEvent(
                     postId = postId,
-                    place = place,
-                    sourceMediaSequence = postPlace.sourceMediaSequence ?: postPlace.sequence,
+                    requests = placeThumbnailRequests,
                     availableAt = clock.instant(),
                 ),
             )
+        }
+        resolvedPlaces.map { it.first }.zip(postPlaces).forEach { (place, postPlace) ->
             eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, postPlace.placeId, place))
         }
     }

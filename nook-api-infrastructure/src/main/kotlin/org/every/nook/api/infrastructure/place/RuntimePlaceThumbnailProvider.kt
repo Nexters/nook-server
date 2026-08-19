@@ -13,7 +13,10 @@ class RuntimePlaceThumbnailProvider(
     private val configurationReader: RuntimeConfigurationReader,
     private val legacyChain: List<PlaceThumbnailProviderType>,
 ) : PlaceThumbnailProvider {
-    override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? {
+    override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = fetchAll(listOf(request)).single()
+
+    override fun fetchAll(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> {
+        if (requests.isEmpty()) return emptyList()
         val configuredValue = configurationReader.findValue(PlaceThumbnailProviderType.CONFIGURATION_KEY)
         val configuredChain = PlaceThumbnailProviderType.parse(configuredValue)
         val chain = configuredChain.ifEmpty { legacyChain }
@@ -30,23 +33,36 @@ class RuntimePlaceThumbnailProvider(
                 flow = "place-thumbnail",
                 stage = "fetch",
                 outcome = "success",
-                sourcePostId = request.sourcePostId,
-                fields = mapOf("provider.chain" to chain.joinToString(",")),
+                sourcePostId = requests.first().sourcePostId,
+                fields = mapOf(
+                    "provider.chain" to chain.joinToString(","),
+                    "provider.request_count" to requests.size,
+                ),
             ),
         )
 
-        var accumulated: PlaceSupplement? = null
-        chain.forEach { type ->
-            if (type == PlaceThumbnailProviderType.DISABLED) return accumulated
-            val provider = providers[type] ?: return@forEach
-            val supplement = runCatching { provider.fetch(request) }
-                .onFailure { exception -> logFallback(request, type, "failure", exception) }
-                .getOrNull()
-            accumulated = accumulated.merge(supplement)
-            if (!supplement?.photoUrls.isNullOrEmpty()) {
-                return accumulated
+        val accumulated = MutableList<PlaceSupplement?>(requests.size) { null }
+        val remaining = requests.indices.toMutableSet()
+        val activeProviders = chain.takeWhile { it != PlaceThumbnailProviderType.DISABLED }
+            .mapNotNull { type -> providers[type]?.let { type to it } }
+        for ((type, provider) in activeProviders) {
+            val pendingIndexes = remaining.toList()
+            val pendingRequests = pendingIndexes.map(requests::get)
+            val supplements = runCatching { provider.fetchAll(pendingRequests) }
+                .onFailure { exception ->
+                    pendingRequests.forEach { request -> logFallback(request, type, "failure", exception) }
+                }
+                .getOrElse { List(pendingRequests.size) { null } }
+            require(supplements.size == pendingRequests.size) { "Thumbnail provider result size mismatch" }
+            pendingIndexes.zip(supplements).forEach { (index, supplement) ->
+                accumulated[index] = accumulated[index].merge(supplement)
+                if (!supplement?.photoUrls.isNullOrEmpty()) {
+                    remaining.remove(index)
+                } else {
+                    logFallback(requests[index], type, "empty", null)
+                }
             }
-            logFallback(request, type, "empty", null)
+            if (remaining.isEmpty()) break
         }
         return accumulated
     }
