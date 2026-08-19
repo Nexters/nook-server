@@ -86,7 +86,7 @@ class PlaceDetailQueryPersistenceAdapterTest {
     @Test
     fun `unbookmarked place remains accessible through the current user's related post`() {
         val pageable = expectedPageable(page = 1, size = 10)
-        val place = place()
+        val place = place(thumbnailUrl = "https://example.com/place.jpg")
         val savedPost = savedPost()
         val sourcePost = sourcePost()
         val media = PostMediaEntity(101, PostMedia.MediaType.IMAGE, "https://example.com/image.jpg", 0)
@@ -116,6 +116,27 @@ class PlaceDetailQueryPersistenceAdapterTest {
         assertEquals(11L, detail.posts.totalElements)
         assertEquals(listOf("createdAt: DESC", "id: DESC"), pageable.sort.map { it.toString() }.toList())
         verify(savedPostRepository).findAllByUserIdAndPlaceId(7, 17, pageable)
+    }
+
+    @Test
+    fun `place thumbnail does not replace missing post representative media`() {
+        val pageable = expectedPageable(page = 0, size = 20)
+        val place = place(thumbnailUrl = "https://example.com/place.jpg")
+        val savedPost = savedPost()
+        val sourcePost = sourcePost()
+        `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
+        `when`(savedPostRepository.findAllByUserIdAndPlaceId(7, 17, pageable))
+            .thenReturn(PageImpl(listOf(savedPost), pageable, 1))
+        `when`(bookmarkRepository.findByUserIdAndPlaceId(7, 17)).thenReturn(bookmark(memo = null))
+        `when`(postRepository.findAllById(listOf(101))).thenReturn(listOf(sourcePost))
+        `when`(mediaRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(listOf(101)))
+            .thenReturn(emptyList())
+        `when`(groupPostRepository.findAllByUserSavedPostIdIn(listOf(21)))
+            .thenReturn(emptyList())
+
+        val detail = assertNotNull(adapter.find(userId = 7, placeId = 17, page = 0, size = 20))
+
+        assertNull(detail.posts.items.single().representativeMedia)
     }
 
     @Test
