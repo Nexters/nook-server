@@ -19,6 +19,7 @@ class ConnectPostPlacePersistenceAdapter(
     private val placeIdentityResolver: PlaceIdentityResolver,
     private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val sharedBookmarkSyncRepository: SharedPlaceBookmarkSyncJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
 ) : ConnectPostPlacePort {
@@ -50,6 +51,7 @@ class ConnectPostPlacePersistenceAdapter(
             savedPostPlaceRepository.save(UserSavedPostPlaceEntity(savedPostId, placeId, nextSequence))
         }
         bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
+        sharedBookmarkSyncRepository.insertForActiveSubscribers(savedPostId = savedPostId, placeId = placeId)
         eventPublisher.publishEvent(PlaceTagsRequestedEvent(savedPost.postId, placeId, candidate))
         return ConnectPostPlacePort.Result.Connected(placeId)
     }

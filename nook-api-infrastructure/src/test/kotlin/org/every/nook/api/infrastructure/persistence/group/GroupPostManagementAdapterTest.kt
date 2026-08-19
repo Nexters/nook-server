@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.port.GroupPostManagementPort
+import org.every.nook.api.infrastructure.persistence.place.SharedPlaceBookmarkSyncJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
 import org.mockito.ArgumentCaptor
@@ -18,10 +19,12 @@ class GroupPostManagementAdapterTest {
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val savedPostRepository = mock(UserSavedPostJpaRepository::class.java)
+    private val bookmarkRepository = mock(SharedPlaceBookmarkSyncJpaRepository::class.java)
     private val adapter = GroupPostManagementAdapter(
         groupRepository = groupRepository,
         groupPostRepository = groupPostRepository,
         savedPostRepository = savedPostRepository,
+        bookmarkRepository = bookmarkRepository,
         clock = FIXED_CLOCK,
     )
 
@@ -42,6 +45,7 @@ class GroupPostManagementAdapterTest {
         val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<GroupPostEntity>>
         verify(groupPostRepository).saveAll(captor.capture())
         assertEquals(setOf(17L, 18L), captor.value.map { it.groupId }.toSet())
+        verify(bookmarkRepository).insertAllForActiveSubscribers(11, setOf(17, 18))
     }
 
     @Test
@@ -65,7 +69,12 @@ class GroupPostManagementAdapterTest {
         verifyNoInteractions(groupPostRepository)
 
         val secondGroupPostRepository = mock(GroupPostJpaRepository::class.java)
-        val secondAdapter = GroupPostManagementAdapter(groupRepository, secondGroupPostRepository, savedPostRepository)
+        val secondAdapter = GroupPostManagementAdapter(
+            groupRepository,
+            secondGroupPostRepository,
+            savedPostRepository,
+            bookmarkRepository,
+        )
         `when`(savedPostRepository.findByIdAndUserId(12, 7)).thenReturn(mock(UserSavedPostEntity::class.java))
         `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17))).thenReturn(emptyList())
         assertEquals(

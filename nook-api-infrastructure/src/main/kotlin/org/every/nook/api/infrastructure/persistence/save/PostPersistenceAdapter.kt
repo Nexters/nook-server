@@ -29,6 +29,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.SharedPlaceBookmarkSyncJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.effectiveThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
@@ -50,6 +51,7 @@ class PostPersistenceAdapter(
     private val placeParsingJobJpaRepository: PlaceParsingJobJpaRepository,
     private val placeJpaRepository: PlaceJpaRepository,
     private val userPlaceBookmarkJpaRepository: UserPlaceBookmarkJpaRepository,
+    private val sharedBookmarkSyncRepository: SharedPlaceBookmarkSyncJpaRepository,
     private val groupJpaRepository: GroupJpaRepository,
     private val groupPostJpaRepository: GroupPostJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
@@ -238,6 +240,9 @@ class PostPersistenceAdapter(
                 )
             },
         )
+        if (groupIds.isNotEmpty()) {
+            sharedBookmarkSyncRepository.insertAllForActiveSubscribers(userSavedPostId, groupIds)
+        }
     }
 
     private data class UserPostCreation(val entity: UserSavedPostEntity, val created: Boolean)

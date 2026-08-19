@@ -25,6 +25,7 @@ class ConnectPostPlacePersistenceAdapterTest {
     private val placeIdentityResolver = mock(PlaceIdentityResolver::class.java)
     private val savedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
+    private val sharedBookmarkSyncRepository = mock(SharedPlaceBookmarkSyncJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val adapter = ConnectPostPlacePersistenceAdapter(
@@ -32,6 +33,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         placeIdentityResolver,
         savedPostPlaceRepository,
         bookmarkRepository,
+        sharedBookmarkSyncRepository,
         parsingJobRepository,
         eventPublisher,
     )
@@ -89,6 +91,7 @@ class ConnectPostPlacePersistenceAdapterTest {
             PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")),
         )
         verify(placeIdentityResolver).resolve(candidate())
+        verify(sharedBookmarkSyncRepository).insertForActiveSubscribers(savedPostId = 11, placeId = 17)
         val captor = ArgumentCaptor.forClass(UserSavedPostPlaceEntity::class.java)
         verify(savedPostPlaceRepository).save(captor.capture())
         assertEquals(11, captor.value.userSavedPostId)

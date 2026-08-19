@@ -18,6 +18,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
+import org.every.nook.api.infrastructure.persistence.place.SharedPlaceBookmarkSyncJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
@@ -46,6 +47,7 @@ class PostPersistenceAdapterTest {
     private val contentParsingJobRepository = mock(PostContentParsingJobJpaRepository::class.java)
     private val userSavedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java)
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
+    private val sharedBookmarkSyncRepository = mock(SharedPlaceBookmarkSyncJpaRepository::class.java)
     private val groupRepository = mock(GroupJpaRepository::class.java)
     private val groupPostRepository = mock(GroupPostJpaRepository::class.java)
     private val eventPublisher = mock(org.springframework.context.ApplicationEventPublisher::class.java)
@@ -57,6 +59,7 @@ class PostPersistenceAdapterTest {
         placeParsingJobJpaRepository = parsingJobRepository,
         placeJpaRepository = placeRepository,
         userPlaceBookmarkJpaRepository = bookmarkRepository,
+        sharedBookmarkSyncRepository = sharedBookmarkSyncRepository,
         groupJpaRepository = groupRepository,
         groupPostJpaRepository = groupPostRepository,
         eventPublisher = eventPublisher,
@@ -217,7 +220,8 @@ class PostPersistenceAdapterTest {
         val eventCaptor = ArgumentCaptor.forClass(PlaceParsingJobRequestedEvent::class.java)
         verify(eventPublisher).publishEvent(eventCaptor.capture())
         assertEquals(101, eventCaptor.value.postId)
-        verifyNoInteractions(userSavedPostPlaceRepository, bookmarkRepository)
+        verifyNoInteractions(userSavedPostPlaceRepository)
+        verify(sharedBookmarkSyncRepository).insertAllForActiveSubscribers(11, setOf(17, 18))
     }
 
     @Test
