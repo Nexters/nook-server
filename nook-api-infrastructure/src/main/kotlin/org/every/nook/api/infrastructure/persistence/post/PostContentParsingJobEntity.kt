@@ -10,6 +10,8 @@ import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.every.nook.api.application.processing.ParsingProgress
+import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 import java.time.Instant
@@ -42,6 +44,13 @@ class PostContentParsingJobEntity(
     var attemptCount: Int = 0,
     @Column(name = "next_attempt_at", nullable = false, columnDefinition = "TIMESTAMP(6)")
     var nextAttemptAt: Instant = Instant.now(),
+    @Enumerated(EnumType.STRING)
+    @Column(name = "progress_stage", nullable = true, length = PROGRESS_STAGE_LENGTH)
+    var progressStage: ParsingProgressStage? = null,
+    @Column(name = "progress_stage_started_at", nullable = true, columnDefinition = "TIMESTAMP(6)")
+    var progressStageStartedAt: Instant? = null,
+    @Column(name = "progress_percent", nullable = false)
+    var progressPercent: Int = 5,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,8 +58,28 @@ class PostContentParsingJobEntity(
     var id: Long? = null
         protected set
 
+    fun advanceProgress(stage: ParsingProgressStage, now: Instant) {
+        val currentPercent = progress().percentAt(now)
+        if (stage == progressStage || stage.startPercent < currentPercent) return
+        progressStage = stage
+        progressStageStartedAt = now
+        progressPercent = stage.startPercent
+    }
+
+    fun freezeProgress(now: Instant) {
+        progressPercent = progress().percentAt(now)
+        progressStageStartedAt = now
+    }
+
+    fun resumeProgress(now: Instant) {
+        progressStageStartedAt = now.takeIf { progressStage != null }
+    }
+
+    fun progress() = ParsingProgress(progressStage, progressStageStartedAt, progressPercent)
+
     companion object {
         const val STATUS_LENGTH = 20
         const val FAILURE_REASON_MAX_LENGTH = 500
+        const val PROGRESS_STAGE_LENGTH = 40
     }
 }

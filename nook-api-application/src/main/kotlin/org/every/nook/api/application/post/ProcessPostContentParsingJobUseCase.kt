@@ -6,6 +6,7 @@ import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.error
@@ -36,6 +37,7 @@ class ProcessPostContentParsingJobUseCase(
         logger.info { "Post content parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
+            jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_FETCH)
             val extracted = measure(job, EXTRACT_STAGE) {
                 extractPostContent(job.canonicalUrl)
             }
@@ -44,6 +46,7 @@ class ProcessPostContentParsingJobUseCase(
                 hashtags = extracted.hashtags.toPersistentHashtags(),
             )
             val coverTitle = providedPost.coverImageUrl()?.let { imageUrl ->
+                jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_COVER_TITLE)
                 measure(job, COVER_TITLE_STAGE) {
                     runCatching {
                         coverTitleExtractor.extract(CoverTitleExtractor.Request(imageUrl))
@@ -54,6 +57,7 @@ class ProcessPostContentParsingJobUseCase(
                     }.getOrNull()
                 }
             }
+            jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_INFERENCE)
             val inference = measure(job, INFERENCE_STAGE) {
                 contentInference.infer(
                     PostContentInference.Request(
@@ -66,27 +70,32 @@ class ProcessPostContentParsingJobUseCase(
             val completedPost = providedPost.copy(
                 title = coverTitle ?: groundedPostTitle(providedPost.body, inference.title),
             )
+            jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_SAVE)
             measure(job, COMPLETE_STAGE) {
                 jobPort.complete(job.postId, completedPost, inference.placeClues)
             }
-            val duration = Duration.between(startedAt, clock.instant()).toMillis()
-            logger.info {
-                "Post content parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "mediaCount=${completedPost.media.size}, durationMs=$duration"
-            }
-            eventLogger.info(
-                job.event(
-                    action = "content.job.completed",
-                    stage = JOB_STAGE,
-                    outcome = SUCCESS_OUTCOME,
-                    durationMs = duration,
-                    fields = mapOf("content.media_count" to completedPost.media.size),
-                ),
-            )
-            Result.Completed
+            completed(job, completedPost, startedAt)
         }.getOrElse { exception ->
             handleFailure(job, exception, startedAt)
         }
+    }
+
+    private fun completed(job: ClaimedPostContentParsingJob, post: Post, startedAt: Instant): Result {
+        val duration = Duration.between(startedAt, clock.instant()).toMillis()
+        logger.info {
+            "Post content parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
+                "mediaCount=${post.media.size}, durationMs=$duration"
+        }
+        eventLogger.info(
+            job.event(
+                action = "content.job.completed",
+                stage = JOB_STAGE,
+                outcome = SUCCESS_OUTCOME,
+                durationMs = duration,
+                fields = mapOf("content.media_count" to post.media.size),
+            ),
+        )
+        return Result.Completed
     }
 
     private fun <T> measure(job: ClaimedPostContentParsingJob, stage: String, action: () -> T): T = metrics.measure(

@@ -6,6 +6,7 @@ import org.every.nook.api.application.post.ClaimedPostContentParsingJob
 import org.every.nook.api.application.post.OutstandingPostContentParsingJob
 import org.every.nook.api.application.post.PostContentParsingJobPort
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
+import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
@@ -41,6 +42,7 @@ class PostContentParsingPersistenceAdapter(
         job.status = PostContentParsingStatus.PROCESSING
         job.attemptCount += 1
         job.nextAttemptAt = now
+        job.resumeProgress(now)
         return ClaimedPostContentParsingJob(
             postId = job.postId,
             attempt = job.attemptCount,
@@ -60,6 +62,11 @@ class PostContentParsingPersistenceAdapter(
                 },
             )
         }
+
+    @Transactional
+    override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
+        requireNotNull(jobRepository.findByPostId(postId)).advanceProgress(stage, clock.instant())
+    }
 
     @Transactional
     override fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>) {
@@ -93,6 +100,7 @@ class PostContentParsingPersistenceAdapter(
         }
         job.status = PostContentParsingStatus.COMPLETED
         job.failureReason = null
+        job.progressPercent = CONTENT_COMPLETED_PERCENT
 
         if (placeParsingJobRepository.findByPostId(postId) == null) {
             placeParsingJobRepository.save(
@@ -125,6 +133,7 @@ class PostContentParsingPersistenceAdapter(
     override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PostContentParsingStatus.PROCESSING)
+        job.freezeProgress(clock.instant())
         job.status = PostContentParsingStatus.PENDING
         job.failureReason = reason.take(PostContentParsingJobEntity.FAILURE_REASON_MAX_LENGTH)
         job.nextAttemptAt = nextAttemptAt
@@ -133,6 +142,7 @@ class PostContentParsingPersistenceAdapter(
     @Transactional
     override fun fail(postId: Long, reason: String) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
+        job.freezeProgress(clock.instant())
         job.status = PostContentParsingStatus.FAILED
         job.failureReason = reason.take(PostContentParsingJobEntity.FAILURE_REASON_MAX_LENGTH)
     }
@@ -153,5 +163,6 @@ class PostContentParsingPersistenceAdapter(
             PostContentParsingStatus.PENDING,
             PostContentParsingStatus.PROCESSING,
         )
+        const val CONTENT_COMPLETED_PERCENT = 45
     }
 }

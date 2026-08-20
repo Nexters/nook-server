@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post.model
 
+import org.every.nook.api.application.processing.ParsingProgress
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import java.time.Duration
@@ -17,16 +18,19 @@ data class PostProcessingView(
             contentStartedAt: Instant? = null,
             placeStartedAt: Instant? = null,
             now: Instant? = null,
+            contentProgress: ParsingProgress? = null,
+            placeProgress: ParsingProgress? = null,
         ): PostProcessingView = when (contentStatus) {
             PostContentParsingStatus.PENDING -> PostProcessingView(
                 PostProcessingStatusView.PENDING,
                 PostProcessingStageView.CONTENT,
+                processingPercent = contentProgress.persistedOr(CONTENT_PENDING_PERCENT),
             )
 
             PostContentParsingStatus.PROCESSING -> PostProcessingView(
                 PostProcessingStatusView.PROCESSING,
                 PostProcessingStageView.CONTENT,
-                processingPercent = progressingPercent(
+                processingPercent = contentProgress?.percentAt(requireNotNull(now)) ?: progressingPercent(
                     startedAt = contentStartedAt,
                     now = now,
                     range = PercentRange(
@@ -46,6 +50,7 @@ data class PostProcessingView(
                 status = placeStatus,
                 placeStartedAt = placeStartedAt,
                 now = now,
+                progress = placeProgress,
             )
         }
 
@@ -53,16 +58,21 @@ data class PostProcessingView(
             status: PlaceParsingStatus?,
             placeStartedAt: Instant?,
             now: Instant?,
+            progress: ParsingProgress?,
         ): PostProcessingView = when (status) {
             null,
             PlaceParsingStatus.PENDING,
-            -> PostProcessingView(PostProcessingStatusView.PENDING, PostProcessingStageView.PLACE)
+            -> PostProcessingView(
+                PostProcessingStatusView.PENDING,
+                PostProcessingStageView.PLACE,
+                processingPercent = progress.persistedOr(PLACE_PENDING_PERCENT),
+            )
 
             PlaceParsingStatus.PROCESSING ->
                 PostProcessingView(
                     PostProcessingStatusView.PROCESSING,
                     PostProcessingStageView.PLACE,
-                    processingPercent = progressingPercent(
+                    processingPercent = progress?.percentAt(requireNotNull(now)) ?: progressingPercent(
                         startedAt = placeStartedAt,
                         now = now,
                         range = PercentRange(
@@ -94,6 +104,8 @@ data class PostProcessingView(
         }
 
         private data class PercentRange(val start: Int, val end: Int, val estimatedDuration: Duration)
+
+        private fun ParsingProgress?.persistedOr(fallback: Int): Int = this?.persistedPercent ?: fallback
 
         private val CONTENT_ESTIMATED_DURATION = Duration.ofSeconds(CONTENT_ESTIMATED_SECONDS)
         private val PLACE_ESTIMATED_DURATION = Duration.ofSeconds(PLACE_ESTIMATED_SECONDS)
