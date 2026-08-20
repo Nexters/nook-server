@@ -189,6 +189,7 @@ class PlaceParsingPersistenceAdapter(
                 place = resolvedPlace.first,
                 sourcePostId = postId,
                 sourceMediaSequence = postPlace.sourceMediaSequence ?: postPlace.sequence,
+                postMediaFallbackAllowed = resolvedPlace.first.postMediaFallbackAllowed,
             )
         }
 

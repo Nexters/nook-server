@@ -42,6 +42,7 @@ class PostMediaPlaceThumbnailProviderTest {
                 place = place(),
                 sourcePostId = 11,
                 sourceMediaSequence = 2,
+                postMediaFallbackAllowed = true,
             ),
         )
 
@@ -68,10 +69,28 @@ class PostMediaPlaceThumbnailProviderTest {
                 place = place(),
                 sourcePostId = 11,
                 sourceMediaSequence = 0,
+                postMediaFallbackAllowed = true,
             ),
         )
 
         assertEquals(listOf("https://cdn.example/place.jpg"), result?.photoUrls)
+    }
+
+    @Test
+    fun `does not use post media without confirmed OCR evidence`() {
+        val repository = mock(PostMediaJpaRepository::class.java)
+        val provider = PostMediaPlaceThumbnailProvider(
+            mediaRepository = repository,
+            mediaStorage = PostMediaStoragePort { error("must not store unverified media") },
+            storedMediaBaseUrl = "https://cdn.example/",
+            obsoleteFixedThumbnailUrl = OBSOLETE_FIXED_URL,
+        )
+
+        val result = provider.fetch(
+            PlaceThumbnailProvider.Request(place(), sourcePostId = 11, sourceMediaSequence = 0),
+        )
+
+        assertEquals(null, result)
     }
 
     private fun media(postId: Long, url: String, sequence: Int) = PostMediaEntity(

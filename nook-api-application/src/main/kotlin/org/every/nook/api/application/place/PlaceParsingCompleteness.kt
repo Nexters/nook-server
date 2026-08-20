@@ -49,6 +49,20 @@ internal fun List<PlaceClue>.filterGroundedTextClues(job: ClaimedPlaceParsingJob
     }
 }
 
+internal fun PlaceClue.hasExclusiveGroundedImageEvidence(clues: List<PlaceClue>): Boolean {
+    val imageIndexes = evidence.map(PlaceClueEvidence::imageIndex).distinct()
+    if (imageIndexes.size != 1) return false
+    val imageIndex = imageIndexes.single()
+    if (clues.count { clue -> clue.evidence.any { it.imageIndex == imageIndex } } != 1) return false
+    val groundingKeys = listOfNotNull(name, addressHint)
+        .map { it.lowercase().filter(Char::isLetterOrDigit) }
+        .filter { it.length >= MIN_PLACE_NAME_TEXT_LENGTH }
+    return evidence
+        .filter { it.imageIndex == imageIndex }
+        .map { it.evidenceText.lowercase().filter(Char::isLetterOrDigit) }
+        .any { evidenceText -> groundingKeys.any(evidenceText::contains) }
+}
+
 private val ADDRESS_PATTERN = Regex(
     "(?:[가-힣]+(?:시|도)\\s+)?[가-힣]+(?:구|군|시)\\s+[가-힣A-Za-z0-9·.-]+(?:로|길|동)\\s*\\d+",
 )
