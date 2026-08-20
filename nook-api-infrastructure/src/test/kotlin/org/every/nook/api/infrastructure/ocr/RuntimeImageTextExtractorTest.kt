@@ -23,7 +23,7 @@ class RuntimeImageTextExtractorTest {
                     listOf(ImageTranscript(3, emptyList()))
                 },
                 OcrProviderType.OPENAI to provider(calls, OcrProviderType.OPENAI) {
-                    listOf(ImageTranscript(3, listOf("에이치커피로스터스", "서울 성동구")))
+                    listOf(ImageTranscript(3, listOf("가람커피", "서울 성동구")))
                 },
             ),
         )
@@ -31,7 +31,7 @@ class RuntimeImageTextExtractorTest {
         val result = extractor.extract(request)
 
         assertEquals(listOf(OcrProviderType.COREPIN, OcrProviderType.CLOVA, OcrProviderType.OPENAI), calls)
-        assertEquals(listOf("에이치커피로스터스", "서울 성동구"), result.single().texts)
+        assertEquals(listOf("가람커피", "서울 성동구"), result.single().texts)
     }
 
     @Test
@@ -41,13 +41,13 @@ class RuntimeImageTextExtractorTest {
             "CLOVA,COREPIN,OPENAI",
             mapOf(
                 OcrProviderType.CLOVA to provider(calls, OcrProviderType.CLOVA) {
-                    listOf(ImageTranscript(3, listOf("꼬레소레하우스")))
+                    listOf(ImageTranscript(3, listOf("누리상점")))
                 },
                 OcrProviderType.COREPIN to provider(calls, OcrProviderType.COREPIN) { error("must not run") },
             ),
         )
 
-        assertEquals(listOf("꼬레소레하우스"), extractor.extract(request).single().texts)
+        assertEquals(listOf("누리상점"), extractor.extract(request).single().texts)
         assertEquals(listOf(OcrProviderType.CLOVA), calls)
     }
 
@@ -58,7 +58,7 @@ class RuntimeImageTextExtractorTest {
             "unknown",
             mapOf(
                 OcrProviderType.OPENAI to provider(calls, OcrProviderType.OPENAI) {
-                    listOf(ImageTranscript(3, listOf("비전스트롤")))
+                    listOf(ImageTranscript(3, listOf("들꽃카페")))
                 },
             ),
         )

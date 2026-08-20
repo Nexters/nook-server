@@ -7,21 +7,35 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.compatibleWith(
     return filter { candidate -> PlaceAddressMatcher.isCompatible(addressHint, candidate.place.address) }
 }
 
-internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
+internal fun PlaceClue.isSupportedBy(
+    candidate: PlaceCandidate,
+    matchedQueries: Collection<String> = emptyList(),
+): Boolean {
     val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
     if (explicitAddressHint != null && !PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address)) {
         return false
     }
+    val hasGroundedAddressSearch = hasGroundedExactAddressSearch(candidate, matchedQueries)
 
-    val hasCompatibleIdentity = hasCompatibleName(candidate) || hasNameEvidence(candidate)
     val hasExactAddressEvidence = explicitAddressHint?.let { hint ->
         PlaceAddressMatcher.addressKeys(hint).intersect(PlaceAddressMatcher.addressKeys(candidate.address)).isNotEmpty()
     } == true
-    val hasAddressBackedOcrIdentity = hasExactAddressEvidence && hasPlausibleOcrIdentity(candidate)
-    if (explicitAddressHint != null && !hasCompatibleIdentity && !hasAddressBackedOcrIdentity) {
+    val hasCompatibleIdentity = hasCompatibleName(candidate) ||
+        hasNameEvidence(candidate, allowShortName = hasExactAddressEvidence)
+    val hasAddressBackedOcrIdentity = explicitAddressHint != null && hasPlausibleOcrIdentity(candidate)
+    val lacksCandidateIdentity = !hasCompatibleIdentity && !hasAddressBackedOcrIdentity
+    if (
+        explicitAddressHint != null &&
+        !hasGroundedAddressSearch &&
+        lacksCandidateIdentity
+    ) {
         return false
     }
-    return evidence.isEmpty() || hasCompatibleIdentity || hasCompatibleEvidence(candidate)
+    return hasGroundedAddressSearch ||
+        evidence.isEmpty() ||
+        hasCompatibleIdentity ||
+        hasAddressBackedOcrIdentity ||
+        hasCompatibleEvidence(candidate)
 }
 
 private fun PlaceClue.hasPlausibleOcrIdentity(candidate: PlaceCandidate): Boolean {
@@ -63,9 +77,10 @@ private fun PlaceClue.hasCompatibleName(candidate: PlaceCandidate): Boolean {
         }
 }
 
-private fun PlaceClue.hasNameEvidence(candidate: PlaceCandidate): Boolean {
+private fun PlaceClue.hasNameEvidence(candidate: PlaceCandidate, allowShortName: Boolean): Boolean {
     val candidateName = candidate.name.groundingKey()
-    return candidateName.length >= MIN_GROUNDING_KEY_LENGTH && evidence.any { clueEvidence ->
+    val minimumLength = if (allowShortName) 1 else MIN_GROUNDING_KEY_LENGTH
+    return candidateName.length >= minimumLength && evidence.any { clueEvidence ->
         clueEvidence.evidenceText.groundingKey().contains(candidateName)
     }
 }
@@ -98,6 +113,6 @@ private const val MIN_GROUNDING_KEY_LENGTH = 2
 private const val MIN_NAME_COMPATIBILITY_KEY_LENGTH = 3
 private const val MIN_FUZZY_NAME_LENGTH = 4
 private const val MAX_NAME_CHARACTER_DIFFERENCE = 1
-private const val MIN_NEAR_OCR_NAME_LENGTH = 6
+private const val MIN_NEAR_OCR_NAME_LENGTH = 3
 private const val MAX_OCR_NAME_EDIT_DISTANCE = 3
 private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6

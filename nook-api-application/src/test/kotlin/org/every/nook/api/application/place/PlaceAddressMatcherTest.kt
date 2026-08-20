@@ -8,6 +8,16 @@ import kotlin.test.assertTrue
 
 class PlaceAddressMatcherTest {
     @Test
+    fun `accepts a one-syllable OCR typo in a road name at the same district and building number`() {
+        assertTrue(
+            PlaceAddressMatcher.isCompatible(
+                "서울 광진구 가람로32길 50 1층",
+                "서울 광진구 나람로32길 50",
+            ),
+        )
+    }
+
+    @Test
     fun `accepts the same base address when provider omits floor and room details`() {
         val candidateAddress = "서울 중구 마른내로 55"
 
@@ -92,8 +102,8 @@ class PlaceAddressMatcherTest {
 
         assertEquals(
             listOf(
-                "파티오피즈 서울 용산구 이태원로20가길 11 4층",
                 "서울 용산구 이태원로20가길 11 4층",
+                "파티오피즈 서울 용산구 이태원로20가길 11 4층",
                 "파티오피즈",
                 "서울 용산구 파티오피즈",
             ),
@@ -117,8 +127,8 @@ class PlaceAddressMatcherTest {
 
         assertEquals(
             listOf(
-                "도원 서울 마포구 동교로38길 27-19 지1층 좌측",
                 "서울 마포구 동교로38길 27-19 지1층 좌측",
+                "도원 서울 마포구 동교로38길 27-19 지1층 좌측",
                 "도원",
                 "홍대입구역 도원",
             ),
@@ -137,8 +147,8 @@ class PlaceAddressMatcherTest {
 
         assertEquals(
             listOf(
-                "라벤다 lavender 서울 광진구 능동로50길 24 1층",
                 "서울 광진구 능동로50길 24 1층",
+                "라벤다 lavender 서울 광진구 능동로50길 24 1층",
                 "라벤다 lavender",
                 "중곡역 라벤다",
             ),
@@ -230,15 +240,51 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
-    fun `accepts a near OCR store name when the road address matches`() {
+    fun `grounds a one-character store name from OCR evidence at the exact address`() {
         val clue = PlaceClue(
-            name = "에이치커퍼스트스터스",
-            region = "서울 성동구",
-            queries = listOf("에이치커퍼스트스터스"),
-            addressHint = "서울 성동구 성수일로11길 10 1층",
+            name = "몬",
+            region = "서울 마포구",
+            queries = listOf("몬"),
+            addressHint = "서울 마포구 가람로37길 1 지1층",
+            evidence = listOf(
+                PlaceClueEvidence(7, "몬 서울특별시 마포구 가람로37길 1 지1층"),
+            ),
         )
 
-        assertTrue(clue.isSupportedBy(candidate("에이치커피로스터스", "서울 성동구 성수일로11길 10")))
+        assertTrue(
+            clue.isSupportedBy(
+                candidate("문", "서울 마포구 가람로37길 1"),
+                matchedQueries = listOf("서울 마포구 가람로37길 1 지1층"),
+            ),
+        )
+        assertFalse(clue.isSupportedBy(candidate("문", "서울 마포구 가람로37길 1")))
+    }
+
+    @Test
+    fun `grounds short OCR name typos when the road address has one OCR typo`() {
+        val clue = PlaceClue(
+            name = "모먼트",
+            region = "서울 광진구",
+            queries = listOf("모먼트"),
+            addressHint = "서울 광진구 가람로32길 50 1층",
+            evidence = listOf(
+                PlaceClueEvidence(10, "모먼트 서울 광진구 가람로32길 50 1층"),
+            ),
+        )
+
+        assertTrue(clue.isSupportedBy(candidate("모멘트", "서울 광진구 나람로32길 50")))
+    }
+
+    @Test
+    fun `accepts a near OCR store name when the road address matches`() {
+        val clue = PlaceClue(
+            name = "가람커퍼로스터스",
+            region = "서울 성동구",
+            queries = listOf("가람커퍼로스터스"),
+            addressHint = "서울 성동구 푸른로11길 10 1층",
+        )
+
+        assertTrue(clue.isSupportedBy(candidate("가람커피로스터스", "서울 성동구 푸른로11길 10")))
     }
 
     private fun candidate(name: String, address: String): PlaceCandidate = PlaceCandidate(
