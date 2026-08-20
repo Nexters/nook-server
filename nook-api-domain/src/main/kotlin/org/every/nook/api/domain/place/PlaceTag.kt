@@ -9,7 +9,7 @@ enum class PlaceTagCategory {
 }
 
 data class PlaceTagDefinition(
-    val tag: PlaceTag,
+    val tag: String,
     val category: PlaceTagCategory,
     val displayName: String,
     val matchingKeywords: Set<String>,
@@ -145,7 +145,7 @@ enum class PlaceTag(
         val selectableEntries: List<PlaceTag> = entries.filter(PlaceTag::selectable)
         val defaultDefinitions: List<PlaceTagDefinition> = selectableEntries.mapIndexed { index, tag ->
             PlaceTagDefinition(
-                tag = tag,
+                tag = tag.name,
                 category = tag.category,
                 displayName = tag.displayName,
                 matchingKeywords = tag.matchingKeywords,

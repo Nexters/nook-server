@@ -250,7 +250,7 @@ class AdminPersistenceAdapter(
                     provider = place.provider,
                     externalPlaceId = place.externalPlaceId,
                     thumbnailUrl = place.thumbnailUrl,
-                    representativeTags = place.representativeTags.map { it.name },
+                    representativeTags = place.representativeTags,
                     sequence = mapping.sequence,
                 )
             }

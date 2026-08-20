@@ -24,7 +24,7 @@ class StorePlaceTagsUseCaseTest {
         useCase(event(target(17, candidate())))
 
         assertEquals(
-            listOf(PlaceTag.AESTHETIC, PlaceTag.COZY, PlaceTag.DATE, PlaceTag.PARKING),
+            listOf(PlaceTag.AESTHETIC, PlaceTag.COZY, PlaceTag.DATE, PlaceTag.PARKING).map { it.name },
             stored.map(InferredPlaceTag::tag),
         )
     }
@@ -67,12 +67,24 @@ class StorePlaceTagsUseCaseTest {
         val request = requireNotNull(captured)
         assertEquals(2, request.places.size)
         assertEquals("누크 식당\n조용하고 데이트하기 좋아요", request.places.first().body)
-        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.DATE), request.places.first().candidateTags.map { it.tag })
+        assertEquals(
+            listOf(PlaceTag.QUIET, PlaceTag.DATE).map { it.name },
+            request.places.first().candidateTags.map { it.tag },
+        )
         assertEquals("다른 카페\n북적이는 핫플이에요", request.places.last().body)
-        assertEquals(listOf(PlaceTag.HOT_PLACE, PlaceTag.CROWDED), request.places.last().candidateTags.map { it.tag })
+        assertEquals(
+            listOf(PlaceTag.HOT_PLACE, PlaceTag.CROWDED).map { it.name },
+            request.places.last().candidateTags.map { it.tag },
+        )
         assertEquals(emptyList(), request.places.first().hashtags)
-        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.DATE), stored.getValue(17).map(InferredPlaceTag::tag))
-        assertEquals(listOf(PlaceTag.CROWDED, PlaceTag.HOT_PLACE), stored.getValue(18).map(InferredPlaceTag::tag))
+        assertEquals(
+            listOf(PlaceTag.QUIET, PlaceTag.DATE).map { it.name },
+            stored.getValue(17).map(InferredPlaceTag::tag),
+        )
+        assertEquals(
+            listOf(PlaceTag.CROWDED, PlaceTag.HOT_PLACE).map { it.name },
+            stored.getValue(18).map(InferredPlaceTag::tag),
+        )
     }
 
     @Test
@@ -99,7 +111,7 @@ class StorePlaceTagsUseCaseTest {
     @Test
     fun `uses enabled definitions from the persisted catalog instead of enum defaults`() {
         var capturedCandidates = emptyList<PlaceTagDefinition>()
-        val customQuiet = PlaceTag.defaultDefinitions.first { it.tag == PlaceTag.QUIET }.copy(
+        val customQuiet = PlaceTag.defaultDefinitions.first { it.tag == PlaceTag.QUIET.name }.copy(
             displayName = "고요한",
             matchingKeywords = setOf("정적이 흐르는"),
         )
@@ -111,7 +123,7 @@ class StorePlaceTagsUseCaseTest {
             },
             updatePort = PlaceTagUpdatePort { _, _, _ -> },
             catalogPort = PlaceTagCatalogQueryPort {
-                listOf(customQuiet, customQuiet.copy(tag = PlaceTag.COZY, enabled = false))
+                listOf(customQuiet, customQuiet.copy(tag = PlaceTag.COZY.name, enabled = false))
             },
         )
 
@@ -132,7 +144,7 @@ class StorePlaceTagsUseCaseTest {
                         listOf(
                             tag(
                                 PlaceTag.DESSERT,
-                                evidenceText = "본문에 디저트 관련 표현은 없으므로 선택하지 않습니다.",
+                                evidenceText = "본문에는 태그를 뒷받침할 표현이 없으므로 선택하지 않습니다.",
                             ),
                         ),
                     ),
@@ -150,7 +162,8 @@ class StorePlaceTagsUseCaseTest {
         StorePlaceTagsUseCase(
             sourcePort = PlaceTagSourcePort {
                 PlaceTagSource(
-                    "감성적이고 아늑하지만 조용하며 데이트하기 좋아요. 가성비가 좋고 주차 가능해요",
+                    "감성적이고 아늑하지만 조용하며 데이트하기 좋아요. " +
+                        "가성비가 좋고 주차 가능해요",
                     emptyList(),
                 )
             },
@@ -165,7 +178,7 @@ class StorePlaceTagsUseCaseTest {
                         PlaceTag.GOOD_VALUE,
                         PlaceTag.PARKING,
                     ),
-                    input.candidateTags.map { it.tag },
+                    input.candidateTags.map { it.tag }.map(PlaceTag::valueOf),
                 )
                 listOf(PlaceTagExtractor.Result(input.placeIndex, inferred))
             },
@@ -177,7 +190,7 @@ class StorePlaceTagsUseCaseTest {
     private fun target(placeId: Long, candidate: PlaceCandidate) = PlaceTagsRequestedEvent.Place(placeId, candidate)
 
     private fun tag(tag: PlaceTag, confidence: Double = 0.9, evidenceText: String = "근거") = InferredPlaceTag(
-        tag = tag,
+        tag = tag.name,
         confidence = confidence,
         evidenceSource = PlaceTagEvidenceSource.BODY,
         evidenceText = evidenceText,

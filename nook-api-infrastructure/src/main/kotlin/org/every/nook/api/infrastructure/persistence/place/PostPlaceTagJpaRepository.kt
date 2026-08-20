@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.persistence.place
 
-import org.every.nook.api.domain.place.PlaceTag
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -17,7 +16,9 @@ interface PostPlaceTagJpaRepository : JpaRepository<PostPlaceTagEntity, Long> {
         ORDER BY COUNT(id) DESC, AVG(confidence) DESC, tag ASC
         """,
     )
-    fun findRepresentativeTags(@Param("placeId") placeId: Long): List<PlaceTag>
+    fun findRepresentativeTags(@Param("placeId") placeId: Long): List<String>
+
+    fun findAllByTag(tag: String): List<PostPlaceTagEntity>
 
     @Query(
         value = """

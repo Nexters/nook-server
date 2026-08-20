@@ -86,6 +86,6 @@ class PlaceMapQueryPersistenceAdapter(
     private fun String?.toDisplayTags(tagCatalog: PlaceTagCatalogSnapshot): List<String> = if (this.isNullOrBlank()) {
         emptyList()
     } else {
-        tagCatalog.displayNames(objectMapper.readValue(this, Array<String>::class.java).map(PlaceTag::valueOf))
+        tagCatalog.displayNames(objectMapper.readValue(this, Array<String>::class.java).asList())
     }
 }

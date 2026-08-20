@@ -11,7 +11,6 @@ import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
-import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagDefinition
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
@@ -107,7 +106,7 @@ class OpenAiContentInferenceAdapter(
                 placeIndex = place.path("placeIndex").asInt(),
                 tags = place.path("tags").toList().map { tag ->
                     InferredPlaceTag(
-                        tag = PlaceTag.valueOf(tag.path("tag").asText()),
+                        tag = tag.path("tag").asText(),
                         confidence = tag.path("confidence").asDouble(),
                         evidenceSource = PlaceTagEvidenceSource.valueOf(tag.path("evidenceSource").asText()),
                         evidenceText = tag.path("evidenceText").asText().trim(),
@@ -386,7 +385,7 @@ private fun PlaceTagExtractor.Request.toInput(objectMapper: ObjectMapper): Strin
                 "hashtags" to input.hashtags,
                 "candidateTags" to input.candidateTags.map { tag ->
                     mapOf(
-                        "tag" to tag.tag.name,
+                        "tag" to tag.tag,
                         "category" to tag.category.name,
                         "displayName" to tag.displayName,
                         "keywords" to tag.matchingKeywords,
@@ -426,7 +425,7 @@ private fun placeTagSchema(places: List<PlaceTagExtractor.PlaceInput>): Map<Stri
 private fun placeTagItemSchema(candidateTags: List<PlaceTagDefinition>): Map<String, Any> = mapOf(
     "type" to "object",
     "properties" to mapOf(
-        "tag" to mapOf("type" to "string", "enum" to candidateTags.map { it.tag.name }),
+        "tag" to mapOf("type" to "string", "enum" to candidateTags.map { it.tag }),
         "confidence" to mapOf("type" to "number", "minimum" to 0, "maximum" to 1),
         "evidenceSource" to mapOf("type" to "string", "enum" to listOf("BODY", "HASHTAG")),
         "evidenceText" to mapOf("type" to "string"),

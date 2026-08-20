@@ -59,14 +59,14 @@ class OpenAiContentInferenceAdapterTest {
                         body = "혼자 먹기 좋고 조용해요",
                         hashtags = listOf("혼밥"),
                         candidateTags = PlaceTag.defaultDefinitions.filter {
-                            it.tag == PlaceTag.QUIET || it.tag == PlaceTag.SOLO_DINING
+                            it.tag == PlaceTag.QUIET.name || it.tag == PlaceTag.SOLO_DINING.name
                         },
                     ),
                 ),
             ),
         )
 
-        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING), tags.single().tags.map { it.tag })
+        assertEquals(listOf(PlaceTag.QUIET.name, PlaceTag.SOLO_DINING.name), tags.single().tags.map { it.tag })
         assertEquals(0.92, tags.single().tags.first().confidence)
         fixture.server.verify()
     }

@@ -70,7 +70,7 @@ class AdminPlacePersistenceAdapter(
             phoneNumber = place.phoneNumber,
             thumbnailUrl = place.thumbnailUrl,
             photoUrls = place.photoUrls,
-            representativeTags = place.representativeTags.map { it.name },
+            representativeTags = place.representativeTags,
             openingHours = place.openingHours,
             linkedPostCount = mappings.map { it.postId }.distinct().size.toLong(),
             affectedUserCount = savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId),
@@ -100,7 +100,7 @@ class AdminPlacePersistenceAdapter(
             command.phoneNumber,
             command.thumbnailUrl,
             command.photoUrls,
-            command.representativeTags.map(PlaceTag::valueOf),
+            command.representativeTags,
             command.openingHours,
             tagCatalogPort.findAll(),
         )
@@ -129,7 +129,7 @@ class AdminPlacePersistenceAdapter(
             provider = provider,
             externalPlaceId = externalPlaceId,
             thumbnailUrl = thumbnailUrl,
-            representativeTags = representativeTags.map { it.name },
+            representativeTags = representativeTags,
             linkedPostCount = if (includeImpact) linkedPostCount(placeId) else 0,
             affectedUserCount = if (includeImpact) {
                 savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId)

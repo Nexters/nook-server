@@ -11,7 +11,6 @@ import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
-import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagCategory
 import org.every.nook.api.domain.place.PlaceTagDefinition
 import org.every.nook.api.infrastructure.persistence.BaseEntity
@@ -31,8 +30,7 @@ import org.springframework.transaction.annotation.Transactional
 )
 class PlaceTagCatalogEntity(
     @Column(name = "tag_code", nullable = false, length = TAG_CODE_LENGTH, updatable = false)
-    @Enumerated(EnumType.STRING)
-    val tagCode: PlaceTag,
+    val tagCode: String,
     @Column(name = "category", nullable = false, length = CATEGORY_LENGTH)
     @Enumerated(EnumType.STRING)
     var category: PlaceTagCategory,
@@ -85,7 +83,7 @@ class PlaceTagCatalogEntity(
 interface PlaceTagCatalogJpaRepository : JpaRepository<PlaceTagCatalogEntity, Long> {
     fun findAllByOrderBySortOrderAscTagCodeAsc(): List<PlaceTagCatalogEntity>
 
-    fun findByTagCode(tagCode: PlaceTag): PlaceTagCatalogEntity?
+    fun findByTagCode(tagCode: String): PlaceTagCatalogEntity?
 }
 
 @Component

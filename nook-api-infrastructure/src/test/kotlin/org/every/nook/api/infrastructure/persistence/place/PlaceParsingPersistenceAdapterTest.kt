@@ -288,11 +288,11 @@ class PlaceParsingPersistenceAdapterTest {
     @Test
     fun `replaces post place tags and updates representative tags`() {
         val place = mock(PlaceEntity::class.java)
-        val inferred = InferredPlaceTag(PlaceTag.QUIET, 0.9, PlaceTagEvidenceSource.BODY, "조용해요")
+        val inferred = InferredPlaceTag(PlaceTag.QUIET.name, 0.9, PlaceTagEvidenceSource.BODY, "조용해요")
         `when`(postPlaceRepository.findByPostIdAndPlaceId(11, 17)).thenReturn(PostPlaceEntity(11, 17, 0))
         `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
         `when`(postPlaceTagRepository.findRepresentativeTags(17))
-            .thenReturn(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING))
+            .thenReturn(listOf(PlaceTag.QUIET.name, PlaceTag.SOLO_DINING.name))
 
         adapter.replace(11, 17, listOf(inferred))
 
@@ -300,7 +300,7 @@ class PlaceParsingPersistenceAdapterTest {
         order.verify(postPlaceTagRepository).deleteAllByPostIdAndPlaceId(11, 17)
         order.verify(postPlaceTagRepository).flush()
         order.verify(postPlaceTagRepository).saveAll(anyList<PostPlaceTagEntity>())
-        verify(place).updateRepresentativeTags(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING))
+        verify(place).updateRepresentativeTags(listOf(PlaceTag.QUIET.name, PlaceTag.SOLO_DINING.name))
     }
 
     private companion object {

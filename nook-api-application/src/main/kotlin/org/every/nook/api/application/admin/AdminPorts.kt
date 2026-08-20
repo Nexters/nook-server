@@ -1,6 +1,5 @@
 package org.every.nook.api.application.admin
 
-import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagCategory
 
 interface AdminPostQueryPort {
@@ -93,8 +92,39 @@ interface AdminPlaceTagCatalogPort {
 
     fun update(command: UpdateCommand): AdminPlaceTagDefinition?
 
+    fun create(command: CreateCommand): AdminPlaceTagDefinition
+
+    fun reorder(command: ReorderCommand)
+
+    fun deleteAndReplace(command: DeleteCommand): Boolean
+
+    data class CreateCommand(
+        val tagCode: String,
+        val category: PlaceTagCategory,
+        val displayName: String,
+        val matchingKeywords: List<String>,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+
+    data class ReorderCommand(
+        val tagCodes: List<String>,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+
+    data class DeleteCommand(
+        val tagCode: String,
+        val replacementTagCode: String,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+
     data class UpdateCommand(
-        val tagCode: PlaceTag,
+        val tagCode: String,
         val category: PlaceTagCategory,
         val displayName: String,
         val matchingKeywords: List<String>,

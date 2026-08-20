@@ -4,7 +4,6 @@ import org.every.nook.api.domain.place.PlaceTag
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class UpdateAdminPlaceTagUseCaseTest {
     @Test
@@ -25,19 +24,16 @@ class UpdateAdminPlaceTagUseCaseTest {
             ),
         )
 
-        assertEquals(PlaceTag.QUIET, captured?.tagCode)
+        assertEquals(PlaceTag.QUIET.name, captured?.tagCode)
         assertEquals("고요한", result.displayName)
         assertEquals(listOf("조용", "고요한"), captured?.matchingKeywords)
         assertEquals("기획 변경", captured?.reason)
     }
 
     @Test
-    fun `does not allow legacy compatibility tags to enter the managed catalog`() {
+    fun `allows a dynamically created tag code`() {
         val useCase = UpdateAdminPlaceTagUseCase(port { view(it) })
-
-        assertFailsWith<IllegalArgumentException> {
-            useCase(command(tagCode = PlaceTag.FAST.name))
-        }
+        assertEquals("TAG_dynamic", useCase(command(tagCode = "TAG_dynamic")).tagCode)
     }
 
     private fun port(update: (AdminPlaceTagCatalogPort.UpdateCommand) -> AdminPlaceTagDefinition) =
@@ -50,6 +46,9 @@ class UpdateAdminPlaceTagUseCaseTest {
             ) = AdminPage<AdminPlaceTagDefinition>(emptyList(), 0)
 
             override fun update(command: AdminPlaceTagCatalogPort.UpdateCommand) = update(command)
+            override fun create(command: AdminPlaceTagCatalogPort.CreateCommand) = error("not used")
+            override fun reorder(command: AdminPlaceTagCatalogPort.ReorderCommand) = Unit
+            override fun deleteAndReplace(command: AdminPlaceTagCatalogPort.DeleteCommand) = false
         }
 
     private fun command(
@@ -70,8 +69,8 @@ class UpdateAdminPlaceTagUseCaseTest {
     )
 
     private fun view(command: AdminPlaceTagCatalogPort.UpdateCommand) = AdminPlaceTagDefinition(
-        id = command.tagCode.name,
-        tagCode = command.tagCode.name,
+        id = command.tagCode,
+        tagCode = command.tagCode,
         category = command.category.name,
         displayName = command.displayName,
         matchingKeywords = command.matchingKeywords,

@@ -19,3 +19,35 @@ Content-Type: application/json
   "sortOrder": 2,
   "reason": "기획 태그 정책 반영"
 }
+
+### 장소 태그 추가
+POST {{baseUrl}}/api/admin/v1/place-tags
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "category": "ATMOSPHERE",
+  "displayName": "포근한",
+  "matchingKeywords": ["포근한", "포근한 분위기"],
+  "reason": "운영 카탈로그 확장"
+}
+
+### 장소 태그 순서 일괄 변경
+PUT {{baseUrl}}/api/admin/v1/place-tags/order
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "tagCodes": ["AESTHETIC", "COZY", "QUIET"],
+  "reason": "드래그로 정렬 순서 변경"
+}
+
+### 장소 태그 대체 후 삭제
+DELETE {{baseUrl}}/api/admin/v1/place-tags/QUIET
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "replacementTagCode": "CALM",
+  "reason": "유사 태그 통합"
+}

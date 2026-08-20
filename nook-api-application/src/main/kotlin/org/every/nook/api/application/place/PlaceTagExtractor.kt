@@ -1,6 +1,5 @@
 package org.every.nook.api.application.place
 
-import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagDefinition
 
 fun interface PlaceTagExtractor {
@@ -24,7 +23,7 @@ fun interface PlaceTagExtractor {
 }
 
 data class InferredPlaceTag(
-    val tag: PlaceTag,
+    val tag: String,
     val confidence: Double,
     val evidenceSource: PlaceTagEvidenceSource,
     val evidenceText: String,

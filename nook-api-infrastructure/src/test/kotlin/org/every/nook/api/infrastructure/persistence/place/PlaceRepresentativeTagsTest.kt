@@ -24,11 +24,11 @@ class PlaceRepresentativeTagsTest {
                 PlaceTag.QUIET,
                 PlaceTag.DATE,
                 PlaceTag.PARKING,
-            ),
+            ).map { it.name },
         )
 
         assertEquals(
-            listOf(PlaceTag.AESTHETIC, PlaceTag.COZY, PlaceTag.DATE, PlaceTag.PARKING),
+            listOf(PlaceTag.AESTHETIC, PlaceTag.COZY, PlaceTag.DATE, PlaceTag.PARKING).map { it.name },
             place.representativeTags,
         )
     }

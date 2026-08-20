@@ -82,7 +82,7 @@ class PlaceEntity(
     var photoUrls: List<String> = emptyList(),
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "representative_tags", nullable = false, columnDefinition = "JSON")
-    var representativeTags: List<PlaceTag> = emptyList(),
+    var representativeTags: List<String> = emptyList(),
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -140,10 +140,7 @@ class PlaceEntity(
         thumbnailParsingStatus = status
     }
 
-    fun updateRepresentativeTags(
-        tags: List<PlaceTag>,
-        catalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions,
-    ) {
+    fun updateRepresentativeTags(tags: List<String>, catalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions) {
         val definitionsByTag = catalog.filter(PlaceTagDefinition::enabled).associateBy(PlaceTagDefinition::tag)
         val categoryCounts = mutableMapOf<PlaceTagCategory, Int>()
         representativeTags = tags.asSequence()
@@ -178,7 +175,7 @@ class PlaceEntity(
         phoneNumber: String?,
         thumbnailUrl: String?,
         photoUrls: List<String>,
-        representativeTags: List<PlaceTag>,
+        representativeTags: List<String>,
         openingHours: PlaceOpeningHours?,
         tagCatalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions,
     ) {

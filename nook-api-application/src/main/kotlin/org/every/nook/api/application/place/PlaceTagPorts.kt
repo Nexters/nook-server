@@ -1,6 +1,5 @@
 package org.every.nook.api.application.place
 
-import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagDefinition
 
 fun interface PlaceTagCatalogQueryPort {
@@ -13,7 +12,7 @@ class PlaceTagCatalogSnapshot(definitions: List<PlaceTagDefinition>) {
         .sortedBy(PlaceTagDefinition::sortOrder)
     private val enabledByTag = enabledDefinitions.associateBy(PlaceTagDefinition::tag)
 
-    fun displayNames(tags: Iterable<PlaceTag>): List<String> = tags.mapNotNull { enabledByTag[it]?.displayName }
+    fun displayNames(tags: Iterable<String>): List<String> = tags.mapNotNull { enabledByTag[it]?.displayName }
 }
 
 fun PlaceTagCatalogQueryPort.snapshot(): PlaceTagCatalogSnapshot = PlaceTagCatalogSnapshot(findAll())
