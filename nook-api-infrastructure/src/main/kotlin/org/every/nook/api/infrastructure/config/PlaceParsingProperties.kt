@@ -11,15 +11,18 @@ data class PlaceParsingProperties(
         Duration.ofSeconds(RETRY_SECONDS),
     ),
     val processingTimeout: Duration = Duration.ofMinutes(1),
+    val imageOcrConcurrency: Int = DEFAULT_IMAGE_OCR_CONCURRENCY,
 ) {
     init {
         require(retryBackoffs.size == RETRY_COUNT) { "Exactly $RETRY_COUNT retry backoffs are required" }
         require(retryBackoffs.all { !it.isNegative && !it.isZero }) { "Retry backoffs must be positive" }
         require(!processingTimeout.isNegative && !processingTimeout.isZero) { "Processing timeout must be positive" }
+        require(imageOcrConcurrency > 0) { "Image OCR concurrency must be positive" }
     }
 
     private companion object {
         const val RETRY_COUNT = 3
         const val RETRY_SECONDS = 3L
+        const val DEFAULT_IMAGE_OCR_CONCURRENCY = 4
     }
 }

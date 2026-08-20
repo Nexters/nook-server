@@ -39,7 +39,8 @@ class PlaceParsingResilienceTest {
     fun `recovers unused image clues and retranscribes only insufficient unused images`() {
         val port = FakeJobPort(body = "카페 4곳", imageUrls = (1..4).map { "https://cdn.test/$it.jpg" })
         val clueRequests = mutableListOf<PlaceClueExtractor.Request>()
-        val transcriptRequests = mutableListOf<ImageTextExtractor.Request>()
+        val transcriptRequests = java.util.Collections.synchronizedList(mutableListOf<ImageTextExtractor.Request>())
+        val callsByImage = java.util.concurrent.ConcurrentHashMap<Int, Int>()
         val useCase = useCase(
             port = port,
             clueExtractor = PlaceClueExtractor { request ->
@@ -58,26 +59,28 @@ class PlaceParsingResilienceTest {
             },
             imageTextExtractor = ImageTextExtractor { request ->
                 transcriptRequests += request
-                if (transcriptRequests.size == 1) {
-                    listOf(
-                        ImageTranscript(1, listOf("기존 장소", "서울 중구")),
-                        ImageTranscript(2, listOf("두 번째 장소", "서울 종로구")),
-                        ImageTranscript(3, listOf("세 번째 장소", "서울 용산구")),
-                        ImageTranscript(4, listOf("공통 워터마크")),
-                    )
-                } else {
-                    request.images.map { ImageTranscript(it.imageIndex, listOf("네 번째 장소", "서울 마포구")) }
+                val image = request.images.single()
+                val call = callsByImage.merge(image.imageIndex, 1, Int::plus)
+                val texts = when (image.imageIndex) {
+                    1 -> listOf("기존 장소", "서울 중구")
+
+                    2 -> listOf("두 번째 장소", "서울 종로구")
+
+                    3 -> listOf("세 번째 장소", "서울 용산구")
+
+                    else -> if (call == 1) {
+                        listOf("공통 워터마크")
+                    } else {
+                        listOf("네 번째 장소", "서울 마포구")
+                    }
                 }
+                listOf(ImageTranscript(image.imageIndex, texts))
             },
         )
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
-        assertEquals(
-            listOf(listOf(1, 2, 3, 4), listOf(4)),
-            transcriptRequests.map { request ->
-                request.images.map(ImageTextExtractor.ImageInput::imageIndex)
-            },
-        )
+        assertEquals(mapOf(1 to 1, 2 to 1, 3 to 1, 4 to 2), callsByImage)
+        assertEquals(setOf(1), transcriptRequests.map { it.images.size }.toSet())
         assertEquals(listOf(2, 3, 4), clueRequests.last().imageTranscripts.map(ImageTranscript::imageIndex))
         assertEquals(listOf("1", "2", "3", "4"), port.completed.map(PlaceCandidate::externalPlaceId))
         assertEquals(
