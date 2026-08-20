@@ -23,6 +23,7 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRe
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.mockito.ArgumentMatchers.anyList
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -295,8 +296,10 @@ class PlaceParsingPersistenceAdapterTest {
 
         adapter.replace(11, 17, listOf(inferred))
 
-        verify(postPlaceTagRepository).deleteAllByPostIdAndPlaceId(11, 17)
-        verify(postPlaceTagRepository).saveAll(anyList<PostPlaceTagEntity>())
+        val order = inOrder(postPlaceTagRepository)
+        order.verify(postPlaceTagRepository).deleteAllByPostIdAndPlaceId(11, 17)
+        order.verify(postPlaceTagRepository).flush()
+        order.verify(postPlaceTagRepository).saveAll(anyList<PostPlaceTagEntity>())
         verify(place).updateRepresentativeTags(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING))
     }
 

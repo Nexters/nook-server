@@ -33,16 +33,17 @@ class OpenAiContentInferenceAdapterTest {
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(containsString("place_tags")))
             .andExpect(content().string(containsString("SOLO_DINING")))
-            .andExpect(content().string(containsString("IMAGE_VISUAL")))
+            .andExpect(content().string(not(containsString("input_image"))))
+            .andExpect(content().string(containsString("placeIndex")))
             .andExpect(content().string(containsString("혼자 먹기 좋고 조용해요")))
             .andRespond(
                 withSuccess(
                     response(
                         """
-                        {"tags":[
-                          {"tag":"QUIET","confidence":0.92,"evidenceSource":"BODY","evidenceText":"조용해요"},
-                          {"tag":"SOLO_DINING","confidence":0.88,"evidenceSource":"BODY","evidenceText":"혼자 먹기 좋아요"}
-                        ]}
+                        {"places":[{"placeIndex":0,"tags":[
+                            {"tag":"QUIET","confidence":0.92,"evidenceSource":"BODY","evidenceText":"조용해요"},
+                            {"tag":"SOLO_DINING","confidence":0.88,"evidenceSource":"BODY","evidenceText":"혼자 먹기 좋아요"}
+                        ]}]}
                         """.trimIndent(),
                     ),
                     MediaType.APPLICATION_JSON,
@@ -51,15 +52,20 @@ class OpenAiContentInferenceAdapterTest {
 
         val tags = fixture.adapter.extract(
             PlaceTagExtractor.Request(
-                place = candidate(),
-                body = "혼자 먹기 좋고 조용해요",
-                hashtags = listOf("혼밥"),
-                imageUrls = emptyList(),
+                places = listOf(
+                    PlaceTagExtractor.PlaceInput(
+                        placeIndex = 0,
+                        place = candidate(),
+                        body = "혼자 먹기 좋고 조용해요",
+                        hashtags = listOf("혼밥"),
+                        candidateTags = listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING),
+                    ),
+                ),
             ),
         )
 
-        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING), tags.map { it.tag })
-        assertEquals(0.92, tags.first().confidence)
+        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING), tags.single().tags.map { it.tag })
+        assertEquals(0.92, tags.single().tags.first().confidence)
         fixture.server.verify()
     }
 

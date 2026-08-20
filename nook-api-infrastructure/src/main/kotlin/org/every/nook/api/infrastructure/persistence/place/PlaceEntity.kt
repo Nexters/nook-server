@@ -15,6 +15,7 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagCategory
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 import org.hibernate.annotations.JdbcTypeCode
@@ -95,6 +96,7 @@ class PlaceEntity(
         const val THUMBNAIL_PARSING_STATUS_LENGTH = 20
         const val GOOGLE_PLACE_ID_MAX_LENGTH = 255
         private const val MAX_REPRESENTATIVE_TAG_COUNT = 4
+        private const val MAX_REPRESENTATIVE_TAG_COUNT_PER_CATEGORY = 2
         private val logger = KotlinLogging.logger {}
     }
 
@@ -138,7 +140,21 @@ class PlaceEntity(
     }
 
     fun updateRepresentativeTags(tags: List<PlaceTag>) {
-        representativeTags = tags.take(MAX_REPRESENTATIVE_TAG_COUNT)
+        val categoryCounts = mutableMapOf<PlaceTagCategory, Int>()
+        representativeTags = tags.asSequence()
+            .filter(PlaceTag::selectable)
+            .distinct()
+            .filter { tag ->
+                val count = categoryCounts.getOrDefault(tag.category, 0)
+                if (count >= MAX_REPRESENTATIVE_TAG_COUNT_PER_CATEGORY) {
+                    false
+                } else {
+                    categoryCounts[tag.category] = count + 1
+                    true
+                }
+            }
+            .take(MAX_REPRESENTATIVE_TAG_COUNT)
+            .toList()
     }
 
     fun updateBasicInformation(name: String, address: String) {
@@ -165,7 +181,7 @@ class PlaceEntity(
         this.phoneNumber = phoneNumber
         this.thumbnailUrl = thumbnailUrl
         this.photoUrls = photoUrls
-        this.representativeTags = representativeTags.take(MAX_REPRESENTATIVE_TAG_COUNT)
+        updateRepresentativeTags(representativeTags)
         this.openingHours = openingHours
     }
 }

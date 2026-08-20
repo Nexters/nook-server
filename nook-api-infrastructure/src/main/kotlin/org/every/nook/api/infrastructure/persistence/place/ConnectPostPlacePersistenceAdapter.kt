@@ -52,7 +52,12 @@ class ConnectPostPlacePersistenceAdapter(
         }
         bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
         sharedBookmarkSyncRepository.insertForActiveSubscribers(savedPostId = savedPostId, placeId = placeId)
-        eventPublisher.publishEvent(PlaceTagsRequestedEvent(savedPost.postId, placeId, candidate))
+        eventPublisher.publishEvent(
+            PlaceTagsRequestedEvent(
+                savedPost.postId,
+                listOf(PlaceTagsRequestedEvent.Place(placeId, candidate)),
+            ),
+        )
         return ConnectPostPlacePort.Result.Connected(placeId)
     }
 

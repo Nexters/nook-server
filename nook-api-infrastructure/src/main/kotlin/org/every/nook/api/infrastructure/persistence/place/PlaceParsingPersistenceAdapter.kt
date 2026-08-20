@@ -160,9 +160,7 @@ class PlaceParsingPersistenceAdapter(
                 ),
             )
         }
-        resolvedPlaces.map { it.first }.zip(postPlaces).forEach { (place, postPlace) ->
-            eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, postPlace.placeId, place))
-        }
+        publishPlaceTagRequests(postId, resolvedPlaces, postPlaces)
     }
 
     @Transactional
@@ -176,16 +174,23 @@ class PlaceParsingPersistenceAdapter(
             ?.updateThumbnailParsing(status, supplement)
     }
 
+    private fun publishPlaceTagRequests(
+        postId: Long,
+        resolvedPlaces: List<Pair<PlaceCandidate, PlaceEntity>>,
+        postPlaces: List<PostPlaceEntity>,
+    ) {
+        val places = resolvedPlaces.map { it.first }.zip(postPlaces).map { (place, postPlace) ->
+            PlaceTagsRequestedEvent.Place(postPlace.placeId, place)
+        }
+        eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, places))
+    }
+
     @Transactional(readOnly = true)
     override fun find(postId: Long): PlaceTagSource? {
         val post = postRepository.findById(postId).orElse(null) ?: return null
         return PlaceTagSource(
             body = post.body,
             hashtags = hashtagRepository.findAllByPostIdOrderBySequenceAsc(postId).map { it.hashtag },
-            imageUrls = mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(
-                postId,
-                PostMedia.MediaType.IMAGE,
-            ).map { it.mediaUrl },
         )
     }
 
@@ -198,6 +203,7 @@ class PlaceParsingPersistenceAdapter(
             "Post place relation does not exist"
         }
         postPlaceTagRepository.deleteAllByPostIdAndPlaceId(postId, placeId)
+        postPlaceTagRepository.flush()
         postPlaceTagRepository.saveAll(tags.map { it.toEntity(postId, placeId) })
         placeRepository.findById(placeId).orElseThrow().updateRepresentativeTags(
             postPlaceTagRepository.findRepresentativeTags(placeId).take(MAX_REPRESENTATIVE_TAG_COUNT),
