@@ -28,6 +28,115 @@ class PlaceIdentityMatcherTest {
     }
 
     @Test
+    fun `matches a store when another provider adds a neighborhood suffix`() {
+        val kakao = place(
+            name = "보후밀 효창공원",
+            address = "서울 마포구 효창목2길 30",
+            latitude = "37.5459790",
+            longitude = "126.9591043",
+        )
+        val naver = candidate(
+            name = "보후밀",
+            address = "서울특별시 마포구 효창목2길 30 1층 일부호",
+            latitude = "37.5459824",
+            longitude = "126.9591035",
+        )
+
+        assertTrue(matcher.matches(kakao, naver))
+    }
+
+    @Test
+    fun `matches an exact store name at an adjacent road number`() {
+        val kakao = place(
+            name = "감나무집기사식당",
+            address = "서울 마포구 연남로 23",
+            latitude = "37.5617089",
+            longitude = "126.9221585",
+        )
+        val naver = candidate(
+            name = "감나무집기사식당",
+            address = "서울특별시 마포구 연남로 25",
+            latitude = "37.5617165",
+            longitude = "126.9221264",
+        )
+
+        assertTrue(matcher.matches(kakao, naver))
+    }
+
+    @Test
+    fun `does not merge another store at an adjacent road number`() {
+        val restaurant = place(
+            name = "감나무집기사식당",
+            address = "서울 마포구 연남로 23",
+            latitude = "37.5617089",
+            longitude = "126.9221585",
+        )
+        val anotherStore = candidate(
+            name = "연남동기사식당",
+            address = "서울특별시 마포구 연남로 25",
+            latitude = "37.5617165",
+            longitude = "126.9221264",
+        )
+
+        assertFalse(matcher.matches(restaurant, anotherStore))
+    }
+
+    @Test
+    fun `does not merge an exact store name when road numbers are not adjacent`() {
+        val restaurant = place(
+            name = "감나무집기사식당",
+            address = "서울 마포구 연남로 23",
+            latitude = "37.5617089",
+            longitude = "126.9221585",
+        )
+        val distantNumber = candidate(
+            name = "감나무집기사식당",
+            address = "서울특별시 마포구 연남로 29",
+            latitude = "37.5617165",
+            longitude = "126.9221264",
+        )
+
+        assertFalse(matcher.matches(restaurant, distantNumber))
+    }
+
+    @Test
+    fun `does not merge an adjacent road number returned by the same provider`() {
+        val restaurant = place(
+            name = "감나무집기사식당",
+            address = "서울 마포구 연남로 23",
+            latitude = "37.5617089",
+            longitude = "126.9221585",
+        )
+        val sameProvider = candidate(
+            provider = "KAKAO",
+            name = "감나무집기사식당",
+            address = "서울 마포구 연남로 25",
+            latitude = "37.5617165",
+            longitude = "126.9221264",
+        )
+
+        assertFalse(matcher.matches(restaurant, sameProvider))
+    }
+
+    @Test
+    fun `does not merge an adjacent road number outside the strict radius`() {
+        val restaurant = place(
+            name = "감나무집기사식당",
+            address = "서울 마포구 연남로 23",
+            latitude = "37.5617089",
+            longitude = "126.9221585",
+        )
+        val fartherCandidate = candidate(
+            name = "감나무집기사식당",
+            address = "서울특별시 마포구 연남로 25",
+            latitude = "37.5618500",
+            longitude = "126.9221585",
+        )
+
+        assertFalse(matcher.matches(restaurant, fartherCandidate))
+    }
+
+    @Test
     fun `does not merge another store in the same building`() {
         val halfHouse = place(
             name = "하프하우스 강남역점",
@@ -72,8 +181,14 @@ class PlaceIdentityMatcherTest {
         longitude = BigDecimal(longitude),
     )
 
-    private fun candidate(name: String, address: String, latitude: String, longitude: String) = PlaceCandidate(
-        provider = "NAVER",
+    private fun candidate(
+        name: String,
+        address: String,
+        latitude: String,
+        longitude: String,
+        provider: String = "NAVER",
+    ) = PlaceCandidate(
+        provider = provider,
         externalPlaceId = "naver-half-house",
         name = name,
         address = address,

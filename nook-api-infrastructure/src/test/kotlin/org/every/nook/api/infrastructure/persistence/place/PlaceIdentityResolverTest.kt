@@ -68,6 +68,58 @@ class PlaceIdentityResolverTest {
     }
 
     @Test
+    fun `registers an adjacent naver road number on the exact-name kakao place`() {
+        val candidate = candidate(
+            name = "감나무집기사식당",
+            externalPlaceId = "naver-gamnamu",
+            address = "서울특별시 마포구 연남로 25",
+            latitude = "37.5617165",
+            longitude = "126.9221264",
+        )
+        val canonical = mockPlace(
+            id = 717,
+            provider = "KAKAO",
+            externalPlaceId = "1641347883",
+            name = "감나무집기사식당",
+            address = "서울 마포구 연남로 23",
+            latitude = "37.5617089",
+            longitude = "126.9221585",
+        )
+        val alias = PlaceProviderReferenceEntity(717, "NAVER", "naver-gamnamu")
+        `when`(referenceRepository.findByProviderAndExternalPlaceId("NAVER", "naver-gamnamu"))
+            .thenReturn(null, alias)
+        `when`(referenceRepository.findByProviderAndExternalPlaceId("KAKAO", "1641347883"))
+            .thenReturn(null)
+        `when`(placeRepository.findByProviderAndExternalPlaceId("NAVER", "naver-gamnamu"))
+            .thenReturn(null)
+        `when`(
+            placeRepository.findAllByLatitudeBetweenAndLongitudeBetween(
+                BigDecimal("37.5612165"),
+                BigDecimal("37.5622165"),
+                BigDecimal("126.9214264"),
+                BigDecimal("126.9228264"),
+            ),
+        ).thenReturn(listOf(canonical))
+        `when`(placeRepository.findById(717)).thenReturn(Optional.of(canonical))
+
+        val resolved = resolver.resolve(candidate)
+
+        assertEquals(canonical, resolved)
+        verify(referenceRepository).insertIgnore(717, "NAVER", "naver-gamnamu")
+        verify(placeRepository, never()).insertIgnore(
+            candidate.provider,
+            candidate.externalPlaceId,
+            candidate.name,
+            candidate.address,
+            candidate.city,
+            candidate.latitude,
+            candidate.longitude,
+            candidate.category,
+            candidate.phoneNumber,
+        )
+    }
+
+    @Test
     fun `creates a separate place for another store in the same building`() {
         val candidate = candidate(name = "강남역 베이커리", externalPlaceId = "another-store")
         val halfHouse = mockPlace(928, "KAKAO", "170705999")
@@ -106,13 +158,19 @@ class PlaceIdentityResolverTest {
         verify(referenceRepository).insertIgnore(930, "NAVER", "another-store")
     }
 
-    private fun candidate(name: String = "하프하우스", externalPlaceId: String = "naver-half-house") = PlaceCandidate(
+    private fun candidate(
+        name: String = "하프하우스",
+        externalPlaceId: String = "naver-half-house",
+        address: String = "서울특별시 강남구 강남대로84길 13 강남역 KR 타워 1층, 2층",
+        latitude: String = "37.4967981",
+        longitude: String = "127.0296710",
+    ) = PlaceCandidate(
         provider = "NAVER",
         externalPlaceId = externalPlaceId,
         name = name,
-        address = "서울특별시 강남구 강남대로84길 13 강남역 KR 타워 1층, 2층",
-        latitude = BigDecimal("37.4967981"),
-        longitude = BigDecimal("127.0296710"),
+        address = address,
+        latitude = BigDecimal(latitude),
+        longitude = BigDecimal(longitude),
         category = "음식점",
         phoneNumber = null,
         providerUrl = null,
@@ -123,13 +181,16 @@ class PlaceIdentityResolverTest {
         provider: String,
         externalPlaceId: String,
         name: String = "하프하우스 강남역점",
+        address: String = "서울 강남구 강남대로84길 13",
+        latitude: String = "37.4968714",
+        longitude: String = "127.0295841",
     ): PlaceEntity = mock(PlaceEntity::class.java).also { place ->
         `when`(place.id).thenReturn(id)
         `when`(place.provider).thenReturn(provider)
         `when`(place.externalPlaceId).thenReturn(externalPlaceId)
         `when`(place.name).thenReturn(name)
-        `when`(place.address).thenReturn("서울 강남구 강남대로84길 13")
-        `when`(place.latitude).thenReturn(BigDecimal("37.4968714"))
-        `when`(place.longitude).thenReturn(BigDecimal("127.0295841"))
+        `when`(place.address).thenReturn(address)
+        `when`(place.latitude).thenReturn(BigDecimal(latitude))
+        `when`(place.longitude).thenReturn(BigDecimal(longitude))
     }
 }
