@@ -93,6 +93,8 @@ external:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com}
     api-key: ${OPENAI_API_KEY:}
     model: ${OPENAI_MODEL:gpt-5-nano}
+    max-concurrent-requests: ${OPENAI_MAX_CONCURRENT_REQUESTS:4}
+    rate-limit-retry-backoffs: ${OPENAI_RATE_LIMIT_RETRY_BACKOFFS:1s,2s,4s}
     connect-timeout: ${OPENAI_CONNECT_TIMEOUT:3s}
     read-timeout: ${OPENAI_READ_TIMEOUT:30s}
   kakao-local:
