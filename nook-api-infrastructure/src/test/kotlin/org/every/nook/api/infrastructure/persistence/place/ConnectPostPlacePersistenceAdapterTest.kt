@@ -1,7 +1,8 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
-import org.every.nook.api.application.place.PlaceSupplement
+import org.every.nook.api.application.place.PlaceTagsRequestedEvent
+import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
@@ -12,6 +13,7 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaR
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
@@ -44,7 +46,7 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.PostNotFound,
-            adapter.connect(7, 11, candidate(), null),
+            adapter.connect(7, 11, candidate()),
         )
         verifyNoInteractions(placeIdentityResolver, savedPostPlaceRepository, bookmarkRepository)
     }
@@ -58,7 +60,7 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.ParsingInProgress,
-            adapter.connect(7, 11, candidate(), null),
+            adapter.connect(7, 11, candidate()),
         )
         verifyNoInteractions(placeIdentityResolver, savedPostPlaceRepository, bookmarkRepository)
     }
@@ -76,20 +78,9 @@ class ConnectPostPlacePersistenceAdapterTest {
         `when`(savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11))
             .thenReturn(listOf(UserSavedPostPlaceEntity(11, 16, 0)))
 
-        assertEquals(
-            ConnectPostPlacePort.Result.Connected(17),
-            adapter.connect(
-                7,
-                11,
-                candidate(),
-                PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")),
-            ),
-        )
+        assertEquals(ConnectPostPlacePort.Result.Connected(17), adapter.connect(7, 11, candidate()))
 
-        verify(place).updateThumbnailParsing(
-            PlaceThumbnailParsingStatus.COMPLETED,
-            PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg")),
-        )
+        verify(place).updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
         verify(placeIdentityResolver).resolve(candidate())
         verify(sharedBookmarkSyncRepository).insertForActiveSubscribers(savedPostId = 11, placeId = 17)
         val captor = ArgumentCaptor.forClass(UserSavedPostPlaceEntity::class.java)
@@ -98,6 +89,12 @@ class ConnectPostPlacePersistenceAdapterTest {
         assertEquals(17, captor.value.placeId)
         assertEquals(1, captor.value.sequence)
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "게시물 메모")
+        val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
+        verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture())
+        val thumbnailEvent = eventCaptor.allValues.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
+        assertEquals(101, thumbnailEvent.postId)
+        assertEquals(listOf(candidate()), thumbnailEvent.requests.map { it.place })
+        assertEquals(1, eventCaptor.allValues.filterIsInstance<PlaceTagsRequestedEvent>().size)
         assertEquals(PlaceParsingStatus.FAILED, job.status)
         assertEquals("failed", job.failureReason)
     }
@@ -116,7 +113,7 @@ class ConnectPostPlacePersistenceAdapterTest {
 
         assertEquals(
             ConnectPostPlacePort.Result.Connected(17),
-            adapter.connect(7, 11, candidate(), null),
+            adapter.connect(7, 11, candidate()),
         )
 
         verify(savedPostPlaceRepository, never()).save(org.mockito.ArgumentMatchers.any())
