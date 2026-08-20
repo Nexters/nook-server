@@ -1,5 +1,6 @@
 package org.every.nook.api.application.admin
 
+import org.every.nook.api.application.place.PlaceOpeningHours
 import java.time.Instant
 
 data class AdminPage<T>(val items: List<T>, val total: Long)
@@ -30,8 +31,13 @@ data class AdminPostDetail(
     val placeParsingFailureReason: String?,
     val savedUserCount: Long,
     val mappingReviewed: Boolean,
-    val places: List<AdminMappedPlace>,
+    val hashtags: List<String> = emptyList(),
+    val media: List<AdminPostMedia> = emptyList(),
+    val manuallyOverridden: Boolean = false,
+    val places: List<AdminMappedPlace> = emptyList(),
 )
+
+data class AdminPostMedia(val mediaType: String, val mediaUrl: String, val sequence: Int)
 
 data class AdminMappedPlace(
     val id: Long,
@@ -39,6 +45,8 @@ data class AdminMappedPlace(
     val address: String,
     val provider: String,
     val externalPlaceId: String,
+    val thumbnailUrl: String? = null,
+    val representativeTags: List<String> = emptyList(),
     val sequence: Int,
 )
 
@@ -48,8 +56,10 @@ data class AdminPlaceSummary(
     val address: String,
     val provider: String,
     val externalPlaceId: String,
-    val linkedPostCount: Long,
-    val affectedUserCount: Long,
+    val thumbnailUrl: String?,
+    val representativeTags: List<String>,
+    val linkedPostCount: Long = 0,
+    val affectedUserCount: Long = 0,
 )
 
 data class AdminPlaceDetail(
@@ -58,9 +68,18 @@ data class AdminPlaceDetail(
     val address: String,
     val provider: String,
     val externalPlaceId: String,
-    val linkedPostCount: Long,
-    val affectedUserCount: Long,
-    val posts: List<AdminLinkedPost>,
+    val city: String? = null,
+    val latitude: String = "",
+    val longitude: String = "",
+    val category: String? = null,
+    val phoneNumber: String? = null,
+    val thumbnailUrl: String? = null,
+    val photoUrls: List<String> = emptyList(),
+    val representativeTags: List<String> = emptyList(),
+    val openingHours: PlaceOpeningHours? = null,
+    val linkedPostCount: Long = 0,
+    val affectedUserCount: Long = 0,
+    val posts: List<AdminLinkedPost> = emptyList(),
 )
 
 data class AdminLinkedPost(

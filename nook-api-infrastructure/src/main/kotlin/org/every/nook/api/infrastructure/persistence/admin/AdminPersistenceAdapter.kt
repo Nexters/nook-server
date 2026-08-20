@@ -4,14 +4,21 @@ import org.every.nook.api.application.admin.AdminAuditLog
 import org.every.nook.api.application.admin.AdminAuditLogPort
 import org.every.nook.api.application.admin.AdminMappedPlace
 import org.every.nook.api.application.admin.AdminPage
+import org.every.nook.api.application.admin.AdminPostCorrectionPort
 import org.every.nook.api.application.admin.AdminPostDetail
+import org.every.nook.api.application.admin.AdminPostMedia
 import org.every.nook.api.application.admin.AdminPostPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPostQueryPort
 import org.every.nook.api.application.admin.AdminPostSummary
+import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostHashtagEntity
+import org.every.nook.api.infrastructure.persistence.post.PostHashtagJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
+import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
+import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
@@ -23,6 +30,8 @@ import tools.jackson.databind.ObjectMapper
 @Component
 class AdminPersistenceAdapter(
     private val postRepository: PostJpaRepository,
+    private val mediaRepository: PostMediaJpaRepository,
+    private val hashtagRepository: PostHashtagJpaRepository,
     private val contentJobRepository: PostContentParsingJobJpaRepository,
     private val placeJobRepository: PlaceParsingJobJpaRepository,
     private val postPlaceRepository: PostPlaceJpaRepository,
@@ -32,6 +41,7 @@ class AdminPersistenceAdapter(
     private val auditRepository: AdminAuditLogJpaRepository,
     private val objectMapper: ObjectMapper,
 ) : AdminPostQueryPort,
+    AdminPostCorrectionPort,
     AdminPostPlaceCorrectionPort,
     AdminAuditLogPort {
     @Transactional(readOnly = true)
@@ -98,8 +108,64 @@ class AdminPersistenceAdapter(
             placeParsingFailureReason = placeJob?.failureReason,
             savedUserCount = savedPostRepository.findDistinctUserIdsByPostId(postId).size.toLong(),
             mappingReviewed = reviewRepository.existsByPostId(postId),
+            hashtags = hashtagRepository.findAllByPostIdOrderBySequenceAsc(postId).map { it.hashtag },
+            media = mediaRepository.findAllByPostIdOrderBySequenceAsc(postId).map {
+                AdminPostMedia(it.mediaType.name, it.mediaUrl, it.sequence)
+            },
+            manuallyOverridden = post.contentManuallyOverridden,
             places = places,
         )
+    }
+
+    @Transactional
+    override fun update(command: AdminPostCorrectionPort.UpdateCommand): AdminPostDetail? {
+        val post = postRepository.findByIdForUpdate(command.postId) ?: return null
+        val before = mapOf(
+            "authorIdentifier" to post.authorIdentifier,
+            "title" to post.title,
+            "body" to post.body,
+            "sourceLocationTag" to post.sourceLocationTag,
+            "hashtags" to hashtagRepository.findAllByPostIdOrderBySequenceAsc(command.postId).map { it.hashtag },
+            "media" to mediaRepository.findAllByPostIdOrderBySequenceAsc(command.postId).map { it.mediaUrl },
+        )
+        post.updateFromAdmin(command.authorIdentifier, command.title, command.body, command.sourceLocationTag)
+        hashtagRepository.deleteAllByPostId(command.postId)
+        hashtagRepository.flush()
+        hashtagRepository.saveAll(
+            command.hashtags.mapIndexed { index, value ->
+                PostHashtagEntity(command.postId, value, index)
+            },
+        )
+        mediaRepository.deleteAllByPostId(command.postId)
+        mediaRepository.flush()
+        mediaRepository.saveAll(
+            command.media.mapIndexed { index, value ->
+                PostMediaEntity(command.postId, PostMedia.MediaType.valueOf(value.mediaType), value.mediaUrl, index)
+            },
+        )
+        val after = before.keys.associateWith { key ->
+            when (key) {
+                "authorIdentifier" -> command.authorIdentifier
+                "title" -> command.title
+                "body" -> command.body
+                "sourceLocationTag" -> command.sourceLocationTag
+                "hashtags" -> command.hashtags
+                else -> command.media.map { it.mediaUrl }
+            }
+        }
+        append(
+            AdminAuditLogPort.Entry(
+                actor = command.actor,
+                action = "POST_CONTENT_UPDATED",
+                targetType = "POST",
+                targetId = command.postId.toString(),
+                reason = command.reason,
+                beforeValue = objectMapper.writeValueAsString(before),
+                afterValue = objectMapper.writeValueAsString(after),
+                requestId = command.requestId,
+            ),
+        )
+        return find(command.postId)
     }
 
     @Transactional
@@ -183,6 +249,8 @@ class AdminPersistenceAdapter(
                     address = place.address,
                     provider = place.provider,
                     externalPlaceId = place.externalPlaceId,
+                    thumbnailUrl = place.thumbnailUrl,
+                    representativeTags = place.representativeTags.map { it.name },
                     sequence = mapping.sequence,
                 )
             }

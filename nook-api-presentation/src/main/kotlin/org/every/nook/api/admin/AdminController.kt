@@ -5,6 +5,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.every.nook.api.application.admin.AdminActor
+import org.every.nook.api.application.admin.AdminPostMedia
 import org.every.nook.api.application.admin.GetAdminPlaceUseCase
 import org.every.nook.api.application.admin.GetAdminPostUseCase
 import org.every.nook.api.application.admin.ListAdminAuditLogsUseCase
@@ -13,6 +14,8 @@ import org.every.nook.api.application.admin.ListAdminPostsUseCase
 import org.every.nook.api.application.admin.ReplaceAdminPostPlacesUseCase
 import org.every.nook.api.application.admin.SearchAdminPlacesUseCase
 import org.every.nook.api.application.admin.UpdateAdminPlaceUseCase
+import org.every.nook.api.application.admin.UpdateAdminPostUseCase
+import org.every.nook.api.application.place.PlaceOpeningHours
 import org.every.nook.api.logging.RequestLoggingFields
 import org.every.nook.api.presentation.response.ApiResponse
 import org.slf4j.MDC
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController
 class AdminController(
     private val listPosts: ListAdminPostsUseCase,
     private val getPost: GetAdminPostUseCase,
+    private val updatePostUseCase: UpdateAdminPostUseCase,
     private val searchPlaces: SearchAdminPlacesUseCase,
     private val listPlaces: ListAdminPlacesUseCase,
     private val getPlace: GetAdminPlaceUseCase,
@@ -53,6 +57,32 @@ class AdminController(
 
     @GetMapping("/posts/{postId}")
     fun post(@PathVariable postId: Long) = ApiResponse.success(getPost(postId))
+
+    @PutMapping("/posts/{postId}")
+    fun updatePost(
+        actor: AdminActor,
+        @PathVariable postId: Long,
+        @Valid @RequestBody request: UpdatePostRequest,
+        servletRequest: HttpServletRequest,
+    ) = ApiResponse.success(
+        updatePostUseCase(
+            UpdateAdminPostUseCase.Command(
+                postId = postId,
+                authorIdentifier = request.authorIdentifier,
+                title = request.title,
+                body = request.body,
+                sourceLocationTag = request.sourceLocationTag,
+                hashtags = request.hashtags,
+                media = request.media.mapIndexed { index, media ->
+                    AdminPostMedia(media.mediaType, media.mediaUrl, index)
+                },
+                actor = actor,
+                reason = request.reason,
+                requestId = MDC.get(RequestLoggingFields.REQUEST_ID)
+                    ?: servletRequest.getHeader(RequestLoggingFields.REQUEST_ID_HEADER),
+            ),
+        ),
+    )
 
     @PutMapping("/posts/{postId}/places")
     fun replacePlaces(
@@ -99,6 +129,13 @@ class AdminController(
                 placeId = placeId,
                 name = request.name,
                 address = request.address,
+                city = request.city,
+                category = request.category,
+                phoneNumber = request.phoneNumber,
+                thumbnailUrl = request.thumbnailUrl,
+                photoUrls = request.photoUrls,
+                representativeTags = request.representativeTags,
+                openingHours = request.openingHours,
                 actor = actor,
                 reason = request.reason,
                 requestId = MDC.get(RequestLoggingFields.REQUEST_ID)
@@ -131,7 +168,31 @@ data class UpdatePlaceRequest(
     @field:NotBlank
     @field:Size(max = 500)
     val address: String,
+    val city: String? = null,
+    val category: String? = null,
+    val phoneNumber: String? = null,
+    val thumbnailUrl: String? = null,
+    @field:Size(max = 6)
+    val photoUrls: List<String> = emptyList(),
+    @field:Size(max = 4)
+    val representativeTags: List<String> = emptyList(),
+    val openingHours: PlaceOpeningHours? = null,
     @field:NotBlank
     @field:Size(max = 500)
     val reason: String,
 )
+
+data class UpdatePostRequest(
+    val authorIdentifier: String?,
+    val title: String?,
+    val body: String?,
+    val sourceLocationTag: String?,
+    @field:Size(max = 30)
+    val hashtags: List<String> = emptyList(),
+    @field:Size(max = 20)
+    val media: List<UpdatePostMediaRequest> = emptyList(),
+    @field:NotBlank @field:Size(max = 500)
+    val reason: String,
+)
+
+data class UpdatePostMediaRequest(@field:NotBlank val mediaType: String, @field:NotBlank val mediaUrl: String)

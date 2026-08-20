@@ -4,6 +4,8 @@ import org.every.nook.api.application.error.ErrorType
 import org.every.nook.api.application.error.NookErrorCode
 import org.every.nook.api.application.error.NookException
 import org.every.nook.api.domain.place.Place
+import org.every.nook.api.domain.post.Post
+import org.every.nook.api.domain.post.PostMedia
 
 class ListAdminPostsUseCase(private val port: AdminPostQueryPort) {
     operator fun invoke(query: Query): AdminPage<AdminPostSummary> = port.listPosts(
@@ -18,6 +20,60 @@ class ListAdminPostsUseCase(private val port: AdminPostQueryPort) {
 
 class GetAdminPostUseCase(private val port: AdminPostQueryPort) {
     operator fun invoke(postId: Long): AdminPostDetail = port.find(postId) ?: throw AdminPostNotFoundException()
+}
+
+class UpdateAdminPostUseCase(private val port: AdminPostCorrectionPort) {
+    operator fun invoke(command: Command): AdminPostDetail {
+        require(command.postId > 0)
+        require(command.title == null || command.title.length <= Post.MAX_TITLE_LENGTH)
+        require(
+            command.authorIdentifier == null ||
+                command.authorIdentifier.length <= Post.MAX_AUTHOR_IDENTIFIER_LENGTH,
+        )
+        require(
+            command.sourceLocationTag == null ||
+                command.sourceLocationTag.length <= Post.MAX_SOURCE_LOCATION_TAG_LENGTH,
+        )
+        require(
+            command.hashtags.size <= MAX_ADMIN_HASHTAG_COUNT && command.hashtags.all {
+                it.isNotBlank() && it.length <= Post.MAX_HASHTAG_LENGTH
+            },
+        )
+        require(
+            command.media.size <= MAX_ADMIN_MEDIA_COUNT && command.media.all {
+                it.mediaType in PostMedia.MediaType.entries.map(PostMedia.MediaType::name) &&
+                    it.mediaUrl.isNotBlank() && it.mediaUrl.length <= PostMedia.MAX_MEDIA_URL_LENGTH
+            },
+        )
+        require(command.reason.isNotBlank())
+        return port.update(
+            AdminPostCorrectionPort.UpdateCommand(
+                command.postId,
+                command.authorIdentifier?.trim()?.ifEmpty { null },
+                command.title?.trim()?.ifEmpty { null },
+                command.body?.trim()?.ifEmpty { null },
+                command.sourceLocationTag?.trim()?.ifEmpty { null },
+                command.hashtags.map(String::trim).distinct(),
+                command.media,
+                command.actor,
+                command.reason.trim(),
+                command.requestId,
+            ),
+        ) ?: throw AdminPostNotFoundException()
+    }
+
+    data class Command(
+        val postId: Long,
+        val authorIdentifier: String?,
+        val title: String?,
+        val body: String?,
+        val sourceLocationTag: String?,
+        val hashtags: List<String>,
+        val media: List<AdminPostMedia>,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
 }
 
 class SearchAdminPlacesUseCase(private val port: AdminPlaceQueryPort) {
@@ -51,12 +107,29 @@ class UpdateAdminPlaceUseCase(private val port: AdminPlaceCorrectionPort) {
         require(name.length <= Place.MAX_NAME_LENGTH) { "Place name is too long" }
         require(address.isNotEmpty()) { "Place address must not be blank" }
         require(address.length <= Place.MAX_ADDRESS_LENGTH) { "Place address is too long" }
+        require(command.city == null || command.city.length <= Place.MAX_CITY_LENGTH)
+        require(command.category == null || command.category.length <= Place.MAX_CATEGORY_LENGTH)
+        require(command.phoneNumber == null || command.phoneNumber.length <= Place.MAX_PHONE_NUMBER_LENGTH)
+        require(command.thumbnailUrl == null || command.thumbnailUrl.length <= MAX_ADMIN_URL_LENGTH)
+        require(command.photoUrls.size <= MAX_ADMIN_PLACE_PHOTO_COUNT)
+        require(command.photoUrls.all { it.isNotBlank() && it.length <= MAX_ADMIN_URL_LENGTH })
         require(command.reason.isNotBlank()) { "Correction reason must not be blank" }
         return port.update(
             AdminPlaceCorrectionPort.UpdateCommand(
                 placeId = command.placeId,
                 name = name,
                 address = address,
+                city = command.city?.trim()?.ifEmpty { null },
+                category = command.category?.trim()?.ifEmpty { null },
+                phoneNumber = command.phoneNumber?.trim()?.ifEmpty { null },
+                thumbnailUrl = command.thumbnailUrl?.trim()?.ifEmpty { null },
+                photoUrls = command.photoUrls.map(String::trim).filter(String::isNotEmpty).distinct(),
+                representativeTags = command.representativeTags
+                    .map { org.every.nook.api.domain.place.PlaceTag.valueOf(it) }
+                    .distinct()
+                    .take(MAX_ADMIN_PLACE_TAG_COUNT)
+                    .map { it.name },
+                openingHours = command.openingHours,
                 actor = command.actor,
                 reason = command.reason.trim(),
                 requestId = command.requestId,
@@ -71,6 +144,13 @@ class UpdateAdminPlaceUseCase(private val port: AdminPlaceCorrectionPort) {
         val actor: AdminActor,
         val reason: String,
         val requestId: String?,
+        val city: String? = null,
+        val category: String? = null,
+        val phoneNumber: String? = null,
+        val thumbnailUrl: String? = null,
+        val photoUrls: List<String> = emptyList(),
+        val representativeTags: List<String> = emptyList(),
+        val openingHours: org.every.nook.api.application.place.PlaceOpeningHours? = null,
     )
 }
 
@@ -123,3 +203,8 @@ private fun Int.validOffset(): Int = coerceAtLeast(0)
 private fun Int.validLimit(): Int = coerceIn(1, MAX_ADMIN_PAGE_SIZE)
 
 private const val MAX_ADMIN_PAGE_SIZE = 100
+private const val MAX_ADMIN_HASHTAG_COUNT = 30
+private const val MAX_ADMIN_MEDIA_COUNT = 20
+private const val MAX_ADMIN_PLACE_TAG_COUNT = 4
+private const val MAX_ADMIN_PLACE_PHOTO_COUNT = 6
+private const val MAX_ADMIN_URL_LENGTH = 2048
