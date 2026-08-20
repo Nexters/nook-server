@@ -132,7 +132,7 @@ class ProcessPlaceParsingJobUseCase(
         val effectiveExpectedPlaceCount = effectiveExpectedPlaceCount(expectedPlaceCount, transcripts)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_CLUES)
         val primaryImageClues = extractClues(job, transcripts)
-            .map { clue -> clue.restorePlaceNameFromCard(transcripts) }
+            .map { clue -> clue.restoreGroundingFromCard(transcripts) }
             .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
         val recoveredImageClues = ImageClueRecallRecovery(
             retranscribe = { recoveryImages ->
@@ -228,9 +228,8 @@ class ProcessPlaceParsingJobUseCase(
         }
         val selectionCandidates = candidates.compatibleWith(clue)
         val matches = strictMatches(clue, selectionCandidates)
-        val groundedMatches = selectionCandidates.filter { candidate ->
-            clue.isSupportedBy(candidate.place, candidate.matchedQueries)
-        }
+        val groundedCandidates = selectionCandidates.groundedCandidateMatches(clue)
+        val groundedMatches = groundedCandidates.matches
         val candidateDescriptions = selectionCandidates.descriptions(CANDIDATE_LOG_LIMIT)
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
@@ -251,7 +250,9 @@ class ProcessPlaceParsingJobUseCase(
             CandidateSelection(selected, "openai")
         }
         val selectedMatchedQueries = selectionCandidates.matchedQueriesFor(selection.place)
-        if (!clue.isSupportedBy(selection.place, selectedMatchedQueries)) {
+        if (!clue.isSupportedBy(selection.place, selectedMatchedQueries) &&
+            !groundedCandidates.explicitNameSearchMatch.matches(selection.place)
+        ) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
         eventLogger.info(
@@ -517,8 +518,7 @@ private fun strictMatches(
 
 internal fun PlaceClue.searchQueries(): List<String> = buildList {
     addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address ->
-        add(address)
-        add("$name $address")
+        addAll(PlaceAddressMatcher.searchVariants(address))
     }
     add(name)
     region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion ->

@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PlaceParsingResilienceTest {
     @Test
@@ -151,7 +152,7 @@ class PlaceParsingResilienceTest {
             evidence = listOf(PlaceClueEvidence(7, transcript.texts.single())),
         )
 
-        assertEquals("몬", clue.restorePlaceNameFromCard(listOf(transcript)).name)
+        assertEquals("몬", clue.restoreGroundingFromCard(listOf(transcript)).name)
     }
 
     @Test
@@ -168,7 +169,48 @@ class PlaceParsingResilienceTest {
             evidence = listOf(PlaceClueEvidence(4, transcript.texts.single())),
         )
 
-        assertEquals("가람커피로스터스", clue.restorePlaceNameFromCard(listOf(transcript)).name)
+        assertEquals("가람커피로스터스", clue.restoreGroundingFromCard(listOf(transcript)).name)
+    }
+
+    @Test
+    fun `restores the explicit OCR address when inference replaces it with a vague landmark`() {
+        val transcript = ImageTranscript(
+            7,
+            listOf("홈 서울특별시 마포구 와우산로37길 1 지1층 홍대가면 경의선 책거리 쪽이 여유롭습니다"),
+        )
+        val clue = PlaceClue(
+            name = "홈",
+            region = "서울 마포구",
+            queries = listOf("홈", "홍대 카페 경의선 책거리"),
+            addressHint = "마포구 경의선 책거리 쪽",
+            evidence = listOf(PlaceClueEvidence(7, "홍대가면 경의선 책거리 쪽이 여유롭습니다")),
+        )
+
+        val restored = clue.restoreGroundingFromCard(listOf(transcript))
+
+        assertEquals("서울특별시 마포구 와우산로37길 1 지1층", restored.addressHint)
+        assertEquals(transcript.texts.single(), restored.evidence.single().evidenceText)
+        assertTrue("서울특별시 마포구 와우산로37길 1 지1층" in restored.queries)
+    }
+
+    @Test
+    fun `replaces generated evidence with the uniquely matching OCR transcript`() {
+        val transcripts = listOf(
+            ImageTranscript(3, listOf("Knewnew 2umoae | 숙대입구역 채광 좋은 창가")),
+            ImageTranscript(4, listOf("3 퍼머넌트해비탯 | 뚝섬역 따뜻한 무드의 카페")),
+        )
+        val clue = PlaceClue(
+            name = "umoae",
+            region = "서울 용산구",
+            queries = listOf("umoae", "Umoae near Sookdae"),
+            addressHint = "서울 용산구 한강대로84길 21-17 1층",
+            evidence = listOf(PlaceClueEvidence(3, transcripts[1].texts.single())),
+        )
+
+        val restored = clue.restoreGroundingFromCard(transcripts)
+
+        assertEquals(3, restored.evidence.single().imageIndex)
+        assertEquals(transcripts[0].texts.single(), restored.evidence.single().evidenceText)
     }
 
     @Test
