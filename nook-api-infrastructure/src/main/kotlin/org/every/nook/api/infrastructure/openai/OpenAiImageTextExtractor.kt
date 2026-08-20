@@ -51,7 +51,7 @@ class OpenAiImageTextExtractor(
                     durationMs = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND,
                     fields = mapOf(
                         "provider.name" to "openai",
-                        "openai.model" to properties.model,
+                        "openai.model" to properties.imageTextModel,
                         "content.image_count" to request.images.size,
                         "ocr.transcript_count" to transcripts.size,
                     ),
@@ -61,7 +61,7 @@ class OpenAiImageTextExtractor(
     }
 
     private fun ImageTextExtractor.Request.toOpenAiRequest(): Map<String, Any> = mapOf(
-        "model" to properties.model,
+        "model" to properties.imageTextModel,
         "instructions" to INSTRUCTIONS,
         "input" to listOf(
             mapOf(
