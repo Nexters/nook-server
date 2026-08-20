@@ -346,11 +346,11 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
-    fun `prioritizes Instagram location tag and allows four grounded queries`() {
+    fun `uses Instagram location tag only as a regional search hint`() {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
-            .andExpect(content().string(containsString("sourceLocationTag가 상호명인 경우")))
-            .andExpect(content().string(containsString("name은 Lodge190")))
+            .andExpect(content().string(containsString("지역 문맥과 검색어를 보조하는 힌트")))
+            .andExpect(content().string(containsString("장소 존재의 근거로 사용하지 않는다")))
             .andExpect(content().string(containsString("\\\"sourceLocationTag\\\":\\\"Lodge190\\\"")))
             .andExpect(content().string(containsString("\"maxItems\":4")))
             .andRespond(

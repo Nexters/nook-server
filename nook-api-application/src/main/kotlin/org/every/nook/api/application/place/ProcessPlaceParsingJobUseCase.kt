@@ -38,7 +38,7 @@ class ProcessPlaceParsingJobUseCase(
     private fun process(job: ClaimedPlaceParsingJob, startedAt: Instant): Result {
         val expectedPlaceCount = expectedPlaceCount(job.body)
         val textClues = (job.textClues ?: extractClues(job)).filter { clue ->
-            clue.isGroundedIn(job).also { grounded ->
+            clue.isGroundedIn(job.body, job.hashtags).also { grounded ->
                 if (!grounded) {
                     logger.warn {
                         "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -436,11 +436,10 @@ private fun logOcrDecision(
     )
 }
 
-private fun PlaceClue.isGroundedIn(job: ClaimedPlaceParsingJob): Boolean {
+internal fun PlaceClue.isGroundedIn(body: String?, hashtags: List<String>): Boolean {
     val sources = buildList {
-        job.body?.let(::add)
-        addAll(job.hashtags)
-        job.sourceLocationTag?.let(::add)
+        body?.let(::add)
+        addAll(hashtags)
     }.map(String::groundingKey)
     return (listOf(name) + queries)
         .asSequence()
