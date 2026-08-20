@@ -125,6 +125,7 @@ class ProcessPlaceParsingJobUseCase(
         }
         val effectiveExpectedPlaceCount = effectiveExpectedPlaceCount(expectedPlaceCount, transcripts)
         val primaryImageClues = extractClues(job, transcripts)
+            .map { clue -> clue.restoreShortPlaceName(transcripts) }
             .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
         val recoveredImageClues = ImageClueRecallRecovery(
             retranscribe = { recoveryImages ->
@@ -509,6 +510,7 @@ internal fun PlaceClue.searchQueries(): List<String> = buildList {
         add(address)
     }
     add(name)
+    addAll(name.singleHangulOcrAliases())
     region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion ->
         name.split(Regex("\\s+"))
             .map(String::trim)

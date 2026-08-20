@@ -5,11 +5,10 @@ internal object PlaceAddressMatcher {
         val hint = addressHint?.trim()?.takeIf(String::isNotEmpty) ?: return true
         val hintAddressKeys = addressKeys(hint)
         val candidateAddressKeys = addressKeys(candidateAddress)
-        if (
-            hintAddressKeys.isNotEmpty() &&
-            candidateAddressKeys.isNotEmpty() &&
-            hintAddressKeys.intersect(candidateAddressKeys).isEmpty()
-        ) {
+        val bothHaveAddressKeys = hintAddressKeys.isNotEmpty() && candidateAddressKeys.isNotEmpty()
+        val hasCompatibleAddressKey = hintAddressKeys.intersect(candidateAddressKeys).isNotEmpty() ||
+            hasNearOcrRoadAddress(hint, candidateAddress)
+        if (bothHaveAddressKeys && !hasCompatibleAddressKey) {
             return false
         }
 
@@ -40,6 +39,47 @@ internal object PlaceAddressMatcher {
     }.toSet()
 
     fun hasLocationDetail(value: String?): Boolean = value != null && locationDetails(value).isNotEmpty()
+
+    private fun hasNearOcrRoadAddress(left: String, right: String): Boolean {
+        val leftAddresses = roadAddresses(left)
+        val rightAddresses = roadAddresses(right)
+        val leftDistricts = DISTRICT_PATTERN.findAll(left).map { it.value }.toSet()
+        val rightDistricts = DISTRICT_PATTERN.findAll(right).map { it.value }.toSet()
+        val districtsConflict = leftDistricts.isNotEmpty() &&
+            rightDistricts.isNotEmpty() &&
+            leftDistricts.intersect(rightDistricts).isEmpty()
+        if (districtsConflict) {
+            return false
+        }
+        return leftAddresses.any { leftAddress ->
+            rightAddresses.any { rightAddress ->
+                leftAddress.buildingNumber == rightAddress.buildingNumber &&
+                    leftAddress.roadName.editDistanceAtMostOne(rightAddress.roadName)
+            }
+        }
+    }
+
+    private fun roadAddresses(value: String): List<RoadAddress> = BASE_ADDRESS_PATTERN.findAll(value).map { match ->
+        RoadAddress(match.groupValues[1].groundingKey(), match.groupValues[2].groundingKey())
+    }.toList()
+
+    private fun String.editDistanceAtMostOne(other: String): Boolean {
+        if (kotlin.math.abs(length - other.length) > 1) return false
+        if (length == other.length) return zip(other).count { (left, right) -> left != right } <= 1
+        val (shorter, longer) = if (length < other.length) this to other else other to this
+        var shortIndex = 0
+        var longIndex = 0
+        var differences = 0
+        while (shortIndex < shorter.length && longIndex < longer.length && differences <= 1) {
+            if (shorter[shortIndex] == longer[longIndex]) {
+                shortIndex += 1
+            } else {
+                differences += 1
+            }
+            longIndex += 1
+        }
+        return differences <= 1
+    }
 
     private fun locationDetails(value: String): Set<LocationDetail> {
         val basementDetails = BASEMENT_PATTERN.findAll(value).map { match ->
@@ -72,6 +112,8 @@ internal object PlaceAddressMatcher {
 
     private data class LocationDetail(val type: LocationDetailType, val value: String)
 
+    private data class RoadAddress(val roadName: String, val buildingNumber: String)
+
     private val BASE_ADDRESS_PATTERN = Regex(
         "([가-힣A-Za-z]+(?:대로|로|길)(?:\\d+[가-힣]?(?:길)?)?|" +
             "[가-힣A-Za-z0-9]+(?:동|읍|면|리))\\s+(\\d+(?:-\\d+)?)",
@@ -88,6 +130,7 @@ internal object PlaceAddressMatcher {
     private val ROOM_PATTERN = Regex(
         "(?<![-\\d])([1-9]\\d{0,3})\\s*호(?=$|[^가-힣A-Za-z0-9])",
     )
+    private val DISTRICT_PATTERN = Regex("[가-힣]+(?:구|군|시)")
 
     private const val ROAD_SUFFIX = "길"
     private const val FLOOR_SUFFIX = "층"

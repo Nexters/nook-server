@@ -125,6 +125,36 @@ class PlaceParsingResilienceTest {
     }
 
     @Test
+    fun `counts flattened Corepin transcripts and deduplicates a repeated place card`() {
+        val transcripts = listOf(
+            ImageTranscript(1, listOf("SPACE 패션 좋아하면 무조건 좋아할 서울 카페")),
+            ImageTranscript(2, listOf("홈 서울특별시 마포구 와우산로37길 1 지1층 홍대가면 여유로워요")),
+            ImageTranscript(3, listOf("피죤트 서울 광진구 능동로32길 50 1층 코너")),
+            ImageTranscript(4, listOf("하우스오브와일드 서울 용산구 이태원로 208 4층")),
+            ImageTranscript(5, listOf("공유 문구 하우스오브와일드 서울 용산구 이태원로 208 4층")),
+        )
+
+        assertEquals(3, transcripts.detectedPlaceCardCount())
+    }
+
+    @Test
+    fun `restores a one-character place name immediately before an address`() {
+        val transcript = ImageTranscript(
+            7,
+            listOf("홈 서울특별시 마포구 와우산로37길 1 지1층 홍대가면 여유로워요"),
+        )
+        val clue = PlaceClue(
+            name = "홍대 카페",
+            region = "서울 마포구",
+            queries = listOf("홍대 카페"),
+            addressHint = "서울특별시 마포구 와우산로37길 1 지1층",
+            evidence = listOf(PlaceClueEvidence(7, transcript.texts.single())),
+        )
+
+        assertEquals("홈", clue.restoreShortPlaceName(listOf(transcript)).name)
+    }
+
+    @Test
     fun `keeps primary places when recall recovery fails`() {
         val port = FakeJobPort(
             body = "카페 2곳",
