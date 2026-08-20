@@ -45,3 +45,8 @@ Instagram 영상 게시물은 목록에서 정적 포스터 이미지를 표시�
 - 목록과 상세 응답의 nullable `thumbnailUrl`
 - 기존 썸네일 없는 미디어 회귀 테스트
 - `./gradlew check`
+
+## DDL 적용 이력
+
+- dev: 2026-08-20 21:39 KST, Codex 적용, MySQL 8.4.11 및 `thumbnail_url` 정의 확인
+- live: 2026-08-20 21:41 KST, Codex 적용, MySQL 8.4.7 및 `thumbnail_url` 정의 확인
