@@ -66,5 +66,33 @@ class ApifyInstagramMapperTest {
             listOf(PostMedia.MediaType.IMAGE, PostMedia.MediaType.VIDEO),
             result.post.media.map { it.type },
         )
+        assertEquals("https://cdn.example/2.jpg", result.post.media[1].thumbnailUrl)
+    }
+
+    @Test
+    fun `maps a reel display url as its video thumbnail`() {
+        val result = ApifyInstagramMapper().map(
+            InstagramContentUrl.parse("https://www.instagram.com/reel/Reel123/"),
+            ApifyInstagramRecord(
+                type = "Video",
+                shortCode = "Reel123",
+                caption = null,
+                hashtags = null,
+                url = null,
+                displayUrl = "https://cdn.example/poster.jpg",
+                images = listOf("https://cdn.example/fallback.jpg"),
+                videoUrl = "https://cdn.example/video.mp4",
+                timestamp = null,
+                childPosts = null,
+                ownerUsername = null,
+                locationName = null,
+                error = null,
+                errorDescription = null,
+            ),
+        )
+
+        assertEquals(PostMedia.MediaType.VIDEO, result.post.media.single().type)
+        assertEquals("https://cdn.example/video.mp4", result.post.media.single().url)
+        assertEquals("https://cdn.example/poster.jpg", result.post.media.single().thumbnailUrl)
     }
 }

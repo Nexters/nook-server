@@ -77,7 +77,12 @@ class PostContentParsingPersistenceAdapterTest {
             body = "본문",
             hashtags = listOf("맛집"),
             media = listOf(
-                PostMedia(PostMedia.MediaType.IMAGE, "https://source/image.jpg", 0),
+                PostMedia(
+                    PostMedia.MediaType.VIDEO,
+                    "https://source/video.mp4",
+                    0,
+                    "https://source/poster.jpg",
+                ),
             ),
         )
         `when`(jobRepository.findByPostId(101)).thenReturn(job)
@@ -115,7 +120,8 @@ class PostContentParsingPersistenceAdapterTest {
         val placeEvent = eventCaptor.allValues.filterIsInstance<PlaceParsingJobRequestedEvent>().single()
         val mediaEvent = eventCaptor.allValues.filterIsInstance<PostMediaStorageRequestedEvent>().single()
         assertEquals(101, placeEvent.postId)
-        assertEquals("https://source/image.jpg", mediaEvent.sourceUrl)
+        assertEquals("https://source/video.mp4", mediaEvent.sourceUrl)
+        assertEquals("https://source/poster.jpg", mediaEvent.sourceThumbnailUrl)
     }
 
     private companion object {

@@ -117,6 +117,7 @@ external:
     api-token: ${APIFY_API_TOKEN:}
     actor-id: ${APIFY_GOOGLE_MAPS_ACTOR_ID:compass~crawler-google-places}
     batch-size: ${APIFY_GOOGLE_MAPS_BATCH_SIZE:20}
+    storage-concurrency: ${APIFY_GOOGLE_MAPS_STORAGE_CONCURRENCY:6}
     connect-timeout: ${APIFY_GOOGLE_MAPS_CONNECT_TIMEOUT:3s}
     read-timeout: ${APIFY_GOOGLE_MAPS_READ_TIMEOUT:300s}
   google-cloud-vision:

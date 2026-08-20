@@ -64,15 +64,11 @@ class SearchPlacesUseCaseTest {
         val candidate = candidate()
         val useCase = ConnectPostPlaceUseCase(
             selectionTokenPort = tokenPort(candidate),
-            connectPostPlacePort = ConnectPostPlacePort { userId, postId, selected, supplement ->
+            connectPostPlacePort = ConnectPostPlacePort { userId, postId, selected ->
                 assertEquals(7, userId)
                 assertEquals(11, postId)
                 assertEquals(candidate, selected)
-                assertEquals("https://cdn.example.com/google-place.jpg", supplement?.photoUrls?.first())
                 ConnectPostPlacePort.Result.Connected(17)
-            },
-            thumbnailProvider = PlaceThumbnailProvider {
-                PlaceSupplement(null, listOf("https://cdn.example.com/google-place.jpg"))
             },
         )
 
@@ -85,7 +81,7 @@ class SearchPlacesUseCaseTest {
     fun `rejects an invalid place selection token`() {
         val useCase = ConnectPostPlaceUseCase(
             selectionTokenPort = tokenPort(candidate()),
-            connectPostPlacePort = ConnectPostPlacePort { _, _, _, _ -> error("should not connect") },
+            connectPostPlacePort = ConnectPostPlacePort { _, _, _ -> error("should not connect") },
         )
 
         assertFailsWith<InvalidPlaceSelectionException> {
@@ -97,7 +93,7 @@ class SearchPlacesUseCaseTest {
     fun `hides a post owned by another user`() {
         val useCase = ConnectPostPlaceUseCase(
             selectionTokenPort = tokenPort(candidate()),
-            connectPostPlacePort = ConnectPostPlacePort { _, _, _, _ -> ConnectPostPlacePort.Result.PostNotFound },
+            connectPostPlacePort = ConnectPostPlacePort { _, _, _ -> ConnectPostPlacePort.Result.PostNotFound },
         )
 
         assertFailsWith<PostNotFoundException> {
@@ -109,7 +105,7 @@ class SearchPlacesUseCaseTest {
     fun `rejects manual connection while automatic parsing is running`() {
         val useCase = ConnectPostPlaceUseCase(
             selectionTokenPort = tokenPort(candidate()),
-            connectPostPlacePort = ConnectPostPlacePort { _, _, _, _ -> ConnectPostPlacePort.Result.ParsingInProgress },
+            connectPostPlacePort = ConnectPostPlacePort { _, _, _ -> ConnectPostPlacePort.Result.ParsingInProgress },
         )
 
         assertFailsWith<PlaceParsingInProgressException> {

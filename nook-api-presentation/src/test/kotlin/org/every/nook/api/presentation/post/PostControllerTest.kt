@@ -325,6 +325,12 @@ class PostControllerTest {
                         url = "https://example.com/1.jpg",
                         sequence = 0,
                     ),
+                    SavedPostMedia(
+                        type = SavedPostMediaType.VIDEO,
+                        url = "https://example.com/2.mp4",
+                        sequence = 1,
+                        thumbnailUrl = "https://example.com/2-poster.jpg",
+                    ),
                 ),
                 hashtags = listOf("성수"),
                 memo = "주말에 방문",
@@ -476,6 +482,9 @@ class PostControllerTest {
             jsonPath("$.success.postId") { value(11) }
             jsonPath("$.success.body") { value("본문") }
             jsonPath("$.success.media[0].url") { value("https://example.com/1.jpg") }
+            jsonPath("$.success.media[1].type") { value("VIDEO") }
+            jsonPath("$.success.media[1].url") { value("https://example.com/2.mp4") }
+            jsonPath("$.success.media[1].thumbnailUrl") { value("https://example.com/2-poster.jpg") }
             jsonPath("$.success.hashtags[0]") { value("성수") }
             jsonPath("$.success.groups[0].id") { value(17) }
             jsonPath("$.success.groups[0].name") { value("맛집") }

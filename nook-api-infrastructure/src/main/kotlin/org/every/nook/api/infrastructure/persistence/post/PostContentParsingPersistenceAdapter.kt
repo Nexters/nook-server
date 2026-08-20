@@ -77,6 +77,7 @@ class PostContentParsingPersistenceAdapter(
                         mediaType = media.type,
                         mediaUrl = media.url,
                         sequence = media.sequence,
+                        thumbnailUrl = media.thumbnailUrl,
                     )
                 },
             )
@@ -112,6 +113,7 @@ class PostContentParsingPersistenceAdapter(
                         mediaType = media.type.name,
                         sourceUrl = media.url,
                         sequence = media.sequence,
+                        sourceThumbnailUrl = media.thumbnailUrl,
                         availableAt = clock.instant(),
                     ),
                 )

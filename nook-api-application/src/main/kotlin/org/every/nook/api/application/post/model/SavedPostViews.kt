@@ -47,7 +47,12 @@ data class SavedPostDetail(
 
 data class SavedPostGroup(val id: Long, val name: String, val color: String)
 
-data class SavedPostMedia(val type: SavedPostMediaType, val url: String, val sequence: Int)
+data class SavedPostMedia(
+    val type: SavedPostMediaType,
+    val url: String,
+    val sequence: Int,
+    val thumbnailUrl: String? = null,
+)
 
 enum class SavedPostMediaType {
     IMAGE,

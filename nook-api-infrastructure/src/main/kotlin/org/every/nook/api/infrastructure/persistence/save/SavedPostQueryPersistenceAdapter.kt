@@ -304,6 +304,7 @@ class SavedPostQueryPersistenceAdapter(
         type = SavedPostMediaType.valueOf(mediaType.name),
         url = mediaUrl,
         sequence = sequence,
+        thumbnailUrl = thumbnailUrl,
     )
 
     private fun findFirstMediaByPostId(sourcePostIds: List<Long>): Map<Long, SavedPostMedia> =

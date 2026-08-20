@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -53,6 +54,63 @@ class ParseLogEntryTest(unittest.TestCase):
 
         self.assertIsNone(level)
         self.assertEqual(line, body)
+
+
+class FollowCurrentContainerLogTest(unittest.TestCase):
+    def test_skips_existing_logs_then_reads_appended_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "container-json.log"
+            log_path.write_text(self.docker_line("old log"))
+            follower = forward_error_logs.follow_current_container_log(
+                resolve_log_path=lambda: log_path,
+                sleep=lambda _: None,
+            )
+
+            self.assertIsNone(next(follower))
+            with log_path.open("a") as fp:
+                fp.write(self.docker_line("new log"))
+
+            self.assertEqual("new log", next(follower))
+            follower.close()
+
+    def test_reads_new_container_log_from_beginning_after_path_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            first_path = Path(directory) / "first-json.log"
+            second_path = Path(directory) / "second-json.log"
+            first_path.write_text(self.docker_line("old log"))
+            current_path = [first_path]
+            follower = forward_error_logs.follow_current_container_log(
+                resolve_log_path=lambda: current_path[0],
+                sleep=lambda _: None,
+            )
+
+            self.assertIsNone(next(follower))
+            second_path.write_text(self.docker_line("first log from replacement"))
+            current_path[0] = second_path
+
+            self.assertEqual("first log from replacement", next(follower))
+            follower.close()
+
+    def test_reads_replaced_log_from_beginning_when_path_is_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "container-json.log"
+            replacement_path = Path(directory) / "replacement-json.log"
+            log_path.write_text(self.docker_line("old log"))
+            follower = forward_error_logs.follow_current_container_log(
+                resolve_log_path=lambda: log_path,
+                sleep=lambda _: None,
+            )
+
+            self.assertIsNone(next(follower))
+            replacement_path.write_text(self.docker_line("first log after rotation"))
+            replacement_path.replace(log_path)
+
+            self.assertEqual("first log after rotation", next(follower))
+            follower.close()
+
+    @staticmethod
+    def docker_line(message: str) -> str:
+        return json.dumps({"log": message}) + "\n"
 
 
 if __name__ == "__main__":
