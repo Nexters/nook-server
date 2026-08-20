@@ -17,10 +17,10 @@ interface PlaceParsingJobPort {
     fun fail(postId: Long, reason: String)
 }
 
+fun interface PlaceImageUrlPort {
+    fun findImageUrls(postId: Long): List<String>
+}
+
 data class OutstandingPlaceParsingJob(val postId: Long, val availableAt: Instant)
 
 data class PlaceCandidateWithThumbnail(val place: PlaceCandidate, val thumbnailUrl: String?)
-
-fun interface PlaceImageReadinessPort {
-    fun areImageUrlsReadyForOcr(postId: Long): Boolean
-}

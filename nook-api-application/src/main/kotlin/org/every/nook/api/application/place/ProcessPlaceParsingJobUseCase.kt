@@ -15,12 +15,13 @@ import java.time.Instant
 class ProcessPlaceParsingJobUseCase(
     private val jobPort: PlaceParsingJobPort,
     private val imageTextExtractor: ImageTextExtractor,
+    private val imageUrlPort: PlaceImageUrlPort = PlaceImageUrlPort { emptyList() },
     private val clueExtractor: PlaceClueExtractor,
     private val searchPlaceCandidates: SearchPlaceCandidatesUseCase,
     private val candidateSelector: PlaceCandidateSelector,
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
-    private val imageReadinessPort: PlaceImageReadinessPort = PlaceImageReadinessPort { true },
+    private val imageOcrConcurrency: Int = DEFAULT_IMAGE_OCR_CONCURRENCY,
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -100,20 +101,19 @@ class ProcessPlaceParsingJobUseCase(
         if (images.isEmpty() || !requiresImageAnalysis(textClueCount, textResolvedCount, expectedPlaceCount)) {
             return null
         }
-        if (!imageReadinessPort.areImageUrlsReadyForOcr(job.postId)) {
-            logger.info {
-                "Place parsing image fallback delayed: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "reason=$OCR_IMAGE_STORAGE_PENDING_REASON, imageCount=${images.size}"
-            }
-            error(OCR_IMAGE_STORAGE_PENDING_REASON)
-        }
         logger.info {
             "Place parsing image fallback started: postId=${job.postId}, attempt=${job.attempt}, " +
                 "imageCount=${images.size}, textClueCount=$textClueCount, textResolvedCount=$textResolvedCount, " +
                 "expectedPlaceCount=$expectedPlaceCount"
         }
         val transcripts = job.imageTranscripts ?: measure(job, IMAGE_TRANSCRIPT_STAGE) {
-            extractImageTranscripts(imageTextExtractor, images)
+            extractTranscriptsWithLatestUrlFallback(
+                job.postId,
+                images,
+                imageTextExtractor,
+                imageUrlPort,
+                imageOcrConcurrency,
+            )
         }.also { extracted ->
             logger.info {
                 "Image transcripts received: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -126,7 +126,13 @@ class ProcessPlaceParsingJobUseCase(
         val recoveredImageClues = ImageClueRecallRecovery(
             retranscribe = { recoveryImages ->
                 measure(job, IMAGE_TRANSCRIPT_STAGE) {
-                    extractImageTranscripts(imageTextExtractor, recoveryImages)
+                    extractTranscriptsWithLatestUrlFallback(
+                        job.postId,
+                        recoveryImages,
+                        imageTextExtractor,
+                        imageUrlPort,
+                        imageOcrConcurrency,
+                    )
                 }
             },
             storeTranscripts = { recovered -> jobPort.storeImageTranscripts(job.postId, recovered) },
@@ -362,7 +368,6 @@ class ProcessPlaceParsingJobUseCase(
         const val CANDIDATE_LOG_LIMIT = 5
         const val NO_PLACE_RESOLVED_REASON = "No place could be resolved from text"
         const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
-        const val OCR_IMAGE_STORAGE_PENDING_REASON = "OCR image storage is not ready"
         const val PLACE_FLOW = "place"
         const val TEXT_CLUE_STAGE = "clue-text"
         const val IMAGE_TRANSCRIPT_STAGE = "image-transcript"
@@ -374,6 +379,7 @@ class ProcessPlaceParsingJobUseCase(
         const val OCR_STAGE = "ocr"
         const val SUCCESS_OUTCOME = "success"
         const val FAILURE_OUTCOME = "failure"
+        const val DEFAULT_IMAGE_OCR_CONCURRENCY = 4
     }
 
     private class PlaceResolutionException(message: String) : IllegalStateException(message)
