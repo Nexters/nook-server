@@ -34,7 +34,10 @@ class ConnectPostPlacePersistenceAdapter(
         }
 
         val place = placeIdentityResolver.resolve(candidate)
-        place.updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
+        val shouldRequestThumbnail = place.shouldRequestThumbnailSupplement()
+        if (shouldRequestThumbnail) {
+            place.updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
+        }
         val placeId = requireNotNull(place.id)
         val existingSavedPostPlace = savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(savedPostId, placeId)
         if (existingSavedPostPlace == null) {
@@ -46,12 +49,14 @@ class ConnectPostPlacePersistenceAdapter(
         }
         bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
         sharedBookmarkSyncRepository.insertForActiveSubscribers(savedPostId = savedPostId, placeId = placeId)
-        eventPublisher.publishEvent(
-            PlaceThumbnailsRequestedEvent(
-                postId = savedPost.postId,
-                requests = listOf(PlaceThumbnailProvider.Request(candidate)),
-            ),
-        )
+        if (shouldRequestThumbnail) {
+            eventPublisher.publishEvent(
+                PlaceThumbnailsRequestedEvent(
+                    postId = savedPost.postId,
+                    requests = listOf(PlaceThumbnailProvider.Request(candidate, sourcePostId = savedPost.postId)),
+                ),
+            )
+        }
         eventPublisher.publishEvent(PlaceTagsRequestedEvent(savedPost.postId, placeId, candidate))
         return ConnectPostPlacePort.Result.Connected(placeId)
     }

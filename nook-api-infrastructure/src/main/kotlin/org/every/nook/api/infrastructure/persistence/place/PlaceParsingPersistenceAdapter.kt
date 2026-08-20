@@ -144,13 +144,7 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
-        val placeThumbnailRequests = resolvedPlaces.map { it.first }.zip(postPlaces).map { (place, postPlace) ->
-            PlaceThumbnailProvider.Request(
-                place = place,
-                sourcePostId = postId,
-                sourceMediaSequence = postPlace.sourceMediaSequence ?: postPlace.sequence,
-            )
-        }
+        val placeThumbnailRequests = thumbnailRequests(postId, resolvedPlaces, postPlaces)
         if (placeThumbnailRequests.isNotEmpty()) {
             eventPublisher.publishEvent(
                 PlaceThumbnailsRequestedEvent(
@@ -164,6 +158,21 @@ class PlaceParsingPersistenceAdapter(
             eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, postPlace.placeId, place))
         }
     }
+
+    private fun thumbnailRequests(
+        postId: Long,
+        resolvedPlaces: List<Pair<PlaceCandidate, PlaceEntity>>,
+        postPlaces: List<PostPlaceEntity>,
+    ): List<PlaceThumbnailProvider.Request> = resolvedPlaces.zip(postPlaces)
+        .filter { (resolvedPlace, _) -> resolvedPlace.second.shouldRequestThumbnailSupplement() }
+        .map { (resolvedPlace, postPlace) ->
+            resolvedPlace.second.updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
+            PlaceThumbnailProvider.Request(
+                place = resolvedPlace.first,
+                sourcePostId = postId,
+                sourceMediaSequence = postPlace.sourceMediaSequence ?: postPlace.sequence,
+            )
+        }
 
     @Transactional
     override fun update(

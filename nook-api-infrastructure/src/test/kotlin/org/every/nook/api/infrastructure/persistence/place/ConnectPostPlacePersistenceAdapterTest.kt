@@ -74,6 +74,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
         `when`(parsingJobRepository.findByPostId(101)).thenReturn(job)
         `when`(placeIdentityResolver.resolve(candidate())).thenReturn(place)
+        `when`(place.shouldRequestThumbnailSupplement()).thenReturn(true)
         `when`(savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(11, 17)).thenReturn(null)
         `when`(savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(11))
             .thenReturn(listOf(UserSavedPostPlaceEntity(11, 16, 0)))
@@ -97,6 +98,28 @@ class ConnectPostPlacePersistenceAdapterTest {
         assertEquals(1, eventCaptor.allValues.filterIsInstance<PlaceTagsRequestedEvent>().size)
         assertEquals(PlaceParsingStatus.FAILED, job.status)
         assertEquals("failed", job.failureReason)
+    }
+
+    @Test
+    fun `keeps a completed thumbnail when directly connecting an existing place`() {
+        val savedPost = savedPost()
+        val job = parsingJob(PlaceParsingStatus.COMPLETED)
+        val place = mock(PlaceEntity::class.java)
+        `when`(place.id).thenReturn(17)
+        `when`(place.shouldRequestThumbnailSupplement()).thenReturn(false)
+        `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
+        `when`(parsingJobRepository.findByPostId(101)).thenReturn(job)
+        `when`(placeIdentityResolver.resolve(candidate())).thenReturn(place)
+        `when`(savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(11, 17))
+            .thenReturn(UserSavedPostPlaceEntity(11, 17, 0))
+
+        assertEquals(ConnectPostPlacePort.Result.Connected(17), adapter.connect(7, 11, candidate()))
+
+        verify(place, never()).updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
+        val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
+        verify(eventPublisher).publishEvent(eventCaptor.capture())
+        assertEquals(1, eventCaptor.allValues.filterIsInstance<PlaceTagsRequestedEvent>().size)
+        assertEquals(0, eventCaptor.allValues.filterIsInstance<PlaceThumbnailsRequestedEvent>().size)
     }
 
     @Test

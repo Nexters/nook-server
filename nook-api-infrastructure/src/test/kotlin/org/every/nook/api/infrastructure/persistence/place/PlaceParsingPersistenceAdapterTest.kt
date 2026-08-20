@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
+import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
@@ -22,6 +23,7 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
@@ -274,6 +276,33 @@ class PlaceParsingPersistenceAdapterTest {
     }
 
     @Test
+    fun `requests thumbnails only for places that still need supplementation`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        val completedPlace = mock(PlaceEntity::class.java)
+        val pendingPlace = mock(PlaceEntity::class.java)
+        val completedCandidate = candidate("completed")
+        val pendingCandidate = candidate("pending")
+        `when`(completedPlace.id).thenReturn(17)
+        `when`(pendingPlace.id).thenReturn(18)
+        `when`(completedPlace.shouldRequestThumbnailSupplement()).thenReturn(false)
+        `when`(pendingPlace.shouldRequestThumbnailSupplement()).thenReturn(true)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+        `when`(placeIdentityResolver.resolve(completedCandidate)).thenReturn(completedPlace)
+        `when`(placeIdentityResolver.resolve(pendingCandidate)).thenReturn(pendingPlace)
+        `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(emptyList())
+
+        adapter.complete(11, listOf(completedCandidate, pendingCandidate))
+
+        verify(completedPlace, org.mockito.Mockito.never())
+            .updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
+        verify(pendingPlace).updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
+        val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
+        verify(eventPublisher, org.mockito.Mockito.times(3)).publishEvent(eventCaptor.capture())
+        val thumbnailEvent = eventCaptor.allValues.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
+        assertEquals(listOf("pending"), thumbnailEvent.requests.map { it.place.externalPlaceId })
+    }
+
+    @Test
     fun `updates a place thumbnail independently after parsing completes`() {
         val place = mock(PlaceEntity::class.java)
         `when`(placeIdentityResolver.find("KAKAO", "123")).thenReturn(place)
@@ -310,4 +339,16 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(savedPost.memo).thenReturn(memo)
         return savedPost
     }
+
+    private fun candidate(externalPlaceId: String): PlaceCandidate = PlaceCandidate(
+        provider = "KAKAO",
+        externalPlaceId = externalPlaceId,
+        name = "누크 카페",
+        address = "서울",
+        latitude = BigDecimal("37.1"),
+        longitude = BigDecimal("127.1"),
+        category = null,
+        phoneNumber = null,
+        providerUrl = null,
+    )
 }

@@ -4,6 +4,9 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.measure
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.slf4j.LoggerFactory
@@ -12,6 +15,8 @@ import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.math.BigDecimal
+import java.time.Clock
+import java.util.concurrent.Executors
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -23,6 +28,8 @@ class ApifyGoogleMapsPhotoProvider(
     private val properties: ApifyGoogleMapsProperties,
     private val mediaStorage: PostMediaStoragePort,
     private val responseCache: ScrapingProviderResponseCache? = null,
+    private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
+    private val clock: Clock = Clock.systemUTC(),
 ) : PlaceThumbnailProvider {
     override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = fetchAll(listOf(request)).single()
 
@@ -44,19 +51,20 @@ class ApifyGoogleMapsPhotoProvider(
             "scrapeImageAuthors" to false,
             "language" to "ko",
         )
-        val response = restClient.post()
-            .uri("/v2/acts/{actorId}/run-sync-get-dataset-items?format=json&clean=true", properties.actorId)
-            .contentType(MediaType.APPLICATION_JSON)
-            .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
-            .body(input)
-            .retrieve()
-            .body(String::class.java)
+        val response = measureThumbnailStage(metrics, clock, requests, ACTOR_STAGE) {
+            restClient.post()
+                .uri("/v2/acts/{actorId}/run-sync-get-dataset-items?format=json&clean=true", properties.actorId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
+                .body(input)
+                .retrieve()
+                .body(String::class.java)
+        }
         response?.let { responseCache?.save(PROVIDER, SOURCE_TYPE, input.hashCode().toString(), it) }
         val places = parsePlaces(response)
-        return requests.map { request ->
-            places.bestMatch(request.place)?.let { match ->
-                storePhotos(request, match.imageUrls, match.placeId)
-            }
+        val matches = requests.map { request -> places.bestMatch(request.place) }
+        return measureThumbnailStage(metrics, clock, requests, IMAGE_STORE_STAGE) {
+            storePhotos(requests, matches)
         }
     }
 
@@ -101,23 +109,34 @@ class ApifyGoogleMapsPhotoProvider(
     }
 
     private fun storePhotos(
-        request: PlaceThumbnailProvider.Request,
-        imageUrls: List<String>,
-        googlePlaceId: String?,
-    ): PlaceSupplement {
-        val storedUrls = imageUrls.distinct().take(MAX_PHOTO_COUNT).mapIndexedNotNull { sequence, url ->
-            runCatching {
-                mediaStorage.store(PostMedia(PostMedia.MediaType.IMAGE, url, sequence)).url
-            }.onFailure { exception ->
-                logger.warn(
-                    "Apify Google Maps photo storage failed: externalPlaceId={}, sequence={}",
-                    request.place.externalPlaceId,
-                    sequence,
-                    exception,
-                )
-            }.getOrNull()
+        requests: List<PlaceThumbnailProvider.Request>,
+        matches: List<GoogleMapsPlace?>,
+    ): List<PlaceSupplement?> = Executors.newFixedThreadPool(properties.storageConcurrency).use { executor ->
+        val storedPhotoTasks = requests.zip(matches).map { (request, match) ->
+            match?.imageUrls.orEmpty().distinct().take(MAX_PHOTO_COUNT).mapIndexed { sequence, url ->
+                executor.submit<String?> {
+                    runCatching {
+                        mediaStorage.store(PostMedia(PostMedia.MediaType.IMAGE, url, sequence)).url
+                    }.onFailure { exception ->
+                        logger.warn(
+                            "Apify Google Maps photo storage failed: externalPlaceId={}, sequence={}",
+                            request.place.externalPlaceId,
+                            sequence,
+                            exception,
+                        )
+                    }.getOrNull()
+                }
+            }
         }
-        return PlaceSupplement(openingHours = null, photoUrls = storedUrls, googlePlaceId = googlePlaceId)
+        matches.zip(storedPhotoTasks).map { (match, tasks) ->
+            match?.let {
+                PlaceSupplement(
+                    openingHours = null,
+                    photoUrls = tasks.mapNotNull { task -> task.get() },
+                    googlePlaceId = match.placeId,
+                )
+            }
+        }
     }
 
     private fun PlaceCandidate.actorQuery(): String = googlePlaceId?.let { "place_id:$it" } ?: "$name $address"
@@ -150,6 +169,8 @@ class ApifyGoogleMapsPhotoProvider(
         const val PROVIDER = "APIFY_GOOGLE_MAPS"
         const val SOURCE_TYPE = "GOOGLE_MAPS_PHOTO"
         const val MAX_SEARCH_RESULT_COUNT = 5
+        const val ACTOR_STAGE = "apify-actor"
+        const val IMAGE_STORE_STAGE = "image-store"
         const val MAX_PHOTO_COUNT = 6
         const val MAX_DISTANCE_METERS = 300.0
         const val SHORT_PLACE_NAME_LENGTH = 1
@@ -219,6 +240,18 @@ private val LODGING_CATEGORY_KEYWORDS = setOf(
     "motel",
     "lodging",
 )
+
+private fun <T> measureThumbnailStage(
+    metrics: ProcessingMetrics,
+    clock: Clock,
+    requests: List<PlaceThumbnailProvider.Request>,
+    stage: String,
+    action: () -> T,
+): T {
+    val postId = requests.firstNotNullOfOrNull(PlaceThumbnailProvider.Request::sourcePostId)
+        ?: return action()
+    return metrics.measure("place-thumbnail", stage, postId, null, clock, action)
+}
 
 private fun JsonNode.text(vararg names: String): String? = names.asSequence()
     .map(::path)
