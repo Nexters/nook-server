@@ -6,7 +6,6 @@ import org.every.nook.api.infrastructure.openai.OpenAiImageTextExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiProperties
 import org.every.nook.api.infrastructure.openai.OpenAiRateLimitInterceptor
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -55,13 +54,7 @@ class OpenAiConfig {
         properties = properties,
     )
 
-    @Bean
-    @ConditionalOnProperty(
-        prefix = "place-parsing",
-        name = ["image-text-provider"],
-        havingValue = "openai",
-        matchIfMissing = true,
-    )
+    @Bean("openAiImageTextExtractor")
     fun openAiImageTextExtractor(
         @Qualifier("openAiRestClient") restClient: RestClient,
         properties: OpenAiProperties,
