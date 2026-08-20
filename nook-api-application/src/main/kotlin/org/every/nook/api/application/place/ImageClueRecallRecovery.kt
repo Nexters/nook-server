@@ -128,12 +128,14 @@ private fun extractSingleImage(
     image: ImageTextExtractor.ImageInput,
     fallbackImage: (ImageTextExtractor.ImageInput) -> ImageTextExtractor.ImageInput?,
 ): SingleImageTranscriptResult {
-    val primary = runCatching { extractor.extract(ImageTextExtractor.Request(listOf(image))).normalize(image) }
+    val primary = runCatching {
+        extractor.extract(ImageTextExtractor.Request(listOf(image))).normalize(image).requireText()
+    }
     if (primary.isSuccess) return SingleImageTranscriptResult(primary.getOrThrow(), null)
     val fallback = fallbackImage(image)
     val recovered = fallback?.let {
         logger.info { "Image transcript retried with refreshed URL: imageIndex=${image.imageIndex}" }
-        runCatching { extractor.extract(ImageTextExtractor.Request(listOf(it))).normalize(it) }
+        runCatching { extractor.extract(ImageTextExtractor.Request(listOf(it))).normalize(it).requireText() }
     }
     val result = recovered ?: primary
     return result.fold(
@@ -143,6 +145,10 @@ private fun extractSingleImage(
             SingleImageTranscriptResult(ImageTranscript(image.imageIndex, emptyList()), exception)
         },
     )
+}
+
+private fun ImageTranscript.requireText(): ImageTranscript = also {
+    check(texts.isNotEmpty()) { "Image transcript is empty: imageIndex=$imageIndex" }
 }
 
 private fun List<ImageTranscript>.normalize(image: ImageTextExtractor.ImageInput): ImageTranscript {

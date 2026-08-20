@@ -181,6 +181,7 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(content().string(containsString(imageUrls.first())))
             .andExpect(content().string(containsString(imageUrls.last())))
             .andExpect(content().string(containsString("\"detail\":\"high\"")))
+            .andExpect(content().string(containsString("\"model\":\"gpt-5-mini\"")))
             .andExpect(content().string(containsString("\"max_output_tokens\":4000")))
             .andExpect(content().string(containsString("판단, 요약, 번역, 맞춤법 교정")))
             .andExpect(content().string(containsString("imageIndex")))

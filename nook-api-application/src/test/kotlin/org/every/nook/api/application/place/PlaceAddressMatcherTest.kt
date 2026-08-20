@@ -93,9 +93,9 @@ class PlaceAddressMatcherTest {
         assertEquals(
             listOf(
                 "파티오피즈 서울 용산구 이태원로20가길 11 4층",
+                "서울 용산구 이태원로20가길 11 4층",
                 "파티오피즈",
                 "서울 용산구 파티오피즈",
-                "이태원 파티오피즈",
             ),
             clue.searchQueries(),
         )
@@ -118,9 +118,9 @@ class PlaceAddressMatcherTest {
         assertEquals(
             listOf(
                 "도원 서울 마포구 동교로38길 27-19 지1층 좌측",
+                "서울 마포구 동교로38길 27-19 지1층 좌측",
                 "도원",
                 "홍대입구역 도원",
-                "dowon.kr 홍대입구역",
             ),
             clue.searchQueries(),
         )
@@ -138,9 +138,9 @@ class PlaceAddressMatcherTest {
         assertEquals(
             listOf(
                 "라벤다 lavender 서울 광진구 능동로50길 24 1층",
+                "서울 광진구 능동로50길 24 1층",
                 "라벤다 lavender",
                 "중곡역 라벤다",
-                "중곡역 lavender",
             ),
             clue.searchQueries(),
         )
@@ -227,6 +227,18 @@ class PlaceAddressMatcherTest {
         )
         assertTrue(basementClue.isSupportedBy(candidate("도원", "서울 마포구 동교로38길 27-19")))
         assertFalse(basementClue.isSupportedBy(candidate("도원", "서울 마포구 월드컵북로5가길 34")))
+    }
+
+    @Test
+    fun `accepts a near OCR store name when the road address matches`() {
+        val clue = PlaceClue(
+            name = "에이치커퍼스트스터스",
+            region = "서울 성동구",
+            queries = listOf("에이치커퍼스트스터스"),
+            addressHint = "서울 성동구 성수일로11길 10 1층",
+        )
+
+        assertTrue(clue.isSupportedBy(candidate("에이치커피로스터스", "서울 성동구 성수일로11길 10")))
     }
 
     private fun candidate(name: String, address: String): PlaceCandidate = PlaceCandidate(
