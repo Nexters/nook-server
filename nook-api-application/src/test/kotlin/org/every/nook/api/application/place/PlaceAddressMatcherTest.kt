@@ -8,6 +8,16 @@ import kotlin.test.assertTrue
 
 class PlaceAddressMatcherTest {
     @Test
+    fun `accepts a one-syllable OCR typo in a road name at the same district and building number`() {
+        assertTrue(
+            PlaceAddressMatcher.isCompatible(
+                "서울 광진구 농동로32길 50 1층",
+                "서울 광진구 능동로32길 50",
+            ),
+        )
+    }
+
+    @Test
     fun `accepts the same base address when provider omits floor and room details`() {
         val candidateAddress = "서울 중구 마른내로 55"
 
@@ -127,6 +137,13 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `adds a common final-consonant OCR alias for a one-character store name`() {
+        val clue = PlaceClue(name = "홈", region = null, queries = listOf("홈"))
+
+        assertEquals(listOf("홈", "홉"), clue.searchQueries())
+    }
+
+    @Test
     fun `uses regional aliases before inferred queries for multilingual store names`() {
         val clue = PlaceClue(
             name = "라벤다 lavender",
@@ -227,6 +244,36 @@ class PlaceAddressMatcherTest {
         )
         assertTrue(basementClue.isSupportedBy(candidate("도원", "서울 마포구 동교로38길 27-19")))
         assertFalse(basementClue.isSupportedBy(candidate("도원", "서울 마포구 월드컵북로5가길 34")))
+    }
+
+    @Test
+    fun `grounds a one-character store name from OCR evidence at the exact address`() {
+        val clue = PlaceClue(
+            name = "홍대 카페",
+            region = "서울 마포구",
+            queries = listOf("홍대 카페"),
+            addressHint = "서울 마포구 와우산로37길 1 지1층",
+            evidence = listOf(
+                PlaceClueEvidence(7, "홈 서울특별시 마포구 와우산로37길 1 지1층"),
+            ),
+        )
+
+        assertTrue(clue.isSupportedBy(candidate("홈", "서울 마포구 와우산로37길 1")))
+    }
+
+    @Test
+    fun `grounds short OCR name typos when the road address has one OCR typo`() {
+        val clue = PlaceClue(
+            name = "퍼즌트",
+            region = "서울 광진구",
+            queries = listOf("퍼즌트"),
+            addressHint = "서울 광진구 농동로32길 50 1층",
+            evidence = listOf(
+                PlaceClueEvidence(10, "퍼즌트 서울 광진구 농동로32길 50 1층"),
+            ),
+        )
+
+        assertTrue(clue.isSupportedBy(candidate("피죤트", "서울 광진구 능동로32길 50")))
     }
 
     @Test
