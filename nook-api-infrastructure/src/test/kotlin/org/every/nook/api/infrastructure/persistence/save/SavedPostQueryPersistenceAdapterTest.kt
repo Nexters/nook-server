@@ -252,9 +252,10 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals("Purr", result.ownerNickname)
         assertEquals(listOf(2L, 0L), result.items.map { it.placeCount })
         assertEquals(SavedPostMediaType.VIDEO, result.items.first().post.representativeMedia?.type)
+        assertEquals("https://example.com/instagram-video.mp4", result.items.first().post.representativeMedia?.url)
         assertEquals(
             "https://example.com/instagram-video-poster.jpg",
-            result.items.first().post.representativeMedia?.url,
+            result.items.first().post.representativeMedia?.thumbnailUrl,
         )
         assertEquals(PostProcessingStatusView.FAILED, result.items.first().post.processingStatus)
         assertEquals(PostProcessingStatusView.COMPLETED, result.items.last().post.processingStatus)
