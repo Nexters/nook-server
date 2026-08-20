@@ -12,6 +12,29 @@ import kotlin.test.assertNull
 
 class PlaceParsingResilienceTest {
     @Test
+    fun `retries an empty transcript with the refreshed stored image`() {
+        val requestedUrls = mutableListOf<String>()
+        val transcripts = extractImageTranscripts(
+            extractor = ImageTextExtractor { request ->
+                val image = request.images.single()
+                requestedUrls += image.imageUrl
+                listOf(
+                    ImageTranscript(
+                        image.imageIndex,
+                        if (image.imageUrl.contains("stored")) listOf("꼬레소레하우스", "서울 성동구 연무장길 1") else emptyList(),
+                    ),
+                )
+            },
+            images = listOf(ImageTextExtractor.ImageInput(5, "https://instagram.test/5.jpg")),
+            concurrency = 1,
+            fallbackImage = { ImageTextExtractor.ImageInput(5, "https://stored.test/5.jpg") },
+        )
+
+        assertEquals(listOf("https://instagram.test/5.jpg", "https://stored.test/5.jpg"), requestedUrls)
+        assertEquals(listOf("꼬레소레하우스", "서울 성동구 연무장길 1"), transcripts.single().texts)
+    }
+
+    @Test
     fun `normalizes partial duplicate and unexpected transcript indexes without failing the job`() {
         val port = FakeJobPort(imageUrls = listOf("https://cdn.test/1.jpg", "https://cdn.test/2.jpg"))
         val useCase = useCase(

@@ -14,10 +14,37 @@ internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
     }
 
     val hasCompatibleIdentity = hasCompatibleName(candidate) || hasNameEvidence(candidate)
-    if (explicitAddressHint != null && !hasCompatibleIdentity) {
+    val hasExactAddressEvidence = explicitAddressHint?.let { hint ->
+        PlaceAddressMatcher.addressKeys(hint).intersect(PlaceAddressMatcher.addressKeys(candidate.address)).isNotEmpty()
+    } == true
+    val hasAddressBackedOcrIdentity = hasExactAddressEvidence && hasPlausibleOcrIdentity(candidate)
+    if (explicitAddressHint != null && !hasCompatibleIdentity && !hasAddressBackedOcrIdentity) {
         return false
     }
     return evidence.isEmpty() || hasCompatibleIdentity || hasCompatibleEvidence(candidate)
+}
+
+private fun PlaceClue.hasPlausibleOcrIdentity(candidate: PlaceCandidate): Boolean {
+    val candidateName = candidate.name.groundingKey()
+    return (sequenceOf(name) + queries.asSequence())
+        .map(String::groundingKey)
+        .any { it.isNearOcrMatch(candidateName) }
+}
+
+private fun String.isNearOcrMatch(other: String): Boolean {
+    if (length < MIN_NEAR_OCR_NAME_LENGTH || other.length < MIN_NEAR_OCR_NAME_LENGTH) return false
+    if (kotlin.math.abs(length - other.length) > MAX_OCR_NAME_EDIT_DISTANCE) return false
+    val distances = IntArray(other.length + 1) { it }
+    forEachIndexed { leftIndex, left ->
+        var previous = distances[0]
+        distances[0] = leftIndex + 1
+        other.forEachIndexed { rightIndex, right ->
+            val replaced = previous + if (left == right) 0 else 1
+            previous = distances[rightIndex + 1]
+            distances[rightIndex + 1] = minOf(distances[rightIndex + 1] + 1, distances[rightIndex] + 1, replaced)
+        }
+    }
+    return distances.last() <= MAX_OCR_NAME_EDIT_DISTANCE
 }
 
 internal fun Collection<PlaceCandidateSelector.Candidate>.descriptions(limit: Int): List<String> =
@@ -71,4 +98,6 @@ private const val MIN_GROUNDING_KEY_LENGTH = 2
 private const val MIN_NAME_COMPATIBILITY_KEY_LENGTH = 3
 private const val MIN_FUZZY_NAME_LENGTH = 4
 private const val MAX_NAME_CHARACTER_DIFFERENCE = 1
+private const val MIN_NEAR_OCR_NAME_LENGTH = 6
+private const val MAX_OCR_NAME_EDIT_DISTANCE = 3
 private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6
