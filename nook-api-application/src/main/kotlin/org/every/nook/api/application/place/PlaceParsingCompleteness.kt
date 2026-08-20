@@ -37,7 +37,21 @@ internal fun List<ImageTranscript>.detectedPlaceCardCount(): Int = mapNotNull { 
 internal fun effectiveExpectedPlaceCount(textExpectedPlaceCount: Int?, transcripts: List<ImageTranscript>): Int? =
     listOfNotNull(textExpectedPlaceCount, transcripts.detectedPlaceCardCount()).maxOrNull()
 
-internal fun PlaceClue.restoreGroundingFromCard(transcripts: List<ImageTranscript>): PlaceClue {
+internal fun PlaceClue.restoreGroundingFromCard(transcripts: List<ImageTranscript>): PlaceClue =
+    restoreEvidenceFromTranscript(transcripts).restoreAddressFromCard(transcripts)
+
+private fun PlaceClue.restoreEvidenceFromTranscript(transcripts: List<ImageTranscript>): PlaceClue {
+    val identityKey = name.placeCardNameKey().takeIf { it.length >= MIN_EVIDENCE_IDENTITY_LENGTH } ?: return this
+    val matches = transcripts.flatMap { transcript ->
+        transcript.texts
+            .filter { text -> text.placeCardNameKey().contains(identityKey) }
+            .map { text -> PlaceClueEvidence(transcript.imageIndex, text) }
+    }
+    val matchedImageIndexes = matches.map(PlaceClueEvidence::imageIndex).distinct()
+    return if (matchedImageIndexes.size == 1) copy(evidence = listOf(matches.first())) else this
+}
+
+private fun PlaceClue.restoreAddressFromCard(transcripts: List<ImageTranscript>): PlaceClue {
     val evidenceIndexes = evidence.map(PlaceClueEvidence::imageIndex).toSet()
     val cardTexts = transcripts.asSequence()
         .filter { transcript -> transcript.imageIndex in evidenceIndexes }
@@ -122,6 +136,7 @@ private val PLACE_CARD_ADDRESS_PATTERN = Regex(
 private fun String.placeCardAddressKey(): String = lowercase().filter(Char::isLetterOrDigit)
 private fun String.placeCardNameKey(): String = lowercase().filter(Char::isLetterOrDigit)
 private const val MIN_PLACE_NAME_TEXT_LENGTH = 2
+private const val MIN_EVIDENCE_IDENTITY_LENGTH = 2
 private const val MAX_PLACE_CARD_NAME_LENGTH = 30
 private const val MAX_PLACE_CARD_NAME_WORDS = 3
 private val METROPOLITAN_REGION_NAMES = setOf(
