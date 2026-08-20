@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceClue
+import org.every.nook.api.application.place.PlaceParsingDiagnostics
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
@@ -82,7 +83,7 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(postPlaceReviewRepository.existsByPostId(11)).thenReturn(true)
 
-        adapter.complete(11, emptyList())
+        adapter.complete(11, emptyList(), diagnostics())
 
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
         verifyNoInteractions(placeRepository, postPlaceRepository)
@@ -237,6 +238,7 @@ class PlaceParsingPersistenceAdapterTest {
         adapter.complete(
             postId = 11,
             places = listOf(candidate),
+            diagnostics = diagnostics(),
         )
 
         assertEquals(0, storedPostPlaces.single().sequence)
@@ -271,6 +273,7 @@ class PlaceParsingPersistenceAdapterTest {
         adapter.complete(
             postId = 11,
             places = listOf(candidate),
+            diagnostics = diagnostics(),
         )
 
         verify(placeIdentityResolver).resolve(candidate)
@@ -293,7 +296,7 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(placeIdentityResolver.resolve(pendingCandidate)).thenReturn(pendingPlace)
         `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(emptyList())
 
-        adapter.complete(11, listOf(completedCandidate, pendingCandidate))
+        adapter.complete(11, listOf(completedCandidate, pendingCandidate), diagnostics())
 
         verify(completedPlace, org.mockito.Mockito.never())
             .updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
@@ -356,5 +359,13 @@ class PlaceParsingPersistenceAdapterTest {
         category = null,
         phoneNumber = null,
         providerUrl = null,
+    )
+
+    private fun diagnostics() = PlaceParsingDiagnostics(
+        outcome = PlaceParsingDiagnostics.Outcome.COMPLETED,
+        expectedPlaceCount = 1,
+        extractedPlaceCount = 1,
+        resolvedPlaceCount = 1,
+        unresolvedClues = emptyList(),
     )
 }

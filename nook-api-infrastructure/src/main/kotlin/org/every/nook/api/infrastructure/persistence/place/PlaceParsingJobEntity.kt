@@ -10,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.every.nook.api.application.place.PlaceParsingDiagnostics
 import org.every.nook.api.application.processing.ParsingProgress
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.place.PlaceParsingJob
@@ -43,6 +44,17 @@ class PlaceParsingJobEntity(
     var textPlaceClues: String? = null,
     @Column(name = "image_transcripts", nullable = true, columnDefinition = "MEDIUMTEXT")
     var imageTranscripts: String? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "parsing_outcome", nullable = true, length = OUTCOME_LENGTH)
+    var parsingOutcome: PlaceParsingDiagnostics.Outcome? = null,
+    @Column(name = "expected_place_count", nullable = true)
+    var expectedPlaceCount: Int? = null,
+    @Column(name = "extracted_place_count", nullable = true)
+    var extractedPlaceCount: Int? = null,
+    @Column(name = "resolved_place_count", nullable = true)
+    var resolvedPlaceCount: Int? = null,
+    @Column(name = "unresolved_place_clues", nullable = true, columnDefinition = "MEDIUMTEXT")
+    var unresolvedPlaceClues: String? = null,
     @Column(
         name = "failure_reason",
         nullable = true,
@@ -88,6 +100,7 @@ class PlaceParsingJobEntity(
 
     companion object {
         const val STATUS_LENGTH = 20
+        const val OUTCOME_LENGTH = 20
         const val PROGRESS_STAGE_LENGTH = 40
     }
 }

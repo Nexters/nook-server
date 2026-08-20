@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceClue
+import org.every.nook.api.application.place.PlaceParsingDiagnostics
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
@@ -117,12 +118,13 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun complete(postId: Long, places: List<PlaceCandidate>) {
+    override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
         if (postPlaceReviewRepository.existsByPostId(postId)) {
             job.status = PlaceParsingStatus.COMPLETED
             job.failureReason = null
+            job.updateDiagnostics(diagnostics, objectMapper)
             job.progressPercent = COMPLETED_PERCENT
             return
         }
@@ -157,6 +159,7 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
+        job.updateDiagnostics(diagnostics, objectMapper)
         job.progressPercent = COMPLETED_PERCENT
         val placeThumbnailRequests = thumbnailRequests(postId, resolvedPlaces, postPlaces)
         if (placeThumbnailRequests.isNotEmpty()) {
@@ -259,4 +262,12 @@ class PlaceParsingPersistenceAdapter(
         const val FAILURE_REASON_MAX_LENGTH = 500
         const val COMPLETED_PERCENT = 100
     }
+}
+
+private fun PlaceParsingJobEntity.updateDiagnostics(diagnostics: PlaceParsingDiagnostics, objectMapper: ObjectMapper) {
+    parsingOutcome = diagnostics.outcome
+    expectedPlaceCount = diagnostics.expectedPlaceCount
+    extractedPlaceCount = diagnostics.extractedPlaceCount
+    resolvedPlaceCount = diagnostics.resolvedPlaceCount
+    unresolvedPlaceClues = objectMapper.writeValueAsString(diagnostics.unresolvedClues)
 }

@@ -380,6 +380,8 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertEquals(listOf("1", "2"), port.completed.map { it.externalPlaceId })
+        assertEquals(PlaceParsingDiagnostics.Outcome.PARTIAL, port.diagnostics?.outcome)
+        assertEquals(1, port.diagnostics?.unresolvedClues?.size)
         assertNull(port.nextAttemptAt)
         assertNull(port.failedReason)
     }
@@ -650,6 +652,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         var nextAttemptAt: Instant? = null
         var retryReason: String? = null
         var storedImageTranscripts: List<ImageTranscript>? = null
+        var diagnostics: PlaceParsingDiagnostics? = null
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob = ClaimedPlaceParsingJob(
             postId = postId,
@@ -668,8 +671,9 @@ class ProcessPlaceParsingJobUseCaseTest {
             storedImageTranscripts = transcripts
         }
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>) {
+        override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
             completed = places
+            this.diagnostics = diagnostics
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
