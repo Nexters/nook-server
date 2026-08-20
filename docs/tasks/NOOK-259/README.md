@@ -33,3 +33,11 @@
 - `./gradlew :nook-api-application:test --tests '*PlaceParsingResilienceTest'`
 - `./gradlew :nook-api-infrastructure:test --tests '*PlaceParsingPersistenceAdapterTest'`
 - `./gradlew check`
+
+## Corepin 한 줄 전사 회귀 수정
+
+- 상호명과 주소가 한 OCR 문자열에 함께 있어도 장소 카드로 계산한다.
+- 같은 주소의 반복 마감 카드는 기대 장소 수에서 중복 제거한다.
+- 주소 바로 앞의 한 글자 상호명을 일반 업종명보다 우선 복구한다.
+- 한 글자 받침 및 짧은 상호명·도로명의 제한적인 OCR 오타를 주소 근거와 함께 복구한다.
+- 폐업 등 모든 검색 provider에서 사라진 장소는 생성하지 않고 미해결 단서로 유지한다.

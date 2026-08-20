@@ -27,16 +27,39 @@ internal fun placeParsingDiagnostics(
     )
 }
 
-internal fun List<ImageTranscript>.detectedPlaceCardCount(): Int = count { transcript ->
-    val hasAddress = transcript.texts.any { ADDRESS_PATTERN.containsMatchIn(it) }
-    val hasPlaceName = transcript.texts.any { text ->
-        text.length >= MIN_PLACE_NAME_TEXT_LENGTH && !ADDRESS_PATTERN.containsMatchIn(text)
-    }
-    hasAddress && hasPlaceName
-}
+internal fun List<ImageTranscript>.detectedPlaceCardCount(): Int = mapNotNull { transcript ->
+    transcript.texts.asSequence()
+        .flatMap { text -> ADDRESS_PATTERN.findAll(text) }
+        .map { match -> match.value.placeCardAddressKey() }
+        .firstOrNull()
+}.distinct().count()
 
 internal fun effectiveExpectedPlaceCount(textExpectedPlaceCount: Int?, transcripts: List<ImageTranscript>): Int? =
     listOfNotNull(textExpectedPlaceCount, transcripts.detectedPlaceCardCount()).maxOrNull()
+
+internal fun PlaceClue.restorePlaceNameFromCard(transcripts: List<ImageTranscript>): PlaceClue {
+    if (addressHint.isNullOrBlank()) return this
+    val evidenceIndexes = evidence.map(PlaceClueEvidence::imageIndex).toSet()
+    val cardName = transcripts.asSequence()
+        .filter { transcript -> transcript.imageIndex in evidenceIndexes }
+        .flatMap(ImageTranscript::texts)
+        .mapNotNull { text ->
+            val addressStart = ADDRESS_PATTERN.find(text)?.range?.first ?: return@mapNotNull null
+            text.substring(0, addressStart)
+                .trim()
+                .split(Regex("\\s+"))
+                .dropLastWhile { token -> token == region || token in METROPOLITAN_REGION_NAMES }
+                .joinToString(" ")
+        }
+        .firstOrNull { candidate ->
+            candidate.isNotEmpty() &&
+                candidate.length <= MAX_PLACE_CARD_NAME_LENGTH &&
+                candidate.split(Regex("\\s+")).size <= MAX_PLACE_CARD_NAME_WORDS &&
+                !name.placeCardNameKey().contains(candidate.placeCardNameKey())
+        }
+        ?: return this
+    return copy(name = cardName, queries = listOf(cardName) + queries)
+}
 
 internal fun List<PlaceClue>.filterGroundedTextClues(job: ClaimedPlaceParsingJob): List<PlaceClue> = filter { clue ->
     clue.isGroundedIn(job.body, job.hashtags).also { grounded ->
@@ -66,5 +89,13 @@ internal fun PlaceClue.hasExclusiveGroundedImageEvidence(clues: List<PlaceClue>)
 private val ADDRESS_PATTERN = Regex(
     "(?:[가-힣]+(?:시|도)\\s+)?[가-힣]+(?:구|군|시)\\s+[가-힣A-Za-z0-9·.-]+(?:로|길|동)\\s*\\d+",
 )
+
+private fun String.placeCardAddressKey(): String = lowercase().filter(Char::isLetterOrDigit)
+private fun String.placeCardNameKey(): String = lowercase().filter(Char::isLetterOrDigit)
 private const val MIN_PLACE_NAME_TEXT_LENGTH = 2
+private const val MAX_PLACE_CARD_NAME_LENGTH = 30
+private const val MAX_PLACE_CARD_NAME_WORDS = 3
+private val METROPOLITAN_REGION_NAMES = setOf(
+    "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "제주",
+)
 private val completenessLogger = KotlinLogging.logger {}
