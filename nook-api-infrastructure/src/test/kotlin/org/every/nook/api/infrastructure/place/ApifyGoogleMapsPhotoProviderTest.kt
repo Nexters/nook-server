@@ -40,7 +40,7 @@ class ApifyGoogleMapsPhotoProviderTest {
     }
 
     @Test
-    fun `matches a differently named place by nearby coordinates and keeps Google place id`() {
+    fun `matches a differently named place by the same road address and keeps Google place id`() {
         val fixture = fixture()
         fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
             .andRespond(withSuccess(NOVEMBER_RESPONSE, MediaType.APPLICATION_JSON))
@@ -50,6 +50,66 @@ class ApifyGoogleMapsPhotoProviderTest {
         assertEquals(6, result?.photoUrls?.size)
         assertEquals("google-november", result?.googlePlaceId)
         fixture.server.verify()
+    }
+
+    @Test
+    fun `rejects a nearby hotel when a short restaurant name and address do not match`() {
+        val fixture = fixture()
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(NEARBY_HOTEL_RESPONSE, MediaType.APPLICATION_JSON))
+
+        val result = fixture.provider.fetch(
+            request(
+                googlePlaceId = null,
+                name = "음",
+                address = "충북 청주시 상당구 남사로102번길 8",
+                category = "음식점",
+                latitude = "36.6314129",
+                longitude = "127.4864368",
+            ),
+        )
+
+        assertNull(result)
+        assertEquals(emptyList(), fixture.storage.stored)
+    }
+
+    @Test
+    fun `selects the exact-address restaurant from multiple results for a short place name`() {
+        val fixture = fixture()
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(SHORT_NAME_CANDIDATES_RESPONSE, MediaType.APPLICATION_JSON))
+
+        val result = fixture.provider.fetch(
+            request(
+                googlePlaceId = null,
+                name = "음",
+                address = "충북 청주시 상당구 남사로102번길 8",
+                category = "음식점",
+                latitude = "36.6314129",
+                longitude = "127.4864368",
+            ),
+        )
+
+        assertEquals("correct-restaurant", result?.googlePlaceId)
+        assertEquals(listOf("https://cdn.example/1.jpg"), result?.photoUrls)
+    }
+
+    @Test
+    fun `keeps a category conflict as a ranking signal when name and address match`() {
+        val fixture = fixture()
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(EXACT_MATCH_WITH_CATEGORY_CONFLICT_RESPONSE, MediaType.APPLICATION_JSON))
+
+        val result = fixture.provider.fetch(
+            request(
+                googlePlaceId = null,
+                name = "누크 카페",
+                category = "음식점",
+            ),
+        )
+
+        assertEquals("category-conflict", result?.googlePlaceId)
+        assertEquals(listOf("https://cdn.example/1.jpg"), result?.photoUrls)
     }
 
     @Test
@@ -103,15 +163,22 @@ class ApifyGoogleMapsPhotoProviderTest {
         )
     }
 
-    private fun request(googlePlaceId: String?, name: String = "누크 카페") = PlaceThumbnailProvider.Request(
+    private fun request(
+        googlePlaceId: String?,
+        name: String = "누크 카페",
+        address: String = "서울 강남구 테헤란로 1",
+        category: String? = null,
+        latitude: String = "37.5000",
+        longitude: String = "127.0000",
+    ) = PlaceThumbnailProvider.Request(
         place = PlaceCandidate(
             provider = "KAKAO",
             externalPlaceId = "place-id-$name",
             name = name,
-            address = "서울 강남구 테헤란로 1",
-            latitude = BigDecimal("37.5000"),
-            longitude = BigDecimal("127.0000"),
-            category = null,
+            address = address,
+            latitude = BigDecimal(latitude),
+            longitude = BigDecimal(longitude),
+            category = category,
             phoneNumber = null,
             providerUrl = null,
             googlePlaceId = googlePlaceId,
@@ -150,7 +217,7 @@ class ApifyGoogleMapsPhotoProviderTest {
     private companion object {
         const val INPUT = """
             {"searchStringsArray":["place_id:google-1","다른 카페 서울 강남구 테헤란로 1"],
-            "maxCrawledPlacesPerSearch":1,"maxImages":6,"scrapePlaceDetailPage":true,
+            "maxCrawledPlacesPerSearch":5,"maxImages":6,"scrapePlaceDetailPage":true,
             "scrapeImageAuthors":false,"language":"ko"}
         """
         val RESPONSE = """
@@ -177,6 +244,28 @@ class ApifyGoogleMapsPhotoProviderTest {
             "imageUrls":["https://google.example/1.jpg","https://google.example/2.jpg",
             "https://google.example/3.jpg","https://google.example/4.jpg",
             "https://google.example/5.jpg","https://google.example/6.jpg"]}]
+        """.trimIndent()
+        val NEARBY_HOTEL_RESPONSE = """
+            [{"placeId":"ChIJKao-p8wnZTURLz8je9GVNj8","title":"정감호텔","categoryName":"호텔",
+            "address":"대한민국 충청북도 청주시 상당구 남사로80번길 3",
+            "location":{"lat":36.631624,"lng":127.48404},
+            "imageUrls":["https://google.example/hotel.jpg"]}]
+        """.trimIndent()
+        val SHORT_NAME_CANDIDATES_RESPONSE = """
+            [{"placeId":"nearby-hotel","title":"정감호텔","categoryName":"호텔",
+            "address":"대한민국 충청북도 청주시 상당구 남사로80번길 3",
+            "location":{"lat":36.631624,"lng":127.48404},
+            "imageUrls":["https://google.example/hotel.jpg"]},
+            {"placeId":"correct-restaurant","title":"음","categoryName":"음식점",
+            "address":"대한민국 충청북도 청주시 상당구 남사로102번길 8",
+            "location":{"lat":36.6314129,"lng":127.4864368},
+            "imageUrls":["https://google.example/restaurant.jpg"]}]
+        """.trimIndent()
+        val EXACT_MATCH_WITH_CATEGORY_CONFLICT_RESPONSE = """
+            [{"placeId":"category-conflict","title":"누크 카페","categoryName":"호텔",
+            "address":"대한민국 서울특별시 강남구 테헤란로 1",
+            "location":{"lat":37.5001,"lng":127.0001},
+            "imageUrls":["https://google.example/category-conflict.jpg"]}]
         """.trimIndent()
     }
 }

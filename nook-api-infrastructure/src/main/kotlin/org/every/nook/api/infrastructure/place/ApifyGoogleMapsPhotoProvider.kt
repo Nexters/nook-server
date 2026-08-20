@@ -38,7 +38,7 @@ class ApifyGoogleMapsPhotoProvider(
     private fun fetchBatch(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> {
         val input = mapOf(
             "searchStringsArray" to requests.map { it.place.actorQuery() },
-            "maxCrawledPlacesPerSearch" to 1,
+            "maxCrawledPlacesPerSearch" to MAX_SEARCH_RESULT_COUNT,
             "maxImages" to MAX_PHOTO_COUNT,
             "scrapePlaceDetailPage" to true,
             "scrapeImageAuthors" to false,
@@ -69,6 +69,7 @@ class ApifyGoogleMapsPhotoProvider(
                 placeId = node.text("placeId"),
                 name = name,
                 address = node.text("address", "street") ?: "",
+                category = node.text("categoryName") ?: node.stringList("categories").firstOrNull(),
                 latitude = node.path("location").decimal("lat") ?: node.decimal("latitude"),
                 longitude = node.path("location").decimal("lng") ?: node.decimal("longitude"),
                 imageUrls = node.stringList("imageUrls").ifEmpty {
@@ -82,16 +83,22 @@ class ApifyGoogleMapsPhotoProvider(
         place.googlePlaceId?.let { googlePlaceId ->
             firstOrNull { it.placeId == googlePlaceId }?.let { return it }
         }
-        return filter { candidate -> candidate.matchesAddressOrLocation(place) }
+        return filter { candidate -> candidate.isEligible(place) }
             .minWithOrNull(
                 compareByDescending<GoogleMapsPlace> { it.name.matches(place.name) }
-                    .thenByDescending { it.address.matches(place.address) }
+                    .thenByDescending { it.address.matchesAddress(place.address) }
+                    .thenBy { it.category.conflictsWith(place.category) }
                     .thenBy { it.distanceMeters(place) },
             )
     }
 
-    private fun GoogleMapsPlace.matchesAddressOrLocation(place: PlaceCandidate): Boolean =
-        address.matches(place.address) || distanceMeters(place) <= MAX_DISTANCE_METERS
+    private fun GoogleMapsPlace.isEligible(place: PlaceCandidate): Boolean {
+        val nameMatches = name.matches(place.name)
+        val addressMatches = address.matchesAddress(place.address)
+        if (place.name.normalized().length <= SHORT_PLACE_NAME_LENGTH) return addressMatches
+
+        return addressMatches || (nameMatches && distanceMeters(place) <= MAX_DISTANCE_METERS)
+    }
 
     private fun storePhotos(
         request: PlaceThumbnailProvider.Request,
@@ -115,15 +122,6 @@ class ApifyGoogleMapsPhotoProvider(
 
     private fun PlaceCandidate.actorQuery(): String = googlePlaceId?.let { "place_id:$it" } ?: "$name $address"
 
-    private fun String.matches(other: String): Boolean {
-        val left = normalize()
-        val right = other.normalize()
-        if (left.isEmpty() || right.isEmpty()) return false
-        return left == right || left.contains(right) || right.contains(left)
-    }
-
-    private fun String.normalize(): String = lowercase().filter(Char::isLetterOrDigit)
-
     private fun GoogleMapsPlace.distanceMeters(place: PlaceCandidate): Double {
         val candidateLatitude = latitude ?: return Double.MAX_VALUE
         val candidateLongitude = longitude ?: return Double.MAX_VALUE
@@ -140,6 +138,7 @@ class ApifyGoogleMapsPhotoProvider(
         val placeId: String?,
         val name: String,
         val address: String,
+        val category: String?,
         val latitude: BigDecimal?,
         val longitude: BigDecimal?,
         val imageUrls: List<String>,
@@ -150,11 +149,76 @@ class ApifyGoogleMapsPhotoProvider(
         const val AUTHORIZATION = "Authorization"
         const val PROVIDER = "APIFY_GOOGLE_MAPS"
         const val SOURCE_TYPE = "GOOGLE_MAPS_PHOTO"
+        const val MAX_SEARCH_RESULT_COUNT = 5
         const val MAX_PHOTO_COUNT = 6
         const val MAX_DISTANCE_METERS = 300.0
+        const val SHORT_PLACE_NAME_LENGTH = 1
         const val EARTH_RADIUS_METERS = 6_371_000.0
     }
 }
+
+private enum class PlaceCategoryGroup {
+    FOOD,
+    LODGING,
+}
+
+private fun String.matches(other: String): Boolean {
+    val left = normalized()
+    val right = other.normalized()
+    if (left.isEmpty() || right.isEmpty()) return false
+    return left == right || left.contains(right) || right.contains(left)
+}
+
+private fun String.matchesAddress(other: String): Boolean = matches(other) || roadAddressKey() == other.roadAddressKey()
+
+private fun String.roadAddressKey(): String? {
+    val tokens = split(Regex("\\s+")).map { it.normalized() }.filter(String::isNotEmpty)
+    if (tokens.size < ROAD_ADDRESS_TOKEN_COUNT) return null
+    return tokens.takeLast(ROAD_ADDRESS_TOKEN_COUNT).joinToString("")
+}
+
+private fun String.normalized(): String = lowercase().filter(Char::isLetterOrDigit)
+
+private fun String?.conflictsWith(other: String?): Boolean {
+    val left = toPlaceCategoryGroup()
+    val right = other.toPlaceCategoryGroup()
+    return left != null && right != null && left != right
+}
+
+private fun String?.toPlaceCategoryGroup(): PlaceCategoryGroup? {
+    val value = this?.lowercase() ?: return null
+    return when {
+        LODGING_CATEGORY_KEYWORDS.any(value::contains) -> PlaceCategoryGroup.LODGING
+        FOOD_CATEGORY_KEYWORDS.any(value::contains) -> PlaceCategoryGroup.FOOD
+        else -> null
+    }
+}
+
+private const val ROAD_ADDRESS_TOKEN_COUNT = 2
+private val FOOD_CATEGORY_KEYWORDS = setOf(
+    "음식",
+    "식당",
+    "맛집",
+    "카페",
+    "베이커리",
+    "빵",
+    "술집",
+    "주점",
+    "restaurant",
+    "cafe",
+    "bakery",
+    "bar",
+)
+private val LODGING_CATEGORY_KEYWORDS = setOf(
+    "숙박",
+    "숙소",
+    "호텔",
+    "모텔",
+    "펜션",
+    "hotel",
+    "motel",
+    "lodging",
+)
 
 private fun JsonNode.text(vararg names: String): String? = names.asSequence()
     .map(::path)
