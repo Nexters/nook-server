@@ -25,6 +25,18 @@ spring:
       enabled: true
 
 external:
+  corepin-ocr:
+    base-url: ${COREPIN_OCR_BASE_URL:https://api.corepin.ai}
+    api-key: ${COREPIN_API_KEY:}
+    connect-timeout: ${COREPIN_OCR_CONNECT_TIMEOUT:3s}
+    read-timeout: ${COREPIN_OCR_READ_TIMEOUT:30s}
+    max-image-bytes: ${COREPIN_OCR_MAX_IMAGE_BYTES:10485760}
+  clova-ocr:
+    invoke-url: ${CLOVA_OCR_INVOKE_URL:}
+    secret-key: ${CLOVA_OCR_SECRET_KEY:}
+    connect-timeout: ${CLOVA_OCR_CONNECT_TIMEOUT:3s}
+    read-timeout: ${CLOVA_OCR_READ_TIMEOUT:30s}
+    max-image-bytes: ${CLOVA_OCR_MAX_IMAGE_BYTES:10485760}
   place-thumbnail:
     provider: ${PLACE_THUMBNAIL_PROVIDER:post_media}
     fixed-url: ${PLACE_THUMBNAIL_FIXED_URL:https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/3d/3dd7bb6919492e58a76fe9012b82c0a44e4bfdf7bf0784cddd90dc9bbbee17f9.jpg}
