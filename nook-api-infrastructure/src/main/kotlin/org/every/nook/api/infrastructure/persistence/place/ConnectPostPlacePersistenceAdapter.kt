@@ -1,8 +1,9 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCandidate
-import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
+import org.every.nook.api.application.place.PlaceThumbnailProvider
+import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
@@ -24,12 +25,7 @@ class ConnectPostPlacePersistenceAdapter(
     private val eventPublisher: ApplicationEventPublisher,
 ) : ConnectPostPlacePort {
     @Transactional
-    override fun connect(
-        userId: Long,
-        savedPostId: Long,
-        candidate: PlaceCandidate,
-        supplement: PlaceSupplement?,
-    ): ConnectPostPlacePort.Result {
+    override fun connect(userId: Long, savedPostId: Long, candidate: PlaceCandidate): ConnectPostPlacePort.Result {
         val savedPost = findSavedPostForConnection(savedPostId, userId)
             ?: return ConnectPostPlacePort.Result.PostNotFound
         val parsingJob = parsingJobRepository.findByPostId(savedPost.postId)
@@ -38,9 +34,7 @@ class ConnectPostPlacePersistenceAdapter(
         }
 
         val place = placeIdentityResolver.resolve(candidate)
-        supplement?.let { resolvedSupplement ->
-            place.updateThumbnailParsing(PlaceThumbnailParsingStatus.COMPLETED, resolvedSupplement)
-        }
+        place.updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
         val placeId = requireNotNull(place.id)
         val existingSavedPostPlace = savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(savedPostId, placeId)
         if (existingSavedPostPlace == null) {
@@ -52,6 +46,12 @@ class ConnectPostPlacePersistenceAdapter(
         }
         bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
         sharedBookmarkSyncRepository.insertForActiveSubscribers(savedPostId = savedPostId, placeId = placeId)
+        eventPublisher.publishEvent(
+            PlaceThumbnailsRequestedEvent(
+                postId = savedPost.postId,
+                requests = listOf(PlaceThumbnailProvider.Request(candidate)),
+            ),
+        )
         eventPublisher.publishEvent(PlaceTagsRequestedEvent(savedPost.postId, placeId, candidate))
         return ConnectPostPlacePort.Result.Connected(placeId)
     }

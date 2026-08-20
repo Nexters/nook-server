@@ -4,7 +4,6 @@ import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.place.DisconnectPostPlaceUseCase
 import org.every.nook.api.application.place.PagedPlaceSearchProvider
 import org.every.nook.api.application.place.PlaceSelectionTokenPort
-import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.application.place.port.DisconnectPostPlacePort
@@ -33,8 +32,7 @@ class ManualPlaceConnectionConfig {
     fun connectPostPlaceUseCase(
         selectionTokenPort: PlaceSelectionTokenPort,
         connectPostPlacePort: ConnectPostPlacePort,
-        thumbnailProvider: PlaceThumbnailProvider,
-    ): ConnectPostPlaceUseCase = ConnectPostPlaceUseCase(selectionTokenPort, connectPostPlacePort, thumbnailProvider)
+    ): ConnectPostPlaceUseCase = ConnectPostPlaceUseCase(selectionTokenPort, connectPostPlacePort)
 
     @Bean
     fun disconnectPostPlaceUseCase(disconnectPostPlacePort: DisconnectPostPlacePort): DisconnectPostPlaceUseCase =
