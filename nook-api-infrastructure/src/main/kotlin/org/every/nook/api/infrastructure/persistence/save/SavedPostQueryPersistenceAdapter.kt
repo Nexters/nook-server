@@ -289,10 +289,11 @@ class SavedPostQueryPersistenceAdapter(
         }
     }
 
-    private fun PostMediaEntity.toView(): SavedPostMedia = SavedPostMedia(
+    private fun PostMediaEntity.toView(useThumbnailAsUrl: Boolean = false): SavedPostMedia = SavedPostMedia(
         type = SavedPostMediaType.valueOf(mediaType.name),
-        url = mediaUrl,
+        url = thumbnailUrl.takeIf { useThumbnailAsUrl } ?: mediaUrl,
         sequence = sequence,
+        thumbnailUrl = thumbnailUrl,
     )
 
     private fun findFirstMediaByPostId(sourcePostIds: List<Long>): Map<Long, SavedPostMedia> =
@@ -302,7 +303,7 @@ class SavedPostQueryPersistenceAdapter(
             mediaRepository
                 .findAllByPostIdInOrderByPostIdAscSequenceAsc(sourcePostIds)
                 .groupBy(PostMediaEntity::postId)
-                .mapValues { (_, media) -> media.first().toView() }
+                .mapValues { (_, media) -> media.first().toView(useThumbnailAsUrl = true) }
         }
 
     private fun findFirstPlaceThumbnailBySavedPostId(

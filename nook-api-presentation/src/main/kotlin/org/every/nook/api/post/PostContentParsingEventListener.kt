@@ -113,7 +113,12 @@ class PostContentParsingEventListener(
             runCatching {
                 storePostMedia(
                     event.postId,
-                    StorePostMediaUseCase.Command(event.mediaType, event.sourceUrl, event.sequence),
+                    StorePostMediaUseCase.Command(
+                        event.mediaType,
+                        event.sourceUrl,
+                        event.sequence,
+                        event.sourceThumbnailUrl,
+                    ),
                 )
             }.onFailure { exception ->
                 if (event.attempt < MEDIA_MAX_ATTEMPTS) {

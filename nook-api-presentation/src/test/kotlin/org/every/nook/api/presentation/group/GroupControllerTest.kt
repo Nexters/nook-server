@@ -12,6 +12,8 @@ import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
+import org.every.nook.api.application.post.model.SavedPostMedia
+import org.every.nook.api.application.post.model.SavedPostMediaType
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.presentation.auth.UserContextArgumentResolver
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -117,7 +119,12 @@ class GroupControllerTest {
                             postId = 11,
                             title = "성수 카페",
                             authorIdentifier = "nook",
-                            representativeMedia = null,
+                            representativeMedia = SavedPostMedia(
+                                type = SavedPostMediaType.VIDEO,
+                                url = "https://example.com/video-poster.jpg",
+                                sequence = 0,
+                                thumbnailUrl = "https://example.com/video-poster.jpg",
+                            ),
                             memo = null,
                             savedAt = Instant.parse("2026-07-27T00:00:00Z"),
                         ),
@@ -137,6 +144,10 @@ class GroupControllerTest {
             jsonPath("$.success.ownerNickname") { value("Purr") }
             jsonPath("$.success.items[0].postId") { value(11) }
             jsonPath("$.success.items[0].placeCount") { value(3) }
+            jsonPath("$.success.items[0].representativeMedia.type") { value("VIDEO") }
+            jsonPath("$.success.items[0].representativeMedia.url") {
+                value("https://example.com/video-poster.jpg")
+            }
             jsonPath("$.success.items[0].processingPercent") { value(100) }
             jsonPath("$.success.items[0].savedAt") { value("2026-07-27T09:00:00+09:00") }
             jsonPath("$.success.totalElements") { value(1) }

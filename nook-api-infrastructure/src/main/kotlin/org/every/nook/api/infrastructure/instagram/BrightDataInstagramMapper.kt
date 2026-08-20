@@ -32,10 +32,13 @@ class BrightDataInstagramMapper {
             .filter { !it.url.isNullOrBlank() }
             .sortedBy { it.index ?: Int.MAX_VALUE }
             .mapIndexed { sequence, item ->
+                val mediaType = item.type.toMediaType()
                 PostMedia(
-                    type = item.type.toMediaType(),
+                    type = mediaType,
                     url = requireNotNull(item.url),
                     sequence = sequence,
+                    thumbnailUrl = record.thumbnail.takeIf { sequence == 0 && mediaType == PostMedia.MediaType.VIDEO }
+                        ?.takeIf(String::isNotBlank),
                 )
             }
         if (postContent.isNotEmpty()) {
@@ -54,7 +57,16 @@ class BrightDataInstagramMapper {
             photos.map { PostMedia.MediaType.IMAGE to it } +
                 videos.distinct().map { PostMedia.MediaType.VIDEO to it }
             )
-            .mapIndexed { sequence, (type, mediaUrl) -> PostMedia(type, mediaUrl, sequence) }
+            .mapIndexed { sequence, (type, mediaUrl) ->
+                PostMedia(
+                    type = type,
+                    url = mediaUrl,
+                    sequence = sequence,
+                    thumbnailUrl = record.thumbnail.takeIf {
+                        sequence == 0 && type == PostMedia.MediaType.VIDEO
+                    }?.takeIf(String::isNotBlank),
+                )
+            }
     }
 
     private fun String?.toMediaType(): PostMedia.MediaType =

@@ -98,12 +98,18 @@ class PostContentParsingEventListenerTest {
             mediaType = "IMAGE",
             sourceUrl = "https://source.example.com/image.jpg",
             sequence = 0,
+            sourceThumbnailUrl = "https://source.example.com/poster.jpg",
         )
         doThrow(IllegalStateException("temporary storage failure"))
             .`when`(storePostMedia)
             .invoke(
                 11,
-                StorePostMediaUseCase.Command("IMAGE", "https://source.example.com/image.jpg", 0),
+                StorePostMediaUseCase.Command(
+                    "IMAGE",
+                    "https://source.example.com/image.jpg",
+                    0,
+                    "https://source.example.com/poster.jpg",
+                ),
             )
 
         listener.storeMedia(event)

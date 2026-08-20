@@ -24,11 +24,12 @@ class ApifyInstagramMapper {
         val childMedia = record.childPosts.orEmpty().mapNotNull { child ->
             when {
                 child.type.isVideo() && !child.videoUrl.isNullOrBlank() ->
-                    PostMedia.MediaType.VIDEO to child.videoUrl
+                    MappedMedia(PostMedia.MediaType.VIDEO, child.videoUrl, child.displayUrl.notBlankOrNull())
 
-                !child.displayUrl.isNullOrBlank() -> PostMedia.MediaType.IMAGE to child.displayUrl
+                !child.displayUrl.isNullOrBlank() -> MappedMedia(PostMedia.MediaType.IMAGE, child.displayUrl)
 
-                !child.videoUrl.isNullOrBlank() -> PostMedia.MediaType.VIDEO to child.videoUrl
+                !child.videoUrl.isNullOrBlank() ->
+                    MappedMedia(PostMedia.MediaType.VIDEO, child.videoUrl, child.displayUrl.notBlankOrNull())
 
                 else -> null
             }
@@ -38,9 +39,16 @@ class ApifyInstagramMapper {
             childMedia.isNotEmpty() -> childMedia.toPostMedia()
 
             !record.videoUrl.isNullOrBlank() ->
-                listOf(PostMedia(PostMedia.MediaType.VIDEO, record.videoUrl, 0))
+                listOf(
+                    PostMedia(
+                        PostMedia.MediaType.VIDEO,
+                        record.videoUrl,
+                        0,
+                        record.displayUrl.notBlankOrNull() ?: images.firstOrNull(),
+                    ),
+                )
 
-            images.isNotEmpty() -> images.map { PostMedia.MediaType.IMAGE to it }.toPostMedia()
+            images.isNotEmpty() -> images.map { MappedMedia(PostMedia.MediaType.IMAGE, it) }.toPostMedia()
 
             else -> listOfNotNull(
                 record.displayUrl?.takeIf(String::isNotBlank)
@@ -49,8 +57,10 @@ class ApifyInstagramMapper {
         }
     }
 
-    private fun List<Pair<PostMedia.MediaType, String>>.toPostMedia(): List<PostMedia> =
-        mapIndexed { sequence, (type, mediaUrl) -> PostMedia(type, mediaUrl, sequence) }
+    private fun List<MappedMedia>.toPostMedia(): List<PostMedia> =
+        mapIndexed { sequence, media -> PostMedia(media.type, media.url, sequence, media.thumbnailUrl) }
+
+    private fun String?.notBlankOrNull(): String? = this?.takeIf(String::isNotBlank)
 
     private fun String?.isVideo(): Boolean = equals("Video", ignoreCase = true)
 
@@ -59,4 +69,6 @@ class ApifyInstagramMapper {
     private companion object {
         const val INSTAGRAM_SOURCE = "INSTAGRAM"
     }
+
+    private data class MappedMedia(val type: PostMedia.MediaType, val url: String, val thumbnailUrl: String? = null)
 }
