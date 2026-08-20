@@ -3,7 +3,10 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.group.GroupPostPage
 import org.every.nook.api.application.group.GroupPostSummary
 import org.every.nook.api.application.group.port.GroupPostQueryPort
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
+import org.every.nook.api.application.place.PlaceTagCatalogSnapshot
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
+import org.every.nook.api.application.place.snapshot
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PostProcessingView
 import org.every.nook.api.application.post.model.SavedPostDetail
@@ -15,6 +18,7 @@ import org.every.nook.api.application.post.model.SavedPostPlace
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
@@ -53,6 +57,7 @@ class SavedPostQueryPersistenceAdapter(
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
     private val memberRepository: MemberJpaRepository,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
 ) : SavedPostQueryPort,
     GroupPostQueryPort {
@@ -209,7 +214,12 @@ class SavedPostQueryPersistenceAdapter(
             ),
             placeParsingFailureReason = parsingJob?.failureReason
                 .takeIf { parsingJob?.status == PlaceParsingStatus.FAILED && savedPostPlaces.isEmpty() },
-            places = savedPostPlaces.toSavedPostPlaces(placesById, bookmarkedPlaceIds, memoByPlaceId),
+            places = savedPostPlaces.toSavedPostPlaces(
+                placesById,
+                bookmarkedPlaceIds,
+                memoByPlaceId,
+                tagCatalogPort.snapshot(),
+            ),
             processingStatus = processing.status,
             processingStage = processing.stage,
             processingPercent = processing.processingPercent,
@@ -220,6 +230,7 @@ class SavedPostQueryPersistenceAdapter(
         placesById: Map<Long, PlaceEntity>,
         bookmarkedPlaceIds: Set<Long>,
         memoByPlaceId: Map<Long, String>,
+        tagCatalog: PlaceTagCatalogSnapshot,
     ): List<SavedPostPlace> = mapNotNull { postPlace ->
         placesById[postPlace.placeId]?.let { place ->
             SavedPostPlace(
@@ -233,7 +244,7 @@ class SavedPostQueryPersistenceAdapter(
                 category = place.category,
                 phoneNumber = place.phoneNumber,
                 thumbnailUrl = place.thumbnailUrl,
-                tags = place.representativeTags.map { it.displayName },
+                tags = tagCatalog.displayNames(place.representativeTags),
                 bookmarked = postPlace.placeId in bookmarkedPlaceIds,
                 memo = memoByPlaceId[postPlace.placeId],
                 thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(

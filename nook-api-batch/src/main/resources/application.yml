@@ -69,3 +69,7 @@ post-content-parsing:
   worker:
     retry-backoffs: ${POST_CONTENT_PARSING_RETRY_BACKOFFS:3s,3s,3s}
     processing-timeout: ${POST_CONTENT_PARSING_PROCESSING_TIMEOUT:15m}
+
+place-tag-backfill:
+  enabled: ${PLACE_TAG_BACKFILL_ENABLED:false}
+  post-ids: ${PLACE_TAG_BACKFILL_POST_IDS:}

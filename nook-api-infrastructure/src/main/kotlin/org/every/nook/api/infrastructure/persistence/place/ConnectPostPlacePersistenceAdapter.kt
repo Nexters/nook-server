@@ -57,7 +57,12 @@ class ConnectPostPlacePersistenceAdapter(
                 ),
             )
         }
-        eventPublisher.publishEvent(PlaceTagsRequestedEvent(savedPost.postId, placeId, candidate))
+        eventPublisher.publishEvent(
+            PlaceTagsRequestedEvent(
+                savedPost.postId,
+                listOf(PlaceTagsRequestedEvent.Place(placeId, candidate)),
+            ),
+        )
         return ConnectPostPlacePort.Result.Connected(placeId)
     }
 

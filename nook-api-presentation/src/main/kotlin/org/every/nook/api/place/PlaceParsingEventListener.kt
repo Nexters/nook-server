@@ -134,8 +134,7 @@ class PlaceParsingEventListener(
                 storePlaceTags(event)
             }.onFailure { exception ->
                 logger.warn(exception) {
-                    "Place tag storage failed: postId=${event.postId}, placeId=${event.placeId}, " +
-                        "provider=${event.place.provider}, externalPlaceId=${event.place.externalPlaceId}"
+                    "Place tag storage failed: postId=${event.postId}, placeCount=${event.places.size}"
                 }
             }
         }

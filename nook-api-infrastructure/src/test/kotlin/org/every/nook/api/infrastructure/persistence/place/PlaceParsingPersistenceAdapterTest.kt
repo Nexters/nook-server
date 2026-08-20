@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
+import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
@@ -25,6 +26,7 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEnti
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.anyList
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -297,9 +299,11 @@ class PlaceParsingPersistenceAdapterTest {
             .updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
         verify(pendingPlace).updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
         val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
-        verify(eventPublisher, org.mockito.Mockito.times(3)).publishEvent(eventCaptor.capture())
+        verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture())
         val thumbnailEvent = eventCaptor.allValues.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
         assertEquals(listOf("pending"), thumbnailEvent.requests.map { it.place.externalPlaceId })
+        val tagEvent = eventCaptor.allValues.filterIsInstance<PlaceTagsRequestedEvent>().single()
+        assertEquals(listOf(17L, 18L), tagEvent.places.map { it.placeId })
     }
 
     @Test
@@ -316,17 +320,19 @@ class PlaceParsingPersistenceAdapterTest {
     @Test
     fun `replaces post place tags and updates representative tags`() {
         val place = mock(PlaceEntity::class.java)
-        val inferred = InferredPlaceTag(PlaceTag.QUIET, 0.9, PlaceTagEvidenceSource.BODY, "조용해요")
+        val inferred = InferredPlaceTag(PlaceTag.QUIET.name, 0.9, PlaceTagEvidenceSource.BODY, "조용해요")
         `when`(postPlaceRepository.findByPostIdAndPlaceId(11, 17)).thenReturn(PostPlaceEntity(11, 17, 0))
         `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
         `when`(postPlaceTagRepository.findRepresentativeTags(17))
-            .thenReturn(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING))
+            .thenReturn(listOf(PlaceTag.QUIET.name, PlaceTag.SOLO_DINING.name))
 
         adapter.replace(11, 17, listOf(inferred))
 
-        verify(postPlaceTagRepository).deleteAllByPostIdAndPlaceId(11, 17)
-        verify(postPlaceTagRepository).saveAll(anyList<PostPlaceTagEntity>())
-        verify(place).updateRepresentativeTags(listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING))
+        val order = inOrder(postPlaceTagRepository)
+        order.verify(postPlaceTagRepository).deleteAllByPostIdAndPlaceId(11, 17)
+        order.verify(postPlaceTagRepository).flush()
+        order.verify(postPlaceTagRepository).saveAll(anyList<PostPlaceTagEntity>())
+        verify(place).updateRepresentativeTags(listOf(PlaceTag.QUIET.name, PlaceTag.SOLO_DINING.name))
     }
 
     private companion object {

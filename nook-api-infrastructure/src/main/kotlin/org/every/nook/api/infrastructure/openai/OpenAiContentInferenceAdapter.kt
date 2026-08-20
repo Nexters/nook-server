@@ -11,7 +11,7 @@ import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
-import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagDefinition
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
@@ -91,20 +91,27 @@ class OpenAiContentInferenceAdapter(
             ?: error("OpenAI selected an unknown place candidate")
     }
 
-    override fun extract(request: PlaceTagExtractor.Request): List<InferredPlaceTag> {
+    override fun extract(request: PlaceTagExtractor.Request): List<PlaceTagExtractor.Result> {
+        require(request.places.all { it.candidateTags.isNotEmpty() }) { "Place tag candidates must not be empty" }
         val result = requestStructured(
             name = "place_tags",
             instructions = PLACE_TAG_INSTRUCTIONS,
             input = request.toInput(objectMapper),
-            schema = placeTagSchema(),
-            maxOutputTokens = PLACE_TAG_MAX_OUTPUT_TOKENS,
+            schema = placeTagSchema(request.places),
+            maxOutputTokens = (request.places.size * PLACE_TAG_MAX_OUTPUT_TOKENS_PER_PLACE)
+                .coerceIn(PLACE_TAG_MIN_OUTPUT_TOKENS, PLACE_TAG_MAX_OUTPUT_TOKENS),
         )
-        return result.path("tags").toList().map { tag ->
-            InferredPlaceTag(
-                tag = PlaceTag.valueOf(tag.path("tag").asText()),
-                confidence = tag.path("confidence").asDouble(),
-                evidenceSource = PlaceTagEvidenceSource.valueOf(tag.path("evidenceSource").asText()),
-                evidenceText = tag.path("evidenceText").asText().trim(),
+        return result.path("places").toList().map { place ->
+            PlaceTagExtractor.Result(
+                placeIndex = place.path("placeIndex").asInt(),
+                tags = place.path("tags").toList().map { tag ->
+                    InferredPlaceTag(
+                        tag = tag.path("tag").asText(),
+                        confidence = tag.path("confidence").asDouble(),
+                        evidenceSource = PlaceTagEvidenceSource.valueOf(tag.path("evidenceSource").asText()),
+                        evidenceText = tag.path("evidenceText").asText().trim(),
+                    )
+                },
             )
         }
     }
@@ -234,7 +241,9 @@ class OpenAiContentInferenceAdapter(
         const val PLACE_MAX_OUTPUT_TOKENS = 2500
         const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 12000
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
-        const val PLACE_TAG_MAX_OUTPUT_TOKENS = 600
+        const val PLACE_TAG_MIN_OUTPUT_TOKENS = 600
+        const val PLACE_TAG_MAX_OUTPUT_TOKENS_PER_PLACE = 500
+        const val PLACE_TAG_MAX_OUTPUT_TOKENS = 5000
         const val DEFAULT_TITLE = "Instagram 게시물"
         val placeListSchema: Map<String, Any> = mapOf(
             "type" to "array",
@@ -340,14 +349,15 @@ class OpenAiContentInferenceAdapter(
                 "후보에 없는 장소를 만들거나 후보 정보를 수정하지 않는다. " +
                 "명확한 근거가 없거나 서로 다른 후보를 하나로 확정할 수 없으면 candidateIndex를 null로 반환한다."
         const val PLACE_TAG_INSTRUCTIONS =
-            "입력된 장소와 Instagram 게시물 본문, 원본 해시태그, 이미지에 명시되거나 명확히 관찰되는 사실만 사용해 " +
-                "장소 특성 태그를 최대 4개 선택한다. 허용 태그는 QUIET(조용한), LIVELY(활기찬), COZY(아늑한), " +
-                "AESTHETIC(감성적인), SOLO_DINING(혼밥), DATE(데이트), GROUP(모임), FAMILY(가족), " +
-                "NEAT(정갈한), GENEROUS(푸짐한), GOOD_VALUE(가성비), UNIQUE(특별한), FRIENDLY(친절한), " +
-                "FAST(빠른), COMFORTABLE(편안한)뿐이다. 장소명, 주소, 카테고리만으로 특성을 추측하지 않는다. " +
+            "하나의 Instagram 게시물에 포함된 여러 장소가 places로 입력된다. 각 placeIndex마다 결과를 정확히 하나 반환한다. " +
+                "해당 장소의 본문 구간과 원본 해시태그에 명시된 사실만 사용해 candidateTags 중 실제 근거가 있는 " +
+                "장소 특성 태그만 최대 4개 선택한다. 후보 밖의 태그는 만들지 않는다. " +
+                "candidateTags의 keywords는 후보를 찾기 위한 예시이며 문맥상 부정되거나 다른 대상을 설명하면 선택하지 않는다. " +
+                "장소명, 주소, 카테고리만으로 특성을 추측하지 않는다. " +
                 "FRIENDLY처럼 경험이 필요한 서비스 태그는 본문이나 원본 해시태그에 직접 근거가 있을 때만 선택한다. " +
-                "근거 우선순위는 본문, 해시태그, 이미지 텍스트, 이미지 시각 정보 순이다. 각 태그에 0부터 1 사이 confidence, " +
-                "BODY·HASHTAG·IMAGE_TEXT·IMAGE_VISUAL 중 evidenceSource, 실제 근거 문구를 evidenceText로 반환한다. " +
+                "근거 우선순위는 본문, 해시태그 순이다. 각 태그에 0부터 1 사이 confidence, " +
+                "BODY·HASHTAG 중 evidenceSource, 원문에서 그대로 인용한 실제 근거 문구만 evidenceText로 반환한다. " +
+                "근거가 없다고 설명하기 위한 태그는 결과에 절대 포함하지 말고 해당 태그 자체를 생략한다. " +
                 "같은 의미나 서로 모순되는 태그를 함께 선택하지 않고, 근거가 부족하면 tags를 비워 두며 4개를 강제로 채우지 않는다."
     }
 }
@@ -361,51 +371,66 @@ private fun contentInput(
     mapOf("body" to body, "hashtags" to hashtags, "sourceLocationTag" to sourceLocationTag),
 )
 
-private fun PlaceTagExtractor.Request.toInput(objectMapper: ObjectMapper): Any {
-    val context = objectMapper.writeValueAsString(
-        mapOf(
-            "place" to mapOf("name" to place.name, "address" to place.address, "category" to place.category),
-            "body" to body,
-            "hashtags" to hashtags,
-        ),
-    )
-    if (imageUrls.isEmpty()) return context
-    return listOf(
-        mapOf(
-            "role" to "user",
-            "content" to buildList {
-                add(mapOf("type" to "input_text", "text" to context))
-                imageUrls.take(MAX_IMAGE_COUNT).forEach { imageUrl ->
-                    add(mapOf("type" to "input_image", "image_url" to imageUrl, "detail" to IMAGE_DETAIL))
-                }
-            },
-        ),
-    )
-}
+private fun PlaceTagExtractor.Request.toInput(objectMapper: ObjectMapper): String = objectMapper.writeValueAsString(
+    mapOf(
+        "places" to places.map { input ->
+            mapOf(
+                "placeIndex" to input.placeIndex,
+                "place" to mapOf(
+                    "name" to input.place.name,
+                    "address" to input.place.address,
+                    "category" to input.place.category,
+                ),
+                "body" to input.body,
+                "hashtags" to input.hashtags,
+                "candidateTags" to input.candidateTags.map { tag ->
+                    mapOf(
+                        "tag" to tag.tag,
+                        "category" to tag.category.name,
+                        "displayName" to tag.displayName,
+                        "keywords" to tag.matchingKeywords,
+                    )
+                },
+            )
+        },
+    ),
+)
 
-private fun placeTagSchema(): Map<String, Any> = mapOf(
+private fun placeTagSchema(places: List<PlaceTagExtractor.PlaceInput>): Map<String, Any> = mapOf(
     "type" to "object",
     "properties" to mapOf(
-        "tags" to mapOf(
+        "places" to mapOf(
             "type" to "array",
-            "maxItems" to MAX_PLACE_TAG_COUNT,
+            "minItems" to places.size,
+            "maxItems" to places.size,
             "items" to mapOf(
                 "type" to "object",
                 "properties" to mapOf(
-                    "tag" to mapOf("type" to "string", "enum" to PlaceTag.entries.map(PlaceTag::name)),
-                    "confidence" to mapOf("type" to "number", "minimum" to 0, "maximum" to 1),
-                    "evidenceSource" to mapOf(
-                        "type" to "string",
-                        "enum" to PlaceTagEvidenceSource.entries.map(PlaceTagEvidenceSource::name),
+                    "placeIndex" to mapOf("type" to "integer", "enum" to places.map { it.placeIndex }),
+                    "tags" to mapOf(
+                        "type" to "array",
+                        "maxItems" to MAX_PLACE_TAG_COUNT,
+                        "items" to placeTagItemSchema(places.flatMap { it.candidateTags }.distinct()),
                     ),
-                    "evidenceText" to mapOf("type" to "string"),
                 ),
-                "required" to listOf("tag", "confidence", "evidenceSource", "evidenceText"),
+                "required" to listOf("placeIndex", "tags"),
                 "additionalProperties" to false,
             ),
         ),
     ),
-    "required" to listOf("tags"),
+    "required" to listOf("places"),
+    "additionalProperties" to false,
+)
+
+private fun placeTagItemSchema(candidateTags: List<PlaceTagDefinition>): Map<String, Any> = mapOf(
+    "type" to "object",
+    "properties" to mapOf(
+        "tag" to mapOf("type" to "string", "enum" to candidateTags.map { it.tag }),
+        "confidence" to mapOf("type" to "number", "minimum" to 0, "maximum" to 1),
+        "evidenceSource" to mapOf("type" to "string", "enum" to listOf("BODY", "HASHTAG")),
+        "evidenceText" to mapOf("type" to "string"),
+    ),
+    "required" to listOf("tag", "confidence", "evidenceSource", "evidenceText"),
     "additionalProperties" to false,
 )
 

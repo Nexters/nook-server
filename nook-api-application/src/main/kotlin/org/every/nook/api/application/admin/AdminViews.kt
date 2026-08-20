@@ -103,3 +103,14 @@ data class AdminAuditLog(
     val requestId: String?,
     val createdAt: Instant,
 )
+
+data class AdminPlaceTagDefinition(
+    val id: String,
+    val tagCode: String,
+    val category: String,
+    val displayName: String,
+    val matchingKeywords: List<String>,
+    val enabled: Boolean,
+    val sortOrder: Int,
+    val updatedAt: Instant,
+)

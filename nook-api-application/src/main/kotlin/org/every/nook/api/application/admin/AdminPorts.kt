@@ -1,5 +1,7 @@
 package org.every.nook.api.application.admin
 
+import org.every.nook.api.domain.place.PlaceTagCategory
+
 interface AdminPostQueryPort {
     fun listPosts(query: String?, parsingStatus: String?, offset: Int, limit: Int): AdminPage<AdminPostSummary>
 
@@ -76,6 +78,60 @@ interface AdminAuditLogPort {
         val reason: String,
         val beforeValue: String?,
         val afterValue: String?,
+        val requestId: String?,
+    )
+}
+
+interface AdminPlaceTagCatalogPort {
+    fun list(
+        category: PlaceTagCategory?,
+        enabled: Boolean?,
+        offset: Int,
+        limit: Int,
+    ): AdminPage<AdminPlaceTagDefinition>
+
+    fun update(command: UpdateCommand): AdminPlaceTagDefinition?
+
+    fun create(command: CreateCommand): AdminPlaceTagDefinition
+
+    fun reorder(command: ReorderCommand)
+
+    fun deleteAndReplace(command: DeleteCommand): Boolean
+
+    data class CreateCommand(
+        val tagCode: String,
+        val category: PlaceTagCategory,
+        val displayName: String,
+        val matchingKeywords: List<String>,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+
+    data class ReorderCommand(
+        val tagCodes: List<String>,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+
+    data class DeleteCommand(
+        val tagCode: String,
+        val replacementTagCode: String,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+
+    data class UpdateCommand(
+        val tagCode: String,
+        val category: PlaceTagCategory,
+        val displayName: String,
+        val matchingKeywords: List<String>,
+        val enabled: Boolean,
+        val sortOrder: Int,
+        val actor: AdminActor,
+        val reason: String,
         val requestId: String?,
     )
 }

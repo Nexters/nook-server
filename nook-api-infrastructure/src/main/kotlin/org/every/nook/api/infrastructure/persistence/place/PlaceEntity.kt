@@ -15,6 +15,8 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagCategory
+import org.every.nook.api.domain.place.PlaceTagDefinition
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 import org.hibernate.annotations.JdbcTypeCode
@@ -80,7 +82,7 @@ class PlaceEntity(
     var photoUrls: List<String> = emptyList(),
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "representative_tags", nullable = false, columnDefinition = "JSON")
-    var representativeTags: List<PlaceTag> = emptyList(),
+    var representativeTags: List<String> = emptyList(),
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -95,6 +97,7 @@ class PlaceEntity(
         const val THUMBNAIL_PARSING_STATUS_LENGTH = 20
         const val GOOGLE_PLACE_ID_MAX_LENGTH = 255
         private const val MAX_REPRESENTATIVE_TAG_COUNT = 4
+        private const val MAX_REPRESENTATIVE_TAG_COUNT_PER_CATEGORY = 2
         private val logger = KotlinLogging.logger {}
     }
 
@@ -145,8 +148,24 @@ class PlaceEntity(
 
     private fun hasPlacePhoto(): Boolean = thumbnailUrl != null || photoUrls.isNotEmpty()
 
-    fun updateRepresentativeTags(tags: List<PlaceTag>) {
-        representativeTags = tags.take(MAX_REPRESENTATIVE_TAG_COUNT)
+    fun updateRepresentativeTags(tags: List<String>, catalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions) {
+        val definitionsByTag = catalog.filter(PlaceTagDefinition::enabled).associateBy(PlaceTagDefinition::tag)
+        val categoryCounts = mutableMapOf<PlaceTagCategory, Int>()
+        representativeTags = tags.asSequence()
+            .filter(definitionsByTag::containsKey)
+            .distinct()
+            .filter { tag ->
+                val category = definitionsByTag.getValue(tag).category
+                val count = categoryCounts.getOrDefault(category, 0)
+                if (count >= MAX_REPRESENTATIVE_TAG_COUNT_PER_CATEGORY) {
+                    false
+                } else {
+                    categoryCounts[category] = count + 1
+                    true
+                }
+            }
+            .take(MAX_REPRESENTATIVE_TAG_COUNT)
+            .toList()
     }
 
     fun updateBasicInformation(name: String, address: String) {
@@ -164,8 +183,9 @@ class PlaceEntity(
         phoneNumber: String?,
         thumbnailUrl: String?,
         photoUrls: List<String>,
-        representativeTags: List<PlaceTag>,
+        representativeTags: List<String>,
         openingHours: PlaceOpeningHours?,
+        tagCatalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions,
     ) {
         updateBasicInformation(name, address)
         this.city = city
@@ -173,7 +193,7 @@ class PlaceEntity(
         this.phoneNumber = phoneNumber
         this.thumbnailUrl = thumbnailUrl
         this.photoUrls = photoUrls
-        this.representativeTags = representativeTags.take(MAX_REPRESENTATIVE_TAG_COUNT)
+        updateRepresentativeTags(representativeTags, tagCatalog)
         this.openingHours = openingHours
     }
 }

@@ -1,20 +1,29 @@
 package org.every.nook.api.application.place
 
-import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagDefinition
 
 fun interface PlaceTagExtractor {
-    fun extract(request: Request): List<InferredPlaceTag>
+    fun extract(request: Request): List<Result>
 
-    data class Request(
+    data class Request(val places: List<PlaceInput>) {
+        init {
+            require(places.isNotEmpty()) { "Place tag inputs must not be empty" }
+        }
+    }
+
+    data class PlaceInput(
+        val placeIndex: Int,
         val place: PlaceCandidate,
         val body: String?,
         val hashtags: List<String>,
-        val imageUrls: List<String>,
+        val candidateTags: List<PlaceTagDefinition>,
     )
+
+    data class Result(val placeIndex: Int, val tags: List<InferredPlaceTag>)
 }
 
 data class InferredPlaceTag(
-    val tag: PlaceTag,
+    val tag: String,
     val confidence: Double,
     val evidenceSource: PlaceTagEvidenceSource,
     val evidenceText: String,

@@ -11,7 +11,6 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
-import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 import java.math.BigDecimal
 
@@ -28,8 +27,7 @@ class PostPlaceTagEntity(
     @Column(name = "place_id", nullable = false)
     val placeId: Long,
     @Column(name = "tag", nullable = false, length = TAG_MAX_LENGTH)
-    @Enumerated(EnumType.STRING)
-    val tag: PlaceTag,
+    val tag: String,
     @Column(name = "confidence", nullable = false, precision = 4, scale = 3)
     val confidence: BigDecimal,
     @Column(name = "evidence_source", nullable = false, length = EVIDENCE_SOURCE_MAX_LENGTH)

@@ -15,6 +15,7 @@ import org.every.nook.api.application.admin.ReplaceAdminPostPlacesUseCase
 import org.every.nook.api.application.admin.SearchAdminPlacesUseCase
 import org.every.nook.api.application.admin.UpdateAdminPlaceUseCase
 import org.every.nook.api.application.admin.UpdateAdminPostUseCase
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -39,7 +40,8 @@ class AdminUseCaseConfig {
     fun getAdminPlaceUseCase(port: AdminPlaceQueryPort) = GetAdminPlaceUseCase(port)
 
     @Bean
-    fun updateAdminPlaceUseCase(port: AdminPlaceCorrectionPort) = UpdateAdminPlaceUseCase(port)
+    fun updateAdminPlaceUseCase(port: AdminPlaceCorrectionPort, tagCatalogPort: PlaceTagCatalogQueryPort) =
+        UpdateAdminPlaceUseCase(port, tagCatalogPort)
 
     @Bean
     fun replaceAdminPostPlacesUseCase(port: AdminPostPlaceCorrectionPort) = ReplaceAdminPostPlacesUseCase(port)

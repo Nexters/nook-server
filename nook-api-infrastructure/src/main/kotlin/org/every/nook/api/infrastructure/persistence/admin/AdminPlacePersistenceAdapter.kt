@@ -7,6 +7,8 @@ import org.every.nook.api.application.admin.AdminPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPlaceDetail
 import org.every.nook.api.application.admin.AdminPlaceQueryPort
 import org.every.nook.api.application.admin.AdminPlaceSummary
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
@@ -24,6 +26,7 @@ class AdminPlacePersistenceAdapter(
     private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val auditLogPort: AdminAuditLogPort,
     private val objectMapper: ObjectMapper,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
 ) : AdminPlaceQueryPort,
     AdminPlaceCorrectionPort {
     @Transactional(readOnly = true)
@@ -67,7 +70,7 @@ class AdminPlacePersistenceAdapter(
             phoneNumber = place.phoneNumber,
             thumbnailUrl = place.thumbnailUrl,
             photoUrls = place.photoUrls,
-            representativeTags = place.representativeTags.map { it.name },
+            representativeTags = place.representativeTags,
             openingHours = place.openingHours,
             linkedPostCount = mappings.map { it.postId }.distinct().size.toLong(),
             affectedUserCount = savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId),
@@ -97,8 +100,9 @@ class AdminPlacePersistenceAdapter(
             command.phoneNumber,
             command.thumbnailUrl,
             command.photoUrls,
-            command.representativeTags.map(org.every.nook.api.domain.place.PlaceTag::valueOf),
+            command.representativeTags,
             command.openingHours,
+            tagCatalogPort.findAll(),
         )
         val after = editableValue(place)
         auditLogPort.append(
@@ -125,7 +129,7 @@ class AdminPlacePersistenceAdapter(
             provider = provider,
             externalPlaceId = externalPlaceId,
             thumbnailUrl = thumbnailUrl,
-            representativeTags = representativeTags.map { it.name },
+            representativeTags = representativeTags,
             linkedPostCount = if (includeImpact) linkedPostCount(placeId) else 0,
             affectedUserCount = if (includeImpact) {
                 savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId)

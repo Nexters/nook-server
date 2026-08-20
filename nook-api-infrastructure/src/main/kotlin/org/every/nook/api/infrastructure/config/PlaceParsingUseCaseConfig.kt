@@ -6,12 +6,15 @@ import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceImageReadinessPort
 import org.every.nook.api.application.place.PlaceParsingJobPort
+import org.every.nook.api.application.place.PlaceTagBackfillPort
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.place.PlaceTagSourcePort
 import org.every.nook.api.application.place.PlaceTagUpdatePort
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
+import org.every.nook.api.application.place.RebuildPlaceTagsUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
 import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
@@ -63,7 +66,14 @@ class PlaceParsingUseCaseConfig {
         sourcePort: PlaceTagSourcePort,
         extractor: PlaceTagExtractor,
         updatePort: PlaceTagUpdatePort,
-    ): StorePlaceTagsUseCase = StorePlaceTagsUseCase(sourcePort, extractor, updatePort)
+        catalogPort: PlaceTagCatalogQueryPort,
+    ): StorePlaceTagsUseCase = StorePlaceTagsUseCase(sourcePort, extractor, updatePort, catalogPort)
+
+    @Bean
+    fun rebuildPlaceTagsUseCase(
+        backfillPort: PlaceTagBackfillPort,
+        storePlaceTags: StorePlaceTagsUseCase,
+    ): RebuildPlaceTagsUseCase = RebuildPlaceTagsUseCase(backfillPort, storePlaceTags)
 
     @Bean
     fun findOutstandingPlaceParsingJobsUseCase(
