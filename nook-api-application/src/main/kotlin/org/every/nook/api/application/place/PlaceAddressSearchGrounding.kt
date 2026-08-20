@@ -9,10 +9,26 @@ internal fun PlaceClue.hasGroundedExactAddressSearch(
     val hasExactAddress = PlaceAddressMatcher.addressKeys(hint).intersect(candidateAddressKeys).isNotEmpty()
     val normalizedHint = hint.normalizedAddressQuery()
     val matchedByFullAddress = matchedQueries.any { query -> query.normalizedAddressQuery() == normalizedHint }
+    val normalizedVariants = PlaceAddressMatcher.searchVariants(hint)
+        .drop(1)
+        .map(String::normalizedAddressQuery)
+        .toSet()
+    val matchedByNormalizedAddress = matchedQueries.any { query ->
+        query.normalizedAddressQuery() in normalizedVariants
+    }
     val groundedInEvidence = evidence.isEmpty() || evidence.any { clueEvidence ->
         PlaceAddressMatcher.addressKeys(clueEvidence.evidenceText).intersect(candidateAddressKeys).isNotEmpty()
     }
-    return hasExactAddress && matchedByFullAddress && groundedInEvidence
+    val hasSafeSearchIdentity = matchedByFullAddress ||
+        (matchedByNormalizedAddress && hasNearHangulOcrIdentity(candidate))
+    return hasExactAddress && hasSafeSearchIdentity && groundedInEvidence
+}
+
+private fun PlaceClue.hasNearHangulOcrIdentity(candidate: PlaceCandidate): Boolean {
+    val candidateName = candidate.name.normalizedIdentity()
+    return (sequenceOf(name) + queries.asSequence())
+        .map(String::normalizedIdentity)
+        .any { clueName -> HangulOcrMatcher.isNearMatch(clueName, candidateName) }
 }
 
 internal fun Collection<PlaceCandidateSelector.Candidate>.matchedQueriesFor(place: PlaceCandidate): List<String> =
@@ -22,3 +38,5 @@ private fun PlaceCandidateSelector.Candidate.refersTo(place: PlaceCandidate): Bo
     this.place.provider == place.provider && this.place.externalPlaceId == place.externalPlaceId
 
 private fun String.normalizedAddressQuery(): String = lowercase().filter(Char::isLetterOrDigit)
+
+private fun String.normalizedIdentity(): String = lowercase().filter(Char::isLetterOrDigit)

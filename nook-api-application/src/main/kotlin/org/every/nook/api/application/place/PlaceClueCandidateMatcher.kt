@@ -38,7 +38,7 @@ internal fun PlaceClue.isSupportedBy(
         hasCompatibleEvidence(candidate)
 }
 
-private fun PlaceClue.hasPlausibleOcrIdentity(candidate: PlaceCandidate): Boolean {
+internal fun PlaceClue.hasPlausibleOcrIdentity(candidate: PlaceCandidate): Boolean {
     val candidateName = candidate.name.groundingKey()
     return (sequenceOf(name) + queries.asSequence())
         .map(String::groundingKey)
