@@ -5,7 +5,12 @@ fun interface PlaceThumbnailProvider {
 
     fun fetchAll(requests: List<Request>): List<PlaceSupplement?> = requests.map(::fetch)
 
-    data class Request(val place: PlaceCandidate, val sourcePostId: Long? = null, val sourceMediaSequence: Int? = null)
+    data class Request(
+        val place: PlaceCandidate,
+        val sourcePostId: Long? = null,
+        val sourceMediaSequence: Int? = null,
+        val postMediaFallbackAllowed: Boolean = false,
+    )
 }
 
 object NoOpPlaceThumbnailProvider : PlaceThumbnailProvider {

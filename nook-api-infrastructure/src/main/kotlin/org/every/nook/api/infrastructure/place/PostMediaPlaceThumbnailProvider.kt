@@ -15,7 +15,7 @@ class PostMediaPlaceThumbnailProvider(
     override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? {
         val sourcePostId = request.sourcePostId
         val sourceMediaSequence = request.sourceMediaSequence
-        if (sourcePostId == null || sourceMediaSequence == null) return null
+        if (!request.postMediaFallbackAllowed || sourcePostId == null || sourceMediaSequence == null) return null
         val images = mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(
             sourcePostId,
             PostMedia.MediaType.IMAGE,
