@@ -3,7 +3,9 @@ package org.every.nook.api.infrastructure.persistence.save
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
+import org.every.nook.api.application.place.snapshot
 import org.every.nook.api.application.post.PostContentParsingJobRequestedEvent
 import org.every.nook.api.application.post.port.CreatePostPort
 import org.every.nook.api.application.post.port.CreatedPost
@@ -19,6 +21,7 @@ import org.every.nook.api.domain.place.GeoPoint
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceProviderReference
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.domain.post.PostSource
@@ -55,6 +58,7 @@ class PostPersistenceAdapter(
     private val groupJpaRepository: GroupJpaRepository,
     private val groupPostJpaRepository: GroupPostJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
 ) : CreatePostPort,
     FindExistingPostPort,
@@ -171,6 +175,7 @@ class PostPersistenceAdapter(
         } else {
             parsingJob?.status ?: PlaceParsingStatus.PENDING
         }
+        val tagCatalog = tagCatalogPort.snapshot()
 
         return PostPlaceParsingSnapshot(
             postId = postId,
@@ -186,7 +191,9 @@ class PostPersistenceAdapter(
                             placesById[savedPostPlace.placeId]?.effectiveThumbnailParsingStatus()
                                 ?: error("Place must exist for postPlace"),
                         ),
-                        tags = placesById[savedPostPlace.placeId]?.representativeTags.orEmpty().map { it.displayName },
+                        tags = tagCatalog.displayNames(
+                            placesById[savedPostPlace.placeId]?.representativeTags.orEmpty(),
+                        ),
                         memo = memoByPlaceId[savedPostPlace.placeId],
                     )
                 }

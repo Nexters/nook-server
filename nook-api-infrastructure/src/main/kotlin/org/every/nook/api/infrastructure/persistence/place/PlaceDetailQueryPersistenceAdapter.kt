@@ -6,9 +6,12 @@ import org.every.nook.api.application.place.PlacePostMediaTypeView
 import org.every.nook.api.application.place.PlacePostMediaView
 import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.port.PlaceDetailQueryPort
 import org.every.nook.api.application.place.port.SharedPlaceDetailQueryPort
+import org.every.nook.api.application.place.snapshot
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.infrastructure.persistence.group.GroupJpaRepository
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostEntity
@@ -34,6 +37,7 @@ class PlaceDetailQueryPersistenceAdapter(
     private val mediaRepository: PostMediaJpaRepository,
     private val groupRepository: GroupJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
     private val sharedContentRepository: SharedGroupContentJpaRepository? = null,
 ) : PlaceDetailQueryPort,
@@ -78,7 +82,7 @@ class PlaceDetailQueryPersistenceAdapter(
             photoUrls = place.photoUrls,
             openingHours = place.openingHours,
             openNow = place.openingHours?.isOpenAt(clock.instant()),
-            tags = place.representativeTags.map { it.displayName },
+            tags = tagCatalogPort.snapshot().displayNames(place.representativeTags),
             bookmarked = bookmarked,
             memo = bookmark?.memo,
             posts = PlacePostPageView(

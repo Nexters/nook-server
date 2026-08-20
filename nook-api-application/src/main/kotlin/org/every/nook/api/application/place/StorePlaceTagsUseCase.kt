@@ -4,6 +4,7 @@ import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagCategory
+import org.every.nook.api.domain.place.PlaceTagDefinition
 import org.slf4j.LoggerFactory
 import java.text.Normalizer
 
@@ -11,10 +12,12 @@ class StorePlaceTagsUseCase(
     private val sourcePort: PlaceTagSourcePort,
     private val extractor: PlaceTagExtractor,
     private val updatePort: PlaceTagUpdatePort,
+    private val catalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
 ) {
     operator fun invoke(event: PlaceTagsRequestedEvent) {
         val source = findSource(event) ?: return
-        val preparedPlaces = preparePlaces(event, source)
+        val catalog = catalogPort.findAll().filter(PlaceTagDefinition::enabled).sortedBy(PlaceTagDefinition::sortOrder)
+        val preparedPlaces = preparePlaces(event, source, catalog)
         val (skippedPlaces, actionablePlaces) = preparedPlaces.partition { it.input.candidateTags.isEmpty() }
         storeSkippedPlaces(event, skippedPlaces)
         if (actionablePlaces.isEmpty()) return
@@ -41,7 +44,11 @@ class StorePlaceTagsUseCase(
         return source
     }
 
-    private fun preparePlaces(event: PlaceTagsRequestedEvent, source: PlaceTagSource): List<PreparedPlace> {
+    private fun preparePlaces(
+        event: PlaceTagsRequestedEvent,
+        source: PlaceTagSource,
+        catalog: List<PlaceTagDefinition>,
+    ): List<PreparedPlace> {
         val relatedPlaceNames = event.places.map { it.candidate.name }
         val isSinglePlace = relatedPlaceNames.distinctBy(String::normalizedForMatch).size == 1
         return event.places.mapIndexed { index, target ->
@@ -54,7 +61,7 @@ class StorePlaceTagsUseCase(
                     place = target.candidate,
                     body = body,
                     hashtags = hashtags,
-                    candidateTags = PlaceTagCandidateMatcher.find(body, hashtags, target.candidate.name),
+                    candidateTags = PlaceTagCandidateMatcher.find(body, hashtags, target.candidate.name, catalog),
                 ),
             )
         }
@@ -100,20 +107,21 @@ class StorePlaceTagsUseCase(
         }
     }
 
-    private fun List<InferredPlaceTag>.filterAndLimit(candidateTags: List<PlaceTag>): List<InferredPlaceTag> {
-        val allowedTags = candidateTags.toSet()
+    private fun List<InferredPlaceTag>.filterAndLimit(
+        candidateTags: List<PlaceTagDefinition>,
+    ): List<InferredPlaceTag> {
+        val definitionsByTag = candidateTags.associateBy(PlaceTagDefinition::tag)
         val categoryCounts = mutableMapOf<PlaceTagCategory, Int>()
         return asSequence()
             .filter {
-                it.tag in allowedTags &&
-                    it.tag.selectable &&
+                it.tag in definitionsByTag &&
                     it.confidence >= MIN_CONFIDENCE &&
                     it.evidenceText.isGroundedEvidence()
             }
             .distinctBy(InferredPlaceTag::tag)
             .sortedByDescending(InferredPlaceTag::confidence)
             .filter { inferred ->
-                val category = inferred.tag.category
+                val category = definitionsByTag.getValue(inferred.tag).category
                 val count = categoryCounts.getOrDefault(category, 0)
                 if (count >= MAX_TAG_COUNT_PER_CATEGORY) {
                     false
@@ -179,14 +187,21 @@ private val UNGROUNDED_EVIDENCE_MARKERS = listOf(
 )
 
 internal object PlaceTagCandidateMatcher {
-    fun find(body: String?, hashtags: List<String>, placeName: String): List<PlaceTag> {
+    fun find(
+        body: String?,
+        hashtags: List<String>,
+        placeName: String,
+        catalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions,
+    ): List<PlaceTagDefinition> {
         val normalizedText = buildString {
             body?.takeIf(String::isNotBlank)?.let { append(it).append('\n') }
             hashtags.forEach { append(it).append('\n') }
         }.normalizedForMatch().replace(placeName.normalizedForMatch(), "")
         if (normalizedText.isBlank()) return emptyList()
-        return PlaceTag.selectableEntries.filter { tag ->
-            tag.matchingKeywords.any { keyword -> normalizedText.contains(keyword.normalizedForMatch()) }
+        return catalog.filter { definition ->
+            definition.enabled && definition.matchingKeywords.any { keyword ->
+                normalizedText.contains(keyword.normalizedForMatch())
+            }
         }
     }
 }

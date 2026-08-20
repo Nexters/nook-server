@@ -7,6 +7,7 @@ import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceImageReadinessPort
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceTagBackfillPort
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.place.PlaceTagSourcePort
 import org.every.nook.api.application.place.PlaceTagUpdatePort
@@ -65,7 +66,8 @@ class PlaceParsingUseCaseConfig {
         sourcePort: PlaceTagSourcePort,
         extractor: PlaceTagExtractor,
         updatePort: PlaceTagUpdatePort,
-    ): StorePlaceTagsUseCase = StorePlaceTagsUseCase(sourcePort, extractor, updatePort)
+        catalogPort: PlaceTagCatalogQueryPort,
+    ): StorePlaceTagsUseCase = StorePlaceTagsUseCase(sourcePort, extractor, updatePort, catalogPort)
 
     @Bean
     fun rebuildPlaceTagsUseCase(

@@ -1,5 +1,8 @@
 package org.every.nook.api.application.admin
 
+import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagCategory
+
 interface AdminPostQueryPort {
     fun listPosts(query: String?, parsingStatus: String?, offset: Int, limit: Int): AdminPage<AdminPostSummary>
 
@@ -76,6 +79,29 @@ interface AdminAuditLogPort {
         val reason: String,
         val beforeValue: String?,
         val afterValue: String?,
+        val requestId: String?,
+    )
+}
+
+interface AdminPlaceTagCatalogPort {
+    fun list(
+        category: PlaceTagCategory?,
+        enabled: Boolean?,
+        offset: Int,
+        limit: Int,
+    ): AdminPage<AdminPlaceTagDefinition>
+
+    fun update(command: UpdateCommand): AdminPlaceTagDefinition?
+
+    data class UpdateCommand(
+        val tagCode: PlaceTag,
+        val category: PlaceTagCategory,
+        val displayName: String,
+        val matchingKeywords: List<String>,
+        val enabled: Boolean,
+        val sortOrder: Int,
+        val actor: AdminActor,
+        val reason: String,
         val requestId: String?,
     )
 }

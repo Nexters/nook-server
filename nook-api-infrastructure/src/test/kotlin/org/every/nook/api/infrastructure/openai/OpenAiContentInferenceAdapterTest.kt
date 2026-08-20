@@ -58,7 +58,9 @@ class OpenAiContentInferenceAdapterTest {
                         place = candidate(),
                         body = "혼자 먹기 좋고 조용해요",
                         hashtags = listOf("혼밥"),
-                        candidateTags = listOf(PlaceTag.QUIET, PlaceTag.SOLO_DINING),
+                        candidateTags = PlaceTag.defaultDefinitions.filter {
+                            it.tag == PlaceTag.QUIET || it.tag == PlaceTag.SOLO_DINING
+                        },
                     ),
                 ),
             ),

@@ -8,11 +8,14 @@ class PlaceTagTest {
     @Test
     fun `catalog contains one hundred selectable tags split evenly across categories`() {
         assertEquals(100, PlaceTag.selectableEntries.size)
+        assertEquals(100, PlaceTag.defaultDefinitions.size)
         assertEquals(100, PlaceTag.selectableEntries.map(PlaceTag::displayName).distinct().size)
         assertEquals(
             PlaceTagCategory.entries.associateWith { 20 },
             PlaceTag.selectableEntries.groupingBy(PlaceTag::category).eachCount(),
         )
+        assertEquals((1..100).toList(), PlaceTag.defaultDefinitions.map(PlaceTagDefinition::sortOrder))
+        assertTrue(PlaceTag.defaultDefinitions.all(PlaceTagDefinition::enabled))
     }
 
     @Test

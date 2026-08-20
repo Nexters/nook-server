@@ -12,6 +12,7 @@ import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagDefinition
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
@@ -385,7 +386,7 @@ private fun PlaceTagExtractor.Request.toInput(objectMapper: ObjectMapper): Strin
                 "hashtags" to input.hashtags,
                 "candidateTags" to input.candidateTags.map { tag ->
                     mapOf(
-                        "tag" to tag.name,
+                        "tag" to tag.tag.name,
                         "category" to tag.category.name,
                         "displayName" to tag.displayName,
                         "keywords" to tag.matchingKeywords,
@@ -422,10 +423,10 @@ private fun placeTagSchema(places: List<PlaceTagExtractor.PlaceInput>): Map<Stri
     "additionalProperties" to false,
 )
 
-private fun placeTagItemSchema(candidateTags: List<PlaceTag>): Map<String, Any> = mapOf(
+private fun placeTagItemSchema(candidateTags: List<PlaceTagDefinition>): Map<String, Any> = mapOf(
     "type" to "object",
     "properties" to mapOf(
-        "tag" to mapOf("type" to "string", "enum" to candidateTags.map(PlaceTag::name)),
+        "tag" to mapOf("type" to "string", "enum" to candidateTags.map { it.tag.name }),
         "confidence" to mapOf("type" to "number", "minimum" to 0, "maximum" to 1),
         "evidenceSource" to mapOf("type" to "string", "enum" to listOf("BODY", "HASHTAG")),
         "evidenceText" to mapOf("type" to "string"),

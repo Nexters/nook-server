@@ -16,6 +16,7 @@ import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceProviderReference
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagCategory
+import org.every.nook.api.domain.place.PlaceTagDefinition
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 import org.hibernate.annotations.JdbcTypeCode
@@ -139,17 +140,22 @@ class PlaceEntity(
         thumbnailParsingStatus = status
     }
 
-    fun updateRepresentativeTags(tags: List<PlaceTag>) {
+    fun updateRepresentativeTags(
+        tags: List<PlaceTag>,
+        catalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions,
+    ) {
+        val definitionsByTag = catalog.filter(PlaceTagDefinition::enabled).associateBy(PlaceTagDefinition::tag)
         val categoryCounts = mutableMapOf<PlaceTagCategory, Int>()
         representativeTags = tags.asSequence()
-            .filter(PlaceTag::selectable)
+            .filter(definitionsByTag::containsKey)
             .distinct()
             .filter { tag ->
-                val count = categoryCounts.getOrDefault(tag.category, 0)
+                val category = definitionsByTag.getValue(tag).category
+                val count = categoryCounts.getOrDefault(category, 0)
                 if (count >= MAX_REPRESENTATIVE_TAG_COUNT_PER_CATEGORY) {
                     false
                 } else {
-                    categoryCounts[tag.category] = count + 1
+                    categoryCounts[category] = count + 1
                     true
                 }
             }
@@ -174,6 +180,7 @@ class PlaceEntity(
         photoUrls: List<String>,
         representativeTags: List<PlaceTag>,
         openingHours: PlaceOpeningHours?,
+        tagCatalog: List<PlaceTagDefinition> = PlaceTag.defaultDefinitions,
     ) {
         updateBasicInformation(name, address)
         this.city = city
@@ -181,7 +188,7 @@ class PlaceEntity(
         this.phoneNumber = phoneNumber
         this.thumbnailUrl = thumbnailUrl
         this.photoUrls = photoUrls
-        updateRepresentativeTags(representativeTags)
+        updateRepresentativeTags(representativeTags, tagCatalog)
         this.openingHours = openingHours
     }
 }

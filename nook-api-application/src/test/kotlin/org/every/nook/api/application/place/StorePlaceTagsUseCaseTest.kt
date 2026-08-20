@@ -1,6 +1,7 @@
 package org.every.nook.api.application.place
 
 import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagDefinition
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,9 +67,9 @@ class StorePlaceTagsUseCaseTest {
         val request = requireNotNull(captured)
         assertEquals(2, request.places.size)
         assertEquals("누크 식당\n조용하고 데이트하기 좋아요", request.places.first().body)
-        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.DATE), request.places.first().candidateTags)
+        assertEquals(listOf(PlaceTag.QUIET, PlaceTag.DATE), request.places.first().candidateTags.map { it.tag })
         assertEquals("다른 카페\n북적이는 핫플이에요", request.places.last().body)
-        assertEquals(listOf(PlaceTag.HOT_PLACE, PlaceTag.CROWDED), request.places.last().candidateTags)
+        assertEquals(listOf(PlaceTag.HOT_PLACE, PlaceTag.CROWDED), request.places.last().candidateTags.map { it.tag })
         assertEquals(emptyList(), request.places.first().hashtags)
         assertEquals(listOf(PlaceTag.QUIET, PlaceTag.DATE), stored.getValue(17).map(InferredPlaceTag::tag))
         assertEquals(listOf(PlaceTag.CROWDED, PlaceTag.HOT_PLACE), stored.getValue(18).map(InferredPlaceTag::tag))
@@ -93,6 +94,30 @@ class StorePlaceTagsUseCaseTest {
 
         assertFalse(extractorCalled)
         assertEquals(emptyList(), stored)
+    }
+
+    @Test
+    fun `uses enabled definitions from the persisted catalog instead of enum defaults`() {
+        var capturedCandidates = emptyList<PlaceTagDefinition>()
+        val customQuiet = PlaceTag.defaultDefinitions.first { it.tag == PlaceTag.QUIET }.copy(
+            displayName = "고요한",
+            matchingKeywords = setOf("정적이 흐르는"),
+        )
+        val useCase = StorePlaceTagsUseCase(
+            sourcePort = PlaceTagSourcePort { PlaceTagSource("정적이 흐르는 공간이에요", emptyList()) },
+            extractor = PlaceTagExtractor { request ->
+                capturedCandidates = request.places.single().candidateTags
+                listOf(PlaceTagExtractor.Result(0, listOf(tag(PlaceTag.QUIET))))
+            },
+            updatePort = PlaceTagUpdatePort { _, _, _ -> },
+            catalogPort = PlaceTagCatalogQueryPort {
+                listOf(customQuiet, customQuiet.copy(tag = PlaceTag.COZY, enabled = false))
+            },
+        )
+
+        useCase(event(target(17, candidate())))
+
+        assertEquals(listOf(customQuiet), capturedCandidates)
     }
 
     @Test
@@ -140,7 +165,7 @@ class StorePlaceTagsUseCaseTest {
                         PlaceTag.GOOD_VALUE,
                         PlaceTag.PARKING,
                     ),
-                    input.candidateTags,
+                    input.candidateTags.map { it.tag },
                 )
                 listOf(PlaceTagExtractor.Result(input.placeIndex, inferred))
             },

@@ -3,7 +3,10 @@ package org.every.nook.api.application.admin
 import org.every.nook.api.application.error.ErrorType
 import org.every.nook.api.application.error.NookErrorCode
 import org.every.nook.api.application.error.NookException
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.domain.place.Place
+import org.every.nook.api.domain.place.PlaceTag
+import org.every.nook.api.domain.place.PlaceTagCategory
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostMedia
 
@@ -98,7 +101,10 @@ class GetAdminPlaceUseCase(private val port: AdminPlaceQueryPort) {
         port.findPlace(placeId) ?: throw AdminPlaceNotFoundException()
 }
 
-class UpdateAdminPlaceUseCase(private val port: AdminPlaceCorrectionPort) {
+class UpdateAdminPlaceUseCase(
+    private val port: AdminPlaceCorrectionPort,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
+) {
     operator fun invoke(command: Command): AdminPlaceDetail {
         require(command.placeId > 0) { "Place id must be positive" }
         val name = command.name.trim()
@@ -114,6 +120,12 @@ class UpdateAdminPlaceUseCase(private val port: AdminPlaceCorrectionPort) {
         require(command.photoUrls.size <= MAX_ADMIN_PLACE_PHOTO_COUNT)
         require(command.photoUrls.all { it.isNotBlank() && it.length <= MAX_ADMIN_URL_LENGTH })
         require(command.reason.isNotBlank()) { "Correction reason must not be blank" }
+        val enabledTags = tagCatalogPort.findAll().filter { it.enabled }.map { it.tag }.toSet()
+        val representativeTags = command.representativeTags
+            .map(PlaceTag::valueOf)
+            .distinct()
+            .take(MAX_ADMIN_PLACE_TAG_COUNT)
+        require(representativeTags.all(enabledTags::contains)) { "Only enabled place tags can be selected" }
         return port.update(
             AdminPlaceCorrectionPort.UpdateCommand(
                 placeId = command.placeId,
@@ -124,11 +136,7 @@ class UpdateAdminPlaceUseCase(private val port: AdminPlaceCorrectionPort) {
                 phoneNumber = command.phoneNumber?.trim()?.ifEmpty { null },
                 thumbnailUrl = command.thumbnailUrl?.trim()?.ifEmpty { null },
                 photoUrls = command.photoUrls.map(String::trim).filter(String::isNotEmpty).distinct(),
-                representativeTags = command.representativeTags
-                    .map { org.every.nook.api.domain.place.PlaceTag.valueOf(it) }
-                    .distinct()
-                    .take(MAX_ADMIN_PLACE_TAG_COUNT)
-                    .map { it.name },
+                representativeTags = representativeTags.map { it.name },
                 openingHours = command.openingHours,
                 actor = command.actor,
                 reason = command.reason.trim(),
@@ -185,6 +193,60 @@ class ListAdminAuditLogsUseCase(private val port: AdminAuditLogPort) {
         port.listAuditLogs(targetType, targetId, offset.validOffset(), limit.validLimit())
 }
 
+class ListAdminPlaceTagsUseCase(private val port: AdminPlaceTagCatalogPort) {
+    operator fun invoke(query: Query): AdminPage<AdminPlaceTagDefinition> = port.list(
+        category = query.category?.takeIf(String::isNotBlank)?.let(PlaceTagCategory::valueOf),
+        enabled = query.enabled,
+        offset = query.offset.validOffset(),
+        limit = query.limit.validLimit(),
+    )
+
+    data class Query(val category: String?, val enabled: Boolean?, val offset: Int, val limit: Int)
+}
+
+class UpdateAdminPlaceTagUseCase(private val port: AdminPlaceTagCatalogPort) {
+    operator fun invoke(command: Command): AdminPlaceTagDefinition {
+        val tagCode = runCatching { PlaceTag.valueOf(command.tagCode) }
+            .getOrElse { throw AdminPlaceTagNotFoundException() }
+        val category = PlaceTagCategory.valueOf(command.category)
+        val displayName = command.displayName.trim()
+        val matchingKeywords = command.matchingKeywords.map(String::trim).filter(String::isNotEmpty).distinct()
+        require(tagCode.selectable) { "Legacy place tags cannot be managed" }
+        require(displayName.isNotEmpty()) { "Display name must not be blank" }
+        require(displayName.length <= MAX_ADMIN_PLACE_TAG_DISPLAY_NAME_LENGTH)
+        require(matchingKeywords.isNotEmpty()) { "At least one matching keyword is required" }
+        require(matchingKeywords.size <= MAX_ADMIN_PLACE_TAG_KEYWORD_COUNT)
+        require(matchingKeywords.all { it.length <= MAX_ADMIN_PLACE_TAG_KEYWORD_LENGTH })
+        require(command.sortOrder > 0) { "Sort order must be positive" }
+        require(command.reason.isNotBlank()) { "Correction reason must not be blank" }
+        return port.update(
+            AdminPlaceTagCatalogPort.UpdateCommand(
+                tagCode = tagCode,
+                category = category,
+                displayName = displayName,
+                matchingKeywords = matchingKeywords,
+                enabled = command.enabled,
+                sortOrder = command.sortOrder,
+                actor = command.actor,
+                reason = command.reason.trim(),
+                requestId = command.requestId,
+            ),
+        ) ?: throw AdminPlaceTagNotFoundException()
+    }
+
+    data class Command(
+        val tagCode: String,
+        val category: String,
+        val displayName: String,
+        val matchingKeywords: List<String>,
+        val enabled: Boolean,
+        val sortOrder: Int,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+}
+
 enum class AdminErrorCode(
     override val code: String,
     override val defaultReason: String,
@@ -192,11 +254,14 @@ enum class AdminErrorCode(
 ) : NookErrorCode {
     POST_NOT_FOUND("ADMIN_POST_NOT_FOUND", "게시글을 찾을 수 없습니다.", ErrorType.NOT_FOUND),
     PLACE_NOT_FOUND("ADMIN_PLACE_NOT_FOUND", "장소를 찾을 수 없습니다.", ErrorType.NOT_FOUND),
+    PLACE_TAG_NOT_FOUND("ADMIN_PLACE_TAG_NOT_FOUND", "장소 태그를 찾을 수 없습니다.", ErrorType.NOT_FOUND),
 }
 
 class AdminPostNotFoundException : NookException(AdminErrorCode.POST_NOT_FOUND)
 
 class AdminPlaceNotFoundException : NookException(AdminErrorCode.PLACE_NOT_FOUND)
+
+class AdminPlaceTagNotFoundException : NookException(AdminErrorCode.PLACE_TAG_NOT_FOUND)
 
 private fun Int.validOffset(): Int = coerceAtLeast(0)
 
@@ -208,3 +273,6 @@ private const val MAX_ADMIN_MEDIA_COUNT = 20
 private const val MAX_ADMIN_PLACE_TAG_COUNT = 4
 private const val MAX_ADMIN_PLACE_PHOTO_COUNT = 6
 private const val MAX_ADMIN_URL_LENGTH = 2048
+private const val MAX_ADMIN_PLACE_TAG_DISPLAY_NAME_LENGTH = 50
+private const val MAX_ADMIN_PLACE_TAG_KEYWORD_COUNT = 20
+private const val MAX_ADMIN_PLACE_TAG_KEYWORD_LENGTH = 100

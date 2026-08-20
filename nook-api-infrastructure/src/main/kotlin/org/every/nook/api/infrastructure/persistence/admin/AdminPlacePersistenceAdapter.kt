@@ -7,6 +7,8 @@ import org.every.nook.api.application.admin.AdminPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPlaceDetail
 import org.every.nook.api.application.admin.AdminPlaceQueryPort
 import org.every.nook.api.application.admin.AdminPlaceSummary
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
@@ -24,6 +26,7 @@ class AdminPlacePersistenceAdapter(
     private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val auditLogPort: AdminAuditLogPort,
     private val objectMapper: ObjectMapper,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
 ) : AdminPlaceQueryPort,
     AdminPlaceCorrectionPort {
     @Transactional(readOnly = true)
@@ -97,8 +100,9 @@ class AdminPlacePersistenceAdapter(
             command.phoneNumber,
             command.thumbnailUrl,
             command.photoUrls,
-            command.representativeTags.map(org.every.nook.api.domain.place.PlaceTag::valueOf),
+            command.representativeTags.map(PlaceTag::valueOf),
             command.openingHours,
+            tagCatalogPort.findAll(),
         )
         val after = editableValue(place)
         auditLogPort.append(

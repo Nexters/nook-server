@@ -3,7 +3,10 @@ package org.every.nook.api.infrastructure.persistence.group
 import org.every.nook.api.application.group.GroupPlacePage
 import org.every.nook.api.application.group.GroupPlaceSummary
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
+import org.every.nook.api.application.place.PlaceTagCatalogSnapshot
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
+import org.every.nook.api.application.place.snapshot
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
@@ -20,6 +23,7 @@ class GroupPlaceQueryPersistenceAdapter(
     private val savedPostRepository: UserSavedPostJpaRepository,
     private val groupRepository: GroupJpaRepository,
     private val memberRepository: MemberJpaRepository,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) : GroupPlaceQueryPort {
     @Transactional(readOnly = true)
@@ -28,6 +32,7 @@ class GroupPlaceQueryPersistenceAdapter(
         val owner = memberRepository.findById(group.userId).orElse(null) ?: return null
         val pageable = PageRequest.of(page, size)
         val places = savedPostRepository.findDistinctPlacesByUserIdAndGroupId(userId, groupId, pageable)
+        val tagCatalog = tagCatalogPort.snapshot()
 
         return GroupPlacePage(
             ownerNickname = owner.nickname,
@@ -47,7 +52,7 @@ class GroupPlaceQueryPersistenceAdapter(
                             projection.thumbnailParsingStatus?.let(PlaceThumbnailParsingStatus::valueOf),
                         ),
                     ),
-                    tags = projection.representativeTags.toDisplayTags(),
+                    tags = projection.representativeTags.toDisplayTags(tagCatalog),
                 )
             },
             page = places.number,
@@ -58,9 +63,9 @@ class GroupPlaceQueryPersistenceAdapter(
         )
     }
 
-    private fun String?.toDisplayTags(): List<String> = if (this.isNullOrBlank()) {
+    private fun String?.toDisplayTags(tagCatalog: PlaceTagCatalogSnapshot): List<String> = if (this.isNullOrBlank()) {
         emptyList()
     } else {
-        objectMapper.readValue(this, Array<String>::class.java).map { PlaceTag.valueOf(it).displayName }
+        tagCatalog.displayNames(objectMapper.readValue(this, Array<String>::class.java).map(PlaceTag::valueOf))
     }
 }

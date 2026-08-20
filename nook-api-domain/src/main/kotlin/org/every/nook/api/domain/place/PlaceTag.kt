@@ -8,6 +8,21 @@ enum class PlaceTagCategory {
     FOOD_AND_BEVERAGE,
 }
 
+data class PlaceTagDefinition(
+    val tag: PlaceTag,
+    val category: PlaceTagCategory,
+    val displayName: String,
+    val matchingKeywords: Set<String>,
+    val enabled: Boolean,
+    val sortOrder: Int,
+) {
+    init {
+        require(displayName.isNotBlank())
+        require(matchingKeywords.none(String::isBlank))
+        require(sortOrder > 0)
+    }
+}
+
 private fun tagKeywords(vararg values: String): Set<String> = values.toSet()
 
 @Suppress("MaxLineLength")
@@ -128,5 +143,15 @@ enum class PlaceTag(
 
     companion object {
         val selectableEntries: List<PlaceTag> = entries.filter(PlaceTag::selectable)
+        val defaultDefinitions: List<PlaceTagDefinition> = selectableEntries.mapIndexed { index, tag ->
+            PlaceTagDefinition(
+                tag = tag,
+                category = tag.category,
+                displayName = tag.displayName,
+                matchingKeywords = tag.matchingKeywords,
+                enabled = true,
+                sortOrder = index + 1,
+            )
+        }
     }
 }

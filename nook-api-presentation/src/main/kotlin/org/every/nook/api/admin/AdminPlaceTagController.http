@@ -1,0 +1,21 @@
+### 관리자 로그인 확인
+GET {{baseUrl}}/api/admin/v1/me
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 장소 태그 카탈로그 조회
+GET {{baseUrl}}/api/admin/v1/place-tags?category=ATMOSPHERE&enabled=true&offset=0&limit=100
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 장소 태그 카탈로그 수정
+PUT {{baseUrl}}/api/admin/v1/place-tags/COZY
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "category": "ATMOSPHERE",
+  "displayName": "아늑한",
+  "matchingKeywords": ["아늑", "포근한", "cozy"],
+  "enabled": true,
+  "sortOrder": 2,
+  "reason": "기획 태그 정책 반영"
+}

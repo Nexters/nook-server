@@ -8,6 +8,7 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceSupplement
+import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagSource
 import org.every.nook.api.application.place.PlaceTagSourcePort
 import org.every.nook.api.application.place.PlaceTagUpdatePort
@@ -16,6 +17,7 @@ import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.admin.PostPlaceReviewJpaRepository
@@ -52,6 +54,7 @@ class PlaceParsingPersistenceAdapter(
     private val postPlaceReviewRepository: PostPlaceReviewJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val objectMapper: ObjectMapper,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
 ) : PlaceParsingJobPort,
     PlaceThumbnailUpdatePort,
@@ -206,7 +209,8 @@ class PlaceParsingPersistenceAdapter(
         postPlaceTagRepository.flush()
         postPlaceTagRepository.saveAll(tags.map { it.toEntity(postId, placeId) })
         placeRepository.findById(placeId).orElseThrow().updateRepresentativeTags(
-            postPlaceTagRepository.findRepresentativeTags(placeId).take(MAX_REPRESENTATIVE_TAG_COUNT),
+            postPlaceTagRepository.findRepresentativeTags(placeId),
+            tagCatalogPort.findAll(),
         )
     }
 
@@ -239,6 +243,5 @@ class PlaceParsingPersistenceAdapter(
     private companion object {
         val OUTSTANDING_STATUSES = listOf(PlaceParsingStatus.PENDING, PlaceParsingStatus.PROCESSING)
         const val FAILURE_REASON_MAX_LENGTH = 500
-        const val MAX_REPRESENTATIVE_TAG_COUNT = 4
     }
 }
