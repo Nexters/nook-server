@@ -8,8 +8,15 @@ import org.springframework.transaction.annotation.Transactional
 class UpdatePostMediaUrlPersistenceAdapter(private val mediaRepository: PostMediaJpaRepository) :
     UpdatePostMediaUrlPort {
     @Transactional
-    override fun update(postId: Long, sequence: Int, sourceUrl: String, storedUrl: String) {
+    override fun update(
+        postId: Long,
+        sequence: Int,
+        sourceUrl: String,
+        storedUrl: String,
+        sourceThumbnailUrl: String?,
+        storedThumbnailUrl: String?,
+    ) {
         mediaRepository.findByPostIdAndSequence(postId, sequence)
-            ?.updateUrlIfCurrent(sourceUrl, storedUrl)
+            ?.updateUrlsIfCurrent(sourceUrl, storedUrl, sourceThumbnailUrl, storedThumbnailUrl)
     }
 }

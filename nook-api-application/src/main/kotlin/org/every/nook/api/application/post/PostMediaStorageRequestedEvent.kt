@@ -7,6 +7,7 @@ data class PostMediaStorageRequestedEvent(
     val mediaType: String,
     val sourceUrl: String,
     val sequence: Int,
+    val sourceThumbnailUrl: String? = null,
     val attempt: Int = 1,
     val availableAt: Instant? = null,
 )

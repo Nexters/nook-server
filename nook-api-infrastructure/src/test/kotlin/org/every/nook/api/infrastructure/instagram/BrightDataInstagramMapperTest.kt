@@ -65,6 +65,7 @@ class BrightDataInstagramMapperTest {
 
         assertEquals(PostMedia.MediaType.VIDEO, result.post.media.single().type)
         assertEquals("https://cdn.example/reel.mp4", result.post.media.single().url)
+        assertEquals("https://cdn.example/reel.jpg", result.post.media.single().thumbnailUrl)
         assertEquals(emptyList(), result.sourceLocationNames)
     }
 }

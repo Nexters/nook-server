@@ -29,6 +29,8 @@ class PostMediaEntity(
     var mediaUrl: String,
     @Column(name = "display_order", nullable = false)
     val sequence: Int,
+    @Column(name = "thumbnail_url", nullable = true, length = PostMedia.MAX_MEDIA_URL_LENGTH)
+    var thumbnailUrl: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,9 +38,17 @@ class PostMediaEntity(
     var id: Long? = null
         protected set
 
-    fun updateUrlIfCurrent(sourceUrl: String, storedUrl: String) {
+    fun updateUrlsIfCurrent(
+        sourceUrl: String,
+        storedUrl: String,
+        sourceThumbnailUrl: String?,
+        storedThumbnailUrl: String?,
+    ) {
         if (mediaUrl == sourceUrl) {
             mediaUrl = storedUrl
+        }
+        if (thumbnailUrl == sourceThumbnailUrl) {
+            thumbnailUrl = storedThumbnailUrl
         }
     }
 

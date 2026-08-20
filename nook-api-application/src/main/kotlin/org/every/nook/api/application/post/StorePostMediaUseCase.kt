@@ -23,16 +23,36 @@ class StorePostMediaUseCase(
         val stored = metrics.measure(MEDIA_FLOW, STORE_STAGE, postId, null, clock) {
             mediaStorage.store(media)
         }
+        val storedThumbnailUrl = command.sourceThumbnailUrl?.let { thumbnailUrl ->
+            metrics.measure(MEDIA_FLOW, STORE_THUMBNAIL_STAGE, postId, null, clock) {
+                mediaStorage.store(
+                    PostMedia(PostMedia.MediaType.IMAGE, thumbnailUrl, command.sequence),
+                ).url
+            }
+        }
         metrics.measure(MEDIA_FLOW, COMPLETE_STAGE, postId, null, clock) {
-            updateMediaUrl.update(postId, media.sequence, media.url, stored.url)
+            updateMediaUrl.update(
+                postId,
+                media.sequence,
+                media.url,
+                stored.url,
+                command.sourceThumbnailUrl,
+                storedThumbnailUrl,
+            )
         }
     }
 
-    data class Command(val mediaType: String, val sourceUrl: String, val sequence: Int)
+    data class Command(
+        val mediaType: String,
+        val sourceUrl: String,
+        val sequence: Int,
+        val sourceThumbnailUrl: String? = null,
+    )
 
     private companion object {
         const val MEDIA_FLOW = "post-media"
         const val STORE_STAGE = "store"
+        const val STORE_THUMBNAIL_STAGE = "store-thumbnail"
         const val COMPLETE_STAGE = "complete"
     }
 }

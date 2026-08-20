@@ -160,12 +160,15 @@ data class SavedPostMediaResponse(
     val url: String,
     @field:Schema(description = "게시물 내 미디어 순서")
     val sequence: Int,
+    @field:Schema(description = "영상 포스터 이미지 URL", nullable = true)
+    val thumbnailUrl: String?,
 ) {
     companion object {
         fun from(result: SavedPostMedia): SavedPostMediaResponse = SavedPostMediaResponse(
             type = result.type,
             url = result.url,
             sequence = result.sequence,
+            thumbnailUrl = result.thumbnailUrl,
         )
     }
 }
