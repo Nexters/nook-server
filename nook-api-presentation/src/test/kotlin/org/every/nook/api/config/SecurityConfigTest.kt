@@ -118,6 +118,50 @@ class SecurityConfigTest {
             .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
             .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
     }
+
+    @Test
+    fun `dev frontend https preflight request is allowed without authentication`() {
+        mockMvc.perform(
+            options("/test/protected")
+                .header(HttpHeaders.ORIGIN, "https://app-dev.everynook.co.kr")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name()),
+        ).andExpect(status().isOk)
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://app-dev.everynook.co.kr"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+    }
+
+    @Test
+    fun `dev frontend http preflight request is rejected`() {
+        mockMvc.perform(
+            options("/test/protected")
+                .header(HttpHeaders.ORIGIN, "http://app-dev.everynook.co.kr")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name()),
+        ).andExpect(status().isForbidden)
+            .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+    }
+
+    @Test
+    fun `live frontend https preflight request is allowed without authentication`() {
+        mockMvc.perform(
+            options("/test/protected")
+                .header(HttpHeaders.ORIGIN, "https://app.everynook.co.kr")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name()),
+        ).andExpect(status().isOk)
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://app.everynook.co.kr"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+    }
+
+    @Test
+    fun `live frontend http preflight request is rejected`() {
+        mockMvc.perform(
+            options("/test/protected")
+                .header(HttpHeaders.ORIGIN, "http://app.everynook.co.kr")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name()),
+        ).andExpect(status().isForbidden)
+            .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+    }
 }
 
 @RestController

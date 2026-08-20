@@ -12,6 +12,8 @@ data class CorsProperties(
         "https://everynook.co.kr",
         "http://www.everynook.co.kr",
         "https://www.everynook.co.kr",
+        "https://app-dev.everynook.co.kr",
+        "https://app.everynook.co.kr",
     ),
     val allowedMethods: List<String> = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
     val allowedHeaders: List<String> = listOf("*"),
