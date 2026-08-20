@@ -517,8 +517,7 @@ private fun strictMatches(
 
 internal fun PlaceClue.searchQueries(): List<String> = buildList {
     addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address ->
-        add(address)
-        add("$name $address")
+        addAll(PlaceAddressMatcher.searchVariants(address))
     }
     add(name)
     region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion ->

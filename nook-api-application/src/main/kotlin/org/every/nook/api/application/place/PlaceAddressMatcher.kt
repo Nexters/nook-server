@@ -40,6 +40,17 @@ internal object PlaceAddressMatcher {
 
     fun hasLocationDetail(value: String?): Boolean = value != null && locationDetails(value).isNotEmpty()
 
+    fun searchVariants(value: String): List<String> {
+        val fullAddress = value.trim()
+        val baseAddress = BASE_ADDRESS_PATTERN.find(fullAddress)
+            ?.let { match -> fullAddress.substring(0, match.range.last + 1).trimEnd(',', ' ') }
+            ?: fullAddress
+        val withoutProvince = PROVINCE_PREFIX_PATTERN.replaceFirst(baseAddress, "").trim()
+        return listOf(fullAddress, baseAddress, withoutProvince)
+            .filter(String::isNotEmpty)
+            .distinct()
+    }
+
     private fun hasNearOcrRoadAddress(left: String, right: String): Boolean {
         val leftAddresses = roadAddresses(left)
         val rightAddresses = roadAddresses(right)
@@ -131,6 +142,9 @@ internal object PlaceAddressMatcher {
         "(?<![-\\d])([1-9]\\d{0,3})\\s*호(?=$|[^가-힣A-Za-z0-9])",
     )
     private val DISTRICT_PATTERN = Regex("[가-힣]+(?:구|군|시)")
+    private val PROVINCE_PREFIX_PATTERN = Regex(
+        "^[가-힣]+(?:특별시|광역시|특별자치시|특별자치도|도)?\\s+(?=[가-힣]+(?:구|군|시)\\s)",
+    )
 
     private const val ROAD_SUFFIX = "길"
     private const val FLOOR_SUFFIX = "층"

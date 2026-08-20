@@ -92,7 +92,7 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
-    fun `puts the full detailed address first without exceeding the query limit`() {
+    fun `searches detailed and base address variants before the OCR store name`() {
         val clue = PlaceClue(
             name = "파티오피즈",
             region = "서울 용산구",
@@ -103,9 +103,9 @@ class PlaceAddressMatcherTest {
         assertEquals(
             listOf(
                 "서울 용산구 이태원로20가길 11 4층",
-                "파티오피즈 서울 용산구 이태원로20가길 11 4층",
+                "서울 용산구 이태원로20가길 11",
+                "용산구 이태원로20가길 11",
                 "파티오피즈",
-                "서울 용산구 파티오피즈",
             ),
             clue.searchQueries(),
         )
@@ -128,9 +128,28 @@ class PlaceAddressMatcherTest {
         assertEquals(
             listOf(
                 "서울 마포구 동교로38길 27-19 지1층 좌측",
-                "도원 서울 마포구 동교로38길 27-19 지1층 좌측",
+                "서울 마포구 동교로38길 27-19",
+                "마포구 동교로38길 27-19",
                 "도원",
-                "홍대입구역 도원",
+            ),
+            clue.searchQueries(),
+        )
+    }
+
+    @Test
+    fun `removes basement details from an address without a province prefix`() {
+        val clue = PlaceClue(
+            name = "홈",
+            region = "마포구",
+            queries = emptyList(),
+            addressHint = "마포구 와우산로37길 1 지1층",
+        )
+
+        assertEquals(
+            listOf(
+                "마포구 와우산로37길 1 지1층",
+                "마포구 와우산로37길 1",
+                "홈",
             ),
             clue.searchQueries(),
         )
@@ -148,9 +167,9 @@ class PlaceAddressMatcherTest {
         assertEquals(
             listOf(
                 "서울 광진구 능동로50길 24 1층",
-                "라벤다 lavender 서울 광진구 능동로50길 24 1층",
+                "서울 광진구 능동로50길 24",
+                "광진구 능동로50길 24",
                 "라벤다 lavender",
-                "중곡역 라벤다",
             ),
             clue.searchQueries(),
         )
