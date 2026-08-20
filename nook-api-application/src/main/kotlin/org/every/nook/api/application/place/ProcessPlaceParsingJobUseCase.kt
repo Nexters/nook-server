@@ -40,16 +40,7 @@ class ProcessPlaceParsingJobUseCase(
     private fun process(job: ClaimedPlaceParsingJob, startedAt: Instant): Result {
         val expectedPlaceCount = expectedPlaceCount(job.body)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_CLUES)
-        val textClues = (job.textClues ?: extractClues(job)).filter { clue ->
-            clue.isGroundedIn(job.body, job.hashtags).also { grounded ->
-                if (!grounded) {
-                    logger.warn {
-                        "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
-                            "placeName=${clue.name}, region=${clue.region}, queries=${clue.queries}"
-                    }
-                }
-            }
-        }
+        val textClues = (job.textClues ?: extractClues(job)).filterGroundedTextClues(job)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_RESOLUTION)
         val textResolution = resolveClues(job, textClues, expectedPlaceCount, useEvidenceImageSequence = false)
         logOcrDecision(eventLogger, job, textClues.size, textResolution.places.size, expectedPlaceCount)
@@ -72,10 +63,15 @@ class ProcessPlaceParsingJobUseCase(
                 },
             )
         }
+        val diagnostics = placeParsingDiagnostics(
+            textExpectedPlaceCount = expectedPlaceCount,
+            imageExpectedPlaceCount = imageResolution?.expectedPlaceCount,
+            extractedPlaceCount = textResolution.clueCount + (imageResolution?.clueCount ?: 0),
+            resolvedPlaceCount = places.size,
+            unresolvedClues = textResolution.unresolvedClues + imageResolution?.unresolvedClues.orEmpty(),
+        )
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_SAVE)
-        measure(job, COMPLETE_STAGE) {
-            jobPort.complete(job.postId, places)
-        }
+        measure(job, COMPLETE_STAGE) { jobPort.complete(job.postId, places, diagnostics) }
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         logger.info {
             "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -87,12 +83,19 @@ class ProcessPlaceParsingJobUseCase(
                 JOB_STAGE,
                 SUCCESS_OUTCOME,
                 duration,
-                mapOf("place.resolved_count" to places.size),
+                mapOf(
+                    "place.outcome" to diagnostics.outcome,
+                    "place.expected_count" to diagnostics.expectedPlaceCount,
+                    "place.extracted_count" to diagnostics.extractedPlaceCount,
+                    "place.resolved_count" to places.size,
+                    "place.unresolved_count" to diagnostics.unresolvedClues.size,
+                ),
             ),
         )
         return Result.Completed
     }
 
+    @Suppress("LongMethod") // Completeness recovery and progress milestones form one orchestration boundary.
     private fun resolveImageClues(
         job: ClaimedPlaceParsingJob,
         textClueCount: Int,
@@ -126,6 +129,7 @@ class ProcessPlaceParsingJobUseCase(
             }
             jobPort.storeImageTranscripts(job.postId, extracted)
         }
+        val effectiveExpectedPlaceCount = effectiveExpectedPlaceCount(expectedPlaceCount, transcripts)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_CLUES)
         val primaryImageClues = extractClues(job, transcripts)
             .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
@@ -151,12 +155,12 @@ class ProcessPlaceParsingJobUseCase(
                 transcripts = transcripts,
                 primaryClues = primaryImageClues,
                 knownPlaceCount = textClueCount,
-                expectedPlaceCount = expectedPlaceCount,
+                expectedPlaceCount = effectiveExpectedPlaceCount,
             ),
         ).filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = true)
         val imageClues = primaryImageClues + recoveredImageClues
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_RESOLUTION)
-        return resolveClues(job, imageClues, expectedPlaceCount, useEvidenceImageSequence = true)
+        return resolveClues(job, imageClues, effectiveExpectedPlaceCount, useEvidenceImageSequence = true)
     }
 
     private fun extractClues(
@@ -186,6 +190,7 @@ class ProcessPlaceParsingJobUseCase(
         useEvidenceImageSequence: Boolean,
     ): ClueResolution {
         var lastFailure: PlaceResolutionException? = null
+        val unresolvedClues = mutableListOf<UnresolvedPlaceClue>()
         val places = clues.mapIndexedNotNull { clueSequence, clue ->
             try {
                 resolve(job, clue).copy(
@@ -198,6 +203,7 @@ class ProcessPlaceParsingJobUseCase(
                 )
             } catch (exception: PlaceResolutionException) {
                 lastFailure = exception
+                unresolvedClues += UnresolvedPlaceClue(clue, exception.message.orEmpty())
                 logger.warn {
                     "Place clue skipped: postId=${job.postId}, placeName=${clue.name}, " +
                         "region=${clue.region}, reason=${exception.message}"
@@ -205,7 +211,7 @@ class ProcessPlaceParsingJobUseCase(
                 null
             }
         }
-        return ClueResolution(places, lastFailure)
+        return ClueResolution(places, lastFailure, clues.size, expectedPlaceCount, unresolvedClues)
     }
 
     private fun resolve(job: ClaimedPlaceParsingJob, clue: PlaceClue): PlaceCandidate {
@@ -393,7 +399,13 @@ class ProcessPlaceParsingJobUseCase(
 
     private class TerminalPlaceParsingException(message: String) : IllegalStateException(message)
 
-    private data class ClueResolution(val places: List<PlaceCandidate>, val failure: PlaceResolutionException?)
+    private data class ClueResolution(
+        val places: List<PlaceCandidate>,
+        val failure: PlaceResolutionException?,
+        val clueCount: Int,
+        val expectedPlaceCount: Int?,
+        val unresolvedClues: List<UnresolvedPlaceClue>,
+    )
 }
 
 internal fun PlaceClue.sourceMediaSequence(
