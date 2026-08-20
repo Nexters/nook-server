@@ -4,7 +4,7 @@ import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCa
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
-import org.every.nook.api.application.place.PlaceImageReadinessPort
+import org.every.nook.api.application.place.PlaceImageUrlPort
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceTagBackfillPort
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
@@ -31,7 +31,7 @@ class PlaceParsingUseCaseConfig {
     @Bean
     fun processPlaceParsingJobUseCase(
         jobPort: PlaceParsingJobPort,
-        imageReadinessPort: PlaceImageReadinessPort,
+        imageUrlPort: PlaceImageUrlPort,
         imageTextExtractor: ImageTextExtractor,
         clueExtractor: PlaceClueExtractor,
         searchPlaceCandidates: SearchPlaceCandidatesUseCase,
@@ -40,13 +40,14 @@ class PlaceParsingUseCaseConfig {
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = jobPort,
-        imageReadinessPort = imageReadinessPort,
+        imageUrlPort = imageUrlPort,
         imageTextExtractor = imageTextExtractor,
         clueExtractor = clueExtractor,
         searchPlaceCandidates = searchPlaceCandidates,
         candidateSelector = candidateSelector,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
+        imageOcrConcurrency = properties.imageOcrConcurrency,
         metrics = processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
     )
 

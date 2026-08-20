@@ -1,6 +1,9 @@
 package org.every.nook.api.application.place
 
 import mu.KotlinLogging
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 
 internal class ImageClueRecallRecovery(
     private val retranscribe: (List<ImageTextExtractor.ImageInput>) -> List<ImageTranscript>,
@@ -81,29 +84,85 @@ internal class ImageClueRecallRecovery(
 internal fun extractImageTranscripts(
     extractor: ImageTextExtractor,
     images: List<ImageTextExtractor.ImageInput>,
-): List<ImageTranscript> = images.chunked(IMAGE_BATCH_SIZE).flatMap { batch ->
-    val requestedIndexes = batch.map(ImageTextExtractor.ImageInput::imageIndex)
-    val transcripts = extractor.extract(ImageTextExtractor.Request(batch))
-    val requestedIndexSet = requestedIndexes.toSet()
-    val responseIndexes = transcripts.map(ImageTranscript::imageIndex)
-    val missingIndexes = requestedIndexes.filterNot(responseIndexes::contains)
-    val duplicateIndexes = responseIndexes.groupingBy { it }.eachCount().filterValues { count -> count > 1 }.keys
-    val unexpectedIndexes = responseIndexes.filterNot(requestedIndexSet::contains).distinct()
-    if (missingIndexes.isNotEmpty() || duplicateIndexes.isNotEmpty() || unexpectedIndexes.isNotEmpty()) {
+    concurrency: Int = DEFAULT_IMAGE_OCR_CONCURRENCY,
+    fallbackImage: (ImageTextExtractor.ImageInput) -> ImageTextExtractor.ImageInput? = { null },
+): List<ImageTranscript> {
+    require(concurrency > 0) { "Image OCR concurrency must be positive" }
+    if (images.isEmpty()) return emptyList()
+    val executor = Executors.newFixedThreadPool(minOf(concurrency, images.size))
+    return executor.use {
+        val results = images.map { image ->
+            executor.submit(Callable { extractSingleImage(extractor, image, fallbackImage) })
+        }.map { it.get() }
+        val failures = results.mapNotNull(SingleImageTranscriptResult::exceptionOrNull)
+        if (failures.size == results.size) throw requireNotNull(failures.firstOrNull())
+        results.map(SingleImageTranscriptResult::transcript).sortedBy(ImageTranscript::imageIndex)
+    }
+}
+
+internal fun extractTranscriptsWithLatestUrlFallback(
+    postId: Long,
+    images: List<ImageTextExtractor.ImageInput>,
+    extractor: ImageTextExtractor,
+    imageUrlPort: PlaceImageUrlPort,
+    concurrency: Int,
+): List<ImageTranscript> {
+    val latestImages = AtomicReference<List<ImageTextExtractor.ImageInput>?>(null)
+    return extractImageTranscripts(
+        extractor = extractor,
+        images = images,
+        concurrency = concurrency,
+        fallbackImage = { failedImage ->
+            latestImages.updateAndGet { existing ->
+                existing ?: imageUrlPort.findImageUrls(postId).take(MAX_IMAGE_COUNT).mapIndexed { index, url ->
+                    ImageTextExtractor.ImageInput(index + 1, url)
+                }
+            }.orEmpty().firstOrNull { it.imageIndex == failedImage.imageIndex }
+                ?.takeIf { it.imageUrl != failedImage.imageUrl }
+        },
+    )
+}
+
+private fun extractSingleImage(
+    extractor: ImageTextExtractor,
+    image: ImageTextExtractor.ImageInput,
+    fallbackImage: (ImageTextExtractor.ImageInput) -> ImageTextExtractor.ImageInput?,
+): SingleImageTranscriptResult {
+    val primary = runCatching { extractor.extract(ImageTextExtractor.Request(listOf(image))).normalize(image) }
+    if (primary.isSuccess) return SingleImageTranscriptResult(primary.getOrThrow(), null)
+    val fallback = fallbackImage(image)
+    val recovered = fallback?.let {
+        logger.info { "Image transcript retried with refreshed URL: imageIndex=${image.imageIndex}" }
+        runCatching { extractor.extract(ImageTextExtractor.Request(listOf(it))).normalize(it) }
+    }
+    val result = recovered ?: primary
+    return result.fold(
+        onSuccess = { SingleImageTranscriptResult(it, null) },
+        onFailure = { exception ->
+            logger.warn(exception) { "Image transcript failed independently: imageIndex=${image.imageIndex}" }
+            SingleImageTranscriptResult(ImageTranscript(image.imageIndex, emptyList()), exception)
+        },
+    )
+}
+
+private fun List<ImageTranscript>.normalize(image: ImageTextExtractor.ImageInput): ImageTranscript {
+    val matching = filter { it.imageIndex == image.imageIndex }
+    val unexpectedIndexes = map(ImageTranscript::imageIndex).filter { it != image.imageIndex }.distinct()
+    if (matching.size != 1 || unexpectedIndexes.isNotEmpty()) {
         logger.warn {
-            "Image transcript response normalized: requestedIndexes=$requestedIndexes, " +
-                "missingIndexes=$missingIndexes, duplicateIndexes=$duplicateIndexes, " +
-                "unexpectedIndexes=$unexpectedIndexes"
+            "Single image transcript response normalized: requestedIndex=${image.imageIndex}, " +
+                "responseCount=${matching.size}, unexpectedIndexes=$unexpectedIndexes"
         }
     }
-    val textsByIndex = transcripts.asSequence()
-        .filter { transcript -> transcript.imageIndex in requestedIndexSet }
-        .groupBy(ImageTranscript::imageIndex)
-        .mapValues { (_, sameIndexTranscripts) -> sameIndexTranscripts.flatMap(ImageTranscript::texts).distinct() }
-    requestedIndexes.map { imageIndex ->
-        ImageTranscript(imageIndex = imageIndex, texts = textsByIndex[imageIndex].orEmpty())
-    }
-}.sortedBy(ImageTranscript::imageIndex)
+    return ImageTranscript(
+        imageIndex = image.imageIndex,
+        texts = matching.flatMap(ImageTranscript::texts).distinct(),
+    )
+}
+
+private data class SingleImageTranscriptResult(val transcript: ImageTranscript, private val exception: Throwable?) {
+    fun exceptionOrNull(): Throwable? = exception
+}
 
 internal fun List<PlaceClue>.filterGroundedImageClues(
     imageCount: Int,
@@ -128,4 +187,5 @@ private fun PlaceClue.hasImageEvidence(imageCount: Int): Boolean = evidence.any 
 }
 
 private val logger = KotlinLogging.logger {}
-private const val IMAGE_BATCH_SIZE = 5
+private const val DEFAULT_IMAGE_OCR_CONCURRENCY = 4
+private const val MAX_IMAGE_COUNT = 20
