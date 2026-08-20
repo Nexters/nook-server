@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.OutstandingPlaceParsingJob
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
+import org.every.nook.api.application.place.PlaceParsingDiagnostics
 import org.every.nook.api.application.place.PlaceParsingJobPort
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
@@ -115,7 +116,7 @@ class PlaceParsingEventListenerTest {
             transcripts: List<org.every.nook.api.application.place.ImageTranscript>,
         ) = Unit
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>) {
+        override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
             completed = true
         }
 
