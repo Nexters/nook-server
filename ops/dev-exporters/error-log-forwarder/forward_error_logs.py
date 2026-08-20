@@ -6,6 +6,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Callable, Iterator, TextIO
 
 
 CONTAINER_NAME = os.getenv("ERROR_LOG_CONTAINER_NAME", "nook-dev-api")
@@ -96,24 +97,66 @@ def parse_log_entry(line: str) -> tuple[str | None, str]:
     return level, f"{body.rstrip()}\n" if body else line
 
 
-def follow(log_path: Path):
-    with log_path.open() as fp:
-        fp.seek(0, os.SEEK_END)
+def opened_file_matches_path(fp: TextIO, log_path: Path) -> bool:
+    try:
+        opened = os.fstat(fp.fileno())
+        current = log_path.stat()
+    except OSError:
+        return False
+    return (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)
+
+
+def follow_current_container_log(
+    resolve_log_path: Callable[[], Path] = docker_container_log_path,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Iterator[str | None]:
+    fp: TextIO | None = None
+    log_path: Path | None = None
+    first_connection = True
+    try:
         while True:
-            line = fp.readline()
+            try:
+                resolved_path = resolve_log_path()
+                needs_reconnect = (
+                    fp is None
+                    or log_path != resolved_path
+                    or not opened_file_matches_path(fp, resolved_path)
+                )
+                if needs_reconnect:
+                    if fp is not None:
+                        fp.close()
+                    fp = resolved_path.open()
+                    log_path = resolved_path
+                    if first_connection:
+                        fp.seek(0, os.SEEK_END)
+                    first_connection = False
+                    print(f"forwarding ERROR logs from {resolved_path}", flush=True)
+
+                line = fp.readline()
+            except (OSError, RuntimeError) as error:
+                if fp is not None:
+                    fp.close()
+                    fp = None
+                log_path = None
+                print(f"waiting for {CONTAINER_NAME} log: {error}", flush=True)
+                sleep(POLL_SECONDS)
+                yield None
+                continue
+
             if line:
                 yield read_json_log_line(line)
                 continue
-            time.sleep(POLL_SECONDS)
+            sleep(POLL_SECONDS)
             yield None
+    finally:
+        if fp is not None:
+            fp.close()
 
 
 def main() -> None:
-    log_path = docker_container_log_path()
-    print(f"forwarding ERROR logs from {log_path}", flush=True)
     buffer: list[str] = []
     last_append_at = 0.0
-    for line in follow(log_path):
+    for line in follow_current_container_log():
         if line is None:
             if buffer and time.monotonic() - last_append_at >= FLUSH_SECONDS:
                 post_to_slack(buffer)
