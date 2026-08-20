@@ -200,6 +200,8 @@ class ProcessPlaceParsingJobUseCase(
                         sourcePlaceCount = expectedPlaceCount ?: clues.size,
                         useEvidenceImageSequence = useEvidenceImageSequence,
                     ),
+                    postMediaFallbackAllowed = useEvidenceImageSequence &&
+                        clue.hasExclusiveGroundedImageEvidence(clues),
                 )
             } catch (exception: PlaceResolutionException) {
                 lastFailure = exception
