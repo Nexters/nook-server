@@ -156,7 +156,9 @@ data class SavedPostGroupResponse(
 data class SavedPostMediaResponse(
     @field:Schema(description = "미디어 유형")
     val type: SavedPostMediaType,
-    @field:Schema(description = "미디어 URL")
+    @field:Schema(
+        description = "미디어 URL. 목록 대표 영상은 썸네일이 있으면 표시용 썸네일 URL, 상세는 원본 영상 URL",
+    )
     val url: String,
     @field:Schema(description = "게시물 내 미디어 순서")
     val sequence: Int,
