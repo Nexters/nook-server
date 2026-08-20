@@ -132,7 +132,7 @@ class ProcessPlaceParsingJobUseCase(
         val effectiveExpectedPlaceCount = effectiveExpectedPlaceCount(expectedPlaceCount, transcripts)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_CLUES)
         val primaryImageClues = extractClues(job, transcripts)
-            .map { clue -> clue.restorePlaceNameFromCard(transcripts) }
+            .map { clue -> clue.restoreGroundingFromCard(transcripts) }
             .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
         val recoveredImageClues = ImageClueRecallRecovery(
             retranscribe = { recoveryImages ->
