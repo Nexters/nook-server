@@ -319,7 +319,7 @@ class OpenAiContentInferenceAdapter(
                 "sourceLocationTag는 지역 문맥과 검색어를 보조하는 힌트로만 사용한다. " +
                 "sourceLocationTag를 name, addressHint 또는 장소 존재의 근거로 사용하지 않는다. " +
                 "name은 본문, 해시태그 또는 imageTranscripts에 명시된 상호명만 사용한다. " +
-                "상호명이 한 글자(예: 홈)여도 주소 바로 앞에 명시되어 있으면 그대로 name으로 사용하고 일반 업종명으로 바꾸지 않는다. " +
+                "상호명이 한 글자여도 주소 바로 앞에 명시되어 있으면 그대로 name으로 사용하고 일반 업종명으로 바꾸지 않는다. " +
                 "imageTranscripts는 이미지별로 별도 전사된 원문이므로 이미지별 텍스트를 독립적으로 확인한다. " +
                 "응답하기 전에 제공된 모든 imageIndex를 순서와 무관하게 한 번씩 검토하고, 상호명과 주소처럼 " +
                 "영업 장소를 식별할 근거가 있는 이미지를 일부만 선택해 생략하지 않는다. " +
