@@ -4,6 +4,7 @@ import org.every.nook.api.infrastructure.openai.OpenAiContentInferenceAdapter
 import org.every.nook.api.infrastructure.openai.OpenAiCoverTitleExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiImageTextExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiProperties
+import org.every.nook.api.infrastructure.openai.OpenAiRateLimitInterceptor
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -25,6 +26,12 @@ class OpenAiConfig {
         return RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
+            .requestInterceptor(
+                OpenAiRateLimitInterceptor(
+                    maxConcurrentRequests = properties.maxConcurrentRequests,
+                    retryBackoffs = properties.rateLimitRetryBackoffs,
+                ),
+            )
             .build()
     }
 
