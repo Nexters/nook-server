@@ -1,5 +1,6 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.processing.ParsingProgressStage
 import java.time.Duration
 import java.time.Instant
 
@@ -7,6 +8,8 @@ interface PlaceParsingJobPort {
     fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob?
 
     fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob>
+
+    fun updateProgress(postId: Long, stage: ParsingProgressStage) = Unit
 
     fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>)
 

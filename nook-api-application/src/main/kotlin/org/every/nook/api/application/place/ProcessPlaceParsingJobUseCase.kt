@@ -2,6 +2,7 @@ package org.every.nook.api.application.place
 
 import mu.KotlinLogging
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.error
 import org.every.nook.api.application.processing.info
@@ -37,6 +38,7 @@ class ProcessPlaceParsingJobUseCase(
 
     private fun process(job: ClaimedPlaceParsingJob, startedAt: Instant): Result {
         val expectedPlaceCount = expectedPlaceCount(job.body)
+        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_CLUES)
         val textClues = (job.textClues ?: extractClues(job)).filter { clue ->
             clue.isGroundedIn(job.body, job.hashtags).also { grounded ->
                 if (!grounded) {
@@ -47,6 +49,7 @@ class ProcessPlaceParsingJobUseCase(
                 }
             }
         }
+        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_RESOLUTION)
         val textResolution = resolveClues(job, textClues, expectedPlaceCount, useEvidenceImageSequence = false)
         logOcrDecision(eventLogger, job, textClues.size, textResolution.places.size, expectedPlaceCount)
         val imageResolution = resolveImageClues(
@@ -68,6 +71,7 @@ class ProcessPlaceParsingJobUseCase(
                 },
             )
         }
+        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_SAVE)
         measure(job, COMPLETE_STAGE) {
             jobPort.complete(job.postId, places)
         }
@@ -112,6 +116,7 @@ class ProcessPlaceParsingJobUseCase(
                 "imageCount=${images.size}, textClueCount=$textClueCount, textResolvedCount=$textResolvedCount, " +
                 "expectedPlaceCount=$expectedPlaceCount"
         }
+        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_OCR)
         val transcripts = job.imageTranscripts ?: measure(job, IMAGE_TRANSCRIPT_STAGE) {
             extractImageTranscripts(imageTextExtractor, images)
         }.also { extracted ->
@@ -121,6 +126,7 @@ class ProcessPlaceParsingJobUseCase(
             }
             jobPort.storeImageTranscripts(job.postId, extracted)
         }
+        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_CLUES)
         val primaryImageClues = extractClues(job, transcripts)
             .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
         val recoveredImageClues = ImageClueRecallRecovery(
@@ -143,6 +149,7 @@ class ProcessPlaceParsingJobUseCase(
             ),
         ).filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = true)
         val imageClues = primaryImageClues + recoveredImageClues
+        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_RESOLUTION)
         return resolveClues(job, imageClues, expectedPlaceCount, useEvidenceImageSequence = true)
     }
 

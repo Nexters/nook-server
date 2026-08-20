@@ -149,6 +149,8 @@ class SavedPostQueryPersistenceAdapter(
                     contentStartedAt = contentJob?.processingStartedAt(),
                     placeStartedAt = placeJob?.processingStartedAt(),
                     now = clock.instant(),
+                    contentProgress = contentJob?.progress(),
+                    placeProgress = placeJob?.progress(),
                 )
                 postsById[savedPost.postId]?.toSummary(
                     savedPost = savedPost,
@@ -194,6 +196,8 @@ class SavedPostQueryPersistenceAdapter(
             contentStartedAt = contentParsingJob?.processingStartedAt(),
             placeStartedAt = parsingJob?.processingStartedAt(),
             now = clock.instant(),
+            contentProgress = contentParsingJob?.progress(),
+            placeProgress = parsingJob?.progress(),
         )
         val groups = findGroups(userId, listOf(postId)).getValue(postId)
 

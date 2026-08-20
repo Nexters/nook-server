@@ -16,6 +16,7 @@ import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
+import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
@@ -38,6 +39,8 @@ import java.time.Duration
 import java.time.Instant
 
 @Component
+// The adapter intentionally keeps cohesive place parsing writes in the same transaction boundary.
+@Suppress("TooManyFunctions")
 class PlaceParsingPersistenceAdapter(
     private val jobRepository: PlaceParsingJobJpaRepository,
     private val postRepository: PostJpaRepository,
@@ -71,6 +74,7 @@ class PlaceParsingPersistenceAdapter(
         job.status = PlaceParsingStatus.PROCESSING
         job.attemptCount += 1
         job.nextAttemptAt = now
+        job.resumeProgress(now)
 
         return ClaimedPlaceParsingJob(
             postId = job.postId,
@@ -108,12 +112,18 @@ class PlaceParsingPersistenceAdapter(
         }
 
     @Transactional
+    override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
+        requireNotNull(jobRepository.findByPostId(postId)).advanceProgress(stage, clock.instant())
+    }
+
+    @Transactional
     override fun complete(postId: Long, places: List<PlaceCandidate>) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
         if (postPlaceReviewRepository.existsByPostId(postId)) {
             job.status = PlaceParsingStatus.COMPLETED
             job.failureReason = null
+            job.progressPercent = COMPLETED_PERCENT
             return
         }
         val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
@@ -147,6 +157,7 @@ class PlaceParsingPersistenceAdapter(
         }
         job.status = PlaceParsingStatus.COMPLETED
         job.failureReason = null
+        job.progressPercent = COMPLETED_PERCENT
         val placeThumbnailRequests = thumbnailRequests(postId, resolvedPlaces, postPlaces)
         if (placeThumbnailRequests.isNotEmpty()) {
             eventPublisher.publishEvent(
@@ -219,6 +230,7 @@ class PlaceParsingPersistenceAdapter(
     override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
+        job.freezeProgress(clock.instant())
         job.status = PlaceParsingStatus.PENDING
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
         job.nextAttemptAt = nextAttemptAt
@@ -227,6 +239,7 @@ class PlaceParsingPersistenceAdapter(
     @Transactional
     override fun fail(postId: Long, reason: String) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
+        job.freezeProgress(clock.instant())
         job.status = PlaceParsingStatus.FAILED
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
     }
@@ -244,5 +257,6 @@ class PlaceParsingPersistenceAdapter(
     private companion object {
         val OUTSTANDING_STATUSES = listOf(PlaceParsingStatus.PENDING, PlaceParsingStatus.PROCESSING)
         const val FAILURE_REASON_MAX_LENGTH = 500
+        const val COMPLETED_PERCENT = 100
     }
 }

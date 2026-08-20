@@ -5,6 +5,7 @@ import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.place.PlaceClue
+import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostMedia
@@ -63,7 +64,20 @@ class ProcessPostContentParsingJobUseCaseTest {
         )
 
         assertIs<ProcessPostContentParsingJobUseCase.Result.Completed>(useCase(101))
-        assertEquals(listOf("claim", "extract", "cover-title", "inference", "complete"), calls)
+        assertEquals(
+            listOf(
+                "claim",
+                "progress:CONTENT_FETCH",
+                "extract",
+                "progress:CONTENT_COVER_TITLE",
+                "cover-title",
+                "progress:CONTENT_INFERENCE",
+                "inference",
+                "progress:CONTENT_SAVE",
+                "complete",
+            ),
+            calls,
+        )
         val completed = requireNotNull(port.completedPost)
         assertEquals("6월 2주차 요즘 뜨고 있는 금주의 신상스폿", completed.title)
         assertEquals("성수", completed.sourceLocationTag)
@@ -172,6 +186,10 @@ class ProcessPostContentParsingJobUseCaseTest {
         }
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPostContentParsingJob> = emptyList()
+
+        override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
+            calls += "progress:${stage.name}"
+        }
 
         override fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>) {
             calls += "complete"
