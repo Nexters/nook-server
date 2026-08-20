@@ -194,6 +194,26 @@ class PlaceParsingResilienceTest {
     }
 
     @Test
+    fun `replaces generated evidence with the uniquely matching OCR transcript`() {
+        val transcripts = listOf(
+            ImageTranscript(3, listOf("Knewnew 2umoae | 숙대입구역 채광 좋은 창가")),
+            ImageTranscript(4, listOf("3 퍼머넌트해비탯 | 뚝섬역 따뜻한 무드의 카페")),
+        )
+        val clue = PlaceClue(
+            name = "umoae",
+            region = "서울 용산구",
+            queries = listOf("umoae", "Umoae near Sookdae"),
+            addressHint = "서울 용산구 한강대로84길 21-17 1층",
+            evidence = listOf(PlaceClueEvidence(3, transcripts[1].texts.single())),
+        )
+
+        val restored = clue.restoreGroundingFromCard(transcripts)
+
+        assertEquals(3, restored.evidence.single().imageIndex)
+        assertEquals(transcripts[0].texts.single(), restored.evidence.single().evidenceText)
+    }
+
+    @Test
     fun `keeps primary places when recall recovery fails`() {
         val port = FakeJobPort(
             body = "카페 2곳",

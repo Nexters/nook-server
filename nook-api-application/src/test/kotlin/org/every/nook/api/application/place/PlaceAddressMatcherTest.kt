@@ -297,6 +297,21 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `grounds a provider localized name only through an explicit OCR name search and exact address`() {
+        val clue = PlaceClue(
+            name = "umoae",
+            region = "서울 용산구",
+            queries = listOf("umoae"),
+            addressHint = "서울 용산구 한강대로84길 21-17 1층",
+            evidence = listOf(PlaceClueEvidence(3, "Knewnew 2umoae | 숙대입구역 채광 좋은 창가")),
+        )
+        val localizedCandidate = candidate("우모에", "서울 용산구 한강대로84길 21-17")
+
+        assertTrue(clue.hasGroundedExplicitNameSearch(localizedCandidate, listOf("umoae")))
+        assertFalse(clue.hasGroundedExplicitNameSearch(localizedCandidate, listOf("용산구 한강대로84길 21-17")))
+    }
+
+    @Test
     fun `grounds short OCR name typos when the road address has one OCR typo`() {
         val clue = PlaceClue(
             name = "모먼트",
