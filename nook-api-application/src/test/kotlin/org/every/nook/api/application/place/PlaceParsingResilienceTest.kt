@@ -62,16 +62,16 @@ class PlaceParsingResilienceTest {
                 val image = request.images.single()
                 val call = callsByImage.merge(image.imageIndex, 1, Int::plus)
                 val texts = when (image.imageIndex) {
-                    1 -> listOf("기존 장소", "서울 중구")
+                    1 -> listOf("기존 장소", "서울 중구 세종대로 1")
 
-                    2 -> listOf("두 번째 장소", "서울 종로구")
+                    2 -> listOf("두 번째 장소", "서울 종로구 종로 2")
 
-                    3 -> listOf("세 번째 장소", "서울 용산구")
+                    3 -> listOf("세 번째 장소", "서울 용산구 한강대로 3")
 
                     else -> if (call == 1) {
                         listOf("공통 워터마크")
                     } else {
-                        listOf("네 번째 장소", "서울 마포구")
+                        listOf("네 번째 장소", "서울 마포구 양화로 4")
                     }
                 }
                 listOf(ImageTranscript(image.imageIndex, texts))
@@ -83,10 +83,22 @@ class PlaceParsingResilienceTest {
         assertEquals(setOf(1), transcriptRequests.map { it.images.size }.toSet())
         assertEquals(listOf(2, 3, 4), clueRequests.last().imageTranscripts.map(ImageTranscript::imageIndex))
         assertEquals(listOf("1", "2", "3", "4"), port.completed.map(PlaceCandidate::externalPlaceId))
+        assertEquals(4, port.diagnostics?.expectedPlaceCount)
         assertEquals(
-            listOf("공통 워터마크", "네 번째 장소", "서울 마포구"),
+            listOf("공통 워터마크", "네 번째 장소", "서울 마포구 양화로 4"),
             port.storedImageTranscripts?.last()?.texts,
         )
+    }
+
+    @Test
+    fun `counts image place cards from separate names and explicit addresses`() {
+        val transcripts = listOf(
+            ImageTranscript(1, listOf("표지", "카페 모음")),
+            ImageTranscript(2, listOf("첫 장소", "서울 중구 세종대로 1")),
+            ImageTranscript(3, listOf("둘째 장소", "서울 마포구 양화로 2")),
+        )
+
+        assertEquals(2, transcripts.detectedPlaceCardCount())
     }
 
     @Test
@@ -148,6 +160,7 @@ class PlaceParsingResilienceTest {
         var failedReason: String? = null
         var nextAttemptAt: Instant? = null
         var storedImageTranscripts: List<ImageTranscript>? = null
+        var diagnostics: PlaceParsingDiagnostics? = null
 
         override fun claim(postId: Long, processingTimeout: Duration) = ClaimedPlaceParsingJob(
             postId = postId,
@@ -164,8 +177,9 @@ class PlaceParsingResilienceTest {
             storedImageTranscripts = transcripts
         }
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>) {
+        override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
             completed = places
+            this.diagnostics = diagnostics
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
