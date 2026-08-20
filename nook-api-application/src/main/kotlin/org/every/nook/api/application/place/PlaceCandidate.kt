@@ -17,4 +17,5 @@ data class PlaceCandidate(
     val city: String? = KoreanCityNameExtractor.extract(address),
     val googlePlaceId: String? = null,
     val sourceMediaSequence: Int? = null,
+    val postMediaFallbackAllowed: Boolean = false,
 )
