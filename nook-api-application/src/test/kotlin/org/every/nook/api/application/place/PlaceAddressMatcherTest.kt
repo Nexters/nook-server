@@ -280,6 +280,23 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `grounds a one-jamo OCR typo found by a normalized address search`() {
+        val clue = PlaceClue(
+            name = "홈",
+            region = "서울 마포구",
+            queries = listOf("홈"),
+            addressHint = "마포구 와우산로37길 1 지1층",
+            evidence = listOf(
+                PlaceClueEvidence(7, "홈 서울특별시 마포구 와우산로37길 1 지1층"),
+            ),
+        )
+        val normalizedAddressQuery = listOf("마포구 와우산로37길 1")
+
+        assertTrue(clue.isSupportedBy(candidate("홉", "서울 마포구 와우산로37길 1"), normalizedAddressQuery))
+        assertFalse(clue.isSupportedBy(candidate("컬러뮤즈", "서울 마포구 와우산로37길 1"), normalizedAddressQuery))
+    }
+
+    @Test
     fun `grounds short OCR name typos when the road address has one OCR typo`() {
         val clue = PlaceClue(
             name = "모먼트",
