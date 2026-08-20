@@ -34,7 +34,7 @@ class ClovaImageTextExtractorTest {
                 withSuccess(
                     """
                     {"images":[{"inferResult":"SUCCESS","fields":[
-                      {"inferText":"마더오프라인"},{"inferText":"서울 성동구 연무장길 1"}
+                      {"inferText":"가람상점"},{"inferText":"서울 성동구 푸른길 1"}
                     ]}]}
                     """.trimIndent(),
                     MediaType.APPLICATION_JSON,
@@ -56,7 +56,7 @@ class ClovaImageTextExtractorTest {
             ImageTextExtractor.Request(listOf(ImageTextExtractor.ImageInput(4, "https://cdn.test/image.jpg"))),
         )
 
-        assertEquals(listOf("마더오프라인", "서울 성동구 연무장길 1"), result.single().texts)
+        assertEquals(listOf("가람상점", "서울 성동구 푸른길 1"), result.single().texts)
         apiServer.verify()
         imageServer.verify()
     }

@@ -218,7 +218,7 @@ class ProcessPlaceParsingJobUseCase(
     }
 
     private fun resolve(job: ClaimedPlaceParsingJob, clue: PlaceClue): PlaceCandidate {
-        if (clue.name.isBlank() || clue.queries.isEmpty() || clue.queries.size > MAX_QUERY_COUNT) {
+        if (clue.name.isBlank() || clue.searchQueries().isEmpty()) {
             failResolution("Invalid place clue")
         }
         val candidates = searchCandidates(job, clue)
@@ -228,7 +228,9 @@ class ProcessPlaceParsingJobUseCase(
         }
         val selectionCandidates = candidates.compatibleWith(clue)
         val matches = strictMatches(clue, selectionCandidates)
-        val groundedMatches = selectionCandidates.filter { candidate -> clue.isSupportedBy(candidate.place) }
+        val groundedMatches = selectionCandidates.filter { candidate ->
+            clue.isSupportedBy(candidate.place, candidate.matchedQueries)
+        }
         val candidateDescriptions = selectionCandidates.descriptions(CANDIDATE_LOG_LIMIT)
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
@@ -248,7 +250,8 @@ class ProcessPlaceParsingJobUseCase(
             )
             CandidateSelection(selected, "openai")
         }
-        if (!clue.isSupportedBy(selection.place)) {
+        val selectedMatchedQueries = selectionCandidates.matchedQueriesFor(selection.place)
+        if (!clue.isSupportedBy(selection.place, selectedMatchedQueries)) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
         eventLogger.info(
@@ -514,11 +517,10 @@ private fun strictMatches(
 
 internal fun PlaceClue.searchQueries(): List<String> = buildList {
     addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address ->
-        add("$name $address")
         add(address)
+        add("$name $address")
     }
     add(name)
-    addAll(name.singleHangulOcrAliases())
     region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion ->
         name.split(Regex("\\s+"))
             .map(String::trim)

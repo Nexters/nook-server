@@ -30,7 +30,7 @@ class CorepinImageTextExtractorTest {
             .andExpect(content().string(containsString("name=\"image\"")))
             .andRespond(
                 withSuccess(
-                    """{"text":"에이치커피로스터스\n서울 성동구 성수이로 1"}""",
+                    """{"text":"가람커피\n서울 성동구 푸른로 1"}""",
                     MediaType.APPLICATION_JSON,
                 ),
             )
@@ -47,7 +47,7 @@ class CorepinImageTextExtractorTest {
         )
 
         assertEquals(2, result.single().imageIndex)
-        assertEquals(listOf("에이치커피로스터스", "서울 성동구 성수이로 1"), result.single().texts)
+        assertEquals(listOf("가람커피", "서울 성동구 푸른로 1"), result.single().texts)
         apiServer.verify()
         imageServer.verify()
     }

@@ -7,11 +7,15 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.compatibleWith(
     return filter { candidate -> PlaceAddressMatcher.isCompatible(addressHint, candidate.place.address) }
 }
 
-internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
+internal fun PlaceClue.isSupportedBy(
+    candidate: PlaceCandidate,
+    matchedQueries: Collection<String> = emptyList(),
+): Boolean {
     val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
     if (explicitAddressHint != null && !PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address)) {
         return false
     }
+    val hasGroundedAddressSearch = hasGroundedExactAddressSearch(candidate, matchedQueries)
 
     val hasExactAddressEvidence = explicitAddressHint?.let { hint ->
         PlaceAddressMatcher.addressKeys(hint).intersect(PlaceAddressMatcher.addressKeys(candidate.address)).isNotEmpty()
@@ -19,10 +23,16 @@ internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
     val hasCompatibleIdentity = hasCompatibleName(candidate) ||
         hasNameEvidence(candidate, allowShortName = hasExactAddressEvidence)
     val hasAddressBackedOcrIdentity = explicitAddressHint != null && hasPlausibleOcrIdentity(candidate)
-    if (explicitAddressHint != null && !hasCompatibleIdentity && !hasAddressBackedOcrIdentity) {
+    val lacksCandidateIdentity = !hasCompatibleIdentity && !hasAddressBackedOcrIdentity
+    if (
+        explicitAddressHint != null &&
+        !hasGroundedAddressSearch &&
+        lacksCandidateIdentity
+    ) {
         return false
     }
-    return evidence.isEmpty() ||
+    return hasGroundedAddressSearch ||
+        evidence.isEmpty() ||
         hasCompatibleIdentity ||
         hasAddressBackedOcrIdentity ||
         hasCompatibleEvidence(candidate)
@@ -30,7 +40,7 @@ internal fun PlaceClue.isSupportedBy(candidate: PlaceCandidate): Boolean {
 
 private fun PlaceClue.hasPlausibleOcrIdentity(candidate: PlaceCandidate): Boolean {
     val candidateName = candidate.name.groundingKey()
-    return (sequenceOf(name) + name.singleHangulOcrAliases().asSequence() + queries.asSequence())
+    return (sequenceOf(name) + queries.asSequence())
         .map(String::groundingKey)
         .any { it.isNearOcrMatch(candidateName) }
 }
@@ -57,7 +67,7 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.descriptions(limit: In
 private fun PlaceClue.hasCompatibleName(candidate: PlaceCandidate): Boolean {
     val candidateName = candidate.name.groundingKey()
     val candidateAddress = candidate.address.groundingKey()
-    return (sequenceOf(name) + name.singleHangulOcrAliases().asSequence() + queries.asSequence())
+    return (sequenceOf(name) + queries.asSequence())
         .map(String::groundingKey)
         .any { queryName ->
             candidateName == queryName ||

@@ -21,7 +21,7 @@ class PlaceParsingResilienceTest {
                 listOf(
                     ImageTranscript(
                         image.imageIndex,
-                        if (image.imageUrl.contains("stored")) listOf("꼬레소레하우스", "서울 성동구 연무장길 1") else emptyList(),
+                        if (image.imageUrl.contains("stored")) listOf("가람상점", "서울 성동구 푸른길 1") else emptyList(),
                     ),
                 )
             },
@@ -31,7 +31,7 @@ class PlaceParsingResilienceTest {
         )
 
         assertEquals(listOf("https://instagram.test/5.jpg", "https://stored.test/5.jpg"), requestedUrls)
-        assertEquals(listOf("꼬레소레하우스", "서울 성동구 연무장길 1"), transcripts.single().texts)
+        assertEquals(listOf("가람상점", "서울 성동구 푸른길 1"), transcripts.single().texts)
     }
 
     @Test
@@ -127,11 +127,11 @@ class PlaceParsingResilienceTest {
     @Test
     fun `counts flattened Corepin transcripts and deduplicates a repeated place card`() {
         val transcripts = listOf(
-            ImageTranscript(1, listOf("SPACE 패션 좋아하면 무조건 좋아할 서울 카페")),
-            ImageTranscript(2, listOf("홈 서울특별시 마포구 와우산로37길 1 지1층 홍대가면 여유로워요")),
-            ImageTranscript(3, listOf("피죤트 서울 광진구 능동로32길 50 1층 코너")),
-            ImageTranscript(4, listOf("하우스오브와일드 서울 용산구 이태원로 208 4층")),
-            ImageTranscript(5, listOf("공유 문구 하우스오브와일드 서울 용산구 이태원로 208 4층")),
+            ImageTranscript(1, listOf("서울 카페 모음")),
+            ImageTranscript(2, listOf("몬 서울특별시 마포구 가람로37길 1 지1층 조용한 카페")),
+            ImageTranscript(3, listOf("모멘트 서울 광진구 나람로32길 50 1층 코너")),
+            ImageTranscript(4, listOf("들꽃상점 서울 용산구 푸른로 208 4층")),
+            ImageTranscript(5, listOf("공유 문구 들꽃상점 서울 용산구 푸른로 208 4층")),
         )
 
         assertEquals(3, transcripts.detectedPlaceCardCount())
@@ -141,34 +141,34 @@ class PlaceParsingResilienceTest {
     fun `restores a one-character place name immediately before an address`() {
         val transcript = ImageTranscript(
             7,
-            listOf("홈 서울특별시 마포구 와우산로37길 1 지1층 홍대가면 여유로워요"),
+            listOf("몬 서울특별시 마포구 가람로37길 1 지1층 조용한 카페"),
         )
         val clue = PlaceClue(
-            name = "홍대 카페",
+            name = "근처 카페",
             region = "서울 마포구",
-            queries = listOf("홍대 카페"),
-            addressHint = "서울특별시 마포구 와우산로37길 1 지1층",
+            queries = listOf("근처 카페"),
+            addressHint = "서울특별시 마포구 가람로37길 1 지1층",
             evidence = listOf(PlaceClueEvidence(7, transcript.texts.single())),
         )
 
-        assertEquals("홈", clue.restorePlaceNameFromCard(listOf(transcript)).name)
+        assertEquals("몬", clue.restorePlaceNameFromCard(listOf(transcript)).name)
     }
 
     @Test
     fun `restores a multi-character place name when inference replaces it with the account name`() {
         val transcript = ImageTranscript(
             4,
-            listOf("에이치커피로스터스 서울 성동구 성수일로11길 10 1층 채광이 좋아요 cheol.jewelry.box"),
+            listOf("가람커피로스터스 서울 성동구 푸른로11길 10 1층 채광이 좋아요 sample.account"),
         )
         val clue = PlaceClue(
-            name = "CHEOL.JEWELRY.BOX",
+            name = "SAMPLE.ACCOUNT",
             region = "서울",
-            queries = listOf("CHEOL.JEWELRY.BOX 성수"),
-            addressHint = "에이치커피로스터스 서울 성동구 성수일로11길 10 1층",
+            queries = listOf("SAMPLE.ACCOUNT 서울"),
+            addressHint = "가람커피로스터스 서울 성동구 푸른로11길 10 1층",
             evidence = listOf(PlaceClueEvidence(4, transcript.texts.single())),
         )
 
-        assertEquals("에이치커피로스터스", clue.restorePlaceNameFromCard(listOf(transcript)).name)
+        assertEquals("가람커피로스터스", clue.restorePlaceNameFromCard(listOf(transcript)).name)
     }
 
     @Test
