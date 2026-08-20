@@ -3,6 +3,8 @@ package org.every.nook.api.infrastructure.place
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.domain.post.PostMedia
 import org.hamcrest.Matchers.containsString
 import org.springframework.http.HttpMethod
@@ -16,6 +18,9 @@ import org.springframework.test.web.client.response.MockRestResponseCreators.wit
 import org.springframework.web.client.RestClient
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -147,16 +152,55 @@ class ApifyGoogleMapsPhotoProviderTest {
         server.verify()
     }
 
-    private fun fixture(): Fixture {
+    @Test
+    fun `stores returned photos with bounded concurrency`() {
+        val storage = ConcurrentStorage(expectedConcurrency = 3)
+        val fixture = fixture(storage, storageConcurrency = 3)
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(RESPONSE, MediaType.APPLICATION_JSON))
+
+        val results = fixture.provider.fetchAll(listOf(request("google-1"), request(null, "다른 카페")))
+
+        assertEquals(3, storage.maxActive.get())
+        assertEquals(6, results[0]?.photoUrls?.size)
+        assertEquals(1, results[1]?.photoUrls?.size)
+    }
+
+    @Test
+    fun `measures Actor waiting and image storage separately`() {
+        val metrics = RecordingMetrics()
+        val fixture = fixture(metrics = metrics)
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(RESPONSE, MediaType.APPLICATION_JSON))
+
+        fixture.provider.fetchAll(
+            listOf(
+                request("google-1").copy(sourcePostId = 11),
+                request(null, "다른 카페").copy(sourcePostId = 11),
+            ),
+        )
+
+        assertEquals(listOf("apify-actor", "image-store"), metrics.measurements.map { it.stage })
+    }
+
+    private fun fixture(
+        storage: FakeStorage = FakeStorage(),
+        storageConcurrency: Int = 6,
+        metrics: ProcessingMetrics = NoOpProcessingMetrics,
+    ): Fixture {
         val builder = RestClient.builder().baseUrl("https://api.apify.test")
         val server = MockRestServiceServer.bindTo(builder).build()
-        val storage = FakeStorage()
         return Fixture(
             provider = ApifyGoogleMapsPhotoProvider(
                 restClient = builder.build(),
                 objectMapper = jacksonObjectMapper(),
-                properties = ApifyGoogleMapsProperties(apiToken = "test-token", actorId = "test-actor"),
+                properties = ApifyGoogleMapsProperties(
+                    apiToken = "test-token",
+                    actorId = "test-actor",
+                    storageConcurrency = storageConcurrency,
+                ),
                 mediaStorage = storage,
+                metrics = metrics,
             ),
             server = server,
             storage = storage,
@@ -199,12 +243,39 @@ class ApifyGoogleMapsPhotoProviderTest {
         ),
     )
 
-    private class FakeStorage : PostMediaStoragePort {
+    private open class FakeStorage : PostMediaStoragePort {
         val stored = mutableListOf<PostMedia>()
 
+        @Synchronized
         override fun store(media: PostMedia): PostMedia {
             stored += media
             return media.copy(url = "https://cdn.example/${stored.size}.jpg")
+        }
+    }
+
+    private class ConcurrentStorage(expectedConcurrency: Int) : FakeStorage() {
+        private val ready = CountDownLatch(expectedConcurrency)
+        private val active = AtomicInteger()
+        val maxActive = AtomicInteger()
+
+        override fun store(media: PostMedia): PostMedia {
+            val current = active.incrementAndGet()
+            maxActive.accumulateAndGet(current) { previous, next -> maxOf(previous, next) }
+            ready.countDown()
+            check(ready.await(3, TimeUnit.SECONDS)) { "photo storage did not run concurrently" }
+            return try {
+                super.store(media)
+            } finally {
+                active.decrementAndGet()
+            }
+        }
+    }
+
+    private class RecordingMetrics : ProcessingMetrics {
+        val measurements = mutableListOf<ProcessingMetrics.Measurement>()
+
+        override fun record(measurement: ProcessingMetrics.Measurement) {
+            measurements += measurement
         }
     }
 

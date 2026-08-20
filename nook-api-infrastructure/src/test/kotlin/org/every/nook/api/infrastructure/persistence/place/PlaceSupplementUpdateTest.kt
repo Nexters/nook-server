@@ -5,8 +5,34 @@ import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PlaceSupplementUpdateTest {
+    @Test
+    fun `completed place with an existing photo does not request supplementation`() {
+        val place = place(thumbnailUrl = "https://cdn.example/place.jpg")
+        place.thumbnailParsingStatus = PlaceThumbnailParsingStatus.COMPLETED
+
+        assertFalse(place.shouldRequestThumbnailSupplement())
+    }
+
+    @Test
+    fun `completed place without a photo requests supplementation`() {
+        val place = place()
+        place.thumbnailParsingStatus = PlaceThumbnailParsingStatus.COMPLETED
+
+        assertTrue(place.shouldRequestThumbnailSupplement())
+    }
+
+    @Test
+    fun `processing place does not start a duplicate supplement request`() {
+        val place = place()
+        place.thumbnailParsingStatus = PlaceThumbnailParsingStatus.PROCESSING
+
+        assertFalse(place.shouldRequestThumbnailSupplement())
+    }
+
     @Test
     fun `replaces the obsolete fixed thumbnail with the post image`() {
         val place = place(OBSOLETE_FIXED_URL)
@@ -50,7 +76,7 @@ class PlaceSupplementUpdateTest {
         assertEquals(PlaceThumbnailParsingStatus.FAILED, place.thumbnailParsingStatus)
     }
 
-    private fun place(thumbnailUrl: String) = PlaceEntity(
+    private fun place(thumbnailUrl: String? = null) = PlaceEntity(
         provider = "KAKAO",
         externalPlaceId = "123",
         name = "Nook Cafe",

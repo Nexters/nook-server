@@ -5,6 +5,8 @@ import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.place.NoOpPlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
+import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.place.ApifyGoogleMapsPhotoProvider
@@ -71,6 +73,7 @@ class PlaceThumbnailConfig {
         mediaRepository: ObjectProvider<PostMediaJpaRepository>,
         mediaStorageProperties: ObjectProvider<MediaStorageProperties>,
         responseCache: ObjectProvider<ScrapingProviderResponseCache>,
+        processingMetrics: ObjectProvider<ProcessingMetrics>,
     ): PlaceThumbnailProvider {
         val providers = mapOf(
             PlaceThumbnailProviderType.POST_MEDIA to postMediaProvider(
@@ -84,6 +87,7 @@ class PlaceThumbnailConfig {
                 apifyProperties,
                 mediaStorage,
                 responseCache.ifAvailable,
+                processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
             ),
             PlaceThumbnailProviderType.GOOGLE to googleProvider(
                 googlePlacePhotoRestClient,
@@ -148,6 +152,7 @@ class PlaceThumbnailConfig {
         properties: ApifyGoogleMapsProperties,
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
         responseCache: ScrapingProviderResponseCache?,
+        processingMetrics: ProcessingMetrics,
     ): PlaceThumbnailProvider {
         val storage = mediaStorage.ifAvailable ?: run {
             logger.warn { "Apify Google Maps provider disabled: reason=missing_media_storage" }
@@ -159,6 +164,7 @@ class PlaceThumbnailConfig {
             properties = properties,
             mediaStorage = storage,
             responseCache = responseCache,
+            metrics = processingMetrics,
         )
     }
 

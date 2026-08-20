@@ -137,6 +137,14 @@ class PlaceEntity(
         thumbnailParsingStatus = status
     }
 
+    fun shouldRequestThumbnailSupplement(): Boolean = when {
+        thumbnailParsingStatus == PlaceThumbnailParsingStatus.PROCESSING -> false
+        thumbnailParsingStatus == PlaceThumbnailParsingStatus.COMPLETED && hasPlacePhoto() -> false
+        else -> true
+    }
+
+    private fun hasPlacePhoto(): Boolean = thumbnailUrl != null || photoUrls.isNotEmpty()
+
     fun updateRepresentativeTags(tags: List<PlaceTag>) {
         representativeTags = tags.take(MAX_REPRESENTATIVE_TAG_COUNT)
     }
