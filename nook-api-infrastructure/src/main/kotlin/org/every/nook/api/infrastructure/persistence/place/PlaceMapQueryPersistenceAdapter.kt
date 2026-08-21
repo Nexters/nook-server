@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagCatalogSnapshot
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
@@ -79,6 +80,8 @@ class PlaceMapQueryPersistenceAdapter(
                     ),
                 ),
                 tags = row.representativeTags.toDisplayTags(tagCatalog),
+                accessType = if (row.shareToken == null) PlaceAccessType.OWNED else PlaceAccessType.SHARED,
+                shareToken = row.shareToken,
             )
         }
     }
