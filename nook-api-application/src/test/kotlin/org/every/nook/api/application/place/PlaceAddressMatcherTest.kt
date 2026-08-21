@@ -196,6 +196,59 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `recovers a unique exact name result when jibun and road addresses differ`() {
+        val clue = PlaceClue(
+            name = "Ordinary Noise Club",
+            region = "망원동",
+            queries = listOf("Ordinary Noise Club 망원동"),
+            addressHint = "서울시 마포구 망원동 378-17",
+        )
+        val candidate = candidate("Ordinary Noise Club", "서울 마포구 월드컵로 79")
+
+        assertEquals(
+            listOf(candidate),
+            listOf(PlaceCandidateSelector.Candidate(candidate, listOf("Ordinary Noise Club")))
+                .compatibleWith(clue)
+                .map(PlaceCandidateSelector.Candidate::place),
+        )
+        assertTrue(clue.isSupportedBy(candidate, listOf("Ordinary Noise Club")))
+    }
+
+    @Test
+    fun `does not recover an exact name result from a conflicting district`() {
+        val clue = PlaceClue(
+            name = "Ordinary Noise Club",
+            region = "마포구 망원동",
+            queries = listOf("Ordinary Noise Club"),
+            addressHint = "서울시 마포구 망원동 378-17",
+        )
+        val candidate = candidate("Ordinary Noise Club", "서울 강남구 테헤란로 1")
+
+        assertTrue(
+            listOf(PlaceCandidateSelector.Candidate(candidate, listOf("Ordinary Noise Club")))
+                .compatibleWith(clue)
+                .isEmpty(),
+        )
+        assertFalse(clue.isSupportedBy(candidate, listOf("Ordinary Noise Club")))
+    }
+
+    @Test
+    fun `does not recover multiple exact name results with incompatible addresses`() {
+        val clue = PlaceClue(
+            name = "동일상호",
+            region = "마포구",
+            queries = listOf("동일상호"),
+            addressHint = "서울 마포구 망원동 378-17",
+        )
+        val candidates = listOf(
+            candidate("동일상호", "서울 마포구 월드컵로 79"),
+            candidate("동일상호", "서울 마포구 월드컵로 81"),
+        ).map { PlaceCandidateSelector.Candidate(it, listOf("동일상호")) }
+
+        assertTrue(candidates.compatibleWith(clue).isEmpty())
+    }
+
+    @Test
     fun `accepts matching store when provider omits floor but rejects wrong address or store`() {
         val clue = PlaceClue(
             name = "SHEET",
