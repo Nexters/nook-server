@@ -4,6 +4,7 @@ import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.group.port.GroupOwnershipPort
+import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.post.CoverTitleExtractor
 import org.every.nook.api.application.post.CreatePostUseCase
 import org.every.nook.api.application.post.DeleteSavedPostUseCase
@@ -59,6 +60,7 @@ class PostUseCaseConfig {
         jobPort: PostContentParsingJobPort,
         extractPostContentUseCase: ExtractPostContentUseCase,
         postContentInference: PostContentInference,
+        imageTextExtractor: ImageTextExtractor,
         coverTitleExtractor: CoverTitleExtractor,
         processingMetrics: ObjectProvider<ProcessingMetrics>,
         properties: PostContentParsingProperties,
@@ -66,6 +68,7 @@ class PostUseCaseConfig {
         jobPort = jobPort,
         extractPostContent = extractPostContentUseCase,
         contentInference = postContentInference,
+        imageTextExtractor = imageTextExtractor,
         coverTitleExtractor = coverTitleExtractor,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,

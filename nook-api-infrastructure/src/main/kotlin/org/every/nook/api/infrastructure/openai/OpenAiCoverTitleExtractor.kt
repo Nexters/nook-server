@@ -38,8 +38,7 @@ class OpenAiCoverTitleExtractor(
             mapOf(
                 "role" to "user",
                 "content" to listOf(
-                    mapOf("type" to "input_text", "text" to "표지의 titleLabel과 title을 정확히 전사하세요."),
-                    mapOf("type" to "input_image", "image_url" to imageUrl, "detail" to IMAGE_DETAIL),
+                    mapOf("type" to "input_text", "text" to objectMapper.writeValueAsString(texts)),
                 ),
             ),
         ),
@@ -50,21 +49,12 @@ class OpenAiCoverTitleExtractor(
                 "type" to "json_schema",
                 "name" to "post_cover_title",
                 "strict" to true,
-                "schema" to SCHEMA,
+                "schema" to schema(texts),
             ),
         ),
     )
 
-    private fun JsonNode.toCoverTitle(): String? {
-        val title = path("title").nullableText() ?: return null
-        val titleLabel = path("titleLabel").nullableText()
-        return listOfNotNull(titleLabel, title)
-            .joinToString(" ")
-            .replace(WHITESPACE_PATTERN, " ")
-            .trim()
-            .take(MAX_TITLE_LENGTH)
-            .ifBlank { null }
-    }
+    private fun JsonNode.toCoverTitle(): String? = path("title").nullableText()
 
     private fun JsonNode.nullableText(): String? = takeUnless { isNull || isMissingNode }
         ?.asText()
@@ -73,21 +63,18 @@ class OpenAiCoverTitleExtractor(
 
     private companion object {
         const val MAX_OUTPUT_TOKENS = 300
-        const val MAX_TITLE_LENGTH = 500
-        const val IMAGE_DETAIL = "high"
         const val INSTRUCTIONS =
-            "Instagram 표지 이미지의 제목 영역을 글자 그대로 전사한다. " +
-                "titleLabel은 제목 바로 위에 붙은 날짜·회차 라벨만, title은 게시물 전체를 설명하는 중앙의 큰 제목 문구만 반환한다. " +
-                "위에서 아래로 읽고 줄바꿈은 공백으로 합친다. NEW 같은 배지와 계정명·로고는 제외한다. " +
-                "추측, 요약, 번역, 맞춤법 교정, 바꿔쓰기를 금지한다. 해당 문구가 없으면 각 필드를 null로 반환한다."
-        val WHITESPACE_PATTERN = Regex("\\s+")
-        val SCHEMA: Map<String, Any> = mapOf(
+            "입력은 Instagram 첫 이미지에서 OCR로 전사한 문자열 배열이다. " +
+                "게시물 전체를 설명하는 명시적인 표지 제목 문구가 배열에 그대로 존재할 때만 하나를 선택한다. " +
+                "날짜, 회차, VOL, PICK, 계정명, 로고, 배지, 장소 카드의 상호명, 주소, 사진 설명은 선택하지 않는다. " +
+                "문구를 합치거나 수정하거나 새로 만들지 않는다. 명시적인 제목이 없거나 확실하지 않으면 null을 반환한다."
+
+        fun schema(texts: List<String>): Map<String, Any> = mapOf(
             "type" to "object",
             "properties" to mapOf(
-                "titleLabel" to mapOf("type" to listOf("string", "null")),
-                "title" to mapOf("type" to listOf("string", "null")),
+                "title" to mapOf("enum" to texts.distinct() + null),
             ),
-            "required" to listOf("titleLabel", "title"),
+            "required" to listOf("title"),
             "additionalProperties" to false,
         )
     }

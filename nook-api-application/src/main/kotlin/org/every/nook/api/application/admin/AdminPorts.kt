@@ -25,6 +25,28 @@ interface AdminPostCorrectionPort {
     )
 }
 
+interface AdminPostTitleRegenerationPort {
+    fun findSource(postId: Long): Source?
+
+    fun updateTitle(command: UpdateCommand): AdminPostDetail?
+
+    data class Source(
+        val postId: Long,
+        val body: String?,
+        val hashtags: List<String>,
+        val sourceLocationTag: String?,
+        val firstImageUrl: String?,
+    )
+
+    data class UpdateCommand(
+        val postId: Long,
+        val title: String?,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+    )
+}
+
 interface AdminPlaceQueryPort {
     fun search(query: String, limit: Int): List<AdminPlaceSummary>
 

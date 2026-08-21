@@ -33,6 +33,15 @@ Content-Type: application/json
 GET {{baseUrl}}/api/admin/v1/places?query=성수&limit=20
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 
+### 게시글 제목 재생성
+POST {{baseUrl}}/api/admin/v1/posts/1/title/regenerate
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "reason": "본문과 관련 없는 제목을 새 규칙으로 재생성"
+}
+
 ### 장소 관리 목록
 GET {{baseUrl}}/api/admin/v1/places/manage?query=성수&offset=0&limit=20
 Cf-Access-Jwt-Assertion: {{accessJwt}}

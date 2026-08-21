@@ -1,7 +1,9 @@
 package org.every.nook.api.application.post
 
+import org.every.nook.api.application.place.ImageTranscript
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class GroundedPostTitleTest {
     @Test
@@ -28,5 +30,32 @@ class GroundedPostTitleTest {
                 inferredTitle = "Instagram 게시물",
             ),
         )
+    }
+
+    @Test
+    fun `prefers an explicit body title over a cover title`() {
+        assertEquals(
+            "서울 카페 5곳",
+            resolvePostTitle("서울 카페 5곳을 소개합니다", "표지의 다른 문구", "AI 제목"),
+        )
+    }
+
+    @Test
+    fun `rejects default null and image explanation titles`() {
+        assertNull(resolvePostTitle("평범한 본문", "null null", "Instagram 게시물"))
+        assertNull(
+            resolvePostTitle(
+                "평범한 본문",
+                "표시된 날짜·회차 라벨이 여기에 와야 하지만 이미지는 회차 표기가 보이지 않습니다",
+                "방문해보기 좋은 곳",
+            ),
+        )
+    }
+
+    @Test
+    fun `rejects a cover title that was not present in OCR texts`() {
+        val transcript = ImageTranscript(1, listOf("누구가 저장하고 다녀온 곳을 소개합니다"))
+
+        assertNull(transcript.validatedCoverTitle(CoverTitleExtractor { "새로 만든 제목" }))
     }
 }

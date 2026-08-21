@@ -6,16 +6,21 @@ import org.every.nook.api.application.admin.AdminPlaceQueryPort
 import org.every.nook.api.application.admin.AdminPostCorrectionPort
 import org.every.nook.api.application.admin.AdminPostPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPostQueryPort
+import org.every.nook.api.application.admin.AdminPostTitleRegenerationPort
 import org.every.nook.api.application.admin.GetAdminPlaceUseCase
 import org.every.nook.api.application.admin.GetAdminPostUseCase
 import org.every.nook.api.application.admin.ListAdminAuditLogsUseCase
 import org.every.nook.api.application.admin.ListAdminPlacesUseCase
 import org.every.nook.api.application.admin.ListAdminPostsUseCase
+import org.every.nook.api.application.admin.RegenerateAdminPostTitleUseCase
 import org.every.nook.api.application.admin.ReplaceAdminPostPlacesUseCase
 import org.every.nook.api.application.admin.SearchAdminPlacesUseCase
 import org.every.nook.api.application.admin.UpdateAdminPlaceUseCase
 import org.every.nook.api.application.admin.UpdateAdminPostUseCase
+import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
+import org.every.nook.api.application.post.CoverTitleExtractor
+import org.every.nook.api.application.post.PostTitleInference
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -29,6 +34,14 @@ class AdminUseCaseConfig {
 
     @Bean
     fun updateAdminPostUseCase(port: AdminPostCorrectionPort) = UpdateAdminPostUseCase(port)
+
+    @Bean
+    fun regenerateAdminPostTitleUseCase(
+        port: AdminPostTitleRegenerationPort,
+        imageTextExtractor: ImageTextExtractor,
+        coverTitleExtractor: CoverTitleExtractor,
+        titleInference: PostTitleInference,
+    ) = RegenerateAdminPostTitleUseCase(port, imageTextExtractor, coverTitleExtractor, titleInference)
 
     @Bean
     fun searchAdminPlacesUseCase(port: AdminPlaceQueryPort) = SearchAdminPlacesUseCase(port)

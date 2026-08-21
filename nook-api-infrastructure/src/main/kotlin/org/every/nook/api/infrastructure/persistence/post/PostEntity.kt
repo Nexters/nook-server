@@ -78,4 +78,9 @@ class PostEntity(
         this.sourceLocationTag = sourceLocationTag
         contentManuallyOverridden = true
     }
+
+    fun updateTitleFromAdmin(title: String?) {
+        this.title = title
+        contentManuallyOverridden = true
+    }
 }

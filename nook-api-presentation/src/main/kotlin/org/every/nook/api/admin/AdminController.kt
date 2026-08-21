@@ -11,6 +11,7 @@ import org.every.nook.api.application.admin.GetAdminPostUseCase
 import org.every.nook.api.application.admin.ListAdminAuditLogsUseCase
 import org.every.nook.api.application.admin.ListAdminPlacesUseCase
 import org.every.nook.api.application.admin.ListAdminPostsUseCase
+import org.every.nook.api.application.admin.RegenerateAdminPostTitleUseCase
 import org.every.nook.api.application.admin.ReplaceAdminPostPlacesUseCase
 import org.every.nook.api.application.admin.SearchAdminPlacesUseCase
 import org.every.nook.api.application.admin.UpdateAdminPlaceUseCase
@@ -22,6 +23,7 @@ import org.slf4j.MDC
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -35,6 +37,7 @@ class AdminController(
     private val listPosts: ListAdminPostsUseCase,
     private val getPost: GetAdminPostUseCase,
     private val updatePostUseCase: UpdateAdminPostUseCase,
+    private val regeneratePostTitle: RegenerateAdminPostTitleUseCase,
     private val searchPlaces: SearchAdminPlacesUseCase,
     private val listPlaces: ListAdminPlacesUseCase,
     private val getPlace: GetAdminPlaceUseCase,
@@ -76,6 +79,24 @@ class AdminController(
                 media = request.media.mapIndexed { index, media ->
                     AdminPostMedia(media.mediaType, media.mediaUrl, index)
                 },
+                actor = actor,
+                reason = request.reason,
+                requestId = MDC.get(RequestLoggingFields.REQUEST_ID)
+                    ?: servletRequest.getHeader(RequestLoggingFields.REQUEST_ID_HEADER),
+            ),
+        ),
+    )
+
+    @PostMapping("/posts/{postId}/title/regenerate")
+    fun regeneratePostTitle(
+        actor: AdminActor,
+        @PathVariable postId: Long,
+        @Valid @RequestBody request: RegeneratePostTitleRequest,
+        servletRequest: HttpServletRequest,
+    ) = ApiResponse.success(
+        regeneratePostTitle(
+            RegenerateAdminPostTitleUseCase.Command(
+                postId = postId,
                 actor = actor,
                 reason = request.reason,
                 requestId = MDC.get(RequestLoggingFields.REQUEST_ID)
@@ -156,6 +177,12 @@ class AdminController(
 data class ReplacePostPlacesRequest(
     @field:Size(max = 100)
     val placeIds: List<Long>,
+    @field:NotBlank
+    @field:Size(max = 500)
+    val reason: String,
+)
+
+data class RegeneratePostTitleRequest(
     @field:NotBlank
     @field:Size(max = 500)
     val reason: String,
