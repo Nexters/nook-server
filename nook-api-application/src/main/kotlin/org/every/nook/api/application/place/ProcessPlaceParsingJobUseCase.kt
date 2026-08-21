@@ -61,7 +61,7 @@ class ProcessPlaceParsingJobUseCase(
             .distinctBy { it.provider to it.externalPlaceId }
             .distinctLogicalPlaces()
         if (places.isEmpty()) {
-            val failure = imageResolution?.failure ?: textResolution.failure
+            val failure = textResolution.failure ?: imageResolution?.failure
             terminalFailure(
                 failure?.message ?: if (imageResolution == null) {
                     NO_PLACE_RESOLVED_REASON
