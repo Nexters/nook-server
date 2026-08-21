@@ -43,6 +43,54 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `normalizes whitespace inside a numbered road name`() {
+        assertTrue(
+            PlaceAddressMatcher.isCompatible(
+                "서울 용산구 한강대로 11길 21, 4층",
+                "서울 용산구 한강대로11길 21",
+            ),
+        )
+        assertEquals(
+            PlaceAddressMatcher.addressKeys("서울 용산구 한강대로11길 21"),
+            PlaceAddressMatcher.addressKeys("서울 용산구 한강대로 11길 21, 4층"),
+        )
+    }
+
+    @Test
+    fun `recognizes a road name that starts with a number`() {
+        assertEquals(
+            setOf("63로50"),
+            PlaceAddressMatcher.addressKeys("서울 영등포구 63로 50"),
+        )
+        assertFalse(
+            PlaceAddressMatcher.isCompatible(
+                "서울 용산구 한강대로 11길 21, 4층",
+                "서울 영등포구 63로 50",
+            ),
+        )
+    }
+
+    @Test
+    fun `selects the matching Lofa Seoul address and rejects the 63 City branch`() {
+        val clue = PlaceClue(
+            name = "로파서울",
+            region = "서울 용산구",
+            queries = listOf("로파서울"),
+            addressHint = "서울 용산구 한강대로 11길 21, 4층",
+        )
+        val yongsan = candidate("로파 서울", "서울 용산구 한강대로11길 21")
+        val city63 = candidate("로파 서울 63시티점", "서울 영등포구 63로 50")
+
+        assertEquals(
+            listOf(yongsan),
+            listOf(yongsan, city63)
+                .map { PlaceCandidateSelector.Candidate(it, listOf("로파서울")) }
+                .compatibleWith(clue)
+                .map(PlaceCandidateSelector.Candidate::place),
+        )
+    }
+
+    @Test
     fun `accepts a road address when the source omits the final gil suffix`() {
         assertTrue(
             PlaceAddressMatcher.isCompatible(
@@ -246,6 +294,45 @@ class PlaceAddressMatcherTest {
         ).map { PlaceCandidateSelector.Candidate(it, listOf("동일상호")) }
 
         assertTrue(candidates.compatibleWith(clue).isEmpty())
+    }
+
+    @Test
+    fun `recovers a branch name found by an explicit jibun address search`() {
+        val clue = PlaceClue(
+            name = "미례국밥",
+            region = "서울 서초구",
+            queries = listOf("미례국밥"),
+            addressHint = "서울 서초구 서초동 1327",
+        )
+        val candidate = candidate("미례국밥 강남삼성타운점", "서울 서초구 서초대로74길 23")
+        val matchedQueries = listOf("서울 서초구 서초동 1327", "미례국밥")
+
+        assertEquals(
+            listOf(candidate),
+            listOf(PlaceCandidateSelector.Candidate(candidate, matchedQueries))
+                .compatibleWith(clue)
+                .map(PlaceCandidateSelector.Candidate::place),
+        )
+        assertTrue(clue.isSupportedBy(candidate, matchedQueries))
+    }
+
+    @Test
+    fun `does not recover a branch name from an address search in a conflicting district`() {
+        val clue = PlaceClue(
+            name = "미례국밥",
+            region = "서울 서초구",
+            queries = listOf("미례국밥"),
+            addressHint = "서울 서초구 서초동 1327",
+        )
+        val candidate = candidate("미례국밥 센텀점", "부산 해운대구 센텀동로 90")
+        val matchedQueries = listOf("서울 서초구 서초동 1327", "미례국밥")
+
+        assertTrue(
+            listOf(PlaceCandidateSelector.Candidate(candidate, matchedQueries))
+                .compatibleWith(clue)
+                .isEmpty(),
+        )
+        assertFalse(clue.isSupportedBy(candidate, matchedQueries))
     }
 
     @Test

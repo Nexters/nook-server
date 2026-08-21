@@ -126,7 +126,7 @@ internal object PlaceAddressMatcher {
     private data class RoadAddress(val roadName: String, val buildingNumber: String)
 
     private val BASE_ADDRESS_PATTERN = Regex(
-        "([가-힣A-Za-z]+(?:대로|로|길)(?:\\d+[가-힣]?(?:길)?)?|" +
+        "([가-힣A-Za-z0-9]+?(?:대로|로|길)(?:(?:\\d+[가-힣]?(?:길)?)|(?:\\s+\\d+[가-힣]?길))?|" +
             "[가-힣A-Za-z0-9]+(?:동|읍|면|리))\\s+(\\d+(?:-\\d+)?)",
     )
     private val BASEMENT_PATTERN = Regex(

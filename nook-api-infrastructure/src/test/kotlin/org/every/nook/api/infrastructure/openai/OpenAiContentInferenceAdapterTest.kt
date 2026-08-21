@@ -230,6 +230,7 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(content().string(not(containsString("\"type\":\"input_image\""))))
             .andExpect(content().string(containsString("빈브라더스 커피하우스 서울")))
             .andExpect(content().string(containsString("층·호 정보를 그대로 유지")))
+            .andExpect(content().string(containsString("뒤쪽의 별도 문단")))
             .andExpect(content().string(containsString("\"addressHint\"")))
             .andExpect(content().string(containsString("\"max_output_tokens\":12000")))
             .andRespond(
