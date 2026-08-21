@@ -162,6 +162,42 @@ class SecurityConfigTest {
         ).andExpect(status().isForbidden)
             .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
     }
+
+    @Test
+    fun `dev admin frontend put preflight request is allowed`() {
+        mockMvc.perform(
+            options("/test/protected")
+                .header(HttpHeaders.ORIGIN, "https://dev-admin.everynook.co.kr")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.PUT.name())
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, HttpHeaders.CONTENT_TYPE),
+        ).andExpect(status().isOk)
+            .andExpect(
+                header().string(
+                    HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN,
+                    "https://dev-admin.everynook.co.kr",
+                ),
+            )
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+    }
+
+    @Test
+    fun `live admin frontend put preflight request is allowed`() {
+        mockMvc.perform(
+            options("/test/protected")
+                .header(HttpHeaders.ORIGIN, "https://admin.everynook.co.kr")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.PUT.name())
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, HttpHeaders.CONTENT_TYPE),
+        ).andExpect(status().isOk)
+            .andExpect(
+                header().string(
+                    HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN,
+                    "https://admin.everynook.co.kr",
+                ),
+            )
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+    }
 }
 
 @RestController
