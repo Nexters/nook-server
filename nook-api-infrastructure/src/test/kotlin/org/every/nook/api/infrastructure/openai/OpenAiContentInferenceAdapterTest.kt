@@ -78,7 +78,8 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(header("Authorization", "Bearer test-key"))
             .andExpect(content().string(containsString("post_content_inference")))
             .andExpect(content().string(containsString("홍보성")))
-            .andExpect(content().string(containsString("방문해보기 좋은 곳")))
+            .andExpect(content().string(containsString("정보가 부족하면 null")))
+            .andExpect(content().string(not(containsString("방문해보기 좋은 곳"))))
             .andExpect(content().string(not(containsString("홍별감네"))))
             .andExpect(content().string(containsString("\"maxLength\":25")))
             .andExpect(content().string(containsString("\"maxItems\":60")))
@@ -111,20 +112,17 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
-    fun `extracts an exact title and date label from a cover image`() {
+    fun `selects an exact cover title from OCR texts`() {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
-            .andExpect(content().string(containsString("\"type\":\"input_image\"")))
-            .andExpect(content().string(containsString(TEST_IMAGE_URLS.first())))
-            .andExpect(content().string(containsString("\"detail\":\"high\"")))
+            .andExpect(content().string(containsString("요즘 뜨고 있는 금주의 신상스폿")))
             .andExpect(content().string(containsString("post_cover_title")))
-            .andExpect(content().string(containsString("titleLabel")))
-            .andExpect(content().string(containsString("계정명·로고")))
+            .andExpect(content().string(containsString("계정명, 로고")))
             .andRespond(
                 withSuccess(
                     response(
                         """
-                        {"titleLabel":"6월 2주차","title":"요즘 뜨고 있는 금주의 신상스폿"}
+                        {"title":"요즘 뜨고 있는 금주의 신상스폿"}
                         """.trimIndent(),
                     ),
                     MediaType.APPLICATION_JSON,
@@ -132,10 +130,10 @@ class OpenAiContentInferenceAdapterTest {
             )
 
         val title = fixture.coverTitleExtractor.extract(
-            CoverTitleExtractor.Request(TEST_IMAGE_URLS.first()),
+            CoverTitleExtractor.Request(listOf("6월 2주차", "요즘 뜨고 있는 금주의 신상스폿")),
         )
 
-        assertEquals("6월 2주차 요즘 뜨고 있는 금주의 신상스폿", title)
+        assertEquals("요즘 뜨고 있는 금주의 신상스폿", title)
         fixture.server.verify()
     }
 

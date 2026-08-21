@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.post
 
+import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
@@ -101,6 +102,7 @@ class PostContentParsingPersistenceAdapterTest {
                     addressHint = "서울 성동구 성수이로 11 4층",
                 ),
             ),
+            imageTranscripts = listOf(ImageTranscript(1, listOf("성수 맛집"))),
         )
 
         assertEquals(PostContentParsingStatus.COMPLETED, job.status)
@@ -115,6 +117,7 @@ class PostContentParsingPersistenceAdapterTest {
                 """"addressHint":"서울 성동구 성수이로 11 4층"}]""",
             placeJobCaptor.value.textPlaceClues,
         )
+        assertEquals("""[{"imageIndex":1,"texts":["성수 맛집"]}]""", placeJobCaptor.value.imageTranscripts)
         val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
         verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture())
         val placeEvent = eventCaptor.allValues.filterIsInstance<PlaceParsingJobRequestedEvent>().single()
