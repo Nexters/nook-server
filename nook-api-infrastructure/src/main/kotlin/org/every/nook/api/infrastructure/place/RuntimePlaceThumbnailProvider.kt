@@ -7,6 +7,7 @@ import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.warn
 import org.slf4j.LoggerFactory
+import java.util.concurrent.Executors
 
 class RuntimePlaceThumbnailProvider(
     private val providers: Map<PlaceThumbnailProviderType, PlaceThumbnailProvider>,
@@ -47,29 +48,35 @@ class RuntimePlaceThumbnailProvider(
             ),
         )
 
-        val accumulated = MutableList<PlaceSupplement?>(requests.size) { null }
-        val remaining = requests.indices.toMutableSet()
         val activeProviders = chain.takeWhile { it != PlaceThumbnailProviderType.DISABLED }
             .mapNotNull { type -> providers[type]?.let { type to it } }
+        return Executors.newFixedThreadPool(minOf(requests.size, MAX_CONCURRENT_PLACE_COUNT)).use { executor ->
+            requests.map { request ->
+                executor.submit<PlaceSupplement?> {
+                    fetchOne(request, activeProviders, onPhotosResolved)
+                }
+            }.map { task -> task.get() }
+        }
+    }
+
+    private fun fetchOne(
+        request: PlaceThumbnailProvider.Request,
+        activeProviders: List<Pair<PlaceThumbnailProviderType, PlaceThumbnailProvider>>,
+        onPhotosResolved: (PlaceThumbnailProvider.Request, PlaceSupplement) -> Unit,
+    ): PlaceSupplement? {
+        var accumulated: PlaceSupplement? = null
         for ((type, provider) in activeProviders) {
-            val pendingIndexes = remaining.toList()
-            val pendingRequests = pendingIndexes.map(requests::get)
-            val supplements = runCatching { provider.fetchAll(pendingRequests) }
+            val supplement = runCatching { provider.fetch(request) }
                 .onFailure { exception ->
-                    pendingRequests.forEach { request -> logFallback(request, type, "failure", exception) }
+                    logFallback(request, type, "failure", exception)
                 }
-                .getOrElse { List(pendingRequests.size) { null } }
-            require(supplements.size == pendingRequests.size) { "Thumbnail provider result size mismatch" }
-            pendingIndexes.zip(supplements).forEach { (index, supplement) ->
-                accumulated[index] = accumulated[index].merge(supplement)
-                if (!supplement?.photoUrls.isNullOrEmpty()) {
-                    remaining.remove(index)
-                    onPhotosResolved(requests[index], requireNotNull(accumulated[index]))
-                } else {
-                    logFallback(requests[index], type, "empty", null)
-                }
+                .getOrNull()
+            accumulated = accumulated.merge(supplement)
+            if (!supplement?.photoUrls.isNullOrEmpty()) {
+                onPhotosResolved(request, requireNotNull(accumulated))
+                return accumulated
             }
-            if (remaining.isEmpty()) break
+            logFallback(request, type, "empty", null)
         }
         return accumulated
     }
@@ -115,5 +122,6 @@ class RuntimePlaceThumbnailProvider(
 
     private companion object {
         val logger = LoggerFactory.getLogger(RuntimePlaceThumbnailProvider::class.java)
+        const val MAX_CONCURRENT_PLACE_COUNT = 6
     }
 }

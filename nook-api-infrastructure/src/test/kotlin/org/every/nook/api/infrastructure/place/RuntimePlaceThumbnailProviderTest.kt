@@ -6,6 +6,10 @@ import org.every.nook.api.application.place.PlaceOpeningHours
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import java.math.BigDecimal
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -119,29 +123,64 @@ class RuntimePlaceThumbnailProviderTest {
 
     @Test
     fun `reports resolved places before invoking the next fallback provider`() {
-        val events = mutableListOf<String>()
+        val events = Collections.synchronizedList(mutableListOf<String>())
+        val firstResolved = CountDownLatch(1)
         val first = REQUEST
         val second = REQUEST.copy(place = REQUEST.place.copy(externalPlaceId = "second-place"))
         val provider = provider(
             value = "APIFY_GOOGLE,APIFY_NAVER_PLACE",
             delegates = mapOf(
-                PlaceThumbnailProviderType.APIFY_GOOGLE to batchProvider {
-                    listOf(PlaceSupplement(null, listOf("https://cdn.example/google.jpg")), null)
+                PlaceThumbnailProviderType.APIFY_GOOGLE to PlaceThumbnailProvider { request ->
+                    request.takeIf { it.place.externalPlaceId == "place-id" }
+                        ?.let { PlaceSupplement(null, listOf("https://cdn.example/google.jpg")) }
                 },
-                PlaceThumbnailProviderType.APIFY_NAVER_PLACE to batchProvider { requests ->
-                    events += "naver:${requests.single().place.externalPlaceId}"
-                    listOf(PlaceSupplement(null, listOf("https://cdn.example/naver.jpg")))
+                PlaceThumbnailProviderType.APIFY_NAVER_PLACE to PlaceThumbnailProvider { request ->
+                    check(firstResolved.await(1, TimeUnit.SECONDS))
+                    events += "naver:${request.place.externalPlaceId}"
+                    PlaceSupplement(null, listOf("https://cdn.example/naver.jpg"))
                 },
             ),
         )
 
         provider.fetchAll(listOf(first, second)) { request, _ ->
             events += "resolved:${request.place.externalPlaceId}"
+            if (request.place.externalPlaceId == "place-id") firstResolved.countDown()
         }
 
         assertEquals(
             listOf("resolved:place-id", "naver:second-place", "resolved:second-place"),
             events,
+        )
+    }
+
+    @Test
+    fun `runs at most six place chains concurrently and preserves result order`() {
+        val active = AtomicInteger()
+        val maxActive = AtomicInteger()
+        val firstWave = CountDownLatch(6)
+        val provider = provider(
+            value = "FIXED",
+            delegates = mapOf(
+                PlaceThumbnailProviderType.FIXED to PlaceThumbnailProvider { request ->
+                    val current = active.incrementAndGet()
+                    maxActive.updateAndGet { previous -> maxOf(previous, current) }
+                    firstWave.countDown()
+                    check(firstWave.await(1, TimeUnit.SECONDS))
+                    active.decrementAndGet()
+                    PlaceSupplement(null, listOf("https://cdn.example/${request.place.externalPlaceId}.jpg"))
+                },
+            ),
+        )
+        val requests = (1..7).map { index ->
+            REQUEST.copy(place = REQUEST.place.copy(externalPlaceId = "place-$index"))
+        }
+
+        val results = provider.fetchAll(requests)
+
+        assertEquals(6, maxActive.get())
+        assertEquals(
+            (1..7).map { index -> listOf("https://cdn.example/place-$index.jpg") },
+            results.map { it?.photoUrls },
         )
     }
 
@@ -177,14 +216,6 @@ class RuntimePlaceThumbnailProviderTest {
             calls += name
             result
         }
-
-    private fun batchProvider(
-        result: (List<PlaceThumbnailProvider.Request>) -> List<PlaceSupplement?>,
-    ): PlaceThumbnailProvider = object : PlaceThumbnailProvider {
-        override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = result(listOf(request)).single()
-
-        override fun fetchAll(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> = result(requests)
-    }
 
     private companion object {
         val REQUEST = PlaceThumbnailProvider.Request(
