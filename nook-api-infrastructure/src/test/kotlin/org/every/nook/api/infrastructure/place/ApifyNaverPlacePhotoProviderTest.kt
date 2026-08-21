@@ -22,7 +22,7 @@ import kotlin.test.assertNull
 
 class ApifyNaverPlacePhotoProviderTest {
     @Test
-    fun `stores up to three business photos for a verified Naver place`() {
+    fun `prioritizes representative images and fills up to six photos from all types`() {
         val fixture = fixture()
         expectSearch(fixture.server, MATCHING_SEARCH_RESPONSE)
         expectPhotos(fixture.server, PHOTO_RESPONSE)
@@ -30,11 +30,18 @@ class ApifyNaverPlacePhotoProviderTest {
         val result = fixture.provider.fetch(REQUEST)
 
         assertEquals(
-            listOf("https://cdn.example/0.jpg", "https://cdn.example/1.jpg", "https://cdn.example/2.jpg"),
+            (0..5).map { "https://cdn.example/$it.jpg" },
             result?.photoUrls,
         )
         assertEquals(
-            listOf("https://naver.example/1.jpg", "https://naver.example/2.jpg", "https://naver.example/3.jpg"),
+            listOf(
+                "https://naver.example/1.jpg",
+                "https://naver.example/2.jpg",
+                "https://naver.example/3.jpg",
+                "https://naver.example/blog.jpg",
+                "https://naver.example/representative.jpg",
+                "https://naver.example/review.jpg",
+            ),
             fixture.storage.stored.map(PostMedia::url).sorted(),
         )
         fixture.server.verify()
@@ -59,16 +66,32 @@ class ApifyNaverPlacePhotoProviderTest {
     }
 
     @Test
-    fun `ignores visitor photos when no business photo exists`() {
+    fun `uses visitor photos when no representative image exists`() {
         val fixture = fixture()
-        expectSearch(fixture.server, MATCHING_SEARCH_RESPONSE)
+        expectSearch(fixture.server, MATCHING_SEARCH_RESPONSE_WITHOUT_IMAGES)
         expectPhotos(
             fixture.server,
             """[{"placeId":"123","photoType":"visitor","originalUrl":"https://naver.example/review.jpg"}]""",
+            PHOTO_INPUT_WITHOUT_REPRESENTATIVE,
         )
 
-        assertNull(fixture.provider.fetch(REQUEST))
-        assertEquals(emptyList(), fixture.storage.stored)
+        assertEquals(listOf("https://cdn.example/0.jpg"), fixture.provider.fetch(REQUEST)?.photoUrls)
+        assertEquals(listOf("https://naver.example/review.jpg"), fixture.storage.stored.map(PostMedia::url))
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `skips photo actor when search returns six representative images`() {
+        val fixture = fixture()
+        expectSearch(fixture.server, SIX_REPRESENTATIVE_IMAGES_RESPONSE)
+
+        val result = fixture.provider.fetch(REQUEST)
+
+        assertEquals((0..5).map { "https://cdn.example/$it.jpg" }, result?.photoUrls)
+        assertEquals(
+            (1..6).map { "https://naver.example/representative-$it.jpg" },
+            fixture.storage.stored.map(PostMedia::url).sorted(),
+        )
         fixture.server.verify()
     }
 
@@ -95,11 +118,11 @@ class ApifyNaverPlacePhotoProviderTest {
             .andRespond(withSuccess(response, MediaType.APPLICATION_JSON))
     }
 
-    private fun expectPhotos(server: MockRestServiceServer, response: String) {
+    private fun expectPhotos(server: MockRestServiceServer, response: String, input: String = PHOTO_INPUT) {
         server.expect(requestTo(containsString("/v2/acts/photo-actor/run-sync-get-dataset-items")))
             .andExpect(method(HttpMethod.POST))
             .andExpect(header("Authorization", "Bearer test-token"))
-            .andExpect(content().json(PHOTO_INPUT))
+            .andExpect(content().json(input))
             .andRespond(withSuccess(response, MediaType.APPLICATION_JSON))
     }
 
@@ -143,21 +166,35 @@ class ApifyNaverPlacePhotoProviderTest {
         const val SEARCH_INPUT =
             """{"keywords":["누크 카페 서울 강남구 테헤란로 1"],"scrapePlaceDetails":false,"maxResultsPerKeyword":5}"""
         const val PHOTO_INPUT =
-            """{"placeUrls":[{"url":"https://map.naver.com/p/entry/place/123"}],"maxPhotos":3,"filterBy":"business","includeFilters":false}"""
+            """{"placeUrls":[{"url":"https://map.naver.com/p/entry/place/123"}],"maxPhotos":5,"filterBy":"all","includeFilters":false}"""
+        const val PHOTO_INPUT_WITHOUT_REPRESENTATIVE =
+            """{"placeUrls":[{"url":"https://map.naver.com/p/entry/place/123"}],"maxPhotos":6,"filterBy":"all","includeFilters":false}"""
         val MATCHING_SEARCH_RESPONSE = """
             [{"Name":"누크 카페","FullAddress":"서울특별시 강남구 테헤란로 1",
               "Latitude":"37.5001","Longitude":"127.0001","PlaceId":"123",
               "NaverMapUrl":"https://map.naver.com/p/entry/place/123",
+              "Images":["https://naver.example/representative.jpg"],
               "SearchKeyword":"누크 카페 서울 강남구 테헤란로 1"}]
         """.trimIndent()
+        val MATCHING_SEARCH_RESPONSE_WITHOUT_IMAGES = MATCHING_SEARCH_RESPONSE.replace(
+            """"Images":["https://naver.example/representative.jpg"],""",
+            "",
+        )
+        val SIX_REPRESENTATIVE_IMAGES_RESPONSE = MATCHING_SEARCH_RESPONSE.replace(
+            """["https://naver.example/representative.jpg"]""",
+            (1..6).joinToString(prefix = "[", postfix = "]") { "\"https://naver.example/representative-$it.jpg\"" },
+        )
         val PHOTO_RESPONSE = """
             [
-              {"placeId":"123","photoType":"ibu","originalUrl":"https://naver.example/1.jpg"},
+              {"placeId":"123","photoType":"ibu","originalUrl":"https://naver.example/representative.jpg"},
               {"placeId":"123","photoType":"visitor","originalUrl":"https://naver.example/review.jpg"},
-              {"placeId":"999","photoType":"ibu","originalUrl":"https://naver.example/wrong.jpg"},
+              {"placeId":"123","photoType":"ugc","originalUrl":"https://naver.example/blog.jpg"},
+              {"placeId":"123","photoType":"ibu","originalUrl":"https://naver.example/1.jpg"},
               {"placeId":"123","photoType":"ibu","originalUrl":"https://naver.example/2.jpg"},
               {"placeId":"123","photoType":"ibu","originalUrl":"https://naver.example/3.jpg"},
-              {"placeId":"123","photoType":"ibu","originalUrl":"https://naver.example/4.jpg"}
+              {"placeId":"123","photoType":"clip","mediaType":"video",
+               "originalUrl":"https://naver.example/clip.jpg"},
+              {"placeId":"999","photoType":"ibu","originalUrl":"https://naver.example/wrong.jpg"}
             ]
         """.trimIndent()
         val REQUEST = PlaceThumbnailProvider.Request(

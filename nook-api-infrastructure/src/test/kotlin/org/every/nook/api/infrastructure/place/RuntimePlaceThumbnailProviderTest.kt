@@ -118,6 +118,34 @@ class RuntimePlaceThumbnailProviderTest {
     }
 
     @Test
+    fun `reports resolved places before invoking the next fallback provider`() {
+        val events = mutableListOf<String>()
+        val first = REQUEST
+        val second = REQUEST.copy(place = REQUEST.place.copy(externalPlaceId = "second-place"))
+        val provider = provider(
+            value = "APIFY_GOOGLE,APIFY_NAVER_PLACE",
+            delegates = mapOf(
+                PlaceThumbnailProviderType.APIFY_GOOGLE to batchProvider {
+                    listOf(PlaceSupplement(null, listOf("https://cdn.example/google.jpg")), null)
+                },
+                PlaceThumbnailProviderType.APIFY_NAVER_PLACE to batchProvider { requests ->
+                    events += "naver:${requests.single().place.externalPlaceId}"
+                    listOf(PlaceSupplement(null, listOf("https://cdn.example/naver.jpg")))
+                },
+            ),
+        )
+
+        provider.fetchAll(listOf(first, second)) { request, _ ->
+            events += "resolved:${request.place.externalPlaceId}"
+        }
+
+        assertEquals(
+            listOf("resolved:place-id", "naver:second-place", "resolved:second-place"),
+            events,
+        )
+    }
+
+    @Test
     fun `disabled stops the remaining chain`() {
         val calls = mutableListOf<String>()
         val provider = provider(
@@ -149,6 +177,14 @@ class RuntimePlaceThumbnailProviderTest {
             calls += name
             result
         }
+
+    private fun batchProvider(
+        result: (List<PlaceThumbnailProvider.Request>) -> List<PlaceSupplement?>,
+    ): PlaceThumbnailProvider = object : PlaceThumbnailProvider {
+        override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = result(listOf(request)).single()
+
+        override fun fetchAll(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> = result(requests)
+    }
 
     private companion object {
         val REQUEST = PlaceThumbnailProvider.Request(

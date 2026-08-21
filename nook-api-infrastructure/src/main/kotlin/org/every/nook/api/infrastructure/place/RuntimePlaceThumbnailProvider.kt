@@ -15,7 +15,13 @@ class RuntimePlaceThumbnailProvider(
 ) : PlaceThumbnailProvider {
     override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = fetchAll(listOf(request)).single()
 
-    override fun fetchAll(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> {
+    override fun fetchAll(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> =
+        fetchAll(requests) { _, _ -> }
+
+    override fun fetchAll(
+        requests: List<PlaceThumbnailProvider.Request>,
+        onPhotosResolved: (PlaceThumbnailProvider.Request, PlaceSupplement) -> Unit,
+    ): List<PlaceSupplement?> {
         if (requests.isEmpty()) return emptyList()
         val configuredValue = configurationReader.findValue(PlaceThumbnailProviderType.CONFIGURATION_KEY)
         val configuredChain = PlaceThumbnailProviderType.parse(configuredValue)
@@ -58,6 +64,7 @@ class RuntimePlaceThumbnailProvider(
                 accumulated[index] = accumulated[index].merge(supplement)
                 if (!supplement?.photoUrls.isNullOrEmpty()) {
                     remaining.remove(index)
+                    onPhotosResolved(requests[index], requireNotNull(accumulated[index]))
                 } else {
                     logFallback(requests[index], type, "empty", null)
                 }

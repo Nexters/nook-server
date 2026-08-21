@@ -19,6 +19,7 @@ class StorePlaceThumbnailUseCase(
     operator fun invoke(postId: Long, requests: List<PlaceThumbnailProvider.Request>) {
         require(requests.isNotEmpty()) { "thumbnail requests must not be empty" }
         val startedAt = clock.millis()
+        val completed = mutableSetOf<PlaceIdentity>()
         requests.forEach { logger.info(event(postId, it.place, "place.thumbnail.started", FETCH_STAGE, "started")) }
         runCatching {
             requests.forEach { request ->
@@ -29,14 +30,17 @@ class StorePlaceThumbnailUseCase(
                 )
             }
             val supplements = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
-                thumbnailProvider.fetchAll(requests)
+                thumbnailProvider.fetchAll(requests) { request, supplement ->
+                    complete(postId, request, supplement, startedAt)
+                    completed += request.identity()
+                }
             }
             require(supplements.size == requests.size) { "thumbnail provider returned an invalid result count" }
             requests.zip(supplements).forEach { (request, supplement) ->
-                complete(postId, request, supplement, startedAt)
+                if (request.identity() !in completed) complete(postId, request, supplement, startedAt)
             }
         }.getOrElse { exception ->
-            requests.forEach { request ->
+            requests.filterNot { it.identity() in completed }.forEach { request ->
                 runCatching {
                     updatePort.update(
                         request.place.provider,
@@ -115,4 +119,9 @@ class StorePlaceThumbnailUseCase(
         const val FETCH_STAGE = "fetch"
         const val COMPLETE_STAGE = "complete"
     }
+
+    private data class PlaceIdentity(val provider: String, val externalPlaceId: String)
+
+    private fun PlaceThumbnailProvider.Request.identity(): PlaceIdentity =
+        PlaceIdentity(place.provider, place.externalPlaceId)
 }
