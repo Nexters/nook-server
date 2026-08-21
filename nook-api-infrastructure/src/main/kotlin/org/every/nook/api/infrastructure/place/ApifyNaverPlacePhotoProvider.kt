@@ -54,13 +54,19 @@ class ApifyNaverPlacePhotoProvider(
         searchResponse?.let { responseCache?.save(PROVIDER, SEARCH_SOURCE_TYPE, searchInput.hashCode().toString(), it) }
         val searchItems = parseSearchItems(searchResponse)
         val matches = requests.map { request -> searchItems.bestMatch(request.place) }
-        val matchedUrls = matches.mapNotNull { it?.naverMapUrl }.distinct()
-        if (matchedUrls.isEmpty()) return List(requests.size) { null }
+        val photoRequests = matches.mapNotNull { match ->
+            match?.takeIf { it.imageUrls.size < MAX_PHOTO_COUNT }?.naverMapUrl
+        }.distinct()
+        if (photoRequests.isEmpty()) return storePhotos(requests, matches, emptyMap())
+        val actorPhotoCount = matches.mapNotNull { match ->
+            match?.takeIf { it.imageUrls.size < MAX_PHOTO_COUNT }
+                ?.let { MAX_PHOTO_COUNT - it.imageUrls.distinct().size }
+        }.maxOrNull() ?: MAX_PHOTO_COUNT
 
         val photoInput = mapOf(
-            "placeUrls" to matchedUrls.map { mapOf("url" to it) },
-            "maxPhotos" to MAX_PHOTO_COUNT,
-            "filterBy" to BUSINESS_FILTER,
+            "placeUrls" to photoRequests.map { mapOf("url" to it) },
+            "maxPhotos" to actorPhotoCount,
+            "filterBy" to ALL_PHOTO_FILTER,
             "includeFilters" to false,
         )
         val photoResponse = measureNaverThumbnailStage(metrics, clock, requests, PHOTO_STAGE) {
@@ -93,6 +99,7 @@ class ApifyNaverPlacePhotoProvider(
             longitude = node.decimalValue("Longitude", "longitude"),
             naverMapUrl = node.textValue("NaverMapUrl", "naverMapUrl"),
             searchKeyword = node.textValue("SearchKeyword", "searchKeyword"),
+            imageUrls = node.stringListValue("Images", "images"),
         )
     }
 
@@ -100,8 +107,9 @@ class ApifyNaverPlacePhotoProvider(
         val placeId = node.textValue("placeId") ?: return@mapNotNull null
         val photoType = node.textValue("photoType") ?: return@mapNotNull null
         val originalUrl = node.textValue("originalUrl") ?: return@mapNotNull null
-        originalUrl.takeIf(::isHttpUrl)?.let { NaverPhoto(placeId, photoType, it) }
-    }.filter { it.photoType in BUSINESS_PHOTO_TYPES }
+        val mediaType = node.textValue("mediaType")
+        originalUrl.takeIf(::isHttpUrl)?.let { NaverPhoto(placeId, photoType, mediaType, it) }
+    }.filterNot { it.mediaType.equals("video", ignoreCase = true) || it.photoType in VIDEO_PHOTO_TYPES }
 
     private fun arrayItems(body: String?): List<JsonNode> = body?.let(objectMapper::readTree)
         ?.takeIf(JsonNode::isArray)?.toList().orEmpty()
@@ -119,7 +127,8 @@ class ApifyNaverPlacePhotoProvider(
         photosByPlaceId: Map<String, List<NaverPhoto>>,
     ): List<PlaceSupplement?> = Executors.newFixedThreadPool(properties.storageConcurrency).use { executor ->
         val tasksByRequest = requests.zip(matches).map { (request, match) ->
-            photosByPlaceId[match?.placeId].orEmpty().map(NaverPhoto::originalUrl).distinct()
+            (match?.imageUrls.orEmpty() + photosByPlaceId[match?.placeId].orEmpty().map(NaverPhoto::originalUrl))
+                .filter(::isHttpUrl).distinct()
                 .take(MAX_PHOTO_COUNT).mapIndexed { sequence, url ->
                     executor.submit<String?> {
                         runCatching {
@@ -152,6 +161,7 @@ class ApifyNaverPlacePhotoProvider(
         val longitude: BigDecimal?,
         val naverMapUrl: String?,
         val searchKeyword: String?,
+        val imageUrls: List<String>,
     ) {
         fun matches(place: PlaceCandidate): Boolean {
             if (!name.matchesName(place.name)) return false
@@ -168,7 +178,12 @@ class ApifyNaverPlacePhotoProvider(
         }
     }
 
-    private data class NaverPhoto(val placeId: String, val photoType: String, val originalUrl: String)
+    private data class NaverPhoto(
+        val placeId: String,
+        val photoType: String,
+        val mediaType: String?,
+        val originalUrl: String,
+    )
 
     private companion object {
         val logger = LoggerFactory.getLogger(ApifyNaverPlacePhotoProvider::class.java)
@@ -179,9 +194,9 @@ class ApifyNaverPlacePhotoProvider(
         const val SEARCH_STAGE = "apify-naver-search"
         const val PHOTO_STAGE = "apify-naver-photo"
         const val IMAGE_STORE_STAGE = "image-store"
-        const val BUSINESS_FILTER = "business"
-        val BUSINESS_PHOTO_TYPES = setOf("ibu", "business")
-        const val MAX_PHOTO_COUNT = 3
+        const val ALL_PHOTO_FILTER = "all"
+        val VIDEO_PHOTO_TYPES = setOf("video", "clip")
+        const val MAX_PHOTO_COUNT = 6
         const val MAX_MATCH_DISTANCE_METERS = 300.0
         const val EARTH_RADIUS_METERS = 6_371_000.0
 
@@ -230,6 +245,12 @@ private fun JsonNode.textValue(vararg names: String): String? = names.asSequence
     .firstOrNull { !it.isMissingNode && !it.isNull }?.asString()?.trim()?.takeIf(String::isNotEmpty)
 
 private fun JsonNode.decimalValue(vararg names: String): BigDecimal? = textValue(*names)?.toBigDecimalOrNull()
+
+private fun JsonNode.stringListValue(vararg names: String): List<String> = names.asSequence()
+    .map(::path)
+    .firstOrNull(JsonNode::isArray)
+    ?.mapNotNull { it.asString().trim().takeIf(::isHttpUrl) }
+    .orEmpty()
 
 private fun isHttpUrl(value: String): Boolean = value.startsWith("https://") || value.startsWith("http://")
 
