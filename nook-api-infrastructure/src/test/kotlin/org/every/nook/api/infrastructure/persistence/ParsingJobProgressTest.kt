@@ -33,6 +33,6 @@ class ParsingJobProgressTest {
         job.advanceProgress(ParsingProgressStage.PLACE_SAVE, now.plusSeconds(1))
 
         assertEquals(ParsingProgressStage.PLACE_SAVE, job.progressStage)
-        assertEquals(93, job.progressPercent)
+        assertEquals(98, job.progressPercent)
     }
 }

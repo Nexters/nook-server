@@ -10,6 +10,29 @@ internal fun List<PlaceCandidate>.distinctLogicalPlaces(): List<PlaceCandidate> 
         places
     }
 
+internal fun List<PlaceCandidateSelector.Candidate>.distinctLogicalCandidates():
+    List<PlaceCandidateSelector.Candidate> =
+    fold(mutableListOf()) { candidates, candidate ->
+        val samePlaceIndex = candidates.indexOfFirst { existing ->
+            existing.place.isSameLogicalPlace(candidate.place)
+        }
+        if (samePlaceIndex < 0) {
+            candidates += candidate
+        } else {
+            val existing = candidates[samePlaceIndex]
+            val representative = if (candidate.place.isMoreDetailedThan(existing.place)) {
+                candidate.place
+            } else {
+                existing.place
+            }
+            candidates[samePlaceIndex] = PlaceCandidateSelector.Candidate(
+                place = representative,
+                matchedQueries = (existing.matchedQueries + candidate.matchedQueries).distinct(),
+            )
+        }
+        candidates
+    }
+
 private fun PlaceCandidate.isSameLogicalPlace(other: PlaceCandidate): Boolean {
     if (name.groundingKey() != other.name.groundingKey()) {
         return false

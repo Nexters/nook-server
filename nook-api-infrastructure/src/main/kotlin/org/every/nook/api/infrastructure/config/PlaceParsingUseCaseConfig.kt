@@ -18,6 +18,7 @@ import org.every.nook.api.application.place.RebuildPlaceTagsUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
 import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
+import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.springframework.beans.factory.ObjectProvider
@@ -36,6 +37,7 @@ class PlaceParsingUseCaseConfig {
         clueExtractor: PlaceClueExtractor,
         searchPlaceCandidates: SearchPlaceCandidatesUseCase,
         candidateSelector: PlaceCandidateSelector,
+        titleSelector: PostTitleSelector,
         processingMetrics: ObjectProvider<ProcessingMetrics>,
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
@@ -45,6 +47,7 @@ class PlaceParsingUseCaseConfig {
         clueExtractor = clueExtractor,
         searchPlaceCandidates = searchPlaceCandidates,
         candidateSelector = candidateSelector,
+        titleSelector = titleSelector,
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
         imageOcrConcurrency = properties.imageOcrConcurrency,

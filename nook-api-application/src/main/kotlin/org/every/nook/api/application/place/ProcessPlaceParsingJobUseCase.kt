@@ -1,6 +1,8 @@
 package org.every.nook.api.application.place
 
 import mu.KotlinLogging
+import org.every.nook.api.application.post.FinalizePostTitle
+import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingMetrics
@@ -20,12 +22,17 @@ class ProcessPlaceParsingJobUseCase(
     private val clueExtractor: PlaceClueExtractor,
     private val searchPlaceCandidates: SearchPlaceCandidatesUseCase,
     private val candidateSelector: PlaceCandidateSelector,
+    titleSelector: PostTitleSelector = PostTitleSelector {
+        PostTitleSelector.Result(null, PostTitleSelector.Source.NONE, emptyList(), null)
+    },
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
     private val imageOcrConcurrency: Int = DEFAULT_IMAGE_OCR_CONCURRENCY,
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
+    private val finalizePostTitle = FinalizePostTitle(titleSelector)
+
     operator fun invoke(postId: Long): Result {
         val job = jobPort.claim(postId, processingTimeout) ?: return Result.Skipped
         val startedAt = clock.instant()
@@ -54,7 +61,7 @@ class ProcessPlaceParsingJobUseCase(
             .distinctBy { it.provider to it.externalPlaceId }
             .distinctLogicalPlaces()
         if (places.isEmpty()) {
-            val failure = imageResolution?.failure ?: textResolution.failure
+            val failure = textResolution.failure ?: imageResolution?.failure
             terminalFailure(
                 failure?.message ?: if (imageResolution == null) {
                     NO_PLACE_RESOLVED_REASON
@@ -70,8 +77,11 @@ class ProcessPlaceParsingJobUseCase(
             resolvedPlaceCount = places.size,
             unresolvedClues = textResolution.unresolvedClues + imageResolution?.unresolvedClues.orEmpty(),
         )
+        jobPort.updateProgress(job.postId, ParsingProgressStage.TITLE_FINALIZATION)
+        val titleTranscripts = imageResolution?.imageTranscripts.orEmpty()
+        val title = measure(job, TITLE_STAGE) { finalizePostTitle(job, places, expectedPlaceCount, titleTranscripts) }
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_SAVE)
-        measure(job, COMPLETE_STAGE) { jobPort.complete(job.postId, places, diagnostics) }
+        measure(job, COMPLETE_STAGE) { jobPort.complete(job.postId, title, places, diagnostics) }
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         logger.info {
             "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -180,6 +190,7 @@ class ProcessPlaceParsingJobUseCase(
         val imageClues = primaryImageClues + recoveredImageClues
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_RESOLUTION)
         return resolveClues(job, imageClues, effectiveExpectedPlaceCount, useEvidenceImageSequence = true)
+            .copy(imageTranscripts = transcripts)
     }
 
     private fun extractClues(
@@ -413,6 +424,7 @@ class ProcessPlaceParsingJobUseCase(
         const val SEARCH_STAGE = "search"
         const val SELECT_STAGE = "select"
         const val COMPLETE_STAGE = "complete"
+        const val TITLE_STAGE = "title-finalization"
         const val JOB_STAGE = "job"
         const val OCR_STAGE = "ocr"
         const val SUCCESS_OUTCOME = "success"
@@ -430,6 +442,7 @@ class ProcessPlaceParsingJobUseCase(
         val clueCount: Int,
         val expectedPlaceCount: Int?,
         val unresolvedClues: List<UnresolvedPlaceClue>,
+        val imageTranscripts: List<ImageTranscript> = emptyList(),
     )
 }
 

@@ -23,6 +23,24 @@ class PlaceCandidateDeduplicatorTest {
         assertEquals(listOf(first, second), listOf(first, second).distinctLogicalPlaces())
     }
 
+    @Test
+    fun `merges matched queries for the same logical candidate across providers`() {
+        val kakao = candidate("KAKAO", "kakao-1", "텀 커피하우스", "서울 마포구 월드컵북로1길 74")
+        val naver = candidate("NAVER", "naver-1", "텀 커피하우스", "서울 마포구 월드컵북로1길 74 1층")
+
+        val result = listOf(
+            PlaceCandidateSelector.Candidate(kakao, listOf("서울 마포구 서교동 376-7")),
+            PlaceCandidateSelector.Candidate(naver, listOf("텀 커피하우스")),
+        ).distinctLogicalCandidates()
+
+        assertEquals(1, result.size)
+        assertEquals(naver, result.single().place)
+        assertEquals(
+            listOf("서울 마포구 서교동 376-7", "텀 커피하우스"),
+            result.single().matchedQueries,
+        )
+    }
+
     private fun candidate(provider: String, id: String, name: String, address: String) = PlaceCandidate(
         provider = provider,
         externalPlaceId = id,

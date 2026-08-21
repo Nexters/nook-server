@@ -1,5 +1,7 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.post.PostTitleSelector
+import org.every.nook.api.application.processing.ParsingProgressStage
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -12,6 +14,80 @@ import kotlin.test.assertNull
 
 @Suppress("LargeClass") // The scenarios share one cohesive orchestration fixture for the place parsing pipeline.
 class ProcessPlaceParsingJobUseCaseTest {
+    @Test
+    fun `selects the final title after resolving places`() {
+        val transcript = ImageTranscript(1, listOf("서춘", "카페 4곳 모음"))
+        val port = FakeJobPort(
+            body = "서촌의 원형들을 소개합니다",
+            imageTranscripts = listOf(transcript),
+            sourceLocationTag = "서촌",
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(PlaceClue("원형들", "서촌", listOf("원형들"))) },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "원형들", "서울 종로구 창경궁로"))
+            },
+            titleSelector = PostTitleSelector { request ->
+                assertEquals(listOf("서춘", "카페 4곳 모음"), request.coverTexts)
+                assertEquals(listOf("원형들"), request.places.map(PostTitleSelector.Place::name))
+                PostTitleSelector.Result(
+                    title = "서촌 카페 원형들",
+                    source = PostTitleSelector.Source.COMBINED,
+                    evidence = listOf("서촌", "원형들"),
+                    rejectedCoverReason = "OCR 지역명 충돌",
+                )
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals("서촌 카페 원형들", port.completedTitle)
+        assertEquals(
+            listOf(ParsingProgressStage.TITLE_FINALIZATION, ParsingProgressStage.PLACE_SAVE),
+            port.progressStages.takeLast(2),
+        )
+    }
+
+    @Test
+    fun `uses a deterministic title when the final selector fails`() {
+        val port = FakeJobPort(body = "아프리포코 방문", sourceLocationTag = "합정&홍대")
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(PlaceClue("아프리포코", "홍대", listOf("아프리포코"))) },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "아프리포코", "서울 마포구 동교로"))
+            },
+            titleSelector = PostTitleSelector { error("provider failed") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals("합정&홍대 아프리포코", port.completedTitle)
+        assertNull(port.failedReason)
+    }
+
+    @Test
+    fun `removes a place count when declared and resolved counts conflict`() {
+        val port = FakeJobPort(body = "서촌 카페 4곳: 원형들", sourceLocationTag = "서촌")
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(PlaceClue("원형들", "서촌", listOf("원형들"))) },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "원형들", "서울 종로구 창경궁로"))
+            },
+            titleSelector = PostTitleSelector {
+                PostTitleSelector.Result(
+                    title = "서촌 카페 4곳",
+                    source = PostTitleSelector.Source.BODY,
+                    evidence = listOf("서촌 카페 4곳"),
+                    rejectedCoverReason = null,
+                )
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals("서촌 원형들", port.completedTitle)
+    }
+
     @Test
     fun `resolves and completes multiple place clues in order`() {
         val port = FakeJobPort(body = "원동미나리삼겹살과 서울역")
@@ -452,6 +528,50 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `resolves the same place returned by multiple providers for jibun and road address searches`() {
+        val port = FakeJobPort(body = "카페 ‘텀 커피하우스‘ 서울 마포구 서교동 376-7")
+        val clue = PlaceClue(
+            name = "텀 커피하우스",
+            region = "서울특별시 마포구",
+            queries = listOf("텀 커피하우스"),
+            addressHint = "서울 마포구 서교동 376-7",
+        )
+        val kakao = candidate(
+            provider = "KAKAO",
+            id = "kakao-tam",
+            name = "텀 커피하우스",
+            address = "서울 마포구 월드컵북로1길 74",
+        )
+        val naver = candidate(
+            provider = "NAVER",
+            id = "naver-tam",
+            name = "텀 커피하우스",
+            address = "서울특별시 마포구 월드컵북로1길 74 1층",
+        )
+        val provider = PlaceSearchProvider { request ->
+            when (request.query) {
+                "서울 마포구 서교동 376-7",
+                "마포구 서교동 376-7",
+                -> listOf(kakao)
+
+                "텀 커피하우스" -> listOf(naver)
+
+                else -> emptyList()
+            }
+        }
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(clue) },
+            search = SearchPlaceCandidatesUseCase(provider),
+            selector = PlaceCandidateSelector { error("same logical place must resolve without model selection") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf("naver-tam"), port.completed.map(PlaceCandidate::externalPlaceId))
+        assertNull(port.failedReason)
+    }
+
+    @Test
     fun `does not choose arbitrarily when multiple exact name candidates do not match region`() {
         val port = FakeJobPort(attempt = 4, body = "동일상호")
         val extractor = PlaceClueExtractor {
@@ -560,6 +680,39 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `preserves the specific text failure when a generic image clue also fails`() {
+        val port = FakeJobPort(
+            body = "카페 ‘텀 커피하우스‘",
+            imageUrls = listOf("https://cdn.test/1.jpg"),
+        )
+        val extractor = PlaceClueExtractor { request ->
+            if (request.imageTranscripts.isEmpty()) {
+                listOf(PlaceClue("텀 커피하우스", "서울 마포구", listOf("텀 커피하우스")))
+            } else {
+                listOf(
+                    PlaceClue(
+                        name = "서교동 카페",
+                        region = "서울 마포구",
+                        queries = listOf("서교동 카페"),
+                        evidence = listOf(PlaceClueEvidence(1, "서교동 카페")),
+                    ),
+                )
+            }
+        }
+        val useCase = useCase(
+            port = port,
+            extractor = extractor,
+            search = SearchPlaceCandidatesUseCase { emptyList() },
+            imageTextExtractor = ImageTextExtractor { request ->
+                request.images.map { ImageTranscript(it.imageIndex, listOf("서교동 카페")) }
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
+        assertEquals("No place candidate found: 텀 커피하우스", port.failedReason)
+    }
+
+    @Test
     fun `retries the whole job when place search provider fails after a resolved clue`() {
         val port = FakeJobPort(attempt = 2, body = "정상 장소와 검색 오류 장소")
         val extractor = PlaceClueExtractor {
@@ -662,6 +815,9 @@ class ProcessPlaceParsingJobUseCaseTest {
         extractor: PlaceClueExtractor,
         search: SearchPlaceCandidatesUseCase,
         selector: PlaceCandidateSelector = PlaceCandidateSelector { null },
+        titleSelector: PostTitleSelector = PostTitleSelector {
+            PostTitleSelector.Result(null, PostTitleSelector.Source.NONE, emptyList(), null)
+        },
         imageTextExtractor: ImageTextExtractor = ImageTextExtractor { request ->
             request.images.map { ImageTranscript(it.imageIndex, listOf("전사 텍스트")) }
         },
@@ -672,6 +828,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         clueExtractor = extractor,
         searchPlaceCandidates = search,
         candidateSelector = selector,
+        titleSelector = titleSelector,
         retryBackoffs = RETRY_BACKOFFS,
         processingTimeout = Duration.ofMinutes(1),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
@@ -683,6 +840,8 @@ class ProcessPlaceParsingJobUseCaseTest {
         private val imageUrls: List<String> = emptyList(),
         private val textClues: List<PlaceClue>? = null,
         private val imageTranscripts: List<ImageTranscript>? = null,
+        private val hashtags: List<String> = emptyList(),
+        private val sourceLocationTag: String? = null,
         val latestImageUrls: List<String> = imageUrls,
     ) : PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
@@ -691,13 +850,15 @@ class ProcessPlaceParsingJobUseCaseTest {
         var retryReason: String? = null
         var storedImageTranscripts: List<ImageTranscript>? = null
         var diagnostics: PlaceParsingDiagnostics? = null
+        var completedTitle: String? = null
+        val progressStages = mutableListOf<ParsingProgressStage>()
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob = ClaimedPlaceParsingJob(
             postId = postId,
             attempt = attempt,
             body = body,
-            hashtags = emptyList(),
-            sourceLocationTag = null,
+            hashtags = hashtags,
+            sourceLocationTag = sourceLocationTag,
             imageUrls = imageUrls,
             textClues = textClues,
             imageTranscripts = imageTranscripts,
@@ -705,11 +866,21 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
 
+        override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
+            progressStages += stage
+        }
+
         override fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>) {
             storedImageTranscripts = transcripts
         }
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
+        override fun complete(
+            postId: Long,
+            title: String?,
+            places: List<PlaceCandidate>,
+            diagnostics: PlaceParsingDiagnostics,
+        ) {
+            completedTitle = title
             completed = places
             this.diagnostics = diagnostics
         }
@@ -734,6 +905,18 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         fun candidate(id: String, name: String, address: String) = PlaceCandidate(
             provider = "KAKAO",
+            externalPlaceId = id,
+            name = name,
+            address = address,
+            latitude = BigDecimal("37.0"),
+            longitude = BigDecimal("127.0"),
+            category = null,
+            phoneNumber = null,
+            providerUrl = null,
+        )
+
+        fun candidate(provider: String, id: String, name: String, address: String) = PlaceCandidate(
+            provider = provider,
             externalPlaceId = id,
             name = name,
             address = address,

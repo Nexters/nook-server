@@ -58,6 +58,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val postPlaceTagRepository = mock(PostPlaceTagJpaRepository::class.java)
     private val postPlaceReviewRepository = mock(PostPlaceReviewJpaRepository::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
+    private val post = PostEntity("INSTAGRAM", "post-11", "https://instagram.test/p/post-11")
     private val adapter = PlaceParsingPersistenceAdapter(
         jobRepository = jobRepository,
         postRepository = postRepository,
@@ -77,16 +78,34 @@ class PlaceParsingPersistenceAdapterTest {
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 
+    init {
+        `when`(postRepository.findById(11)).thenReturn(Optional.of(post))
+    }
+
     @Test
     fun `does not overwrite an administrator reviewed mapping`() {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(postPlaceReviewRepository.existsByPostId(11)).thenReturn(true)
 
-        adapter.complete(11, emptyList(), diagnostics())
+        adapter.complete(11, "서촌 카페 모음", emptyList(), diagnostics())
 
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
+        assertEquals("서촌 카페 모음", post.title)
         verifyNoInteractions(placeRepository, postPlaceRepository)
+    }
+
+    @Test
+    fun `does not overwrite an administrator corrected title when place parsing completes`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        post.updateTitleFromAdmin("운영자 제목")
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+        `when`(postPlaceReviewRepository.existsByPostId(11)).thenReturn(true)
+
+        adapter.complete(11, "자동 제목", emptyList(), diagnostics())
+
+        assertEquals("운영자 제목", post.title)
+        assertEquals(PlaceParsingStatus.COMPLETED, job.status)
     }
 
     @Test
@@ -237,6 +256,7 @@ class PlaceParsingPersistenceAdapterTest {
 
         adapter.complete(
             postId = 11,
+            title = "서울 누크 카페",
             places = listOf(candidate),
             diagnostics = diagnostics(),
         )
@@ -272,6 +292,7 @@ class PlaceParsingPersistenceAdapterTest {
 
         adapter.complete(
             postId = 11,
+            title = "성남 누크 카페",
             places = listOf(candidate),
             diagnostics = diagnostics(),
         )
@@ -296,7 +317,7 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(placeIdentityResolver.resolve(pendingCandidate)).thenReturn(pendingPlace)
         `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(emptyList())
 
-        adapter.complete(11, listOf(completedCandidate, pendingCandidate), diagnostics())
+        adapter.complete(11, "서울 카페 2곳", listOf(completedCandidate, pendingCandidate), diagnostics())
 
         verify(completedPlace, org.mockito.Mockito.never())
             .updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
