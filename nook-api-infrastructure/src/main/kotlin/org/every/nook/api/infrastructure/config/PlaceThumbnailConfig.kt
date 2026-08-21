@@ -11,6 +11,8 @@ import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderRespo
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.place.ApifyGoogleMapsPhotoProvider
 import org.every.nook.api.infrastructure.place.ApifyGoogleMapsProperties
+import org.every.nook.api.infrastructure.place.ApifyNaverPlacePhotoProperties
+import org.every.nook.api.infrastructure.place.ApifyNaverPlacePhotoProvider
 import org.every.nook.api.infrastructure.place.FixedPlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.GooglePlacePhotoProperties
 import org.every.nook.api.infrastructure.place.GooglePlacePhotoProvider
@@ -33,6 +35,7 @@ import tools.jackson.module.kotlin.jacksonObjectMapper
     GooglePlacePhotoProperties::class,
     PlaceThumbnailProperties::class,
     ApifyGoogleMapsProperties::class,
+    ApifyNaverPlacePhotoProperties::class,
 )
 class PlaceThumbnailConfig {
     @Bean("googlePlacePhotoRestClient")
@@ -59,14 +62,29 @@ class PlaceThumbnailConfig {
             .build()
     }
 
+    @Bean("apifyNaverPlacePhotoRestClient")
+    fun apifyNaverPlacePhotoRestClient(properties: ApifyNaverPlacePhotoProperties): RestClient {
+        val requestFactory = SimpleClientHttpRequestFactory().apply {
+            setConnectTimeout(properties.connectTimeout)
+            setReadTimeout(properties.readTimeout)
+        }
+        return RestClient.builder()
+            .baseUrl(properties.baseUrl)
+            .requestFactory(requestFactory)
+            .build()
+    }
+
     @Bean
     fun placeThumbnailProvider(
         @Qualifier("googlePlacePhotoRestClient")
         googlePlacePhotoRestClient: RestClient,
         @Qualifier("apifyGoogleMapsRestClient")
         apifyGoogleMapsRestClient: RestClient,
+        @Qualifier("apifyNaverPlacePhotoRestClient")
+        apifyNaverPlacePhotoRestClient: RestClient,
         googleProperties: GooglePlacePhotoProperties,
         apifyProperties: ApifyGoogleMapsProperties,
+        apifyNaverProperties: ApifyNaverPlacePhotoProperties,
         thumbnailProperties: PlaceThumbnailProperties,
         configurationReader: RuntimeConfigurationReader,
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
@@ -85,6 +103,13 @@ class PlaceThumbnailConfig {
             PlaceThumbnailProviderType.APIFY_GOOGLE to apifyProvider(
                 apifyGoogleMapsRestClient,
                 apifyProperties,
+                mediaStorage,
+                responseCache.ifAvailable,
+                processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
+            ),
+            PlaceThumbnailProviderType.APIFY_NAVER_PLACE to apifyNaverProvider(
+                apifyNaverPlacePhotoRestClient,
+                apifyNaverProperties,
                 mediaStorage,
                 responseCache.ifAvailable,
                 processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
@@ -159,6 +184,27 @@ class PlaceThumbnailConfig {
             return NoOpPlaceThumbnailProvider
         }
         return ApifyGoogleMapsPhotoProvider(
+            restClient = restClient,
+            objectMapper = jacksonObjectMapper(),
+            properties = properties,
+            mediaStorage = storage,
+            responseCache = responseCache,
+            metrics = processingMetrics,
+        )
+    }
+
+    private fun apifyNaverProvider(
+        restClient: RestClient,
+        properties: ApifyNaverPlacePhotoProperties,
+        mediaStorage: ObjectProvider<PostMediaStoragePort>,
+        responseCache: ScrapingProviderResponseCache?,
+        processingMetrics: ProcessingMetrics,
+    ): PlaceThumbnailProvider {
+        val storage = mediaStorage.ifAvailable ?: run {
+            logger.warn { "Apify Naver place provider disabled: reason=missing_media_storage" }
+            return NoOpPlaceThumbnailProvider
+        }
+        return ApifyNaverPlacePhotoProvider(
             restClient = restClient,
             objectMapper = jacksonObjectMapper(),
             properties = properties,
