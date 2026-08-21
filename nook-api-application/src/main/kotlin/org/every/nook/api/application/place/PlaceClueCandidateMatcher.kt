@@ -4,7 +4,15 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.compatibleWith(
     clue: PlaceClue,
 ): List<PlaceCandidateSelector.Candidate> {
     val addressHint = clue.addressHint?.trim()?.takeIf(String::isNotEmpty) ?: return toList()
-    return filter { candidate -> PlaceAddressMatcher.isCompatible(addressHint, candidate.place.address) }
+    val addressCompatible = filter { candidate ->
+        PlaceAddressMatcher.isCompatible(addressHint, candidate.place.address)
+    }
+    if (addressCompatible.isNotEmpty()) return addressCompatible
+
+    val exactNameCandidates = filter { candidate ->
+        clue.isSafeExactNameSearchResult(candidate.place, candidate.matchedQueries)
+    }
+    return exactNameCandidates.takeIf { it.size == 1 }.orEmpty()
 }
 
 internal fun PlaceClue.isSupportedBy(
@@ -12,7 +20,10 @@ internal fun PlaceClue.isSupportedBy(
     matchedQueries: Collection<String> = emptyList(),
 ): Boolean {
     val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
-    if (explicitAddressHint != null && !PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address)) {
+    if (explicitAddressHint != null &&
+        !PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address) &&
+        !isSafeExactNameSearchResult(candidate, matchedQueries)
+    ) {
         return false
     }
     val hasGroundedAddressSearch = hasGroundedExactAddressSearch(candidate, matchedQueries)
