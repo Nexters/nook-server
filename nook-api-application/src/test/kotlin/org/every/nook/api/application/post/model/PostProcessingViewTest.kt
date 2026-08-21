@@ -20,7 +20,7 @@ class PostProcessingViewTest {
     }
 
     @Test
-    fun `completed content delegates overall status to place parsing`() {
+    fun `completed content waits for place parsing but remains completed when only place parsing fails`() {
         assertEquals(
             PostProcessingView(PostProcessingStatusView.PENDING, PostProcessingStageView.PLACE),
             PostProcessingView.from(PostContentParsingStatus.COMPLETED, null),
@@ -32,6 +32,10 @@ class PostProcessingViewTest {
         assertEquals(
             PostProcessingView(PostProcessingStatusView.COMPLETED, null),
             PostProcessingView.from(PostContentParsingStatus.COMPLETED, PlaceParsingStatus.COMPLETED),
+        )
+        assertEquals(
+            PostProcessingView(PostProcessingStatusView.COMPLETED, null),
+            PostProcessingView.from(PostContentParsingStatus.COMPLETED, PlaceParsingStatus.FAILED),
         )
     }
 

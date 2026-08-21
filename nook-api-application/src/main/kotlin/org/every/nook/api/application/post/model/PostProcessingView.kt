@@ -86,7 +86,7 @@ data class PostProcessingView(
             PlaceParsingStatus.COMPLETED -> PostProcessingView(PostProcessingStatusView.COMPLETED, null)
 
             PlaceParsingStatus.FAILED ->
-                PostProcessingView(PostProcessingStatusView.FAILED, PostProcessingStageView.PLACE)
+                PostProcessingView(PostProcessingStatusView.COMPLETED, null)
         }
 
         private fun progressingPercent(startedAt: Instant?, now: Instant?, range: PercentRange): Int {
