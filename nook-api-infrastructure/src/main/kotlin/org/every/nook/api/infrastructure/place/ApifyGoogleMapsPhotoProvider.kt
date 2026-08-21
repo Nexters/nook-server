@@ -194,6 +194,11 @@ private fun String.matchesAddress(other: String): Boolean = matches(other) || ro
 
 private fun String.roadAddressKey(): String? {
     val tokens = split(Regex("\\s+")).map { it.normalized() }.filter(String::isNotEmpty)
+    val roadNameIndex = tokens.indexOfLast { token -> ROAD_NAME_SUFFIXES.any(token::endsWith) }
+    if (roadNameIndex >= 0) {
+        val buildingNumber = tokens.drop(roadNameIndex + 1).firstOrNull { token -> token.all(Char::isDigit) }
+        if (buildingNumber != null) return tokens[roadNameIndex] + buildingNumber
+    }
     if (tokens.size < ROAD_ADDRESS_TOKEN_COUNT) return null
     return tokens.takeLast(ROAD_ADDRESS_TOKEN_COUNT).joinToString("")
 }
@@ -216,6 +221,7 @@ private fun String?.toPlaceCategoryGroup(): PlaceCategoryGroup? {
 }
 
 private const val ROAD_ADDRESS_TOKEN_COUNT = 2
+private val ROAD_NAME_SUFFIXES = setOf("로", "길")
 private val FOOD_CATEGORY_KEYWORDS = setOf(
     "음식",
     "식당",
