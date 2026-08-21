@@ -10,7 +10,7 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.compatibleWith(
     if (addressCompatible.isNotEmpty()) return addressCompatible
 
     val exactNameCandidates = filter { candidate ->
-        clue.isSafeExactNameSearchResult(candidate.place, candidate.matchedQueries)
+        clue.isSafeAddressMismatchRecovery(candidate.place, candidate.matchedQueries)
     }
     return exactNameCandidates.takeIf { it.size == 1 }.orEmpty()
 }
@@ -22,7 +22,7 @@ internal fun PlaceClue.isSupportedBy(
     val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
     if (explicitAddressHint != null &&
         !PlaceAddressMatcher.isCompatible(explicitAddressHint, candidate.address) &&
-        !isSafeExactNameSearchResult(candidate, matchedQueries)
+        !isSafeAddressMismatchRecovery(candidate, matchedQueries)
     ) {
         return false
     }

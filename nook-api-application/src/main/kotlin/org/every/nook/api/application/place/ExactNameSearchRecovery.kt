@@ -1,5 +1,11 @@
 package org.every.nook.api.application.place
 
+internal fun PlaceClue.isSafeAddressMismatchRecovery(
+    candidate: PlaceCandidate,
+    matchedQueries: Collection<String>,
+): Boolean = isSafeExactNameSearchResult(candidate, matchedQueries) ||
+    isSafeNameAtExplicitAddressSearchResult(candidate, matchedQueries)
+
 internal fun PlaceClue.isSafeExactNameSearchResult(
     candidate: PlaceCandidate,
     matchedQueries: Collection<String>,
@@ -14,6 +20,29 @@ internal fun PlaceClue.isSafeExactNameSearchResult(
     } == true
     return candidate.name.recoveryKey() == clueName &&
         matchedQueries.any { query -> query.recoveryKey() == clueName } &&
+        !hasAdministrativeAreaConflict &&
+        !hasLocationDetailConflict
+}
+
+internal fun PlaceClue.isSafeNameAtExplicitAddressSearchResult(
+    candidate: PlaceCandidate,
+    matchedQueries: Collection<String>,
+): Boolean {
+    val hint = addressHint?.trim()?.takeIf(String::isNotEmpty) ?: return false
+    val clueName = name.recoveryKey()
+    val candidateName = candidate.name.recoveryKey()
+    val hintAddressKeys = PlaceAddressMatcher.addressKeys(hint)
+    val wasFoundByExplicitAddress = hintAddressKeys.isNotEmpty() && matchedQueries.any { query ->
+        PlaceAddressMatcher.addressKeys(query).intersect(hintAddressKeys).isNotEmpty()
+    }
+    val locationHints = listOfNotNull(region, addressHint).filter(String::isNotBlank)
+    val hasAdministrativeAreaConflict = locationHints.any { locationHint ->
+        PlaceLocationConflictMatcher.hasAdministrativeAreaConflict(locationHint, candidate.address)
+    }
+    val hasLocationDetailConflict = PlaceLocationConflictMatcher.hasLocationDetailConflict(hint, candidate.address)
+    return clueName.length >= MIN_BRANCH_NAME_RECOVERY_LENGTH &&
+        candidateName.startsWith(clueName) &&
+        wasFoundByExplicitAddress &&
         !hasAdministrativeAreaConflict &&
         !hasLocationDetailConflict
 }
@@ -67,3 +96,5 @@ private object PlaceLocationConflictMatcher {
 }
 
 private fun String.recoveryKey(): String = lowercase().filter(Char::isLetterOrDigit)
+
+private const val MIN_BRANCH_NAME_RECOVERY_LENGTH = 3
