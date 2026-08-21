@@ -2,6 +2,7 @@ package org.every.nook.api.presentation.place.response
 
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
@@ -84,6 +85,13 @@ data class RecentPlaceResponse(
     val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,
     @field:Schema(description = "장소 대표 태그 목록(최대 4개)")
     val tags: List<String>,
+    @field:Schema(description = "장소 접근 유형. 공유 그룹 구독으로만 접근하는 장소는 SHARED입니다.")
+    val accessType: PlaceAccessType,
+    @field:Schema(
+        description = "공유 그룹 접근 토큰. accessType이 SHARED일 때만 내려가고 내 장소면 null입니다.",
+        nullable = true,
+    )
+    val shareToken: String?,
 ) {
     companion object {
         fun from(view: RecentPlaceView): RecentPlaceResponse = RecentPlaceResponse(
@@ -97,6 +105,8 @@ data class RecentPlaceResponse(
             thumbnailUrl = view.thumbnailUrl,
             thumbnailParsingStatus = view.thumbnailParsingStatus,
             tags = view.tags,
+            accessType = view.accessType,
+            shareToken = view.shareToken,
         )
     }
 }
