@@ -10,6 +10,7 @@ import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.CoverTitleExtractor
 import org.every.nook.api.application.post.PostContentInference
+import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.domain.place.PlaceTag
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
@@ -72,23 +73,18 @@ class OpenAiContentInferenceAdapterTest {
     }
 
     @Test
-    fun `infers a title and text place clues with one structured output`() {
+    fun `extracts text place clues without generating an early title`() {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(header("Authorization", "Bearer test-key"))
             .andExpect(content().string(containsString("post_content_inference")))
-            .andExpect(content().string(containsString("홍보성")))
-            .andExpect(content().string(containsString("정보가 부족하면 null")))
-            .andExpect(content().string(not(containsString("방문해보기 좋은 곳"))))
-            .andExpect(content().string(not(containsString("홍별감네"))))
-            .andExpect(content().string(containsString("\"maxLength\":25")))
+            .andExpect(content().string(not(containsString("\"title\""))))
             .andExpect(content().string(containsString("\"maxItems\":60")))
             .andRespond(
                 withSuccess(
                     response(
                         """
                         {
-                          "title":"용산 미나리 삼겹살",
                           "places":[{
                             "name":"원동미나리삼겹살",
                             "region":"용산구",
@@ -106,8 +102,56 @@ class OpenAiContentInferenceAdapterTest {
             PostContentInference.Request("원동미나리삼겹살 방문", listOf("용산맛집"), "용산구"),
         )
 
-        assertEquals("용산 미나리 삼겹살", inference.title)
         assertEquals(listOf("원동미나리삼겹살"), inference.placeClues.map(PlaceClue::name))
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `selects a final title from body OCR and resolved places`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("post_title_selection")))
+            .andExpect(content().string(containsString("카페 in 홍대")))
+            .andExpect(content().string(containsString("아프리포코")))
+            .andExpect(content().string(containsString("resolvedPlaces")))
+            .andExpect(content().string(containsString("PICK, VOL")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {
+                          "title":"홍대 살구 디저트 카페 아프리포코",
+                          "source":"COMBINED",
+                          "evidence":["살구로 물든 여름","아프리포코"],
+                          "rejectedCoverReason":"장식 문구만으로 주제를 설명하지 못함"
+                        }
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val result = fixture.titleSelector.select(
+            PostTitleSelector.Request(
+                body = "살구로 물든 여름. 아프리포코의 살구 디저트를 소개합니다.",
+                hashtags = listOf("홍대카페", "살구디저트"),
+                sourceLocationTag = "합정&홍대",
+                coverTexts = listOf("카페 in 홍대", "ApriPoco", "살구 케이크"),
+                declaredPlaceCount = null,
+                places = listOf(
+                    PostTitleSelector.Place(
+                        name = "아프리포코",
+                        address = "서울 마포구 동교로 142-16",
+                        city = "서울특별시",
+                        category = "음식점 > 카페",
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals("홍대 살구 디저트 카페 아프리포코", result.title)
+        assertEquals(PostTitleSelector.Source.COMBINED, result.source)
+        assertEquals("장식 문구만으로 주제를 설명하지 못함", result.rejectedCoverReason)
         fixture.server.verify()
     }
 
@@ -411,6 +455,7 @@ class OpenAiContentInferenceAdapterTest {
                 objectMapper = objectMapper,
                 properties = properties,
             ),
+            titleSelector = OpenAiPostTitleSelector(restClient, objectMapper, properties),
             coverTitleExtractor = OpenAiCoverTitleExtractor(restClient, objectMapper, properties),
             imageTextExtractor = OpenAiImageTextExtractor(restClient, objectMapper, properties),
             server = server,
@@ -431,6 +476,7 @@ class OpenAiContentInferenceAdapterTest {
 
     private data class AdapterFixture(
         val adapter: OpenAiContentInferenceAdapter,
+        val titleSelector: OpenAiPostTitleSelector,
         val coverTitleExtractor: OpenAiCoverTitleExtractor,
         val imageTextExtractor: OpenAiImageTextExtractor,
         val server: MockRestServiceServer,

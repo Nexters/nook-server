@@ -118,9 +118,15 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
+    override fun complete(
+        postId: Long,
+        title: String?,
+        places: List<PlaceCandidate>,
+        diagnostics: PlaceParsingDiagnostics,
+    ) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PlaceParsingStatus.PROCESSING)
+        postRepository.findById(postId).orElseThrow().updateTitleFromParsing(title)
         if (postPlaceReviewRepository.existsByPostId(postId)) {
             job.status = PlaceParsingStatus.COMPLETED
             job.failureReason = null

@@ -1,5 +1,7 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.post.PostTitleSelector
+import org.every.nook.api.application.processing.ParsingProgressStage
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -12,6 +14,80 @@ import kotlin.test.assertNull
 
 @Suppress("LargeClass") // The scenarios share one cohesive orchestration fixture for the place parsing pipeline.
 class ProcessPlaceParsingJobUseCaseTest {
+    @Test
+    fun `selects the final title after resolving places`() {
+        val transcript = ImageTranscript(1, listOf("서춘", "카페 4곳 모음"))
+        val port = FakeJobPort(
+            body = "서촌의 원형들을 소개합니다",
+            imageTranscripts = listOf(transcript),
+            sourceLocationTag = "서촌",
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(PlaceClue("원형들", "서촌", listOf("원형들"))) },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "원형들", "서울 종로구 창경궁로"))
+            },
+            titleSelector = PostTitleSelector { request ->
+                assertEquals(listOf("서춘", "카페 4곳 모음"), request.coverTexts)
+                assertEquals(listOf("원형들"), request.places.map(PostTitleSelector.Place::name))
+                PostTitleSelector.Result(
+                    title = "서촌 카페 원형들",
+                    source = PostTitleSelector.Source.COMBINED,
+                    evidence = listOf("서촌", "원형들"),
+                    rejectedCoverReason = "OCR 지역명 충돌",
+                )
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals("서촌 카페 원형들", port.completedTitle)
+        assertEquals(
+            listOf(ParsingProgressStage.TITLE_FINALIZATION, ParsingProgressStage.PLACE_SAVE),
+            port.progressStages.takeLast(2),
+        )
+    }
+
+    @Test
+    fun `uses a deterministic title when the final selector fails`() {
+        val port = FakeJobPort(body = "아프리포코 방문", sourceLocationTag = "합정&홍대")
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(PlaceClue("아프리포코", "홍대", listOf("아프리포코"))) },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "아프리포코", "서울 마포구 동교로"))
+            },
+            titleSelector = PostTitleSelector { error("provider failed") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals("합정&홍대 아프리포코", port.completedTitle)
+        assertNull(port.failedReason)
+    }
+
+    @Test
+    fun `removes a place count when declared and resolved counts conflict`() {
+        val port = FakeJobPort(body = "서촌 카페 4곳: 원형들", sourceLocationTag = "서촌")
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(PlaceClue("원형들", "서촌", listOf("원형들"))) },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "원형들", "서울 종로구 창경궁로"))
+            },
+            titleSelector = PostTitleSelector {
+                PostTitleSelector.Result(
+                    title = "서촌 카페 4곳",
+                    source = PostTitleSelector.Source.BODY,
+                    evidence = listOf("서촌 카페 4곳"),
+                    rejectedCoverReason = null,
+                )
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals("서촌 원형들", port.completedTitle)
+    }
+
     @Test
     fun `resolves and completes multiple place clues in order`() {
         val port = FakeJobPort(body = "원동미나리삼겹살과 서울역")
@@ -662,6 +738,9 @@ class ProcessPlaceParsingJobUseCaseTest {
         extractor: PlaceClueExtractor,
         search: SearchPlaceCandidatesUseCase,
         selector: PlaceCandidateSelector = PlaceCandidateSelector { null },
+        titleSelector: PostTitleSelector = PostTitleSelector {
+            PostTitleSelector.Result(null, PostTitleSelector.Source.NONE, emptyList(), null)
+        },
         imageTextExtractor: ImageTextExtractor = ImageTextExtractor { request ->
             request.images.map { ImageTranscript(it.imageIndex, listOf("전사 텍스트")) }
         },
@@ -672,6 +751,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         clueExtractor = extractor,
         searchPlaceCandidates = search,
         candidateSelector = selector,
+        titleSelector = titleSelector,
         retryBackoffs = RETRY_BACKOFFS,
         processingTimeout = Duration.ofMinutes(1),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
@@ -683,6 +763,8 @@ class ProcessPlaceParsingJobUseCaseTest {
         private val imageUrls: List<String> = emptyList(),
         private val textClues: List<PlaceClue>? = null,
         private val imageTranscripts: List<ImageTranscript>? = null,
+        private val hashtags: List<String> = emptyList(),
+        private val sourceLocationTag: String? = null,
         val latestImageUrls: List<String> = imageUrls,
     ) : PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
@@ -691,13 +773,15 @@ class ProcessPlaceParsingJobUseCaseTest {
         var retryReason: String? = null
         var storedImageTranscripts: List<ImageTranscript>? = null
         var diagnostics: PlaceParsingDiagnostics? = null
+        var completedTitle: String? = null
+        val progressStages = mutableListOf<ParsingProgressStage>()
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob = ClaimedPlaceParsingJob(
             postId = postId,
             attempt = attempt,
             body = body,
-            hashtags = emptyList(),
-            sourceLocationTag = null,
+            hashtags = hashtags,
+            sourceLocationTag = sourceLocationTag,
             imageUrls = imageUrls,
             textClues = textClues,
             imageTranscripts = imageTranscripts,
@@ -705,11 +789,21 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
 
+        override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
+            progressStages += stage
+        }
+
         override fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>) {
             storedImageTranscripts = transcripts
         }
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
+        override fun complete(
+            postId: Long,
+            title: String?,
+            places: List<PlaceCandidate>,
+            diagnostics: PlaceParsingDiagnostics,
+        ) {
+            completedTitle = title
             completed = places
             this.diagnostics = diagnostics
         }

@@ -7,5 +7,5 @@ fun interface PostContentInference {
 
     data class Request(val body: String?, val hashtags: List<String>, val sourceLocationTag: String?)
 
-    data class Inference(val title: String, val placeClues: List<PlaceClue>)
+    data class Inference(val placeClues: List<PlaceClue>)
 }

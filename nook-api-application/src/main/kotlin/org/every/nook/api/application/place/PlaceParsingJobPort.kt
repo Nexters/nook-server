@@ -13,7 +13,7 @@ interface PlaceParsingJobPort {
 
     fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>)
 
-    fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics)
+    fun complete(postId: Long, title: String?, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics)
 
     fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
 

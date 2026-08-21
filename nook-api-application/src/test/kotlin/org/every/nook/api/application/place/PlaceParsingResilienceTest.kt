@@ -289,7 +289,12 @@ class PlaceParsingResilienceTest {
             storedImageTranscripts = transcripts
         }
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
+        override fun complete(
+            postId: Long,
+            title: String?,
+            places: List<PlaceCandidate>,
+            diagnostics: PlaceParsingDiagnostics,
+        ) {
             completed = places
             this.diagnostics = diagnostics
         }
