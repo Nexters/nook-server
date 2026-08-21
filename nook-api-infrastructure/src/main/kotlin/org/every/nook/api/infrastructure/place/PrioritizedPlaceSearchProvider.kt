@@ -8,63 +8,63 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
     PlaceSearchProvider {
     override fun search(request: PlaceSearchProvider.Request): List<PlaceCandidate> {
         val queryContext = QueryContext.from(request.query)
-        val kakaoCandidates = runCatching { kakao.search(request) }.getOrElse { exception ->
-            logger.debug(exception) { "[PostParcingTracker] stage=KAKAO_SEARCH status=FAILED query=${request.query}" }
-            emptyList()
-        }.sortedByDescending { score(queryContext, it) }
-        val bestKakaoScore = kakaoCandidates.firstOrNull()?.let { score(queryContext, it) } ?: 0
-        logger.debug {
-            "[PostParcingTracker] stage=KAKAO_SEARCH status=COMPLETED query=${request.query} " +
-                "candidateCount=${kakaoCandidates.size} bestScore=$bestKakaoScore"
-        }
-        if (bestKakaoScore >= KAKAO_CONFIDENCE_SCORE) {
-            logger.debug { "[PostParcingTracker] stage=NAVER_SEARCH status=SKIPPED reason=kakao_confident" }
-            return kakaoCandidates
-        }
-
         val naverCandidates = runCatching { naver.search(request) }.getOrElse { exception ->
             logger.debug(exception) { "[PostParcingTracker] stage=NAVER_SEARCH status=FAILED query=${request.query}" }
             emptyList()
-        }
+        }.sortedByDescending { score(queryContext, it) }
+        val bestNaverScore = naverCandidates.firstOrNull()?.let { score(queryContext, it) } ?: 0
         logger.debug {
             "[PostParcingTracker] stage=NAVER_SEARCH status=COMPLETED query=${request.query} " +
-                "candidateCount=${naverCandidates.size}"
+                "candidateCount=${naverCandidates.size} bestScore=$bestNaverScore"
         }
-        if (kakaoCandidates.isEmpty()) {
-            return naverCandidates.sortedByDescending { score(queryContext, it) }
+        if (bestNaverScore >= NAVER_CONFIDENCE_SCORE) {
+            logger.debug { "[PostParcingTracker] stage=KAKAO_SEARCH status=SKIPPED reason=naver_confident" }
+            return naverCandidates
         }
-        val validatedKakaoCandidates = kakaoCandidates.sortedByDescending { candidate ->
+
+        val kakaoCandidates = runCatching { kakao.search(request) }.getOrElse { exception ->
+            logger.debug(exception) { "[PostParcingTracker] stage=KAKAO_SEARCH status=FAILED query=${request.query}" }
+            emptyList()
+        }
+        logger.debug {
+            "[PostParcingTracker] stage=KAKAO_SEARCH status=COMPLETED query=${request.query} " +
+                "candidateCount=${kakaoCandidates.size}"
+        }
+        if (naverCandidates.isEmpty()) {
+            return kakaoCandidates.sortedByDescending { score(queryContext, it) }
+        }
+        val validatedNaverCandidates = naverCandidates.sortedByDescending { candidate ->
             score(queryContext, candidate) +
-                naverValidationScore(
+                kakaoValidationScore(
                     candidate,
-                    naverCandidates,
+                    kakaoCandidates,
                     queryContext,
                 )
         }
-        val rankedNaverCandidates = naverCandidates.sortedByDescending { score(queryContext, it) }
-        return (validatedKakaoCandidates + rankedNaverCandidates)
+        val rankedKakaoCandidates = kakaoCandidates.sortedByDescending { score(queryContext, it) }
+        return (validatedNaverCandidates + rankedKakaoCandidates)
             .distinctBy { candidate -> candidate.provider to candidate.externalPlaceId }
     }
 
-    private fun naverValidationScore(
+    private fun kakaoValidationScore(
         candidate: PlaceCandidate,
-        naverCandidates: List<PlaceCandidate>,
+        kakaoCandidates: List<PlaceCandidate>,
         queryContext: QueryContext,
     ): Int {
         @Suppress("FunctionExpressionBody")
-        return if (naverCandidates.any { naver ->
-                val namesMatch = candidate.name.normalize().let { kakaoName ->
-                    val naverName = naver.name.normalize()
-                    kakaoName.contains(naverName) || naverName.contains(kakaoName)
+        return if (kakaoCandidates.any { kakao ->
+                val namesMatch = candidate.name.normalize().let { naverName ->
+                    val kakaoName = kakao.name.normalize()
+                    naverName.contains(kakaoName) || kakaoName.contains(naverName)
                 }
-                val addressesMatch = candidate.address.tokens().intersect(naver.address.tokens().toSet()).size >=
+                val addressesMatch = candidate.address.tokens().intersect(kakao.address.tokens().toSet()).size >=
                     MIN_SHARED_ADDRESS_TOKEN_COUNT
                 val regionsAlign = regionScore(queryContext, candidate.address) > 0 &&
-                    regionScore(queryContext, naver.address) > 0
+                    regionScore(queryContext, kakao.address) > 0
                 namesMatch && addressesMatch && regionsAlign
             }
         ) {
-            NAVER_VALIDATION_SCORE
+            KAKAO_VALIDATION_SCORE
         } else {
             0
         }
@@ -132,14 +132,14 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
 
     private companion object {
         val logger = KotlinLogging.logger {}
-        const val KAKAO_CONFIDENCE_SCORE = 80
+        const val NAVER_CONFIDENCE_SCORE = 80
         const val EXACT_NAME_SCORE = 100
         const val CONTAINS_NAME_SCORE = 80
         const val TOKEN_NAME_SCORE = 55
         const val ADDRESS_SCORE = 30
         const val MIN_TOKEN_LENGTH = 2
         const val MIN_SHARED_ADDRESS_TOKEN_COUNT = 2
-        const val NAVER_VALIDATION_SCORE = 30
+        const val KAKAO_VALIDATION_SCORE = 30
         const val STRONG_REGION_SCORE = 35
         const val WEAK_REGION_SCORE = 15
         const val REGION_MISMATCH_PENALTY = 40

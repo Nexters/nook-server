@@ -8,54 +8,54 @@ import kotlin.test.assertEquals
 
 class PrioritizedPlaceSearchProviderTest {
     @Test
-    fun `skips Naver when Kakao name match is confident`() {
-        var naverCalled = false
-        val provider = PrioritizedPlaceSearchProvider(
-            kakao = PlaceSearchProvider { listOf(candidate("KAKAO", "누크 카페")) },
-            naver = PlaceSearchProvider {
-                naverCalled = true
-                emptyList()
-            },
-        )
-
-        val result = provider.search(PlaceSearchProvider.Request("누크 카페"))
-
-        assertEquals("KAKAO", result.single().provider)
-        assertEquals(false, naverCalled)
-    }
-
-    @Test
-    fun `uses Naver to validate but keeps Kakao as the selected provider`() {
-        var naverCalled = false
-        val provider = PrioritizedPlaceSearchProvider(
-            kakao = PlaceSearchProvider { listOf(candidate("KAKAO", "누크 용산점")) },
-            naver = PlaceSearchProvider {
-                naverCalled = true
-                listOf(candidate("NAVER", "누크 용산"))
-            },
-        )
-
-        val result = provider.search(PlaceSearchProvider.Request("누크 카페"))
-
-        assertEquals("KAKAO", result.first().provider)
-        assertEquals(true, naverCalled)
-    }
-
-    @Test
-    fun `includes exact Naver candidate when Kakao confidence is low`() {
+    fun `skips Kakao when Naver name match is confident`() {
+        var kakaoCalled = false
         val provider = PrioritizedPlaceSearchProvider(
             kakao = PlaceSearchProvider {
-                listOf(candidate("KAKAO", "어니언컴퍼니 안국점", address = "서울 종로구 계동길 5"))
+                kakaoCalled = true
+                emptyList()
             },
+            naver = PlaceSearchProvider { listOf(candidate("NAVER", "누크 카페")) },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request("누크 카페"))
+
+        assertEquals("NAVER", result.single().provider)
+        assertEquals(false, kakaoCalled)
+    }
+
+    @Test
+    fun `uses Kakao to validate but keeps Naver as the selected provider`() {
+        var kakaoCalled = false
+        val provider = PrioritizedPlaceSearchProvider(
+            kakao = PlaceSearchProvider {
+                kakaoCalled = true
+                listOf(candidate("KAKAO", "누크 용산"))
+            },
+            naver = PlaceSearchProvider { listOf(candidate("NAVER", "누크 용산점")) },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request("누크 카페"))
+
+        assertEquals("NAVER", result.first().provider)
+        assertEquals(true, kakaoCalled)
+    }
+
+    @Test
+    fun `includes exact Kakao candidate when Naver confidence is low`() {
+        val provider = PrioritizedPlaceSearchProvider(
             naver = PlaceSearchProvider {
-                listOf(candidate("NAVER", "어니언 안국", address = "서울 종로구 계동길 5"))
+                listOf(candidate("NAVER", "어니언컴퍼니 안국점", address = "서울 종로구 계동길 5"))
+            },
+            kakao = PlaceSearchProvider {
+                listOf(candidate("KAKAO", "어니언 안국", address = "서울 종로구 계동길 5"))
             },
         )
 
         val result = provider.search(PlaceSearchProvider.Request("어니언 안국"))
 
-        assertEquals(listOf("KAKAO", "NAVER"), result.map(PlaceCandidate::provider))
-        assertEquals("어니언 안국", result.single { it.provider == "NAVER" }.name)
+        assertEquals(listOf("NAVER", "KAKAO"), result.map(PlaceCandidate::provider))
+        assertEquals("어니언 안국", result.single { it.provider == "KAKAO" }.name)
     }
 
     @Test
@@ -72,15 +72,15 @@ class PrioritizedPlaceSearchProviderTest {
     }
 
     @Test
-    fun `prefers Kakao candidate in same region over different region with same name`() {
+    fun `prefers Naver candidate in same region over different region with same name`() {
         val provider = PrioritizedPlaceSearchProvider(
-            kakao = PlaceSearchProvider {
+            kakao = PlaceSearchProvider { emptyList() },
+            naver = PlaceSearchProvider {
                 listOf(
-                    candidate("KAKAO", "보니스피자", address = "부산 해운대구 달맞이길 10"),
-                    candidate("KAKAO", "보니스피자", address = "서울 용산구 신흥로3길 2"),
+                    candidate("NAVER", "보니스피자", address = "부산 해운대구 달맞이길 10"),
+                    candidate("NAVER", "보니스피자", address = "서울 용산구 신흥로3길 2"),
                 )
             },
-            naver = PlaceSearchProvider { emptyList() },
         )
 
         val result = provider.search(PlaceSearchProvider.Request("보니스피자 용산구 신흥로3길"))
@@ -89,22 +89,34 @@ class PrioritizedPlaceSearchProviderTest {
     }
 
     @Test
-    fun `does not boost Kakao candidate when Naver match is in different region`() {
+    fun `does not boost Naver candidate when Kakao match is in different region`() {
         val provider = PrioritizedPlaceSearchProvider(
             kakao = PlaceSearchProvider {
-                listOf(
-                    candidate("KAKAO", "모로코코", address = "서울 용산구 신흥로 34"),
-                    candidate("KAKAO", "모로코코", address = "부산 수영구 광안해변로 1"),
-                )
+                listOf(candidate("KAKAO", "모로코코", address = "부산 수영구 광안해변로 1"))
             },
             naver = PlaceSearchProvider {
-                listOf(candidate("NAVER", "모로코코", address = "부산 수영구 광안해변로 1"))
+                listOf(
+                    candidate("NAVER", "모로코코", address = "서울 용산구 신흥로 34"),
+                    candidate("NAVER", "모로코코", address = "부산 수영구 광안해변로 1"),
+                )
             },
         )
 
         val result = provider.search(PlaceSearchProvider.Request("모로코코 용산구 카페"))
 
         assertEquals("서울 용산구 신흥로 34", result.first().address)
+    }
+
+    @Test
+    fun `falls back to Kakao when Naver search fails`() {
+        val provider = PrioritizedPlaceSearchProvider(
+            kakao = PlaceSearchProvider { listOf(candidate("KAKAO", "누크 카페")) },
+            naver = PlaceSearchProvider { error("Naver unavailable") },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request("누크 카페"))
+
+        assertEquals("KAKAO", result.single().provider)
     }
 
     private fun candidate(provider: String, name: String, address: String = "서울 용산구 한강대로 1"): PlaceCandidate =
