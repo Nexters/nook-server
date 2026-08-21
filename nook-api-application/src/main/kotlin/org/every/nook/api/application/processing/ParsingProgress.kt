@@ -17,7 +17,8 @@ enum class ParsingProgressStage(
     PLACE_IMAGE_OCR(74, 82, Duration.ofSeconds(25)),
     PLACE_IMAGE_CLUES(82, 87, Duration.ofSeconds(15)),
     PLACE_IMAGE_RESOLUTION(87, 93, Duration.ofSeconds(20)),
-    PLACE_SAVE(93, 95, Duration.ofSeconds(5)),
+    TITLE_FINALIZATION(93, 98, Duration.ofSeconds(10)),
+    PLACE_SAVE(98, 99, Duration.ofSeconds(5)),
     ;
 
     fun percentAt(startedAt: Instant?, now: Instant, floorPercent: Int): Int {

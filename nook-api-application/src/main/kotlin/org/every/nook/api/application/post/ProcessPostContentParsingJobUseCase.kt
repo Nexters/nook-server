@@ -28,7 +28,6 @@ class ProcessPostContentParsingJobUseCase(
     private val retryBackoffs: List<Duration>,
     private val processingTimeout: Duration,
     private val imageTextExtractor: ImageTextExtractor = ImageTextExtractor { emptyList() },
-    private val coverTitleExtractor: CoverTitleExtractor = CoverTitleExtractor { null },
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -61,7 +60,6 @@ class ProcessPostContentParsingJobUseCase(
                     }.getOrNull()
                 }
             }
-            val coverTitle = coverTranscript?.validatedCoverTitle(coverTitleExtractor)
             jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_INFERENCE)
             val inference = measure(job, INFERENCE_STAGE) {
                 contentInference.infer(
@@ -73,7 +71,7 @@ class ProcessPostContentParsingJobUseCase(
                 )
             }
             val completedPost = providedPost.copy(
-                title = resolvePostTitle(providedPost.body, coverTitle, inference.title),
+                title = null,
             )
             jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_SAVE)
             measure(job, COMPLETE_STAGE) {

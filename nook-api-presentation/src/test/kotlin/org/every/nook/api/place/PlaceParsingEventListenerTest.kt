@@ -116,7 +116,12 @@ class PlaceParsingEventListenerTest {
             transcripts: List<org.every.nook.api.application.place.ImageTranscript>,
         ) = Unit
 
-        override fun complete(postId: Long, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics) {
+        override fun complete(
+            postId: Long,
+            title: String?,
+            places: List<PlaceCandidate>,
+            diagnostics: PlaceParsingDiagnostics,
+        ) {
             completed = true
         }
 

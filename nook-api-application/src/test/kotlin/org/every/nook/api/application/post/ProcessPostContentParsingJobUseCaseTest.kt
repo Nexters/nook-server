@@ -51,7 +51,6 @@ class ProcessPostContentParsingJobUseCaseTest {
             contentInference = PostContentInference {
                 calls += "inference"
                 PostContentInference.Inference(
-                    title = "성수 맛집",
                     placeClues = listOf(PlaceClue("성수 식당", "성수", listOf("성수 식당"))),
                 )
             },
@@ -59,11 +58,6 @@ class ProcessPostContentParsingJobUseCaseTest {
                 calls += "ocr"
                 assertEquals("https://source/image.jpg", request.images.single().imageUrl)
                 listOf(ImageTranscript(1, listOf("6월 2주차", "요즘 뜨고 있는 금주의 신상스폿")))
-            },
-            coverTitleExtractor = CoverTitleExtractor { request ->
-                calls += "cover-title"
-                assertEquals(listOf("6월 2주차", "요즘 뜨고 있는 금주의 신상스폿"), request.texts)
-                "요즘 뜨고 있는 금주의 신상스폿"
             },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),
@@ -78,7 +72,6 @@ class ProcessPostContentParsingJobUseCaseTest {
                 "extract",
                 "progress:CONTENT_COVER_TITLE",
                 "ocr",
-                "cover-title",
                 "progress:CONTENT_INFERENCE",
                 "inference",
                 "progress:CONTENT_SAVE",
@@ -87,7 +80,7 @@ class ProcessPostContentParsingJobUseCaseTest {
             calls,
         )
         val completed = requireNotNull(port.completedPost)
-        assertEquals("요즘 뜨고 있는 금주의 신상스폿", completed.title)
+        assertEquals(null, completed.title)
         assertEquals("성수", completed.sourceLocationTag)
         assertEquals(listOf("맛집", "서울"), completed.hashtags)
         assertEquals("https://source/image.jpg", completed.media.single().url)
@@ -165,7 +158,7 @@ class ProcessPostContentParsingJobUseCaseTest {
             jobPort = port,
             extractPostContent = ExtractPostContentUseCase(listOf(extractor)),
             contentInference = PostContentInference {
-                PostContentInference.Inference("Instagram 게시물", emptyList())
+                PostContentInference.Inference(emptyList())
             },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),

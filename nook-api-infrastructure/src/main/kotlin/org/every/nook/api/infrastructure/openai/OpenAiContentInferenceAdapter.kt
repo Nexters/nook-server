@@ -30,18 +30,12 @@ class OpenAiContentInferenceAdapter(
     override fun infer(request: PostContentInference.Request): PostContentInference.Inference {
         val result = requestStructured(
             name = "post_content_inference",
-            instructions = CONTENT_INFERENCE_INSTRUCTIONS,
+            instructions = PLACE_INSTRUCTIONS,
             input = request.toInput(),
-            schema = contentInferenceSchema,
+            schema = placeSchema,
             maxOutputTokens = CONTENT_INFERENCE_MAX_OUTPUT_TOKENS,
         )
         return PostContentInference.Inference(
-            title = result.path("title")
-                .takeUnless { it.isNull || it.isMissingNode }
-                ?.asText()
-                ?.trim()
-                ?.take(MAX_TITLE_LENGTH)
-                .orEmpty(),
             placeClues = result.toPlaceClues(),
         )
     }
@@ -303,15 +297,6 @@ class OpenAiContentInferenceAdapter(
                 "additionalProperties" to false,
             ),
         )
-        val contentInferenceSchema: Map<String, Any> = mapOf(
-            "type" to "object",
-            "properties" to mapOf(
-                "title" to mapOf("type" to listOf("string", "null"), "maxLength" to MAX_TITLE_LENGTH),
-                "places" to placeListSchema,
-            ),
-            "required" to listOf("title", "places"),
-            "additionalProperties" to false,
-        )
         val titleInferenceSchema: Map<String, Any> = mapOf(
             "type" to "object",
             "properties" to mapOf(
@@ -367,8 +352,6 @@ class OpenAiContentInferenceAdapter(
                 "sourceLocationTag는 상호명과 결합한 지역 검색어에만 사용할 수 있다. " +
                 "addressHint가 있으면 상호명과 전체 주소를 조합한 검색어를 포함하고 층·호 정보를 그대로 유지한다. " +
                 "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 60개 가게와 가게당 최대 4개 검색어만 반환한다."
-        const val CONTENT_INFERENCE_INSTRUCTIONS =
-            "title과 places를 하나의 응답으로 함께 반환한다. " + TITLE_INSTRUCTIONS + " " + PLACE_INSTRUCTIONS
         const val CANDIDATE_SELECTION_INSTRUCTIONS =
             "placeClue는 Instagram 게시물에서 추출한 장소 단서이고 candidates는 실제 장소 검색 결과다. " +
                 "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, addressHint, 후보 주소, region, " +

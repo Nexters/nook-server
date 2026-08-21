@@ -83,4 +83,10 @@ class PostEntity(
         this.title = title
         contentManuallyOverridden = true
     }
+
+    fun updateTitleFromParsing(title: String?) {
+        if (!contentManuallyOverridden) {
+            this.title = title
+        }
+    }
 }

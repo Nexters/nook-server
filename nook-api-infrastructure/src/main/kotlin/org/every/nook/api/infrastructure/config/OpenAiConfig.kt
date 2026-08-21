@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.config
 import org.every.nook.api.infrastructure.openai.OpenAiContentInferenceAdapter
 import org.every.nook.api.infrastructure.openai.OpenAiCoverTitleExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiImageTextExtractor
+import org.every.nook.api.infrastructure.openai.OpenAiPostTitleSelector
 import org.every.nook.api.infrastructure.openai.OpenAiProperties
 import org.every.nook.api.infrastructure.openai.OpenAiRateLimitInterceptor
 import org.springframework.beans.factory.annotation.Qualifier
@@ -49,6 +50,16 @@ class OpenAiConfig {
         @Qualifier("openAiRestClient") restClient: RestClient,
         properties: OpenAiProperties,
     ): OpenAiCoverTitleExtractor = OpenAiCoverTitleExtractor(
+        restClient = restClient,
+        objectMapper = jacksonObjectMapper(),
+        properties = properties,
+    )
+
+    @Bean
+    fun openAiPostTitleSelector(
+        @Qualifier("openAiRestClient") restClient: RestClient,
+        properties: OpenAiProperties,
+    ): OpenAiPostTitleSelector = OpenAiPostTitleSelector(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
