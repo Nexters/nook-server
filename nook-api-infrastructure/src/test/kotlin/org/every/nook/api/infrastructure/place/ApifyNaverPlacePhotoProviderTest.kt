@@ -56,12 +56,48 @@ class ApifyNaverPlacePhotoProviderTest {
             [{"Name":"누크 카페","FullAddress":"부산광역시 해운대구 해운대로 1",
               "Latitude":"35.1587","Longitude":"129.1604","PlaceId":"999",
               "NaverMapUrl":"https://map.naver.com/p/entry/place/999",
-              "SearchKeyword":"누크 카페 서울 강남구 테헤란로 1"}]
+              "SearchKeyword":"누크 카페 강남구"}]
             """.trimIndent(),
         )
 
         assertNull(fixture.provider.fetch(REQUEST))
         assertEquals(emptyList(), fixture.storage.stored)
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `falls back to name and district within the same search actor run`() {
+        val fixture = fixture()
+        expectSearch(
+            fixture.server,
+            """
+            [{"Name":"누크 카페","FullAddress":"서울특별시 강남구 테헤란로 1",
+              "Latitude":"37.5001","Longitude":"127.0001","PlaceId":"123",
+              "NaverMapUrl":"https://map.naver.com/p/entry/place/123",
+              "Images":["https://naver.example/representative.jpg"],
+              "SearchKeyword":"누크 카페 강남구"}]
+            """.trimIndent(),
+        )
+        expectPhotos(fixture.server, PHOTO_RESPONSE)
+
+        assertEquals((0..5).map { "https://cdn.example/$it.jpg" }, fixture.provider.fetch(REQUEST)?.photoUrls)
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `requires both exact road address and nearby coordinates`() {
+        val fixture = fixture()
+        expectSearch(
+            fixture.server,
+            """
+            [{"Name":"누크 카페","FullAddress":"서울특별시 강남구 테헤란로 10",
+              "Latitude":"37.5001","Longitude":"127.0001","PlaceId":"999",
+              "NaverMapUrl":"https://map.naver.com/p/entry/place/999",
+              "SearchKeyword":"누크 카페 강남구"}]
+            """.trimIndent(),
+        )
+
+        assertNull(fixture.provider.fetch(REQUEST))
         fixture.server.verify()
     }
 
@@ -164,7 +200,7 @@ class ApifyNaverPlacePhotoProviderTest {
 
     private companion object {
         const val SEARCH_INPUT =
-            """{"keywords":["누크 카페 서울 강남구 테헤란로 1"],"scrapePlaceDetails":false,"maxResultsPerKeyword":5}"""
+            """{"keywords":["누크 카페 테헤란로 1","누크 카페 강남구"],"scrapePlaceDetails":false,"maxResultsPerKeyword":5}"""
         const val PHOTO_INPUT =
             """{"placeUrls":[{"url":"https://map.naver.com/p/entry/place/123"}],"maxPhotos":5,"filterBy":"all","includeFilters":false}"""
         const val PHOTO_INPUT_WITHOUT_REPRESENTATIVE =
@@ -174,7 +210,7 @@ class ApifyNaverPlacePhotoProviderTest {
               "Latitude":"37.5001","Longitude":"127.0001","PlaceId":"123",
               "NaverMapUrl":"https://map.naver.com/p/entry/place/123",
               "Images":["https://naver.example/representative.jpg"],
-              "SearchKeyword":"누크 카페 서울 강남구 테헤란로 1"}]
+              "SearchKeyword":"누크 카페 테헤란로 1"}]
         """.trimIndent()
         val MATCHING_SEARCH_RESPONSE_WITHOUT_IMAGES = MATCHING_SEARCH_RESPONSE.replace(
             """"Images":["https://naver.example/representative.jpg"],""",
