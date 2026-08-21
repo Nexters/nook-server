@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
 import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceDetailView
 import org.every.nook.api.application.place.PlacePostGroupView
@@ -234,10 +235,54 @@ class PlaceControllerTest {
                 jsonPath("$.success.items[0].city") { value("용인") }
                 jsonPath("$.success.items[0].thumbnailUrl") { value("https://example.com/place.jpg") }
                 jsonPath("$.success.items[0].thumbnailParsingStatus") { value("PROCESSING") }
+                jsonPath("$.success.items[0].accessType") { value("OWNED") }
+                jsonPath("$.success.items[0].shareToken") { value(null) }
                 jsonPath("$.success.nextCursor") { isNotEmpty() }
                 jsonPath("$.success.hasNext") { value(true) }
             }
     }
+
+    @Test
+    fun `exposes the share token of a recent place that is only reachable through a shared group`() {
+        `when`(
+            getRecentPlacesUseCase(
+                GetRecentPlacesUseCase.Query(userId = TEST_USER_ID, cursor = null, size = 20),
+            ),
+        ).thenReturn(
+            RecentPlaceSliceView(
+                items = listOf(
+                    recentPlaceView(accessType = PlaceAccessType.SHARED, shareToken = "share-token-value"),
+                    recentPlaceView(accessType = PlaceAccessType.OWNED, shareToken = null),
+                ),
+                nextCursor = null,
+                hasNext = false,
+            ),
+        )
+
+        mockMvc.get("/api/v1/places/recent")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.success.items[0].accessType") { value("SHARED") }
+                jsonPath("$.success.items[0].shareToken") { value("share-token-value") }
+                jsonPath("$.success.items[1].accessType") { value("OWNED") }
+                jsonPath("$.success.items[1].shareToken") { value(null) }
+            }
+    }
+
+    private fun recentPlaceView(accessType: PlaceAccessType, shareToken: String?) = RecentPlaceView(
+        bookmarkId = 31,
+        bookmarkedAt = Instant.parse("2026-07-27T00:00:00Z"),
+        id = 17,
+        name = "퍼머넌트해비탯",
+        city = "용인",
+        address = "경기 용인시",
+        category = "카페",
+        latitude = BigDecimal("37.5"),
+        longitude = BigDecimal("127.0"),
+        thumbnailUrl = "https://example.com/place.jpg",
+        accessType = accessType,
+        shareToken = shareToken,
+    )
 
     @Test
     fun `returns paged place candidates for manual connection`() {

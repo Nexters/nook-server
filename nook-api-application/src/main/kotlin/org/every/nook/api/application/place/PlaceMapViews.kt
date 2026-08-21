@@ -29,7 +29,15 @@ data class RecentPlaceView(
     val thumbnailUrl: String?,
     val thumbnailParsingStatus: PlaceThumbnailParsingStatusView = PlaceThumbnailParsingStatusView.PENDING,
     val tags: List<String> = emptyList(),
+    val accessType: PlaceAccessType = PlaceAccessType.OWNED,
+    val shareToken: String? = null,
 )
+
+/**
+ * 내 저장 게시물로 접근하는 장소는 OWNED, 공유 그룹 구독으로만 접근하는 장소는 SHARED다.
+ * SHARED 장소의 상세는 공유 토큰이 있어야 조회할 수 있다.
+ */
+enum class PlaceAccessType { OWNED, SHARED }
 
 data class RecentPlaceSliceView(
     val items: List<RecentPlaceView>,

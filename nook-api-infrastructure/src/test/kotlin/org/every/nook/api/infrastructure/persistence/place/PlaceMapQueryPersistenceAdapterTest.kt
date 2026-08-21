@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.domain.place.GeoBounds
@@ -10,6 +11,7 @@ import java.math.BigDecimal
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class PlaceMapQueryPersistenceAdapterTest {
     private val repository = mock(UserPlaceBookmarkJpaRepository::class.java)
@@ -115,5 +117,40 @@ class PlaceMapQueryPersistenceAdapterTest {
         assertEquals("https://example.com/place.jpg", result.single().thumbnailUrl)
         assertEquals(PlaceThumbnailParsingStatusView.COMPLETED, result.single().thumbnailParsingStatus)
         verify(repository).findRecentPlaces(7, cursor.bookmarkedAt, cursor.bookmarkId, 21)
+    }
+
+    @Test
+    fun `marks a recent place reachable through my own saved posts as owned without a share token`() {
+        val row = recentRow(shareToken = null)
+        `when`(repository.findRecentPlaces(7, null, null, 21)).thenReturn(listOf(row))
+
+        val result = adapter.findRecent(7, null, 21)
+
+        assertEquals(PlaceAccessType.OWNED, result.single().accessType)
+        assertNull(result.single().shareToken)
+    }
+
+    @Test
+    fun `marks a recent place reachable only through a shared subscription as shared with its token`() {
+        val row = recentRow(shareToken = "share-token-value")
+        `when`(repository.findRecentPlaces(7, null, null, 21)).thenReturn(listOf(row))
+
+        val result = adapter.findRecent(7, null, 21)
+
+        assertEquals(PlaceAccessType.SHARED, result.single().accessType)
+        assertEquals("share-token-value", result.single().shareToken)
+    }
+
+    private fun recentRow(shareToken: String?): RecentPlaceProjection {
+        val row = mock(RecentPlaceProjection::class.java)
+        `when`(row.bookmarkId).thenReturn(30)
+        `when`(row.bookmarkedAt).thenReturn(Instant.parse("2026-07-27T00:00:00Z"))
+        `when`(row.placeId).thenReturn(17)
+        `when`(row.name).thenReturn("퍼머넌트해비탯")
+        `when`(row.address).thenReturn("경기 용인시")
+        `when`(row.latitude).thenReturn(BigDecimal("37.5"))
+        `when`(row.longitude).thenReturn(BigDecimal("127.0"))
+        `when`(row.shareToken).thenReturn(shareToken)
+        return row
     }
 }
