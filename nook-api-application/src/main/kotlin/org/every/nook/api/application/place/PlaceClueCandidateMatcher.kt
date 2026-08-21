@@ -11,7 +11,7 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.compatibleWith(
 
     val exactNameCandidates = filter { candidate ->
         clue.isSafeAddressMismatchRecovery(candidate.place, candidate.matchedQueries)
-    }
+    }.toList().distinctLogicalCandidates()
     return exactNameCandidates.takeIf { it.size == 1 }.orEmpty()
 }
 

@@ -452,6 +452,50 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `resolves the same place returned by multiple providers for jibun and road address searches`() {
+        val port = FakeJobPort(body = "카페 ‘텀 커피하우스‘ 서울 마포구 서교동 376-7")
+        val clue = PlaceClue(
+            name = "텀 커피하우스",
+            region = "서울특별시 마포구",
+            queries = listOf("텀 커피하우스"),
+            addressHint = "서울 마포구 서교동 376-7",
+        )
+        val kakao = candidate(
+            provider = "KAKAO",
+            id = "kakao-tam",
+            name = "텀 커피하우스",
+            address = "서울 마포구 월드컵북로1길 74",
+        )
+        val naver = candidate(
+            provider = "NAVER",
+            id = "naver-tam",
+            name = "텀 커피하우스",
+            address = "서울특별시 마포구 월드컵북로1길 74 1층",
+        )
+        val provider = PlaceSearchProvider { request ->
+            when (request.query) {
+                "서울 마포구 서교동 376-7",
+                "마포구 서교동 376-7",
+                -> listOf(kakao)
+
+                "텀 커피하우스" -> listOf(naver)
+
+                else -> emptyList()
+            }
+        }
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(clue) },
+            search = SearchPlaceCandidatesUseCase(provider),
+            selector = PlaceCandidateSelector { error("same logical place must resolve without model selection") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf("naver-tam"), port.completed.map(PlaceCandidate::externalPlaceId))
+        assertNull(port.failedReason)
+    }
+
+    @Test
     fun `does not choose arbitrarily when multiple exact name candidates do not match region`() {
         val port = FakeJobPort(attempt = 4, body = "동일상호")
         val extractor = PlaceClueExtractor {
@@ -557,6 +601,39 @@ class ProcessPlaceParsingJobUseCaseTest {
         assertNull(port.nextAttemptAt)
         assertEquals("No place candidate found: 매칭 실패 장소", port.failedReason)
         assertEquals(emptyList(), port.completed)
+    }
+
+    @Test
+    fun `preserves the specific text failure when a generic image clue also fails`() {
+        val port = FakeJobPort(
+            body = "카페 ‘텀 커피하우스‘",
+            imageUrls = listOf("https://cdn.test/1.jpg"),
+        )
+        val extractor = PlaceClueExtractor { request ->
+            if (request.imageTranscripts.isEmpty()) {
+                listOf(PlaceClue("텀 커피하우스", "서울 마포구", listOf("텀 커피하우스")))
+            } else {
+                listOf(
+                    PlaceClue(
+                        name = "서교동 카페",
+                        region = "서울 마포구",
+                        queries = listOf("서교동 카페"),
+                        evidence = listOf(PlaceClueEvidence(1, "서교동 카페")),
+                    ),
+                )
+            }
+        }
+        val useCase = useCase(
+            port = port,
+            extractor = extractor,
+            search = SearchPlaceCandidatesUseCase { emptyList() },
+            imageTextExtractor = ImageTextExtractor { request ->
+                request.images.map { ImageTranscript(it.imageIndex, listOf("서교동 카페")) }
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
+        assertEquals("No place candidate found: 텀 커피하우스", port.failedReason)
     }
 
     @Test
@@ -734,6 +811,18 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         fun candidate(id: String, name: String, address: String) = PlaceCandidate(
             provider = "KAKAO",
+            externalPlaceId = id,
+            name = name,
+            address = address,
+            latitude = BigDecimal("37.0"),
+            longitude = BigDecimal("127.0"),
+            category = null,
+            phoneNumber = null,
+            providerUrl = null,
+        )
+
+        fun candidate(provider: String, id: String, name: String, address: String) = PlaceCandidate(
+            provider = provider,
             externalPlaceId = id,
             name = name,
             address = address,
