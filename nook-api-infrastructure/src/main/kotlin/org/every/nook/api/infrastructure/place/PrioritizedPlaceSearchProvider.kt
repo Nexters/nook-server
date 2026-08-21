@@ -33,7 +33,7 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
         if (kakaoCandidates.isEmpty()) {
             return naverCandidates.sortedByDescending { score(queryContext, it) }
         }
-        return kakaoCandidates.sortedByDescending { candidate ->
+        val validatedKakaoCandidates = kakaoCandidates.sortedByDescending { candidate ->
             score(queryContext, candidate) +
                 naverValidationScore(
                     candidate,
@@ -41,6 +41,9 @@ class PrioritizedPlaceSearchProvider(private val kakao: PlaceSearchProvider, pri
                     queryContext,
                 )
         }
+        val rankedNaverCandidates = naverCandidates.sortedByDescending { score(queryContext, it) }
+        return (validatedKakaoCandidates + rankedNaverCandidates)
+            .distinctBy { candidate -> candidate.provider to candidate.externalPlaceId }
     }
 
     private fun naverValidationScore(

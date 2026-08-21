@@ -42,6 +42,36 @@ class PrioritizedPlaceSearchProviderTest {
     }
 
     @Test
+    fun `includes exact Naver candidate when Kakao confidence is low`() {
+        val provider = PrioritizedPlaceSearchProvider(
+            kakao = PlaceSearchProvider {
+                listOf(candidate("KAKAO", "어니언컴퍼니 안국점", address = "서울 종로구 계동길 5"))
+            },
+            naver = PlaceSearchProvider {
+                listOf(candidate("NAVER", "어니언 안국", address = "서울 종로구 계동길 5"))
+            },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request("어니언 안국"))
+
+        assertEquals(listOf("KAKAO", "NAVER"), result.map(PlaceCandidate::provider))
+        assertEquals("어니언 안국", result.single { it.provider == "NAVER" }.name)
+    }
+
+    @Test
+    fun `removes duplicate candidates after merging Kakao and Naver results`() {
+        val duplicate = candidate("SHARED", "누크 카페")
+        val provider = PrioritizedPlaceSearchProvider(
+            kakao = PlaceSearchProvider { listOf(duplicate) },
+            naver = PlaceSearchProvider { listOf(duplicate) },
+        )
+
+        val result = provider.search(PlaceSearchProvider.Request("용산"))
+
+        assertEquals(listOf(duplicate), result)
+    }
+
+    @Test
     fun `prefers Kakao candidate in same region over different region with same name`() {
         val provider = PrioritizedPlaceSearchProvider(
             kakao = PlaceSearchProvider {
