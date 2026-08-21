@@ -24,18 +24,19 @@ class BodyLogFieldExtractor(
         requireNotNull(body)
         val fields = linkedMapOf<String, String>()
         val limitedBody = body.take(properties.body.maxBytes).toByteArray()
+        val decodedBody = limitedBody.toString(resolveCharset(contentType, charset))
         fields["$prefix.size.bytes"] = body.size.toString()
         fields["$prefix.truncated"] = (body.size > properties.body.maxBytes).toString()
 
         try {
-            val root = objectMapper.readTree(limitedBody.toString(charset(charset)))
+            val root = objectMapper.readTree(decodedBody)
             fields[prefix] = objectMapper.writeValueAsString(redactJson(root, sensitive = false))
         } catch (_: IllegalArgumentException) {
             fields["$prefix.parse_error"] = "true"
-            fields[prefix] = limitedBody.toString(charset(charset))
+            fields[prefix] = decodedBody
         } catch (_: JacksonException) {
             fields["$prefix.parse_error"] = "true"
-            fields[prefix] = limitedBody.toString(charset(charset))
+            fields[prefix] = decodedBody
         }
 
         return fields
@@ -72,8 +73,15 @@ class BodyLogFieldExtractor(
         node.forEach { child -> add(redactJson(child, sensitive = false)) }
     }
 
-    private fun charset(name: String?): Charset =
-        name?.let { runCatching { Charset.forName(it) }.getOrNull() } ?: StandardCharsets.UTF_8
+    private fun resolveCharset(contentType: String?, fallbackName: String?): Charset {
+        val mediaType = contentType?.let { runCatching { MediaType.parseMediaType(it) }.getOrNull() }
+        val isJson = mediaType?.isCompatibleWith(MediaType.APPLICATION_JSON) == true ||
+            mediaType?.subtype?.endsWith("+json") == true
+        if (isJson) {
+            return mediaType.charset ?: StandardCharsets.UTF_8
+        }
+        return fallbackName?.let { runCatching { Charset.forName(it) }.getOrNull() } ?: StandardCharsets.UTF_8
+    }
 
     private fun String.isSensitiveFieldName(): Boolean {
         val normalized = toLogFieldName().replace("_", "")

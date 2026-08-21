@@ -29,6 +29,24 @@ class BodyLogFieldExtractorTest {
         assertFalse(fields.containsKey("request.body.publicvalue"))
     }
 
+    @Test
+    fun `decodes json without an explicit charset as utf-8`() {
+        val extractor = BodyLogFieldExtractor(
+            properties = HttpLoggingProperties(),
+            objectMapper = ObjectMapper(),
+            privacyArgumentFieldNames = PrivacyArgumentFieldNames.scan("org.every.nook.api.logging"),
+        )
+
+        val fields = extractor.extract(
+            prefix = "response.body",
+            body = """{"title":"종로·마포 카페 6곳"}""".toByteArray(Charsets.UTF_8),
+            contentType = MediaType.APPLICATION_JSON_VALUE,
+            charset = Charsets.ISO_8859_1.name(),
+        )
+
+        assertEquals("""{"title":"종로·마포 카페 6곳"}""", fields["response.body"])
+    }
+
     data class AnnotatedBody(
         val publicValue: String,
         @field:PrivacyArgument
