@@ -9,6 +9,7 @@ import org.every.nook.api.application.processing.measure
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.slf4j.LoggerFactory
 import java.time.Clock
+import java.util.concurrent.ConcurrentHashMap
 
 class StorePlaceThumbnailUseCase(
     private val thumbnailProvider: PlaceThumbnailProvider,
@@ -19,7 +20,7 @@ class StorePlaceThumbnailUseCase(
     operator fun invoke(postId: Long, requests: List<PlaceThumbnailProvider.Request>) {
         require(requests.isNotEmpty()) { "thumbnail requests must not be empty" }
         val startedAt = clock.millis()
-        val completed = mutableSetOf<PlaceIdentity>()
+        val completed = ConcurrentHashMap.newKeySet<PlaceIdentity>()
         requests.forEach { logger.info(event(postId, it.place, "place.thumbnail.started", FETCH_STAGE, "started")) }
         runCatching {
             requests.forEach { request ->

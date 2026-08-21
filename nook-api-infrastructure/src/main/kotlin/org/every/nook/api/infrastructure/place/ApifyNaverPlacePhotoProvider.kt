@@ -44,7 +44,7 @@ class ApifyNaverPlacePhotoProvider(
 
     private fun fetchBatch(requests: List<PlaceThumbnailProvider.Request>): List<PlaceSupplement?> {
         val searchInput = mapOf(
-            "keywords" to requests.map { it.place.searchQuery() },
+            "keywords" to requests.flatMap { it.place.searchQueries() }.distinct(),
             "scrapePlaceDetails" to false,
             "maxResultsPerKeyword" to properties.maxResults,
         )
@@ -115,9 +115,14 @@ class ApifyNaverPlacePhotoProvider(
         ?.takeIf(JsonNode::isArray)?.toList().orEmpty()
 
     private fun List<NaverPlaceMatch>.bestMatch(place: PlaceCandidate): NaverPlaceMatch? {
-        val query = place.searchQuery()
-        val queryResults = filter { it.searchKeyword == query }.ifEmpty { this }
-        return queryResults.filter { it.matches(place) }
+        place.searchQueries().forEach { query ->
+            filter { it.searchKeyword == query }
+                .filter { it.matches(place) }
+                .minByOrNull { it.distanceMeters(place) ?: Double.MAX_VALUE }
+                ?.let { return it }
+        }
+        return filter { it.searchKeyword == null }
+            .filter { it.matches(place) }
             .minByOrNull { it.distanceMeters(place) ?: Double.MAX_VALUE }
     }
 
@@ -151,7 +156,13 @@ class ApifyNaverPlacePhotoProvider(
         }
     }
 
-    private fun PlaceCandidate.searchQuery(): String = "$name $address"
+    private fun PlaceCandidate.searchQueries(): List<String> {
+        val (roadAddress, district) = address.searchAddressParts()
+        return listOfNotNull(
+            roadAddress?.let { "$name $it" },
+            district?.let { "$name $it" },
+        ).distinct().ifEmpty { listOf(name) }
+    }
 
     private data class NaverPlaceMatch(
         val placeId: String,
@@ -168,7 +179,7 @@ class ApifyNaverPlacePhotoProvider(
             val nearby = distanceMeters(place)?.let { distance ->
                 distance <= MAX_MATCH_DISTANCE_METERS
             } == true
-            return address.matchesAddress(place.address) || nearby
+            return address.matchesAddress(place.address) && nearby
         }
 
         fun distanceMeters(place: PlaceCandidate): Double? {
@@ -221,23 +232,47 @@ private fun String.matchesName(other: String): Boolean {
 private fun String.matchesAddress(other: String): Boolean {
     val left = normalizedNaverValue()
     val right = other.normalizedNaverValue()
-    val normalizedMatch = left.isNotEmpty() && right.isNotEmpty() &&
-        (left.contains(right) || right.contains(left))
-    val roadMatch = roadAddressKey()?.let { it == other.roadAddressKey() } == true
+    val leftRoadAddress = roadAddressKey()
+    val rightRoadAddress = other.roadAddressKey()
     val districtMatch = districtKey()?.let { it == other.districtKey() } == true
-    return normalizedMatch || (roadMatch && districtMatch)
+    if (leftRoadAddress != null || rightRoadAddress != null) {
+        return leftRoadAddress != null && leftRoadAddress == rightRoadAddress && districtMatch
+    }
+    return left.isNotEmpty() && left == right
 }
 
 private fun String.roadAddressKey(): String? {
     val tokens = split(Regex("\\s+")).map(String::normalizedNaverValue).filter(String::isNotEmpty)
-    return tokens.takeLast(2).takeIf { it.size == 2 }?.joinToString("")
+    val roadNameIndex = tokens.indexOfLast { token -> ROAD_NAME_SUFFIXES.any(token::endsWith) }
+    if (roadNameIndex < 0) return null
+    val buildingNumber = tokens.drop(roadNameIndex + 1).firstOrNull { it.matches(BUILDING_NUMBER_PATTERN) }
+        ?: return null
+    return tokens[roadNameIndex] + buildingNumber
 }
 
 private fun String.districtKey(): String? = split(Regex("\\s+"))
     .map(String::normalizedNaverValue)
     .firstOrNull { token -> DISTRICT_SUFFIXES.any(token::endsWith) }
 
+private fun String.searchAddressParts(): Pair<String?, String?> {
+    val tokens = split(Regex("\\s+")).filter(String::isNotBlank)
+    val roadNameIndex = tokens.indexOfLast { token -> ROAD_NAME_SUFFIXES.any(token::endsWith) }
+    val roadAddress = if (roadNameIndex < 0) {
+        null
+    } else {
+        tokens.drop(roadNameIndex + 1)
+            .firstOrNull { it.normalizedNaverValue().matches(BUILDING_NUMBER_PATTERN) }
+            ?.let { buildingNumber -> "${tokens[roadNameIndex]} $buildingNumber" }
+    }
+    val district = tokens.firstOrNull { token ->
+        DISTRICT_SUFFIXES.any(token.normalizedNaverValue()::endsWith)
+    }
+    return roadAddress to district
+}
+
 private val DISTRICT_SUFFIXES = setOf("구", "군")
+private val ROAD_NAME_SUFFIXES = setOf("로", "길")
+private val BUILDING_NUMBER_PATTERN = Regex("\\d+(?:-\\d+)?")
 
 private fun String.normalizedNaverValue(): String = lowercase().filter(Char::isLetterOrDigit)
 
