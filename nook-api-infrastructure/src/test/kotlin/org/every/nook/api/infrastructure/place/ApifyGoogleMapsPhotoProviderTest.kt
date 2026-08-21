@@ -58,6 +58,27 @@ class ApifyGoogleMapsPhotoProviderTest {
     }
 
     @Test
+    fun `matches a differently named place when Google address includes floor details`() {
+        val fixture = fixture()
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(FLOOR_DETAIL_RESPONSE, MediaType.APPLICATION_JSON))
+
+        val result = fixture.provider.fetch(
+            request(
+                googlePlaceId = null,
+                name = "아사시",
+                address = "서울 중구 을지로 130-1",
+                latitude = "37.5661844",
+                longitude = "126.9923597",
+            ),
+        )
+
+        assertEquals("google-asasi", result?.googlePlaceId)
+        assertEquals(listOf("https://cdn.example/1.jpg"), result?.photoUrls)
+        fixture.server.verify()
+    }
+
+    @Test
     fun `rejects a nearby hotel when a short restaurant name and address do not match`() {
         val fixture = fixture()
         fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
@@ -315,6 +336,12 @@ class ApifyGoogleMapsPhotoProviderTest {
             "imageUrls":["https://google.example/1.jpg","https://google.example/2.jpg",
             "https://google.example/3.jpg","https://google.example/4.jpg",
             "https://google.example/5.jpg","https://google.example/6.jpg"]}]
+        """.trimIndent()
+        val FLOOR_DETAIL_RESPONSE = """
+            [{"placeId":"google-asasi","title":"ASASI",
+            "address":"대한민국 서울특별시 중구 을지로 130-1 4층 401호",
+            "location":{"lat":37.5661253,"lng":126.9922289},
+            "imageUrls":["https://google.example/asasi.jpg"]}]
         """.trimIndent()
         val NEARBY_HOTEL_RESPONSE = """
             [{"placeId":"ChIJKao-p8wnZTURLz8je9GVNj8","title":"정감호텔","categoryName":"호텔",
