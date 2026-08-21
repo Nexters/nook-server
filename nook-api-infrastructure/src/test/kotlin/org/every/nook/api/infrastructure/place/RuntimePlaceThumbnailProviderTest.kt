@@ -96,6 +96,28 @@ class RuntimePlaceThumbnailProviderTest {
     }
 
     @Test
+    fun `routes from Apify Google to Apify Naver place without Google`() {
+        val calls = mutableListOf<String>()
+        val provider = provider(
+            value = "APIFY_GOOGLE,APIFY_NAVER_PLACE,POST_MEDIA",
+            delegates = mapOf(
+                PlaceThumbnailProviderType.APIFY_GOOGLE to recording(calls, "APIFY_GOOGLE", null),
+                PlaceThumbnailProviderType.APIFY_NAVER_PLACE to recording(
+                    calls,
+                    "APIFY_NAVER_PLACE",
+                    PlaceSupplement(null, listOf("https://cdn.example/naver.jpg")),
+                ),
+                PlaceThumbnailProviderType.POST_MEDIA to recording(calls, "POST_MEDIA", null),
+            ),
+        )
+
+        val result = provider.fetch(REQUEST)
+
+        assertEquals(listOf("APIFY_GOOGLE", "APIFY_NAVER_PLACE"), calls)
+        assertEquals(listOf("https://cdn.example/naver.jpg"), result?.photoUrls)
+    }
+
+    @Test
     fun `disabled stops the remaining chain`() {
         val calls = mutableListOf<String>()
         val provider = provider(
