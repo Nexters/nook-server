@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.post
 
+import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
 import org.every.nook.api.application.post.ClaimedPostContentParsingJob
@@ -69,7 +70,12 @@ class PostContentParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>) {
+    override fun complete(
+        postId: Long,
+        post: Post,
+        textPlaceClues: List<PlaceClue>,
+        imageTranscripts: List<ImageTranscript>,
+    ) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PostContentParsingStatus.PROCESSING)
         val entity = postRepository.findById(postId).orElseThrow()
@@ -107,6 +113,8 @@ class PostContentParsingPersistenceAdapter(
                 PlaceParsingJobEntity(
                     postId = postId,
                     textPlaceClues = objectMapper.writeValueAsString(textPlaceClues),
+                    imageTranscripts = imageTranscripts.takeIf(List<ImageTranscript>::isNotEmpty)
+                        ?.let(objectMapper::writeValueAsString),
                     status = PlaceParsingStatus.PENDING,
                     nextAttemptAt = clock.instant(),
                 ),

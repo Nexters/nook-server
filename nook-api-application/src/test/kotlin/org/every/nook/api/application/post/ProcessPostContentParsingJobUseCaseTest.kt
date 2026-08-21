@@ -4,6 +4,8 @@ import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
+import org.every.nook.api.application.place.ImageTextExtractor
+import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingMetrics
@@ -53,10 +55,15 @@ class ProcessPostContentParsingJobUseCaseTest {
                     placeClues = listOf(PlaceClue("성수 식당", "성수", listOf("성수 식당"))),
                 )
             },
+            imageTextExtractor = ImageTextExtractor { request ->
+                calls += "ocr"
+                assertEquals("https://source/image.jpg", request.images.single().imageUrl)
+                listOf(ImageTranscript(1, listOf("6월 2주차", "요즘 뜨고 있는 금주의 신상스폿")))
+            },
             coverTitleExtractor = CoverTitleExtractor { request ->
                 calls += "cover-title"
-                assertEquals("https://source/image.jpg", request.imageUrl)
-                "6월 2주차 요즘 뜨고 있는 금주의 신상스폿"
+                assertEquals(listOf("6월 2주차", "요즘 뜨고 있는 금주의 신상스폿"), request.texts)
+                "요즘 뜨고 있는 금주의 신상스폿"
             },
             retryBackoffs = listOf(Duration.ofSeconds(3)),
             processingTimeout = Duration.ofMinutes(2),
@@ -70,6 +77,7 @@ class ProcessPostContentParsingJobUseCaseTest {
                 "progress:CONTENT_FETCH",
                 "extract",
                 "progress:CONTENT_COVER_TITLE",
+                "ocr",
                 "cover-title",
                 "progress:CONTENT_INFERENCE",
                 "inference",
@@ -79,11 +87,12 @@ class ProcessPostContentParsingJobUseCaseTest {
             calls,
         )
         val completed = requireNotNull(port.completedPost)
-        assertEquals("6월 2주차 요즘 뜨고 있는 금주의 신상스폿", completed.title)
+        assertEquals("요즘 뜨고 있는 금주의 신상스폿", completed.title)
         assertEquals("성수", completed.sourceLocationTag)
         assertEquals(listOf("맛집", "서울"), completed.hashtags)
         assertEquals("https://source/image.jpg", completed.media.single().url)
         assertEquals(listOf("성수 식당"), port.completedTextPlaceClues.map(PlaceClue::name))
+        assertEquals(listOf("6월 2주차", "요즘 뜨고 있는 금주의 신상스폿"), port.completedImageTranscripts.single().texts)
     }
 
     @Test
@@ -173,6 +182,7 @@ class ProcessPostContentParsingJobUseCaseTest {
         PostContentParsingJobPort {
         var completedPost: Post? = null
         var completedTextPlaceClues: List<PlaceClue> = emptyList()
+        var completedImageTranscripts: List<ImageTranscript> = emptyList()
         var retryAt: Instant? = null
         var failureReason: String? = null
 
@@ -191,10 +201,16 @@ class ProcessPostContentParsingJobUseCaseTest {
             calls += "progress:${stage.name}"
         }
 
-        override fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>) {
+        override fun complete(
+            postId: Long,
+            post: Post,
+            textPlaceClues: List<PlaceClue>,
+            imageTranscripts: List<ImageTranscript>,
+        ) {
             calls += "complete"
             completedPost = post
             completedTextPlaceClues = textPlaceClues
+            completedImageTranscripts = imageTranscripts
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {

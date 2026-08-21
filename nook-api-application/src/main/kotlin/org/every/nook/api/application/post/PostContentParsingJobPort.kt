@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post
 
+import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.post.Post
@@ -13,7 +14,12 @@ interface PostContentParsingJobPort {
 
     fun updateProgress(postId: Long, stage: ParsingProgressStage) = Unit
 
-    fun complete(postId: Long, post: Post, textPlaceClues: List<PlaceClue>)
+    fun complete(
+        postId: Long,
+        post: Post,
+        textPlaceClues: List<PlaceClue>,
+        imageTranscripts: List<ImageTranscript> = emptyList(),
+    )
 
     fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
 

@@ -3,7 +3,12 @@ package org.every.nook.api.application.admin
 import org.every.nook.api.application.error.ErrorType
 import org.every.nook.api.application.error.NookErrorCode
 import org.every.nook.api.application.error.NookException
+import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
+import org.every.nook.api.application.post.CoverTitleExtractor
+import org.every.nook.api.application.post.PostTitleInference
+import org.every.nook.api.application.post.resolvePostTitle
+import org.every.nook.api.application.post.validatedCoverTitle
 import org.every.nook.api.domain.place.Place
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagCategory
@@ -78,6 +83,43 @@ class UpdateAdminPostUseCase(private val port: AdminPostCorrectionPort) {
         val reason: String,
         val requestId: String?,
     )
+}
+
+class RegenerateAdminPostTitleUseCase(
+    private val port: AdminPostTitleRegenerationPort,
+    private val imageTextExtractor: ImageTextExtractor,
+    private val coverTitleExtractor: CoverTitleExtractor,
+    private val titleInference: PostTitleInference,
+) {
+    operator fun invoke(command: Command): AdminPostDetail {
+        require(command.postId > 0) { "Post id must be positive" }
+        require(command.reason.isNotBlank()) { "Regeneration reason must not be blank" }
+        val source = port.findSource(command.postId) ?: throw AdminPostNotFoundException()
+        val coverTitle = source.firstImageUrl?.let { imageUrl ->
+            runCatching {
+                imageTextExtractor.extract(
+                    ImageTextExtractor.Request(listOf(ImageTextExtractor.ImageInput(1, imageUrl))),
+                ).firstOrNull { it.imageIndex == 1 }
+                    ?.validatedCoverTitle(coverTitleExtractor)
+            }.getOrNull()
+        }
+        val title = resolvePostTitle(source.body, coverTitle, null) ?: resolvePostTitle(
+            source.body,
+            coverTitle,
+            titleInference.infer(PostTitleInference.Request(source.body, source.hashtags, source.sourceLocationTag)),
+        )
+        return port.updateTitle(
+            AdminPostTitleRegenerationPort.UpdateCommand(
+                postId = command.postId,
+                title = title,
+                actor = command.actor,
+                reason = command.reason.trim(),
+                requestId = command.requestId,
+            ),
+        ) ?: throw AdminPostNotFoundException()
+    }
+
+    data class Command(val postId: Long, val actor: AdminActor, val reason: String, val requestId: String?)
 }
 
 class SearchAdminPlacesUseCase(private val port: AdminPlaceQueryPort) {

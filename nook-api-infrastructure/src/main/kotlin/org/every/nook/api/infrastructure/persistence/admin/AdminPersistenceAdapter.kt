@@ -10,6 +10,7 @@ import org.every.nook.api.application.admin.AdminPostMedia
 import org.every.nook.api.application.admin.AdminPostPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPostQueryPort
 import org.every.nook.api.application.admin.AdminPostSummary
+import org.every.nook.api.application.admin.AdminPostTitleRegenerationPort
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
@@ -42,8 +43,24 @@ class AdminPersistenceAdapter(
     private val objectMapper: ObjectMapper,
 ) : AdminPostQueryPort,
     AdminPostCorrectionPort,
+    AdminPostTitleRegenerationPort,
     AdminPostPlaceCorrectionPort,
     AdminAuditLogPort {
+    @Transactional(readOnly = true)
+    override fun findSource(postId: Long): AdminPostTitleRegenerationPort.Source? {
+        val post = postRepository.findById(postId).orElse(null) ?: return null
+        return AdminPostTitleRegenerationPort.Source(
+            postId = postId,
+            body = post.body,
+            hashtags = hashtagRepository.findAllByPostIdOrderBySequenceAsc(postId).map { it.hashtag },
+            sourceLocationTag = post.sourceLocationTag,
+            firstImageUrl = mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(
+                postId,
+                PostMedia.MediaType.IMAGE,
+            ).firstOrNull()?.mediaUrl,
+        )
+    }
+
     @Transactional(readOnly = true)
     override fun listPosts(
         query: String?,
@@ -162,6 +179,26 @@ class AdminPersistenceAdapter(
                 reason = command.reason,
                 beforeValue = objectMapper.writeValueAsString(before),
                 afterValue = objectMapper.writeValueAsString(after),
+                requestId = command.requestId,
+            ),
+        )
+        return find(command.postId)
+    }
+
+    @Transactional
+    override fun updateTitle(command: AdminPostTitleRegenerationPort.UpdateCommand): AdminPostDetail? {
+        val post = postRepository.findByIdForUpdate(command.postId) ?: return null
+        val before = mapOf("title" to post.title)
+        post.updateTitleFromAdmin(command.title)
+        append(
+            AdminAuditLogPort.Entry(
+                actor = command.actor,
+                action = "POST_TITLE_REGENERATED",
+                targetType = "POST",
+                targetId = command.postId.toString(),
+                reason = command.reason,
+                beforeValue = objectMapper.writeValueAsString(before),
+                afterValue = objectMapper.writeValueAsString(mapOf("title" to command.title)),
                 requestId = command.requestId,
             ),
         )

@@ -9,6 +9,7 @@ import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.PostContentInference
+import org.every.nook.api.application.post.PostTitleInference
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.domain.place.PlaceTagDefinition
@@ -22,6 +23,7 @@ class OpenAiContentInferenceAdapter(
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
 ) : PostContentInference,
+    PostTitleInference,
     PlaceClueExtractor,
     PlaceCandidateSelector,
     PlaceTagExtractor {
@@ -34,10 +36,29 @@ class OpenAiContentInferenceAdapter(
             maxOutputTokens = CONTENT_INFERENCE_MAX_OUTPUT_TOKENS,
         )
         return PostContentInference.Inference(
-            title = result.path("title").asText().trim().take(MAX_TITLE_LENGTH)
-                .ifBlank { DEFAULT_TITLE },
+            title = result.path("title")
+                .takeUnless { it.isNull || it.isMissingNode }
+                ?.asText()
+                ?.trim()
+                ?.take(MAX_TITLE_LENGTH)
+                .orEmpty(),
             placeClues = result.toPlaceClues(),
         )
+    }
+
+    override fun infer(request: PostTitleInference.Request): String? {
+        val result = requestStructured(
+            name = "post_title_inference",
+            instructions = TITLE_INSTRUCTIONS,
+            input = contentInput(objectMapper, request.body, request.hashtags, request.sourceLocationTag),
+            schema = titleInferenceSchema,
+            maxOutputTokens = TITLE_INFERENCE_MAX_OUTPUT_TOKENS,
+        )
+        return result.path("title")
+            .takeUnless { it.isNull || it.isMissingNode }
+            ?.asText()
+            ?.trim()
+            ?.ifBlank { null }
     }
 
     override fun extract(request: PlaceClueExtractor.Request): List<PlaceClue> {
@@ -238,13 +259,13 @@ class OpenAiContentInferenceAdapter(
         const val MAX_PLACE_COUNT = 60
         const val MAX_QUERY_COUNT = 4
         const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 8000
+        const val TITLE_INFERENCE_MAX_OUTPUT_TOKENS = 300
         const val PLACE_MAX_OUTPUT_TOKENS = 2500
         const val IMAGE_PLACE_MAX_OUTPUT_TOKENS = 12000
         const val CANDIDATE_SELECTION_MAX_OUTPUT_TOKENS = 100
         const val PLACE_TAG_MIN_OUTPUT_TOKENS = 600
         const val PLACE_TAG_MAX_OUTPUT_TOKENS_PER_PLACE = 500
         const val PLACE_TAG_MAX_OUTPUT_TOKENS = 5000
-        const val DEFAULT_TITLE = "Instagram 게시물"
         val placeListSchema: Map<String, Any> = mapOf(
             "type" to "array",
             "maxItems" to MAX_PLACE_COUNT,
@@ -285,10 +306,18 @@ class OpenAiContentInferenceAdapter(
         val contentInferenceSchema: Map<String, Any> = mapOf(
             "type" to "object",
             "properties" to mapOf(
-                "title" to mapOf("type" to "string", "maxLength" to MAX_TITLE_LENGTH),
+                "title" to mapOf("type" to listOf("string", "null"), "maxLength" to MAX_TITLE_LENGTH),
                 "places" to placeListSchema,
             ),
             "required" to listOf("title", "places"),
+            "additionalProperties" to false,
+        )
+        val titleInferenceSchema: Map<String, Any> = mapOf(
+            "type" to "object",
+            "properties" to mapOf(
+                "title" to mapOf("type" to listOf("string", "null"), "maxLength" to MAX_TITLE_LENGTH),
+            ),
+            "required" to listOf("title"),
             "additionalProperties" to false,
         )
         val placeSchema: Map<String, Any> = mapOf(
@@ -301,12 +330,12 @@ class OpenAiContentInferenceAdapter(
             "입력된 Instagram 본문, 해시태그, 장소 태그에 명시된 사실만 사용해 검색과 보관에 적합한 한국어 제목을 작성한다. " +
                 "제목은 최대 25자이며 지역명, 상호명, 업종, 장소 개수 중 확인 가능한 핵심 정보만 사용한다. " +
                 "한 가게는 '중랑구 임현숙의이화김치찌개', 여러 가게는 '중곡동 맛집 5곳', " +
-                "지역이나 상호 정보가 부족하면 '방문해보기 좋은 곳'처럼 입력에 없는 고유명사를 만들지 않는 일반 제목을 사용한다. " +
+                "지역이나 상호 정보가 부족하면 제목을 만들지 않는다. " +
                 "본문에 지역, 업종, 장소 개수가 명시되면 그 표현과 숫자를 그대로 유지한다. 카페를 맛집으로 바꾸지 않는다. " +
                 "sourceLocationTag는 지역 문맥으로만 참고하고 상호명이나 고유 장소명으로 제목에 사용하지 않는다. " +
                 "입력에 0개라고 명시되지 않은 한 제목에 0곳을 사용하지 않는다. " +
                 "투어, 감동, 보물, 한자리 같은 홍보성·감상적 표현과 따옴표, 해시태그를 사용하지 않는다. " +
-                "정보가 부족하면 'Instagram 게시물'을 반환한다."
+                "정보가 부족하면 null을 반환한다."
         const val PLACE_INSTRUCTIONS =
             "입력된 Instagram 본문, 해시태그, 장소 태그와 imageTranscripts에서 게시물이 방문, 소개 또는 추천하는 " +
                 "실제 영업 장소만 추출한다. " +

@@ -10,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
+@Suppress("LargeClass") // The scenarios share one cohesive orchestration fixture for the place parsing pipeline.
 class ProcessPlaceParsingJobUseCaseTest {
     @Test
     fun `resolves and completes multiple place clues in order`() {
@@ -107,6 +108,43 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
         assertNull(port.storedImageTranscripts)
+    }
+
+    @Test
+    fun `only transcribes images missing from the stored transcript cache`() {
+        val coverTranscript = ImageTranscript(1, listOf("서울 카페 2곳", "표지"))
+        val requestedIndexes = mutableListOf<Int>()
+        val port = FakeJobPort(
+            body = "카페 2곳",
+            imageUrls = listOf("https://cdn.test/1.jpg", "https://cdn.test/2.jpg"),
+            textClues = emptyList(),
+            imageTranscripts = listOf(coverTranscript),
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { request ->
+                assertEquals(listOf(1, 2), request.imageTranscripts.map(ImageTranscript::imageIndex))
+                listOf(
+                    PlaceClue(
+                        "이미지 장소",
+                        "서울",
+                        listOf("이미지 장소"),
+                        listOf(PlaceClueEvidence(2, "이미지 장소 / 서울")),
+                    ),
+                )
+            },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "이미지 장소", "서울 중구"))
+            },
+            imageTextExtractor = ImageTextExtractor { request ->
+                requestedIndexes += request.images.map(ImageTextExtractor.ImageInput::imageIndex)
+                listOf(ImageTranscript(2, listOf("이미지 장소 / 서울")))
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf(2), requestedIndexes)
+        assertEquals(listOf(1, 2), port.storedImageTranscripts?.map(ImageTranscript::imageIndex))
     }
 
     @Test

@@ -114,20 +114,38 @@ class ProcessPlaceParsingJobUseCase(
                 "expectedPlaceCount=$expectedPlaceCount"
         }
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_OCR)
-        val transcripts = job.imageTranscripts ?: measure(job, IMAGE_TRANSCRIPT_STAGE) {
-            extractTranscriptsWithLatestUrlFallback(
-                job.postId,
-                images,
-                imageTextExtractor,
-                imageUrlPort,
-                imageOcrConcurrency,
-            )
-        }.also { extracted ->
+        val cachedTranscripts = job.imageTranscripts.orEmpty()
+            .filter { transcript -> images.any { it.imageIndex == transcript.imageIndex } }
+        val cachedByIndex = cachedTranscripts.associateBy(ImageTranscript::imageIndex)
+        val missingImages = images.filter { image ->
+            cachedByIndex[image.imageIndex]?.texts?.any(String::isNotBlank) != true
+        }
+        val transcripts = if (missingImages.isEmpty()) {
+            cachedTranscripts.sortedBy(ImageTranscript::imageIndex)
+        } else {
+            val extracted = measure(job, IMAGE_TRANSCRIPT_STAGE) {
+                extractTranscriptsWithLatestUrlFallback(
+                    job.postId,
+                    missingImages,
+                    imageTextExtractor,
+                    imageUrlPort,
+                    imageOcrConcurrency,
+                )
+            }
+            val extractedByIndex = extracted.associateBy(ImageTranscript::imageIndex)
+            images.map { image ->
+                extractedByIndex[image.imageIndex] ?: cachedByIndex[image.imageIndex]
+                    ?: ImageTranscript(image.imageIndex, emptyList())
+            }
+        }.also { merged ->
             logger.info {
                 "Image transcripts received: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "imageCount=${images.size}, transcriptCount=${extracted.size}"
+                    "imageCount=${images.size}, cachedCount=${cachedTranscripts.size}, " +
+                    "requestedCount=${missingImages.size}, transcriptCount=${merged.size}"
             }
-            jobPort.storeImageTranscripts(job.postId, extracted)
+            if (missingImages.isNotEmpty()) {
+                jobPort.storeImageTranscripts(job.postId, merged)
+            }
         }
         val effectiveExpectedPlaceCount = effectiveExpectedPlaceCount(expectedPlaceCount, transcripts)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_CLUES)
