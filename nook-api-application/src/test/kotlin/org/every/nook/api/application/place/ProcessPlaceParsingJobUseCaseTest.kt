@@ -1,5 +1,6 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.ParsingProgressStage
 import java.math.BigDecimal
@@ -572,6 +573,88 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `resolves the same grounded place returned by multiple providers without an address hint`() {
+        val port = FakeJobPort(body = "망원역 항정국밥 송정")
+        val clue = PlaceClue(
+            name = "송정",
+            region = "망원역",
+            queries = listOf("송정 항정국밥 망원역", "송정 망원동"),
+            evidence = listOf(PlaceClueEvidence(1, "송정 | 망원역 항정국밥")),
+        )
+        val kakao = candidate(
+            provider = "KAKAO",
+            id = "kakao-songjeong",
+            name = "송정",
+            address = "서울 마포구 월드컵로17길 38",
+        )
+        val naver = candidate(
+            provider = "NAVER",
+            id = "naver-songjeong",
+            name = "송정",
+            address = "서울특별시 마포구 월드컵로17길 38 1층",
+        )
+        val provider = PlaceSearchProvider { request ->
+            when (request.query) {
+                "송정" -> listOf(candidate("busan", "송정집 부산송정 본점", "부산 해운대구 송정광어골로 59"))
+                "송정 항정국밥 망원역" -> listOf(kakao)
+                "송정 망원동" -> listOf(naver)
+                else -> emptyList()
+            }
+        }
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(clue) },
+            search = SearchPlaceCandidatesUseCase(provider),
+            selector = PlaceCandidateSelector { error("same logical place must resolve without model selection") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf("naver-songjeong"), port.completed.map(PlaceCandidate::externalPlaceId))
+        assertNull(port.failedReason)
+    }
+
+    @Test
+    fun `resolves a provider name without a generic prefix using a matched profile hint alias`() {
+        val transcript = ImageTranscript(1, listOf("흐릿 ᆞ화양동 디저트 카페"))
+        val requestedQueries = mutableListOf<String>()
+        val port = FakeJobPort(
+            body = "건대 디저트 카페",
+            imageUrls = listOf("https://cdn.test/hruit.jpg"),
+            textClues = emptyList(),
+            imageTranscripts = listOf(transcript),
+            sourceProfileHints = listOf(SourceProfileHint("카페흐릇🍑", "hruit__")),
+        )
+        val provider = PlaceSearchProvider { request ->
+            requestedQueries += request.query
+            if (request.query.contains("카페흐릇") || request.query == "흐릇") {
+                listOf(candidate("hruit", "흐릇", "서울특별시 광진구 군자로 19 1층"))
+            } else {
+                emptyList()
+            }
+        }
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor {
+                listOf(
+                    PlaceClue(
+                        name = "흐릿",
+                        region = "화양동",
+                        queries = listOf("화양동 흐릿"),
+                        evidence = listOf(PlaceClueEvidence(1, transcript.texts.single())),
+                    ),
+                )
+            },
+            search = SearchPlaceCandidatesUseCase(provider),
+            selector = PlaceCandidateSelector { error("profile alias must ground the provider candidate") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals(listOf("hruit"), port.completed.map(PlaceCandidate::externalPlaceId))
+        assertEquals(true, "흐릇" in requestedQueries)
+        assertNull(port.failedReason)
+    }
+
+    @Test
     fun `does not choose arbitrarily when multiple exact name candidates do not match region`() {
         val port = FakeJobPort(attempt = 4, body = "동일상호")
         val extractor = PlaceClueExtractor {
@@ -867,6 +950,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         private val imageTranscripts: List<ImageTranscript>? = null,
         private val hashtags: List<String> = emptyList(),
         private val sourceLocationTag: String? = null,
+        private val sourceProfileHints: List<SourceProfileHint> = emptyList(),
         val latestImageUrls: List<String> = imageUrls,
     ) : PlaceParsingJobPort {
         var completed = emptyList<PlaceCandidate>()
@@ -888,6 +972,7 @@ class ProcessPlaceParsingJobUseCaseTest {
             imageUrls = imageUrls,
             textClues = textClues,
             imageTranscripts = imageTranscripts,
+            sourceProfileHints = sourceProfileHints,
         )
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()

@@ -30,18 +30,25 @@ internal fun List<PlaceClue>.mergePlaceClues(): PlaceClue {
 private fun PlaceClue.correctNameFrom(profileNames: List<String>): PlaceClue {
     val clueIdentity = name.hangulIdentity().takeIf { it.length >= MIN_PROFILE_NAME_LENGTH } ?: return this
     val correctedName = profileNames.correctedNameFor(clueIdentity) ?: return this
-    return if (correctedName.placeClueIdentity() == name.placeClueIdentity()) {
-        this
-    } else {
-        copy(
-            name = correctedName,
-            queries = buildList {
+    val nameChanged = correctedName.placeClueIdentity() != name.placeClueIdentity()
+    return copy(
+        name = correctedName,
+        queries = buildList {
+            addAll(correctedName.genericPrefixAliases())
+            if (nameChanged) {
                 add(correctedName)
                 region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion -> add("$placeRegion $correctedName") }
                 addAll(queries.map { query -> query.replace(name, correctedName, ignoreCase = true) })
-            }.distinct(),
-        )
-    }
+            } else {
+                addAll(queries)
+            }
+        }.distinct(),
+    )
+}
+
+private fun String.genericPrefixAliases(): List<String> = GENERIC_PROFILE_NAME_TOKENS.mapNotNull { prefix ->
+    removePrefix(prefix)
+        .takeIf { alias -> alias != this && alias.length >= MIN_PROFILE_NAME_LENGTH }
 }
 
 private fun List<String>.correctedNameFor(clueIdentity: String): String? {
