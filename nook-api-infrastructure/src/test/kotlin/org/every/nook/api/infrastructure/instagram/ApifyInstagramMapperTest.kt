@@ -25,6 +25,9 @@ class ApifyInstagramMapperTest {
                 locationName = "Nook Cafe",
                 error = null,
                 errorDescription = null,
+                taggedUsers = listOf(
+                    ApifyInstagramRecord.TaggedUser("호뎅 | 건대 술집 ㅣ 이자카야", "ho.den_g"),
+                ),
             ),
         )
 
@@ -33,6 +36,8 @@ class ApifyInstagramMapperTest {
         assertEquals(Instant.parse("2026-08-01T01:02:03Z"), result.post.publishedAt)
         assertEquals(listOf("seoul", "food"), result.hashtags)
         assertEquals(listOf("Nook Cafe"), result.sourceLocationNames)
+        assertEquals("호뎅 | 건대 술집 ㅣ 이자카야", result.sourceProfileHints.single().displayName)
+        assertEquals("ho.den_g", result.sourceProfileHints.single().username)
         assertEquals(PostMedia.MediaType.IMAGE, result.post.media.single().type)
     }
 

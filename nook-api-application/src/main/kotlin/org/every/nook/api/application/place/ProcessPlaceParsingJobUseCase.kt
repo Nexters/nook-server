@@ -179,6 +179,7 @@ class ProcessPlaceParsingJobUseCase(
         val primaryImageClues = extractClues(job, transcripts)
             .map { clue -> clue.restoreGroundingFromCard(transcripts) }
             .reconcileWithNumberedPlaceCards(transcripts)
+            .reconcileWithSourceProfileHints(job.sourceProfileHints)
             .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
         val recoveredImageClues = ImageClueRecallRecovery(
             retranscribe = { recoveryImages ->
@@ -197,6 +198,7 @@ class ProcessPlaceParsingJobUseCase(
                 extractClues(job, recoveryTranscripts)
                     .map { clue -> clue.restoreGroundingFromCard(recoveryTranscripts) }
                     .reconcileWithNumberedPlaceCards(recoveryTranscripts)
+                    .reconcileWithSourceProfileHints(job.sourceProfileHints)
             },
         ).recover(
             ImageClueRecallRecovery.Request(

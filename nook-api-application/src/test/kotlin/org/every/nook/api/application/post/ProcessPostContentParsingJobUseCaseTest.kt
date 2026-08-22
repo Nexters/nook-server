@@ -4,6 +4,7 @@ import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
@@ -42,6 +43,7 @@ class ProcessPostContentParsingJobUseCaseTest {
                     ),
                     hashtags = listOf("#맛집", "맛집", "서울"),
                     sourceLocationNames = listOf("", "성수"),
+                    sourceProfileHints = listOf(SourceProfileHint("성수 식당", "seongsu.restaurant")),
                 )
             }
         }
@@ -86,6 +88,7 @@ class ProcessPostContentParsingJobUseCaseTest {
         assertEquals("https://source/image.jpg", completed.media.single().url)
         assertEquals(listOf("성수 식당"), port.completedTextPlaceClues.map(PlaceClue::name))
         assertEquals(listOf("6월 2주차", "요즘 뜨고 있는 금주의 신상스폿"), port.completedImageTranscripts.single().texts)
+        assertEquals("seongsu.restaurant", port.completedSourceProfileHints.single().username)
     }
 
     @Test
@@ -176,6 +179,7 @@ class ProcessPostContentParsingJobUseCaseTest {
         var completedPost: Post? = null
         var completedTextPlaceClues: List<PlaceClue> = emptyList()
         var completedImageTranscripts: List<ImageTranscript> = emptyList()
+        var completedSourceProfileHints: List<SourceProfileHint> = emptyList()
         var retryAt: Instant? = null
         var failureReason: String? = null
 
@@ -199,11 +203,13 @@ class ProcessPostContentParsingJobUseCaseTest {
             post: Post,
             textPlaceClues: List<PlaceClue>,
             imageTranscripts: List<ImageTranscript>,
+            sourceProfileHints: List<SourceProfileHint>,
         ) {
             calls += "complete"
             completedPost = post
             completedTextPlaceClues = textPlaceClues
             completedImageTranscripts = imageTranscripts
+            completedSourceProfileHints = sourceProfileHints
         }
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {

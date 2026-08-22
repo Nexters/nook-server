@@ -75,7 +75,13 @@ class ProcessPostContentParsingJobUseCase(
             )
             jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_SAVE)
             measure(job, COMPLETE_STAGE) {
-                jobPort.complete(job.postId, completedPost, inference.placeClues, listOfNotNull(coverTranscript))
+                jobPort.complete(
+                    postId = job.postId,
+                    post = completedPost,
+                    textPlaceClues = inference.placeClues,
+                    imageTranscripts = listOfNotNull(coverTranscript),
+                    sourceProfileHints = extracted.sourceProfileHints,
+                )
             }
             completed(job, completedPost, startedAt)
         }.getOrElse { exception ->

@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.post
 
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
@@ -103,6 +104,7 @@ class PostContentParsingPersistenceAdapterTest {
                 ),
             ),
             imageTranscripts = listOf(ImageTranscript(1, listOf("성수 맛집"))),
+            sourceProfileHints = listOf(SourceProfileHint("성수 식당", "seongsu.restaurant")),
         )
 
         assertEquals(PostContentParsingStatus.COMPLETED, job.status)
@@ -118,6 +120,7 @@ class PostContentParsingPersistenceAdapterTest {
             placeJobCaptor.value.textPlaceClues,
         )
         assertEquals("""[{"imageIndex":1,"texts":["성수 맛집"]}]""", placeJobCaptor.value.imageTranscripts)
+        assertSourceProfileHints(placeJobCaptor.value)
         val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
         verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture())
         val placeEvent = eventCaptor.allValues.filterIsInstance<PlaceParsingJobRequestedEvent>().single()
@@ -125,6 +128,13 @@ class PostContentParsingPersistenceAdapterTest {
         assertEquals(101, placeEvent.postId)
         assertEquals("https://source/video.mp4", mediaEvent.sourceUrl)
         assertEquals("https://source/poster.jpg", mediaEvent.sourceThumbnailUrl)
+    }
+
+    private fun assertSourceProfileHints(placeJob: PlaceParsingJobEntity) {
+        assertEquals(
+            """[{"displayName":"성수 식당","username":"seongsu.restaurant"}]""",
+            placeJob.sourceProfileHints,
+        )
     }
 
     private companion object {
