@@ -78,6 +78,7 @@ class OpenAiContentInferenceAdapterTest {
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(header("Authorization", "Bearer test-key"))
             .andExpect(content().string(containsString("post_content_inference")))
+            .andExpect(content().string(containsString("\"model\":\"gpt-5-mini\"")))
             .andExpect(content().string(not(containsString("\"title\""))))
             .andExpect(content().string(containsString("\"maxItems\":60")))
             .andRespond(
@@ -186,6 +187,10 @@ class OpenAiContentInferenceAdapterTest {
         val fixture = adapterFixture()
         fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
             .andExpect(content().string(containsString("place_clues")))
+            .andExpect(content().string(containsString("\"model\":\"gpt-5-mini\"")))
+            .andExpect(content().string(containsString("반복되는 매거진명, 계정명, 로고, 워터마크")))
+            .andExpect(content().string(containsString("3 초라멘 | 화양동")))
+            .andExpect(content().string(containsString("상위 행정구나 대표 인근역")))
             .andExpect(content().string(containsString("\"maxItems\":60")))
             .andRespond(
                 withSuccess(
