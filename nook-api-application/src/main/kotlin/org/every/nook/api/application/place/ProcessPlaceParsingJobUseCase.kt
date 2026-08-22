@@ -279,7 +279,7 @@ class ProcessPlaceParsingJobUseCase(
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
                 "addressHint=${clue.addressHint}, queries=${clue.searchQueries()}, candidateCount=${candidates.size}"
         }
-        val selectionCandidates = candidates.compatibleWith(clue)
+        val selectionCandidates = candidates.compatibleWith(clue).distinctLogicalCandidates()
         val matches = strictMatches(clue, selectionCandidates)
         val groundedCandidates = selectionCandidates.groundedCandidateMatches(clue)
         val groundedMatches = groundedCandidates.matches
