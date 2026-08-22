@@ -17,7 +17,12 @@ data class AppVersionPolicy(
     val latestBuildNumber: Long,
     val latestVersion: String,
     val storeUrl: String,
-)
+) {
+    companion object {
+        const val MAX_VERSION_LENGTH = 30
+        const val MAX_STORE_URL_LENGTH = 500
+    }
+}
 
 data class AppVersionPolicyView(
     val updateType: AppUpdateType,
