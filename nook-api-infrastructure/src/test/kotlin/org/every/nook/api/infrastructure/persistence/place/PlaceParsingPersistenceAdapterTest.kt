@@ -109,6 +109,30 @@ class PlaceParsingPersistenceAdapterTest {
     }
 
     @Test
+    fun `stores a fallback title when place parsing fails`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+
+        adapter.fail(11, "방문해보기 좋은 곳", "No place candidate found")
+
+        assertEquals("방문해보기 좋은 곳", post.title)
+        assertEquals(PlaceParsingStatus.FAILED, job.status)
+        assertEquals("No place candidate found", job.failureReason)
+    }
+
+    @Test
+    fun `does not overwrite an administrator corrected title when place parsing fails`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        post.updateTitleFromAdmin("운영자 제목")
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+
+        adapter.fail(11, "자동 제목", "No place candidate found")
+
+        assertEquals("운영자 제목", post.title)
+        assertEquals(PlaceParsingStatus.FAILED, job.status)
+    }
+
+    @Test
     fun `claims an available pending job and increments its attempt`() {
         val job = PlaceParsingJobEntity(
             postId = 11,

@@ -61,14 +61,7 @@ class ProcessPlaceParsingJobUseCase(
             .distinctBy { it.provider to it.externalPlaceId }
             .distinctLogicalPlaces()
         if (places.isEmpty()) {
-            val failure = textResolution.failure ?: imageResolution?.failure
-            terminalFailure(
-                failure?.message ?: if (imageResolution == null) {
-                    NO_PLACE_RESOLVED_REASON
-                } else {
-                    NO_PLACE_RESOLVED_AFTER_IMAGE_REASON
-                },
-            )
+            failWithFinalizedTitle(job, textResolution, imageResolution, expectedPlaceCount)
         }
         val diagnostics = placeParsingDiagnostics(
             textExpectedPlaceCount = expectedPlaceCount,
@@ -103,6 +96,30 @@ class ProcessPlaceParsingJobUseCase(
             ),
         )
         return Result.Completed
+    }
+
+    private fun failWithFinalizedTitle(
+        job: ClaimedPlaceParsingJob,
+        textResolution: ClueResolution,
+        imageResolution: ClueResolution?,
+        expectedPlaceCount: Int?,
+    ): Nothing {
+        val failure = textResolution.failure ?: imageResolution?.failure
+        jobPort.updateProgress(job.postId, ParsingProgressStage.TITLE_FINALIZATION)
+        val title = measure(job, TITLE_STAGE) {
+            finalizePostTitle(
+                job = job,
+                places = emptyList(),
+                declaredPlaceCount = expectedPlaceCount,
+                latestImageTranscripts = imageResolution?.imageTranscripts.orEmpty(),
+            )
+        }
+        val reason = failure?.message ?: if (imageResolution == null) {
+            NO_PLACE_RESOLVED_REASON
+        } else {
+            NO_PLACE_RESOLVED_AFTER_IMAGE_REASON
+        }
+        throw TerminalPlaceParsingException(reason, title)
     }
 
     @Suppress("LongMethod") // Completeness recovery and progress milestones form one orchestration boundary.
@@ -355,7 +372,7 @@ class ProcessPlaceParsingJobUseCase(
         val reason = placeFailureReason(exception)
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         if (exception is TerminalPlaceParsingException) {
-            jobPort.fail(job.postId, reason)
+            jobPort.fail(job.postId, exception.title, reason)
             eventLogger.warn(
                 job.event("place.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
                 exception,
@@ -388,7 +405,13 @@ class ProcessPlaceParsingJobUseCase(
             return Result.Retry(nextAttemptAt)
         }
 
-        jobPort.fail(job.postId, reason)
+        val title = finalizePostTitle(
+            job = job,
+            places = emptyList(),
+            declaredPlaceCount = expectedPlaceCount(job.body),
+            latestImageTranscripts = emptyList(),
+        )
+        jobPort.fail(job.postId, title, reason)
         eventLogger.error(
             job.event("place.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
             exception,
@@ -399,8 +422,6 @@ class ProcessPlaceParsingJobUseCase(
         }
         return Result.Failed
     }
-
-    private fun terminalFailure(message: String): Nothing = throw TerminalPlaceParsingException(message)
 
     sealed interface Result {
         data object Completed : Result
@@ -439,7 +460,7 @@ class ProcessPlaceParsingJobUseCase(
 
     private class PlaceResolutionException(message: String) : IllegalStateException(message)
 
-    private class TerminalPlaceParsingException(message: String) : IllegalStateException(message)
+    private class TerminalPlaceParsingException(message: String, val title: String) : IllegalStateException(message)
 
     private data class ClueResolution(
         val places: List<PlaceCandidate>,
