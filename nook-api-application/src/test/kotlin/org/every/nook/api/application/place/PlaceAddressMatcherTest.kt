@@ -224,6 +224,20 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `removes reversed regional duplicates and keeps broader district queries`() {
+        val clue = PlaceClue(
+            name = "포비",
+            region = "화양동",
+            queries = listOf("포비 화양동", "광진구 포비", "건대 포비"),
+        )
+
+        assertEquals(
+            listOf("포비", "화양동 포비", "광진구 포비", "건대 포비"),
+            clue.searchQueries(),
+        )
+    }
+
+    @Test
     fun `limits candidate selection to addresses compatible with the explicit clue`() {
         val clue = PlaceClue(
             name = "도원",

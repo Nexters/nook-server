@@ -178,6 +178,7 @@ class ProcessPlaceParsingJobUseCase(
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_CLUES)
         val primaryImageClues = extractClues(job, transcripts)
             .map { clue -> clue.restoreGroundingFromCard(transcripts) }
+            .reconcileWithNumberedPlaceCards(transcripts)
             .filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = false)
         val recoveredImageClues = ImageClueRecallRecovery(
             retranscribe = { recoveryImages ->
@@ -192,7 +193,11 @@ class ProcessPlaceParsingJobUseCase(
                 }
             },
             storeTranscripts = { recovered -> jobPort.storeImageTranscripts(job.postId, recovered) },
-            extractClues = { recoveryTranscripts -> extractClues(job, recoveryTranscripts) },
+            extractClues = { recoveryTranscripts ->
+                extractClues(job, recoveryTranscripts)
+                    .map { clue -> clue.restoreGroundingFromCard(recoveryTranscripts) }
+                    .reconcileWithNumberedPlaceCards(recoveryTranscripts)
+            },
         ).recover(
             ImageClueRecallRecovery.Request(
                 postId = job.postId,
@@ -568,27 +573,11 @@ private fun strictMatches(
     }
 }
 
-internal fun PlaceClue.searchQueries(): List<String> = buildList {
-    addressHint?.trim()?.takeIf(String::isNotEmpty)?.let { address ->
-        addAll(PlaceAddressMatcher.searchVariants(address))
-    }
-    add(name)
-    region?.trim()?.takeIf(String::isNotEmpty)?.let { placeRegion ->
-        name.split(Regex("\\s+"))
-            .map(String::trim)
-            .filter { it.length >= MIN_SEARCH_ALIAS_LENGTH }
-            .forEach { alias -> add("$placeRegion $alias") }
-    }
-    addAll(queries)
-}.map(String::trim).filter(String::isNotEmpty).distinct().take(MAX_PLACE_QUERY_COUNT)
-
 private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)
 
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private const val MIN_GROUNDING_KEY_LENGTH = 2
-private const val MIN_SEARCH_ALIAS_LENGTH = 2
 private const val MIN_EXPECTED_PLACE_COUNT = 2
 private const val MAX_EXPECTED_PLACE_COUNT = 80
-private const val MAX_PLACE_QUERY_COUNT = 4
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
