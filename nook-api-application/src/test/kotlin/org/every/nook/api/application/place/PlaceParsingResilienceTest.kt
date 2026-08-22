@@ -241,6 +241,7 @@ class PlaceParsingResilienceTest {
         assertEquals(listOf("쑨송", "송정", "카페흐릇", "호뎅"), reconciled.map(PlaceClue::name))
         assertEquals(2, reconciled.first().evidence.size)
         assertTrue(reconciled.first().queries.any { query -> "쑨송" in query })
+        assertTrue("흐릇" in reconciled.single { clue -> clue.name == "카페흐릇" }.queries)
         assertTrue(reconciled.none { clue -> "펩시" in clue.name })
     }
 
