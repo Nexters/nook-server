@@ -10,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.every.nook.api.application.appversion.AppPlatform
+import org.every.nook.api.application.appversion.AppVersionPolicy
 import org.every.nook.api.infrastructure.persistence.BaseEntity
 
 @Entity
@@ -24,13 +25,13 @@ class AppVersionPolicyEntity(
     @Column(name = "platform", nullable = false, length = MAX_PLATFORM_LENGTH)
     val platform: AppPlatform,
     @Column(name = "minimum_supported_build_number", nullable = false)
-    val minimumSupportedBuildNumber: Long,
+    var minimumSupportedBuildNumber: Long,
     @Column(name = "latest_build_number", nullable = false)
-    val latestBuildNumber: Long,
+    var latestBuildNumber: Long,
     @Column(name = "latest_version", nullable = false, length = MAX_VERSION_LENGTH)
-    val latestVersion: String,
+    var latestVersion: String,
     @Column(name = "store_url", nullable = false, length = MAX_STORE_URL_LENGTH)
-    val storeUrl: String,
+    var storeUrl: String,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,9 +39,16 @@ class AppVersionPolicyEntity(
     var id: Long? = null
         protected set
 
+    fun update(policy: AppVersionPolicy) {
+        minimumSupportedBuildNumber = policy.minimumSupportedBuildNumber
+        latestBuildNumber = policy.latestBuildNumber
+        latestVersion = policy.latestVersion
+        storeUrl = policy.storeUrl
+    }
+
     companion object {
         const val MAX_PLATFORM_LENGTH = 20
-        const val MAX_VERSION_LENGTH = 30
-        const val MAX_STORE_URL_LENGTH = 500
+        const val MAX_VERSION_LENGTH = AppVersionPolicy.MAX_VERSION_LENGTH
+        const val MAX_STORE_URL_LENGTH = AppVersionPolicy.MAX_STORE_URL_LENGTH
     }
 }
