@@ -1,5 +1,6 @@
 package org.every.nook.api.application.post
 
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.processing.ParsingProgressStage
@@ -19,6 +20,7 @@ interface PostContentParsingJobPort {
         post: Post,
         textPlaceClues: List<PlaceClue>,
         imageTranscripts: List<ImageTranscript> = emptyList(),
+        sourceProfileHints: List<SourceProfileHint> = emptyList(),
     )
 
     fun retry(postId: Long, nextAttemptAt: Instant, reason: String)

@@ -44,6 +44,8 @@ class PlaceParsingJobEntity(
     var textPlaceClues: String? = null,
     @Column(name = "image_transcripts", nullable = true, columnDefinition = "MEDIUMTEXT")
     var imageTranscripts: String? = null,
+    @Column(name = "source_profile_hints", nullable = true, columnDefinition = "TEXT")
+    var sourceProfileHints: String? = null,
     @Enumerated(EnumType.STRING)
     @Column(name = "parsing_outcome", nullable = true, length = OUTCOME_LENGTH)
     var parsingOutcome: PlaceParsingDiagnostics.Outcome? = null,

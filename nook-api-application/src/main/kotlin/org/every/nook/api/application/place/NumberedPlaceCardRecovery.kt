@@ -8,7 +8,9 @@ internal fun List<PlaceClue>.reconcileWithNumberedPlaceCards(transcripts: List<I
         .map { clue -> clue.restoreNumberedCardName(cards) }
         .toList()
     return (cards.map(NumberedPlaceCard::toPlaceClue) + normalizedClues)
-        .distinctBy { clue -> clue.name.numberedCardIdentity() }
+        .groupByTo(linkedMapOf()) { clue -> clue.name.numberedCardIdentity() }
+        .values
+        .map { clues -> clues.mergePlaceClues() }
 }
 
 private fun ImageTranscript.numberedPlaceCards(): List<NumberedPlaceCard> = texts.flatMap { text ->
@@ -68,7 +70,7 @@ private data class NumberedPlaceCard(
 )
 
 private val NUMBERED_PLACE_CARD_PATTERN = Regex(
-    "(?:^|\\s)\\d{1,2}\\s*([가-힣A-Za-z][^|ㅣ\\n]{0,29}?)\\s*[|ㅣ]\\s*([^\\s|ㅣ,.;!?]{1,20})",
+    "(?:^|\\s)\\d{1,2}\\s*([가-힣A-Za-z][^|ㅣᅵᆞ·•\\n]{0,29}?)\\s*[|ㅣᅵᆞ·•]\\s*([^\\s|ㅣᅵᆞ·•,.;!?]{1,20})",
 )
 private val CARD_SEQUENCE_PREFIX_PATTERN = Regex("^\\s*\\d{1,2}\\s*")
 private const val MIN_CARD_NAME_LENGTH = 2

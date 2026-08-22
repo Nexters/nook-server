@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.InferredPlaceTag
@@ -89,6 +90,8 @@ class PlaceParsingPersistenceAdapter(
             ).map { it.mediaUrl },
             textClues = job.textPlaceClues?.let { objectMapper.readValue<List<PlaceClue>>(it) },
             imageTranscripts = job.imageTranscripts?.let { objectMapper.readValue<List<ImageTranscript>>(it) },
+            sourceProfileHints = job.sourceProfileHints?.let { objectMapper.readValue<List<SourceProfileHint>>(it) }
+                .orEmpty(),
         )
     }
 
