@@ -34,6 +34,7 @@ class OpenAiContentInferenceAdapter(
             input = request.toInput(),
             schema = placeSchema,
             maxOutputTokens = CONTENT_INFERENCE_MAX_OUTPUT_TOKENS,
+            model = properties.placeClueModel,
         )
         return PostContentInference.Inference(
             placeClues = result.toPlaceClues(),
@@ -66,6 +67,7 @@ class OpenAiContentInferenceAdapter(
             } else {
                 IMAGE_PLACE_MAX_OUTPUT_TOKENS
             },
+            model = properties.placeClueModel,
         )
         return result.toPlaceClues()
     }
@@ -137,11 +139,12 @@ class OpenAiContentInferenceAdapter(
         input: Any,
         schema: Map<String, Any>,
         maxOutputTokens: Int,
+        model: String = properties.model,
     ): JsonNode {
         val startedAt = System.nanoTime()
         require(properties.apiKey.isNotBlank()) { "OpenAI API key is not configured" }
         val request = mapOf(
-            "model" to properties.model,
+            "model" to model,
             "instructions" to instructions,
             "input" to input,
             "reasoning" to mapOf("effort" to "minimal"),
@@ -181,7 +184,7 @@ class OpenAiContentInferenceAdapter(
                     stage = name,
                     outcome = "success",
                     durationMs = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND,
-                    fields = mapOf("provider.name" to "openai", "openai.model" to properties.model),
+                    fields = mapOf("provider.name" to "openai", "openai.model" to model),
                 ),
             )
         }
@@ -250,6 +253,7 @@ class OpenAiContentInferenceAdapter(
         const val NANOS_PER_MILLISECOND = 1_000_000
 
         const val MAX_TITLE_LENGTH = 25
+        const val MAX_PLACE_NAME_LENGTH = 50
         const val MAX_PLACE_COUNT = 60
         const val MAX_QUERY_COUNT = 4
         const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 8000
@@ -266,7 +270,7 @@ class OpenAiContentInferenceAdapter(
             "items" to mapOf(
                 "type" to "object",
                 "properties" to mapOf(
-                    "name" to mapOf("type" to "string"),
+                    "name" to mapOf("type" to "string", "minLength" to 1, "maxLength" to MAX_PLACE_NAME_LENGTH),
                     "region" to mapOf("type" to listOf("string", "null")),
                     "addressHint" to mapOf("type" to listOf("string", "null")),
                     "queries" to mapOf(
@@ -333,6 +337,8 @@ class OpenAiContentInferenceAdapter(
                 "sourceLocationTag는 지역 문맥과 검색어를 보조하는 힌트로만 사용한다. " +
                 "sourceLocationTag를 name, addressHint 또는 장소 존재의 근거로 사용하지 않는다. " +
                 "name은 본문, 해시태그 또는 imageTranscripts에 명시된 상호명만 사용한다. " +
+                "name에는 짧은 고유 상호명만 담고, 상호명을 설명문·감상문·업종 문장으로 바꾸거나 " +
+                "상호명이 없다는 해설을 덧붙이지 않는다. '위치는 OOO입니다'처럼 위치를 명시한 문장에서는 OOO를 상호명으로 검토한다. " +
                 "본문에서 상호명이 해시태그, 첫 문장 또는 소개 문장에 있고 '위치', '주소', 'add.'로 시작하는 주소가 " +
                 "뒤쪽의 별도 문단에 있더라도, 다른 장소가 명시되지 않았다면 같은 영업 장소의 name과 addressHint로 연결한다. " +
                 "주소가 없거나 여러 상호명 중 어느 주소인지 불명확하면 해시태그만으로 장소를 만들지 않는다. " +
@@ -342,6 +348,10 @@ class OpenAiContentInferenceAdapter(
                 "영업 장소를 식별할 근거가 있는 이미지를 일부만 선택해 생략하지 않는다. " +
                 "텍스트의 위치, 크기, 번호, 카드 형식이나 이미지당 장소 개수를 가정하지 않는다. " +
                 "한 이미지에서 장소가 없거나 여러 개일 수 있고, 같은 장소가 여러 이미지에 나오면 하나로 합친다. " +
+                "여러 이미지에 반복되는 매거진명, 계정명, 로고, 워터마크는 장소명이 아니다. " +
+                "서로 다른 카드의 상호명을 반복 워터마크가 같다는 이유로 하나로 합치지 않는다. " +
+                "'3 초라멘 | 화양동'처럼 순번, 상호명, 지역이 구분된 카드는 숫자를 제외한 '초라멘'만 name으로 사용하고 " +
+                "각 순번 카드의 상호명을 별도 장소로 반환한다. " +
                 "표지 제목, 장소 개수 문구, 지역명 또는 일반 업종명만으로 상호명을 만들지 않는다. " +
                 "주소가 있는 장소 카드에서는 주소 바로 앞의 상호명 표기를 우선하며 OCR 오타로 보여도 임의 교정하지 않는다. " +
                 "이미지 근거가 있는 장소는 imageTranscripts의 imageIndex와 상호명 또는 주소가 포함된 실제 전사 문구를 " +
@@ -349,6 +359,10 @@ class OpenAiContentInferenceAdapter(
                 "읽을 수 없는 글씨나 로고를 추측하지 않는다. " +
                 "장소별 상호명 name, 확인 가능한 region, 명시된 전체 주소 addressHint, 장소 검색용 queries를 반환한다. " +
                 "queries는 본문에서 확인되는 한글·영문 표기와 지역 조합을 우선해 서로 다른 검색어 3~4개를 만든다. " +
+                "상호명과 지역의 순서만 뒤집은 중복 검색어를 만들지 않는다. 동·역·랜드마크만 확인된 경우에는 " +
+                "확실히 알 수 있는 상위 행정구나 대표 인근역을 결합한 검색어도 하나 포함한다. " +
+                "짧은 이미지 상호명이 OCR 오독일 가능성이 있으면 name은 전사 원문대로 유지하되, " +
+                "검색어 하나에는 문맥상 가능한 한글 OCR 변형과 지역을 함께 사용할 수 있다. " +
                 "sourceLocationTag는 상호명과 결합한 지역 검색어에만 사용할 수 있다. " +
                 "addressHint가 있으면 상호명과 전체 주소를 조합한 검색어를 포함하고 층·호 정보를 그대로 유지한다. " +
                 "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 60개 가게와 가게당 최대 4개 검색어만 반환한다."

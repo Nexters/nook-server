@@ -27,12 +27,21 @@ internal fun placeParsingDiagnostics(
     )
 }
 
-internal fun List<ImageTranscript>.detectedPlaceCardCount(): Int = mapNotNull { transcript ->
-    transcript.texts.asSequence()
-        .flatMap { text -> ADDRESS_PATTERN.findAll(text) }
-        .map { match -> match.value.placeCardAddressKey() }
-        .firstOrNull()
-}.distinct().count()
+internal fun List<ImageTranscript>.detectedPlaceCardCount(): Int {
+    val addressCardCount = mapNotNull { transcript ->
+        transcript.texts.asSequence()
+            .flatMap { text -> ADDRESS_PATTERN.findAll(text) }
+            .map { match -> match.value.placeCardAddressKey() }
+            .firstOrNull()
+    }.distinct().count()
+    val declaredPickCount = asSequence()
+        .flatMap { transcript -> transcript.texts.asSequence() }
+        .flatMap { text -> PICK_COUNT_PATTERN.findAll(text) }
+        .mapNotNull { match -> match.groupValues[1].toIntOrNull() }
+        .filter { count -> count in MIN_PICK_COUNT..MAX_PICK_COUNT }
+        .maxOrNull()
+    return maxOf(addressCardCount, declaredPickCount ?: 0)
+}
 
 internal fun effectiveExpectedPlaceCount(textExpectedPlaceCount: Int?, transcripts: List<ImageTranscript>): Int? =
     listOfNotNull(textExpectedPlaceCount, transcripts.detectedPlaceCardCount()).maxOrNull()
@@ -132,6 +141,7 @@ private val PLACE_CARD_ADDRESS_PATTERN = Regex(
         "(?:-\\d+)?(?:\\s+(?:지(?:하)?\\s*\\d+\\s*층|B\\s*-?\\s*\\d+|\\d+(?:\\s*,\\s*\\d+)?\\s*층|\\d+\\s*호))*",
     RegexOption.IGNORE_CASE,
 )
+private val PICK_COUNT_PATTERN = Regex("(?i)\\bPICK\\s*[:#-]?\\s*(\\d{1,2})\\b")
 
 private fun String.placeCardAddressKey(): String = lowercase().filter(Char::isLetterOrDigit)
 private fun String.placeCardNameKey(): String = lowercase().filter(Char::isLetterOrDigit)
@@ -139,6 +149,8 @@ private const val MIN_PLACE_NAME_TEXT_LENGTH = 2
 private const val MIN_EVIDENCE_IDENTITY_LENGTH = 2
 private const val MAX_PLACE_CARD_NAME_LENGTH = 30
 private const val MAX_PLACE_CARD_NAME_WORDS = 3
+private const val MIN_PICK_COUNT = 2
+private const val MAX_PICK_COUNT = 60
 private val METROPOLITAN_REGION_NAMES = setOf(
     "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "제주",
 )

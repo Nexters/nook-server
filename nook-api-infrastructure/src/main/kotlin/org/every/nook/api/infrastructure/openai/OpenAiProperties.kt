@@ -8,6 +8,7 @@ data class OpenAiProperties(
     val baseUrl: String = "https://api.openai.com",
     val apiKey: String = "",
     val model: String = "gpt-5-nano",
+    val placeClueModel: String = "gpt-5-mini",
     val imageTextModel: String = "gpt-5-mini",
     val connectTimeout: Duration = Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS),
     val readTimeout: Duration = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS),
