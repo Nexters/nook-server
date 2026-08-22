@@ -303,7 +303,7 @@ class PlaceParsingResilienceTest {
             this.nextAttemptAt = nextAttemptAt
         }
 
-        override fun fail(postId: Long, reason: String) {
+        override fun fail(postId: Long, title: String, reason: String) {
             failedReason = reason
         }
     }

@@ -247,8 +247,9 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun fail(postId: Long, reason: String) {
+    override fun fail(postId: Long, title: String, reason: String) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
+        postRepository.findById(postId).orElseThrow().updateTitleFromParsing(title)
         job.freezeProgress(clock.instant())
         job.status = PlaceParsingStatus.FAILED
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)

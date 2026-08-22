@@ -17,7 +17,7 @@ interface PlaceParsingJobPort {
 
     fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
 
-    fun fail(postId: Long, reason: String)
+    fun fail(postId: Long, title: String, reason: String)
 }
 
 data class PlaceParsingDiagnostics(

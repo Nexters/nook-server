@@ -11,7 +11,7 @@ internal class FinalizePostTitle(private val selector: PostTitleSelector) {
         places: List<PlaceCandidate>,
         declaredPlaceCount: Int?,
         latestImageTranscripts: List<ImageTranscript>,
-    ): String? {
+    ): String {
         val transcripts = latestImageTranscripts.ifEmpty { job.imageTranscripts.orEmpty() }
         val request = PostTitleSelector.Request(
             body = job.body,
@@ -38,10 +38,12 @@ internal class FinalizePostTitle(private val selector: PostTitleSelector) {
                     "rejectedCoverReason=${result.rejectedCoverReason}, usedFallback=${selected == null}"
             }
             selected
-        } ?: fallback
+        } ?: fallback ?: DEFAULT_POST_TITLE
     }
 
     private companion object {
         val logger = KotlinLogging.logger {}
     }
 }
+
+internal const val DEFAULT_POST_TITLE = "방문해보기 좋은 곳"
