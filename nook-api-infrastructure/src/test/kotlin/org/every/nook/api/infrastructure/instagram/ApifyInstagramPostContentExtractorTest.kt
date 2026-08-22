@@ -49,6 +49,7 @@ class ApifyInstagramPostContentExtractorTest {
 
         assertEquals("Post123", result.post.source.externalPostId)
         assertEquals("owner", result.post.authorIdentifier)
+        assertEquals("호뎅 | 건대 술집 ㅣ 이자카야", result.sourceProfileHints.single().displayName)
         verify(fixture.responseCache).save("APIFY", "INSTAGRAM", "Post123", POST_RESPONSE)
         fixture.server.verify()
     }
@@ -152,7 +153,11 @@ class ApifyInstagramPostContentExtractorTest {
               "caption": "caption",
               "url": "https://www.instagram.com/p/Post123/",
               "displayUrl": "https://cdn.example/image.jpg",
-              "ownerUsername": "owner"
+              "ownerUsername": "owner",
+              "taggedUsers": [{
+                "full_name": "호뎅 | 건대 술집 ㅣ 이자카야",
+                "username": "ho.den_g"
+              }]
             }]
             """.trimIndent()
     }

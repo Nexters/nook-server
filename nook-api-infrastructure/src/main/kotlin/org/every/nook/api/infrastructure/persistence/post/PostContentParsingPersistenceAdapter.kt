@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.post
 
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceClue
 import org.every.nook.api.application.place.PlaceParsingJobRequestedEvent
@@ -75,6 +76,7 @@ class PostContentParsingPersistenceAdapter(
         post: Post,
         textPlaceClues: List<PlaceClue>,
         imageTranscripts: List<ImageTranscript>,
+        sourceProfileHints: List<SourceProfileHint>,
     ) {
         val job = requireNotNull(jobRepository.findByPostId(postId))
         check(job.status == PostContentParsingStatus.PROCESSING)
@@ -113,8 +115,8 @@ class PostContentParsingPersistenceAdapter(
                 PlaceParsingJobEntity(
                     postId = postId,
                     textPlaceClues = objectMapper.writeValueAsString(textPlaceClues),
-                    imageTranscripts = imageTranscripts.takeIf(List<ImageTranscript>::isNotEmpty)
-                        ?.let(objectMapper::writeValueAsString),
+                    imageTranscripts = imageTranscripts.toJsonOrNull(),
+                    sourceProfileHints = sourceProfileHints.toJsonOrNull(),
                     status = PlaceParsingStatus.PENDING,
                     nextAttemptAt = clock.instant(),
                 ),
@@ -165,6 +167,9 @@ class PostContentParsingPersistenceAdapter(
             PostContentParsingStatus.FAILED,
             -> false
         }
+
+    private fun <T> List<T>.toJsonOrNull(): String? = takeIf(List<T>::isNotEmpty)
+        ?.let(objectMapper::writeValueAsString)
 
     private companion object {
         val OUTSTANDING_STATUSES = listOf(

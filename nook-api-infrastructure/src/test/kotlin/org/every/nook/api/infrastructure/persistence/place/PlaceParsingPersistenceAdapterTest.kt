@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.InferredPlaceTag
 import org.every.nook.api.application.place.PlaceCandidate
@@ -207,6 +208,30 @@ class PlaceParsingPersistenceAdapterTest {
     }
 
     @Test
+    fun `returns stored source profile hints when claiming a job`() {
+        val job = PlaceParsingJobEntity(
+            postId = 11,
+            status = PlaceParsingStatus.PENDING,
+            sourceProfileHints = SOURCE_PROFILE_HINTS_JSON,
+            nextAttemptAt = NOW.minusSeconds(1),
+        )
+        val post = mock(PostEntity::class.java)
+        `when`(jobRepository.findByPostIdForUpdate(11)).thenReturn(job)
+        `when`(postRepository.findById(11)).thenReturn(Optional.of(post))
+        `when`(hashtagRepository.findAllByPostIdOrderBySequenceAsc(11)).thenReturn(emptyList())
+        `when`(
+            mediaRepository.findFirst20ByPostIdAndMediaTypeOrderBySequenceAsc(11, PostMedia.MediaType.IMAGE),
+        ).thenReturn(emptyList())
+
+        val claimed = requireNotNull(adapter.claim(11, Duration.ofMinutes(1)))
+
+        assertEquals(
+            SourceProfileHint("호뎅 | 건대 술집 ㅣ 이자카야", "ho.den_g"),
+            claimed.sourceProfileHints.single(),
+        )
+    }
+
+    @Test
     fun `stores image transcripts on a processing job`() {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
@@ -384,6 +409,8 @@ class PlaceParsingPersistenceAdapterTest {
     }
 
     private companion object {
+        const val SOURCE_PROFILE_HINTS_JSON =
+            """[{"displayName":"호뎅 | 건대 술집 ㅣ 이자카야","username":"ho.den_g"}]"""
         val NOW: Instant = Instant.parse("2026-07-28T00:00:00Z")
     }
     private fun savedPostWithMemo(userId: Long, memo: String?): UserSavedPostEntity {

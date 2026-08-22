@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.instagram
 
 import org.every.nook.api.application.content.ExtractedPostContent
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.domain.post.PostSource
@@ -18,6 +19,11 @@ class ApifyInstagramMapper {
         ),
         hashtags = record.hashtags.orEmpty().filter(String::isNotBlank),
         sourceLocationNames = listOfNotNull(record.locationName?.takeIf(String::isNotBlank)),
+        sourceProfileHints = record.taggedUsers.orEmpty().mapNotNull { taggedUser ->
+            val displayName = taggedUser.fullName?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+            val username = taggedUser.username?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+            SourceProfileHint(displayName = displayName, username = username)
+        }.distinctBy(SourceProfileHint::username),
     )
 
     private fun mapMedia(record: ApifyInstagramRecord): List<PostMedia> {

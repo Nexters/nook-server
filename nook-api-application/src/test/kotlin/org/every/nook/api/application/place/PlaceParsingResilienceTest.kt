@@ -1,5 +1,6 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.content.SourceProfileHint
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -180,6 +181,82 @@ class PlaceParsingResilienceTest {
         assertTrue(reconciled.none { clue -> clue.name == "Knewnew" })
         assertEquals("화양동", reconciled.last().region)
         assertEquals(listOf(2, 3, 4), reconciled.map { clue -> clue.evidence.single().imageIndex })
+    }
+
+    @Test
+    fun `merges numbered card grounding without dropping model search queries`() {
+        val transcript = ImageTranscript(
+            6,
+            listOf("PEPSI 스트릿 5 송정 | 망원역 항정국밥이 인상적인 곳"),
+        )
+        val modelClue = PlaceClue(
+            name = "송정",
+            region = "망원역",
+            queries = listOf("송정 항정국밥 망원", "망원동 한식 송정"),
+            evidence = listOf(PlaceClueEvidence(6, transcript.texts.single())),
+        )
+
+        val reconciled = listOf(modelClue).reconcileWithNumberedPlaceCards(listOf(transcript)).single()
+
+        assertEquals("송정", reconciled.name)
+        assertTrue("송정 항정국밥 망원" in reconciled.queries)
+        assertTrue("망원동 한식 송정" in reconciled.queries)
+        assertEquals(
+            listOf("송정", "망원역 송정", "송정 항정국밥 망원", "망원동 한식 송정"),
+            reconciled.searchQueries(),
+        )
+    }
+
+    @Test
+    fun `corrects OCR place names from tagged profiles without adding sponsor profiles`() {
+        val transcripts = listOf(
+            ImageTranscript(4, listOf("3 쏟송 | 망원역 태국 쌀국수집")),
+            ImageTranscript(6, listOf("5 송정 | 망원역 항정국밥집")),
+            ImageTranscript(9, listOf("표준 5 흐릿 ᆞ화양동 생과일 디저트 카페")),
+            ImageTranscript(11, listOf("7 호덱 ᅵ 화양동 수제 오뎅 이자카야")),
+        )
+        val summaryClue = PlaceClue(
+            name = "순송",
+            region = "망원역",
+            queries = listOf("순송 망원 태국 쌀국수"),
+            evidence = listOf(PlaceClueEvidence(7, "③ 순송 : 순송 콤보")),
+        )
+        val hints = listOf(
+            SourceProfileHint("쑨송 ศูนย์สอง", "suunsong.seoul"),
+            SourceProfileHint("송정", "song.jung_"),
+            SourceProfileHint("오드커피하우스 - 건대카페", "odee_coffee_house"),
+            SourceProfileHint("카페 우리스", "cafe.wuris"),
+            SourceProfileHint("cho_ramen", "cho_ramen"),
+            SourceProfileHint("킨보이서울 | 갸또 • 디저트 • 케이크 • 건대카페", "keenboy.seoul"),
+            SourceProfileHint("오코노미야키 | 야키소바 | 일본하이볼", "pobi.okonomiyaki"),
+            SourceProfileHint("카페흐릇🍑", "hruit__"),
+            SourceProfileHint("호뎅 | 건대 술집 ㅣ 이자카야", "ho.den_g"),
+            SourceProfileHint("펩시코리아 Pepsi Korea", "pepsi.korea"),
+        )
+
+        val reconciled = listOf(summaryClue)
+            .reconcileWithNumberedPlaceCards(transcripts)
+            .reconcileWithSourceProfileHints(hints)
+
+        assertEquals(listOf("쑨송", "송정", "카페흐릇", "호뎅"), reconciled.map(PlaceClue::name))
+        assertEquals(2, reconciled.first().evidence.size)
+        assertTrue(reconciled.first().queries.any { query -> "쑨송" in query })
+        assertTrue(reconciled.none { clue -> "펩시" in clue.name })
+    }
+
+    @Test
+    fun `does not correct a text-only clue from a nearby tagged profile name`() {
+        val textClue = PlaceClue(
+            name = "호덱",
+            region = "화양동",
+            queries = listOf("호덱 화양동"),
+        )
+
+        val reconciled = listOf(textClue).reconcileWithSourceProfileHints(
+            listOf(SourceProfileHint("호뎅 | 건대 술집", "ho.den_g")),
+        )
+
+        assertEquals("호덱", reconciled.single().name)
     }
 
     @Test
