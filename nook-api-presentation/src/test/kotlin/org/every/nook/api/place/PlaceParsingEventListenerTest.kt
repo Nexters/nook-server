@@ -127,7 +127,7 @@ class PlaceParsingEventListenerTest {
 
         override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) = Unit
 
-        override fun fail(postId: Long, reason: String) = Unit
+        override fun fail(postId: Long, title: String, reason: String) = Unit
     }
 
     private companion object {

@@ -745,7 +745,31 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
         assertEquals("No place could be resolved after image analysis", port.failedReason)
+        assertEquals("방문해보기 좋은 곳", port.failedTitle)
         assertNull(port.nextAttemptAt)
+    }
+
+    @Test
+    fun `selects a grounded title before failing place parsing`() {
+        val port = FakeJobPort(body = "망원동 오니기리", sourceLocationTag = "망원동")
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { emptyList() },
+            search = SearchPlaceCandidatesUseCase { emptyList() },
+            titleSelector = PostTitleSelector { request ->
+                assertEquals(emptyList(), request.places)
+                PostTitleSelector.Result(
+                    title = "망원동 오니기리",
+                    source = PostTitleSelector.Source.BODY,
+                    evidence = listOf("망원동 오니기리"),
+                    rejectedCoverReason = null,
+                )
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
+        assertEquals("망원동 오니기리", port.failedTitle)
+        assertEquals("No place could be resolved from text", port.failedReason)
     }
 
     @Test
@@ -790,6 +814,7 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
         assertEquals("permanent provider failure", port.failedReason)
+        assertEquals("방문해보기 좋은 곳", port.failedTitle)
         assertNull(port.nextAttemptAt)
     }
 
@@ -851,6 +876,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         var storedImageTranscripts: List<ImageTranscript>? = null
         var diagnostics: PlaceParsingDiagnostics? = null
         var completedTitle: String? = null
+        var failedTitle: String? = null
         val progressStages = mutableListOf<ParsingProgressStage>()
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob = ClaimedPlaceParsingJob(
@@ -890,7 +916,8 @@ class ProcessPlaceParsingJobUseCaseTest {
             retryReason = reason
         }
 
-        override fun fail(postId: Long, reason: String) {
+        override fun fail(postId: Long, title: String, reason: String) {
+            failedTitle = title
             failedReason = reason
         }
     }
