@@ -139,6 +139,79 @@ class PlaceParsingResilienceTest {
     }
 
     @Test
+    fun `detects declared PICK count without card addresses`() {
+        val transcripts = listOf(
+            ImageTranscript(1, listOf("건대생들이 사랑하는 맛집 PICK 7")),
+            ImageTranscript(2, listOf("Knewnew 1 카페우리스 | 화양동")),
+        )
+
+        assertEquals(7, transcripts.detectedPlaceCardCount())
+        assertEquals(7, effectiveExpectedPlaceCount(null, transcripts))
+    }
+
+    @Test
+    fun `recovers numbered card names and removes a repeated publisher watermark`() {
+        val transcripts = listOf(
+            ImageTranscript(2, listOf("Knewnew 1 토마토코엔 | 망원역 일본 가정식")),
+            ImageTranscript(3, listOf("Knewnew 2 새벽카레 | 망원역 카레")),
+            ImageTranscript(4, listOf("Knewnew 3 초라멘 | 화양동 라멘")),
+        )
+        val clues = listOf(
+            PlaceClue(
+                name = "Knewnew",
+                region = null,
+                queries = listOf("Knewnew"),
+                evidence = listOf(
+                    PlaceClueEvidence(2, transcripts[0].texts.single()),
+                    PlaceClueEvidence(3, transcripts[1].texts.single()),
+                ),
+            ),
+            PlaceClue(
+                name = "3 초라멘",
+                region = "화양동",
+                queries = listOf("3 초라멘 화양동"),
+                evidence = listOf(PlaceClueEvidence(4, transcripts[2].texts.single())),
+            ),
+        )
+
+        val reconciled = clues.reconcileWithNumberedPlaceCards(transcripts)
+
+        assertEquals(listOf("토마토코엔", "새벽카레", "초라멘"), reconciled.map(PlaceClue::name))
+        assertTrue(reconciled.none { clue -> clue.name == "Knewnew" })
+        assertEquals("화양동", reconciled.last().region)
+        assertEquals(listOf(2, 3, 4), reconciled.map { clue -> clue.evidence.single().imageIndex })
+    }
+
+    @Test
+    fun `keeps all seven independent places from the post 386 card format`() {
+        val names = listOf(
+            "토마토코엔",
+            "새벽카레",
+            "키친갈매기",
+            "나고미칸",
+            "이치젠",
+            "카페나하 본점",
+            "로스트비프 산볼 망원본점",
+        )
+        val transcripts = names.mapIndexed { index, name ->
+            ImageTranscript(index + 2, listOf("Knewnew ${index + 1} $name | 망원역 장소 소개"))
+        }
+        val mergedWatermark = PlaceClue(
+            name = "Knewnew",
+            region = "망원역",
+            queries = listOf("Knewnew 망원"),
+            evidence = transcripts.take(3).map { transcript ->
+                PlaceClueEvidence(transcript.imageIndex, transcript.texts.single())
+            },
+        )
+
+        val reconciled = listOf(mergedWatermark).reconcileWithNumberedPlaceCards(transcripts)
+
+        assertEquals(names, reconciled.map(PlaceClue::name))
+        assertEquals((2..8).toList(), reconciled.map { clue -> clue.evidence.single().imageIndex })
+    }
+
+    @Test
     fun `restores a one-character place name immediately before an address`() {
         val transcript = ImageTranscript(
             7,
