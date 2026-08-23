@@ -18,6 +18,7 @@ import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailUpdatePort
 import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
+import org.every.nook.api.application.processing.ParsingFollowUpJobPort
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
@@ -31,7 +32,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
-import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -57,7 +58,7 @@ class PlaceParsingPersistenceAdapter(
     private val sharedBookmarkSyncRepository: SharedPlaceBookmarkSyncJpaRepository,
     private val postPlaceTagRepository: PostPlaceTagJpaRepository,
     private val postPlaceReviewRepository: PostPlaceReviewJpaRepository,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val followUpJobPort: ParsingFollowUpJobPort,
     private val objectMapper: ObjectMapper,
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
@@ -96,10 +97,11 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>) {
-        val job = requireNotNull(jobRepository.findByPostId(postId))
-        check(job.status == PlaceParsingStatus.PROCESSING)
+    override fun storeImageTranscripts(postId: Long, attempt: Int, transcripts: List<ImageTranscript>): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
         job.imageTranscripts = objectMapper.writeValueAsString(transcripts)
+        return true
     }
 
     @Transactional(readOnly = true)
@@ -115,27 +117,45 @@ class PlaceParsingPersistenceAdapter(
             )
         }
 
+    @Transactional(readOnly = true)
+    override fun findOutstanding(processingTimeout: Duration, limit: Int): List<OutstandingPlaceParsingJob> =
+        jobRepository.findAllByStatusInOrderByNextAttemptAtAsc(OUTSTANDING_STATUSES, PageRequest.of(0, limit))
+            .map { job ->
+                OutstandingPlaceParsingJob(
+                    postId = job.postId,
+                    availableAt = when (job.status) {
+                        PlaceParsingStatus.PENDING -> job.nextAttemptAt
+                        PlaceParsingStatus.PROCESSING -> job.updatedAt.plus(processingTimeout)
+                        else -> error("Unexpected place parsing status: ${job.status}")
+                    },
+                )
+            }
+
     @Transactional
-    override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
-        requireNotNull(jobRepository.findByPostId(postId)).advanceProgress(stage, clock.instant())
+    override fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
+        job.advanceProgress(stage, clock.instant())
+        return true
     }
 
     @Transactional
     override fun complete(
         postId: Long,
+        attempt: Int,
         title: String?,
         places: List<PlaceCandidate>,
         diagnostics: PlaceParsingDiagnostics,
-    ) {
-        val job = requireNotNull(jobRepository.findByPostId(postId))
-        check(job.status == PlaceParsingStatus.PROCESSING)
+    ): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
         postRepository.findById(postId).orElseThrow().updateTitleFromParsing(title)
         if (postPlaceReviewRepository.existsByPostId(postId)) {
             job.status = PlaceParsingStatus.COMPLETED
             job.failureReason = null
             job.updateDiagnostics(diagnostics, objectMapper)
             job.progressPercent = COMPLETED_PERCENT
-            return
+            return true
         }
         val distinctPlaces = places.distinctBy { it.provider to it.externalPlaceId }
         val resolvedPlaces = distinctPlaces.map { candidate ->
@@ -172,7 +192,7 @@ class PlaceParsingPersistenceAdapter(
         job.progressPercent = COMPLETED_PERCENT
         val placeThumbnailRequests = thumbnailRequests(postId, resolvedPlaces, postPlaces)
         if (placeThumbnailRequests.isNotEmpty()) {
-            eventPublisher.publishEvent(
+            followUpJobPort.enqueue(
                 PlaceThumbnailsRequestedEvent(
                     postId = postId,
                     requests = placeThumbnailRequests,
@@ -183,7 +203,8 @@ class PlaceParsingPersistenceAdapter(
         val tagRequestPlaces = resolvedPlaces.map { it.first }.zip(postPlaces).map { (place, postPlace) ->
             PlaceTagsRequestedEvent.Place(postPlace.placeId, place)
         }
-        eventPublisher.publishEvent(PlaceTagsRequestedEvent(postId, tagRequestPlaces))
+        followUpJobPort.enqueue(PlaceTagsRequestedEvent(postId, tagRequestPlaces))
+        return true
     }
 
     private fun thumbnailRequests(
@@ -240,22 +261,25 @@ class PlaceParsingPersistenceAdapter(
     }
 
     @Transactional
-    override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
-        val job = requireNotNull(jobRepository.findByPostId(postId))
-        check(job.status == PlaceParsingStatus.PROCESSING)
+    override fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
         job.freezeProgress(clock.instant())
         job.status = PlaceParsingStatus.PENDING
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
         job.nextAttemptAt = nextAttemptAt
+        return true
     }
 
     @Transactional
-    override fun fail(postId: Long, title: String, reason: String) {
-        val job = requireNotNull(jobRepository.findByPostId(postId))
+    override fun fail(postId: Long, attempt: Int, title: String, reason: String): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
         postRepository.findById(postId).orElseThrow().updateTitleFromParsing(title)
         job.freezeProgress(clock.instant())
         job.status = PlaceParsingStatus.FAILED
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
+        return true
     }
 
     private fun PlaceParsingJobEntity.isAvailable(now: Instant, processingTimeout: Duration): Boolean = when (status) {
@@ -267,6 +291,9 @@ class PlaceParsingPersistenceAdapter(
         PlaceParsingStatus.FAILED,
         -> false
     }
+
+    private fun PlaceParsingJobEntity.isCurrentAttempt(attempt: Int): Boolean =
+        status == PlaceParsingStatus.PROCESSING && attemptCount == attempt
 
     private companion object {
         val OUTSTANDING_STATUSES = listOf(PlaceParsingStatus.PENDING, PlaceParsingStatus.PROCESSING)

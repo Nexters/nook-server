@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
+import org.every.nook.api.application.processing.ParsingFollowUpJobPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
@@ -12,12 +13,11 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEnti
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.never
-import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
-import org.springframework.context.ApplicationEventPublisher
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +29,7 @@ class ConnectPostPlacePersistenceAdapterTest {
     private val bookmarkRepository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val sharedBookmarkSyncRepository = mock(SharedPlaceBookmarkSyncJpaRepository::class.java)
     private val parsingJobRepository = mock(PlaceParsingJobJpaRepository::class.java)
-    private val eventPublisher = mock(ApplicationEventPublisher::class.java)
+    private val followUpJobPort = mock(ParsingFollowUpJobPort::class.java)
     private val adapter = ConnectPostPlacePersistenceAdapter(
         savedPostRepository,
         placeIdentityResolver,
@@ -37,7 +37,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         bookmarkRepository,
         sharedBookmarkSyncRepository,
         parsingJobRepository,
-        eventPublisher,
+        followUpJobPort,
     )
 
     @Test
@@ -90,12 +90,11 @@ class ConnectPostPlacePersistenceAdapterTest {
         assertEquals(17, captor.value.placeId)
         assertEquals(1, captor.value.sequence)
         verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "게시물 메모")
-        val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
-        verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture())
-        val thumbnailEvent = eventCaptor.allValues.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
+        val followUps = followUps()
+        val thumbnailEvent = followUps.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
         assertEquals(101, thumbnailEvent.postId)
         assertEquals(listOf(candidate()), thumbnailEvent.requests.map { it.place })
-        assertEquals(1, eventCaptor.allValues.filterIsInstance<PlaceTagsRequestedEvent>().size)
+        assertEquals(1, followUps.filterIsInstance<PlaceTagsRequestedEvent>().size)
         assertEquals(PlaceParsingStatus.FAILED, job.status)
         assertEquals("failed", job.failureReason)
     }
@@ -116,10 +115,8 @@ class ConnectPostPlacePersistenceAdapterTest {
         assertEquals(ConnectPostPlacePort.Result.Connected(17), adapter.connect(7, 11, candidate()))
 
         verify(place, never()).updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
-        val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
-        verify(eventPublisher).publishEvent(eventCaptor.capture())
-        assertEquals(1, eventCaptor.allValues.filterIsInstance<PlaceTagsRequestedEvent>().size)
-        assertEquals(0, eventCaptor.allValues.filterIsInstance<PlaceThumbnailsRequestedEvent>().size)
+        assertEquals(1, followUps().filterIsInstance<PlaceTagsRequestedEvent>().size)
+        assertEquals(0, followUps().filterIsInstance<PlaceThumbnailsRequestedEvent>().size)
     }
 
     @Test
@@ -153,6 +150,9 @@ class ConnectPostPlacePersistenceAdapterTest {
 
     private fun parsingJob(status: PlaceParsingStatus): PlaceParsingJobEntity =
         PlaceParsingJobEntity(postId = 101, status = status, failureReason = "failed")
+
+    private fun followUps(): List<Any> = mockingDetails(followUpJobPort).invocations
+        .map { invocation -> invocation.arguments.single() }
 
     private fun candidate(): PlaceCandidate = PlaceCandidate(
         provider = "KAKAO",

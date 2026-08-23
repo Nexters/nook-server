@@ -26,6 +26,7 @@ val allowedModuleDependencies = mapOf(
     ":nook-api-infrastructure" to setOf(":nook-api-application", ":nook-api-domain"),
     ":nook-api-presentation" to setOf(":nook-api-application", ":nook-api-infrastructure"),
     ":nook-api-batch" to setOf(":nook-api-application", ":nook-api-infrastructure"),
+    ":nook-api-worker" to setOf(":nook-api-application", ":nook-api-infrastructure"),
 )
 
 val verifyModuleDependencies = tasks.register("verifyModuleDependencies") {

@@ -37,6 +37,30 @@ scrape_configs:
           env: live
           service: nook-api
 
+  - job_name: nook-worker-dev
+    metrics_path: /actuator/prometheus
+    relabel_configs:
+      - target_label: job
+        replacement: nook-worker
+    static_configs:
+      - targets:
+          - localhost:18081
+        labels:
+          env: dev
+          service: nook-worker
+
+  - job_name: nook-worker-live
+    metrics_path: /actuator/prometheus
+    relabel_configs:
+      - target_label: job
+        replacement: nook-worker
+    static_configs:
+      - targets:
+          - 192.168.0.216:18081
+        labels:
+          env: live
+          service: nook-worker
+
   - job_name: node
     static_configs:
       - targets:

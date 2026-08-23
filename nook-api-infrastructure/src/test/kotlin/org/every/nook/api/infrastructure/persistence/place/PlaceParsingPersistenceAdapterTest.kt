@@ -10,6 +10,7 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagEvidenceSource
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
+import org.every.nook.api.application.processing.ParsingFollowUpJobPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
@@ -26,14 +27,13 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
-import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
-import org.springframework.context.ApplicationEventPublisher
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
 import java.time.Clock
@@ -43,6 +43,7 @@ import java.time.ZoneOffset
 import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class PlaceParsingPersistenceAdapterTest {
     private val jobRepository = mock(PlaceParsingJobJpaRepository::class.java)
@@ -58,7 +59,7 @@ class PlaceParsingPersistenceAdapterTest {
     private val sharedBookmarkSyncRepository = mock(SharedPlaceBookmarkSyncJpaRepository::class.java)
     private val postPlaceTagRepository = mock(PostPlaceTagJpaRepository::class.java)
     private val postPlaceReviewRepository = mock(PostPlaceReviewJpaRepository::class.java)
-    private val eventPublisher = mock(ApplicationEventPublisher::class.java)
+    private val followUpJobPort = mock(ParsingFollowUpJobPort::class.java)
     private val post = PostEntity("INSTAGRAM", "post-11", "https://instagram.test/p/post-11")
     private val adapter = PlaceParsingPersistenceAdapter(
         jobRepository = jobRepository,
@@ -74,13 +75,34 @@ class PlaceParsingPersistenceAdapterTest {
         sharedBookmarkSyncRepository = sharedBookmarkSyncRepository,
         postPlaceTagRepository = postPlaceTagRepository,
         postPlaceReviewRepository = postPlaceReviewRepository,
-        eventPublisher = eventPublisher,
+        followUpJobPort = followUpJobPort,
         objectMapper = jacksonObjectMapper(),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 
     init {
         `when`(postRepository.findById(11)).thenReturn(Optional.of(post))
+        `when`(jobRepository.findByPostIdForUpdate(11)).thenAnswer { jobRepository.findByPostId(11) }
+    }
+
+    @Test
+    fun `ignores completion retry and failure from an expired attempt`() {
+        val job = PlaceParsingJobEntity(
+            postId = 11,
+            status = PlaceParsingStatus.PROCESSING,
+            attemptCount = 2,
+        )
+        `when`(jobRepository.findByPostIdForUpdate(11)).thenReturn(job)
+
+        assertFalse(adapter.complete(11, 1, "오래된 제목", emptyList(), diagnostics()))
+        assertFalse(adapter.retry(11, 1, NOW.plusSeconds(60), "old retry"))
+        assertFalse(adapter.fail(11, 1, "오래된 제목", "old failure"))
+
+        assertEquals(PlaceParsingStatus.PROCESSING, job.status)
+        assertEquals(2, job.attemptCount)
+        assertEquals(null, job.failureReason)
+        assertEquals(null, post.title)
+        verifyNoInteractions(placeRepository, postPlaceRepository, followUpJobPort)
     }
 
     @Test
@@ -89,7 +111,7 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(postPlaceReviewRepository.existsByPostId(11)).thenReturn(true)
 
-        adapter.complete(11, "서촌 카페 모음", emptyList(), diagnostics())
+        adapter.complete(11, 0, "서촌 카페 모음", emptyList(), diagnostics())
 
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
         assertEquals("서촌 카페 모음", post.title)
@@ -103,7 +125,7 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
         `when`(postPlaceReviewRepository.existsByPostId(11)).thenReturn(true)
 
-        adapter.complete(11, "자동 제목", emptyList(), diagnostics())
+        adapter.complete(11, 0, "자동 제목", emptyList(), diagnostics())
 
         assertEquals("운영자 제목", post.title)
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
@@ -114,7 +136,7 @@ class PlaceParsingPersistenceAdapterTest {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
 
-        adapter.fail(11, "방문해보기 좋은 곳", "No place candidate found")
+        adapter.fail(11, 0, "방문해보기 좋은 곳", "No place candidate found")
 
         assertEquals("방문해보기 좋은 곳", post.title)
         assertEquals(PlaceParsingStatus.FAILED, job.status)
@@ -127,7 +149,7 @@ class PlaceParsingPersistenceAdapterTest {
         post.updateTitleFromAdmin("운영자 제목")
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
 
-        adapter.fail(11, "자동 제목", "No place candidate found")
+        adapter.fail(11, 0, "자동 제목", "No place candidate found")
 
         assertEquals("운영자 제목", post.title)
         assertEquals(PlaceParsingStatus.FAILED, job.status)
@@ -236,7 +258,7 @@ class PlaceParsingPersistenceAdapterTest {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
 
-        adapter.storeImageTranscripts(11, listOf(ImageTranscript(1, listOf("원형들", "서울 중구"))))
+        adapter.storeImageTranscripts(11, 0, listOf(ImageTranscript(1, listOf("원형들", "서울 중구"))))
 
         assertEquals("""[{"imageIndex":1,"texts":["원형들","서울 중구"]}]""", job.imageTranscripts)
     }
@@ -248,6 +270,7 @@ class PlaceParsingPersistenceAdapterTest {
 
         adapter.retry(
             postId = 11,
+            attempt = 0,
             nextAttemptAt = NOW.plusSeconds(3),
             reason = "No place candidate matched: Lodge190",
         )
@@ -305,6 +328,7 @@ class PlaceParsingPersistenceAdapterTest {
 
         adapter.complete(
             postId = 11,
+            attempt = 0,
             title = "서울 누크 카페",
             places = listOf(candidate),
             diagnostics = diagnostics(),
@@ -341,6 +365,7 @@ class PlaceParsingPersistenceAdapterTest {
 
         adapter.complete(
             postId = 11,
+            attempt = 0,
             title = "성남 누크 카페",
             places = listOf(candidate),
             diagnostics = diagnostics(),
@@ -366,16 +391,16 @@ class PlaceParsingPersistenceAdapterTest {
         `when`(placeIdentityResolver.resolve(pendingCandidate)).thenReturn(pendingPlace)
         `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(emptyList())
 
-        adapter.complete(11, "서울 카페 2곳", listOf(completedCandidate, pendingCandidate), diagnostics())
+        adapter.complete(11, 0, "서울 카페 2곳", listOf(completedCandidate, pendingCandidate), diagnostics())
 
         verify(completedPlace, org.mockito.Mockito.never())
             .updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
         verify(pendingPlace).updateThumbnailParsing(PlaceThumbnailParsingStatus.PENDING, null)
-        val eventCaptor = ArgumentCaptor.forClass(Any::class.java)
-        verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture())
-        val thumbnailEvent = eventCaptor.allValues.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
+        val followUps = mockingDetails(followUpJobPort).invocations
+            .map { invocation -> invocation.arguments.single() }
+        val thumbnailEvent = followUps.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
         assertEquals(listOf("pending"), thumbnailEvent.requests.map { it.place.externalPlaceId })
-        val tagEvent = eventCaptor.allValues.filterIsInstance<PlaceTagsRequestedEvent>().single()
+        val tagEvent = followUps.filterIsInstance<PlaceTagsRequestedEvent>().single()
         assertEquals(listOf(17L, 18L), tagEvent.places.map { it.placeId })
     }
 

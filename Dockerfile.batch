@@ -9,6 +9,7 @@ COPY nook-api-batch nook-api-batch
 COPY nook-api-domain nook-api-domain
 COPY nook-api-infrastructure nook-api-infrastructure
 COPY nook-api-presentation nook-api-presentation
+COPY nook-api-worker nook-api-worker
 
 RUN chmod +x gradlew && ./gradlew :nook-api-batch:bootJar --no-daemon
 

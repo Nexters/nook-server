@@ -8,6 +8,7 @@ import org.every.nook.api.application.post.ClaimedPostContentParsingJob
 import org.every.nook.api.application.post.OutstandingPostContentParsingJob
 import org.every.nook.api.application.post.PostContentParsingJobPort
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
+import org.every.nook.api.application.processing.ParsingFollowUpJobPort
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.Post
@@ -15,6 +16,7 @@ import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -30,6 +32,7 @@ class PostContentParsingPersistenceAdapter(
     private val hashtagRepository: PostHashtagJpaRepository,
     private val placeParsingJobRepository: PlaceParsingJobJpaRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val followUpJobPort: ParsingFollowUpJobPort,
     private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
 ) : PostContentParsingJobPort {
@@ -65,21 +68,41 @@ class PostContentParsingPersistenceAdapter(
             )
         }
 
+    @Transactional(readOnly = true)
+    override fun findOutstanding(processingTimeout: Duration, limit: Int): List<OutstandingPostContentParsingJob> =
+        jobRepository.findAllByStatusInOrderByNextAttemptAtAsc(OUTSTANDING_STATUSES, PageRequest.of(0, limit))
+            .map { job ->
+                OutstandingPostContentParsingJob(
+                    postId = job.postId,
+                    availableAt = when (job.status) {
+                        PostContentParsingStatus.PENDING -> job.nextAttemptAt
+                        PostContentParsingStatus.PROCESSING -> job.updatedAt.plus(processingTimeout)
+                        else -> error("Unexpected post content parsing status: ${job.status}")
+                    },
+                )
+            }
+
     @Transactional
-    override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
-        requireNotNull(jobRepository.findByPostId(postId)).advanceProgress(stage, clock.instant())
+    override fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
+        job.advanceProgress(stage, clock.instant())
+        return true
     }
 
     @Transactional
+    // Content, dependent place job, and durable follow-ups must remain one short atomic persistence boundary.
+    @Suppress("LongMethod")
     override fun complete(
         postId: Long,
+        attempt: Int,
         post: Post,
         textPlaceClues: List<PlaceClue>,
         imageTranscripts: List<ImageTranscript>,
         sourceProfileHints: List<SourceProfileHint>,
-    ) {
-        val job = requireNotNull(jobRepository.findByPostId(postId))
-        check(job.status == PostContentParsingStatus.PROCESSING)
+    ): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
         val entity = postRepository.findById(postId).orElseThrow()
         if (!entity.contentManuallyOverridden) {
             entity.updateContent(post)
@@ -125,7 +148,7 @@ class PostContentParsingPersistenceAdapter(
         }
         if (!entity.contentManuallyOverridden) {
             post.media.forEach { media ->
-                eventPublisher.publishEvent(
+                followUpJobPort.enqueue(
                     PostMediaStorageRequestedEvent(
                         postId = postId,
                         mediaType = media.type.name,
@@ -137,24 +160,28 @@ class PostContentParsingPersistenceAdapter(
                 )
             }
         }
+        return true
     }
 
     @Transactional
-    override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
-        val job = requireNotNull(jobRepository.findByPostId(postId))
-        check(job.status == PostContentParsingStatus.PROCESSING)
+    override fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
         job.freezeProgress(clock.instant())
         job.status = PostContentParsingStatus.PENDING
         job.failureReason = reason.take(PostContentParsingJobEntity.FAILURE_REASON_MAX_LENGTH)
         job.nextAttemptAt = nextAttemptAt
+        return true
     }
 
     @Transactional
-    override fun fail(postId: Long, reason: String) {
-        val job = requireNotNull(jobRepository.findByPostId(postId))
+    override fun fail(postId: Long, attempt: Int, reason: String): Boolean {
+        val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
+        if (!job.isCurrentAttempt(attempt)) return false
         job.freezeProgress(clock.instant())
         job.status = PostContentParsingStatus.FAILED
         job.failureReason = reason.take(PostContentParsingJobEntity.FAILURE_REASON_MAX_LENGTH)
+        return true
     }
 
     private fun PostContentParsingJobEntity.isAvailable(now: Instant, processingTimeout: Duration): Boolean =
@@ -167,6 +194,9 @@ class PostContentParsingPersistenceAdapter(
             PostContentParsingStatus.FAILED,
             -> false
         }
+
+    private fun PostContentParsingJobEntity.isCurrentAttempt(attempt: Int): Boolean =
+        status == PostContentParsingStatus.PROCESSING && attemptCount == attempt
 
     private fun <T> List<T>.toJsonOrNull(): String? = takeIf(List<T>::isNotEmpty)
         ?.let(objectMapper::writeValueAsString)

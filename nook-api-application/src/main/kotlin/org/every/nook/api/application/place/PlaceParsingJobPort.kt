@@ -9,15 +9,24 @@ interface PlaceParsingJobPort {
 
     fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob>
 
-    fun updateProgress(postId: Long, stage: ParsingProgressStage) = Unit
+    fun findOutstanding(processingTimeout: Duration, limit: Int): List<OutstandingPlaceParsingJob> =
+        findOutstanding(processingTimeout).take(limit)
 
-    fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>)
+    fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean
 
-    fun complete(postId: Long, title: String?, places: List<PlaceCandidate>, diagnostics: PlaceParsingDiagnostics)
+    fun storeImageTranscripts(postId: Long, attempt: Int, transcripts: List<ImageTranscript>): Boolean
 
-    fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
+    fun complete(
+        postId: Long,
+        attempt: Int,
+        title: String?,
+        places: List<PlaceCandidate>,
+        diagnostics: PlaceParsingDiagnostics,
+    ): Boolean
 
-    fun fail(postId: Long, title: String, reason: String)
+    fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String): Boolean
+
+    fun fail(postId: Long, attempt: Int, title: String, reason: String): Boolean
 }
 
 data class PlaceParsingDiagnostics(

@@ -24,8 +24,8 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 
-// Trace recording is part of this orchestration boundary to preserve stage order.
-@Suppress("LongMethod")
+// Trace/fencing helpers stay in this orchestration boundary to preserve stage and attempt transition order.
+@Suppress("LongMethod", "TooManyFunctions")
 class ProcessPostContentParsingJobUseCase(
     private val jobPort: PostContentParsingJobPort,
     private val extractPostContent: ExtractPostContentUseCase,
@@ -45,7 +45,7 @@ class ProcessPostContentParsingJobUseCase(
         logger.info { "Post content parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
-            jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_FETCH)
+            ensureActive(job, ParsingProgressStage.CONTENT_FETCH)
             val extracted = measure(job, EXTRACT_STAGE) {
                 extractPostContent(job.canonicalUrl)
             }
@@ -54,7 +54,7 @@ class ProcessPostContentParsingJobUseCase(
                 hashtags = extracted.hashtags.toPersistentHashtags(),
             )
             val coverTranscript = providedPost.coverImageUrl()?.let { imageUrl ->
-                jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_COVER_TITLE)
+                ensureActive(job, ParsingProgressStage.CONTENT_COVER_TITLE)
                 measure(job, COVER_TITLE_STAGE) {
                     runCatching {
                         imageTextExtractor.extract(
@@ -67,7 +67,7 @@ class ProcessPostContentParsingJobUseCase(
                     }.getOrNull()
                 }
             }
-            jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_INFERENCE)
+            ensureActive(job, ParsingProgressStage.CONTENT_INFERENCE)
             val inference = measure(job, INFERENCE_STAGE) {
                 contentInference.infer(
                     PostContentInference.Request(
@@ -87,17 +87,18 @@ class ProcessPostContentParsingJobUseCase(
             val completedPost = providedPost.copy(
                 title = null,
             )
-            jobPort.updateProgress(job.postId, ParsingProgressStage.CONTENT_SAVE)
-            measure(job, COMPLETE_STAGE) {
+            ensureActive(job, ParsingProgressStage.CONTENT_SAVE)
+            val stored = measure(job, COMPLETE_STAGE) {
                 jobPort.complete(
                     postId = job.postId,
+                    attempt = job.attempt,
                     post = completedPost,
                     textPlaceClues = inference.placeClues,
                     imageTranscripts = listOfNotNull(coverTranscript),
                     sourceProfileHints = extracted.sourceProfileHints,
                 )
             }
-            completed(job, completedPost, startedAt)
+            if (stored) completed(job, completedPost, startedAt) else Result.Skipped
         }.getOrElse { exception ->
             handleFailure(job, exception, startedAt)
         }
@@ -147,13 +148,16 @@ class ProcessPostContentParsingJobUseCase(
         }.getOrThrow()
     }
 
+    // Each early return represents a distinct fenced state transition and prevents stale attempts from logging errors.
+    @Suppress("ReturnCount")
     private fun handleFailure(job: ClaimedPostContentParsingJob, exception: Throwable, startedAt: Instant): Result {
+        if (exception is StalePostContentParsingAttemptException) return Result.Skipped
         val reason = exception.message.orEmpty()
             .ifBlank { DEFAULT_FAILURE_REASON }
             .take(MAX_FAILURE_REASON_LENGTH)
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         if (exception is PostContentNotFoundException || exception is UnsupportedPostUrlException) {
-            jobPort.fail(job.postId, reason)
+            if (!jobPort.fail(job.postId, job.attempt, reason)) return Result.Skipped
             eventLogger.warn(
                 job.event("content.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
                 exception,
@@ -168,7 +172,7 @@ class ProcessPostContentParsingJobUseCase(
         val backoff = retryBackoffs.getOrNull(job.attempt - 1)
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(backoff)
-            jobPort.retry(job.postId, nextAttemptAt, reason)
+            if (!jobPort.retry(job.postId, job.attempt, nextAttemptAt, reason)) return Result.Skipped
             eventLogger.warn(
                 job.event(
                     "content.job.retry_scheduled",
@@ -194,7 +198,7 @@ class ProcessPostContentParsingJobUseCase(
             return Result.Retry(nextAttemptAt)
         }
 
-        jobPort.fail(job.postId, reason)
+        if (!jobPort.fail(job.postId, job.attempt, reason)) return Result.Skipped
         eventLogger.error(
             job.event("content.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
             exception,
@@ -206,6 +210,12 @@ class ProcessPostContentParsingJobUseCase(
         recordTrace(job, JOB_STAGE, "content.job.failed", FAILURE_OUTCOME, duration, mapOf("reason" to reason))
         return Result.Failed
     }
+
+    private fun ensureActive(job: ClaimedPostContentParsingJob, stage: ParsingProgressStage) {
+        if (!jobPort.updateProgress(job.postId, job.attempt, stage)) throw StalePostContentParsingAttemptException()
+    }
+
+    private class StalePostContentParsingAttemptException : RuntimeException()
 
     private fun elapsedMillis(startedAt: Instant): Long = Duration.between(startedAt, clock.instant()).toMillis()
 

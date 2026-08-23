@@ -1,0 +1,59 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "mappings": [{ "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }] }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "up{job=\"nook-worker\", env=\"$env\"}", "legendFormat": "{{instance}}", "refId": "A" }],
+      "title": "Worker Health",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "max": 1, "min": 0, "unit": "percentunit" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "sum(jvm_memory_used_bytes{job=\"nook-worker\", env=\"$env\", area=\"heap\"}) / clamp_min(sum(jvm_memory_max_bytes{job=\"nook-worker\", env=\"$env\", area=\"heap\"}), 1)", "legendFormat": "heap", "refId": "A" }],
+      "title": "Worker Heap Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 0 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        { "expr": "hikaricp_connections_active{job=\"nook-worker\", env=\"$env\"}", "legendFormat": "active", "refId": "A" },
+        { "expr": "hikaricp_connections_pending{job=\"nook-worker\", env=\"$env\"}", "legendFormat": "pending", "refId": "B" }
+      ],
+      "title": "Worker DB Pool",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
+      "id": 4,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [{ "expr": "{env=\"$env\", job=\"nook-worker\"} | json | line_format \"[{{.service_name}}] [{{.level}}] {{.message}}\"", "queryType": "range", "refId": "A" }],
+      "title": "Worker Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["nook", "worker"],
+  "templating": {
+    "list": [{ "current": { "selected": true, "text": "live", "value": "live" }, "hide": 0, "label": "Environment", "name": "env", "options": [{ "selected": false, "text": "dev", "value": "dev" }, { "selected": true, "text": "live", "value": "live" }], "query": "dev,live", "type": "custom" }]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Nook Worker Overview",
+  "uid": "nook-worker-overview",
+  "version": 1
+}

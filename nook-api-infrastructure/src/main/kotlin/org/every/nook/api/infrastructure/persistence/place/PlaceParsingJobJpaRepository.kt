@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.place
 
 import jakarta.persistence.LockModeType
 import org.every.nook.api.domain.place.PlaceParsingStatus
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
@@ -17,4 +18,9 @@ interface PlaceParsingJobJpaRepository : JpaRepository<PlaceParsingJobEntity, Lo
     fun findByPostIdForUpdate(@Param("postId") postId: Long): PlaceParsingJobEntity?
 
     fun findAllByStatusIn(statuses: Collection<PlaceParsingStatus>): List<PlaceParsingJobEntity>
+
+    fun findAllByStatusInOrderByNextAttemptAtAsc(
+        statuses: Collection<PlaceParsingStatus>,
+        pageable: Pageable,
+    ): List<PlaceParsingJobEntity>
 }

@@ -54,7 +54,7 @@ class ProcessPlaceParsingJobUseCase(
     }
 
     private fun process(job: ClaimedPlaceParsingJob, startedAt: Instant): Result {
-        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_CLUES)
+        ensureActive(job, ParsingProgressStage.PLACE_TEXT_CLUES)
         val extractedTextClues = job.textClues ?: extractClues(job)
         val initialCoverage = SourcePlaceCoveragePolicy().evaluate(
             SourcePlaceCoveragePolicy.Context(job.body, extractedTextClues),
@@ -66,7 +66,7 @@ class ProcessPlaceParsingJobUseCase(
         val textClues = extractedTextClues.filterGroundedTextClues(job) { clue, evaluation ->
             recordRuleTrace(job, TEXT_CLUE_STAGE, evaluation, clue)
         }
-        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_RESOLUTION)
+        ensureActive(job, ParsingProgressStage.PLACE_TEXT_RESOLUTION)
         val textResolution = resolveClues(job, textClues, expectedPlaceCount, useEvidenceImageSequence = false)
         val imageDecision = ImageAnalysisPolicy().evaluate(
             ImageAnalysisPolicy.Context(
@@ -106,15 +106,18 @@ class ProcessPlaceParsingJobUseCase(
                 imageResolution?.unresolvedClues.orEmpty() +
                 finalCoverage.unresolvedClues(),
         )
-        jobPort.updateProgress(job.postId, ParsingProgressStage.TITLE_FINALIZATION)
+        ensureActive(job, ParsingProgressStage.TITLE_FINALIZATION)
         val titleTranscripts = imageResolution?.imageTranscripts.orEmpty()
         val title = measure(job, TITLE_STAGE) {
             finalizePostTitle(job, places, expectedPlaceCount, titleTranscripts) {
                 recordRuleTrace(job, TITLE_STAGE, it)
             }
         }
-        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_SAVE)
-        measure(job, COMPLETE_STAGE) { jobPort.complete(job.postId, title, places, diagnostics) }
+        ensureActive(job, ParsingProgressStage.PLACE_SAVE)
+        val completed = measure(job, COMPLETE_STAGE) {
+            jobPort.complete(job.postId, job.attempt, title, places, diagnostics)
+        }
+        if (!completed) return Result.Skipped
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         logger.info {
             "Place parsing completed: postId=${job.postId}, attempt=${job.attempt}, " +
@@ -158,7 +161,7 @@ class ProcessPlaceParsingJobUseCase(
         expectedPlaceCount: Int?,
     ): Nothing {
         val failure = textResolution.failure ?: imageResolution?.failure
-        jobPort.updateProgress(job.postId, ParsingProgressStage.TITLE_FINALIZATION)
+        ensureActive(job, ParsingProgressStage.TITLE_FINALIZATION)
         val title = measure(job, TITLE_STAGE) {
             finalizePostTitle(
                 job = job,
@@ -195,7 +198,7 @@ class ProcessPlaceParsingJobUseCase(
                 "imageCount=${images.size}, textClueCount=$textClueCount, textResolvedCount=$textResolvedCount, " +
                 "expectedPlaceCount=$expectedPlaceCount"
         }
-        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_OCR)
+        ensureActive(job, ParsingProgressStage.PLACE_IMAGE_OCR)
         val cachedTranscripts = job.imageTranscripts.orEmpty()
             .filter { transcript -> images.any { it.imageIndex == transcript.imageIndex } }
         val cachedByIndex = cachedTranscripts.associateBy(ImageTranscript::imageIndex)
@@ -226,11 +229,13 @@ class ProcessPlaceParsingJobUseCase(
                     "requestedCount=${missingImages.size}, transcriptCount=${merged.size}"
             }
             if (missingImages.isNotEmpty()) {
-                jobPort.storeImageTranscripts(job.postId, merged)
+                if (!jobPort.storeImageTranscripts(job.postId, job.attempt, merged)) {
+                    throw StalePlaceParsingAttemptException()
+                }
             }
         }
         val effectiveExpectedPlaceCount = effectiveExpectedPlaceCount(expectedPlaceCount, transcripts)
-        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_CLUES)
+        ensureActive(job, ParsingProgressStage.PLACE_IMAGE_CLUES)
         val primaryImageClues = extractClues(job, transcripts)
             .map { clue -> clue.restoreGroundingFromCard(transcripts) }
             .reconcileWithNumberedPlaceCards(transcripts)
@@ -248,7 +253,11 @@ class ProcessPlaceParsingJobUseCase(
                     )
                 }
             },
-            storeTranscripts = { recovered -> jobPort.storeImageTranscripts(job.postId, recovered) },
+            storeTranscripts = { recovered ->
+                if (!jobPort.storeImageTranscripts(job.postId, job.attempt, recovered)) {
+                    throw StalePlaceParsingAttemptException()
+                }
+            },
             extractClues = { recoveryTranscripts ->
                 extractClues(job, recoveryTranscripts)
                     .map { clue -> clue.restoreGroundingFromCard(recoveryTranscripts) }
@@ -267,7 +276,7 @@ class ProcessPlaceParsingJobUseCase(
             ),
         ).filterGroundedImageClues(images.size, job.postId, job.attempt, recovered = true)
         val imageClues = primaryImageClues + recoveredImageClues
-        jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_IMAGE_RESOLUTION)
+        ensureActive(job, ParsingProgressStage.PLACE_IMAGE_RESOLUTION)
         return resolveClues(job, imageClues, effectiveExpectedPlaceCount, useEvidenceImageSequence = true)
             .copy(imageTranscripts = transcripts)
     }
@@ -494,11 +503,14 @@ class ProcessPlaceParsingJobUseCase(
 
     private fun failResolution(message: String): Nothing = throw PlaceResolutionException(message)
 
+    // Each early return represents a distinct fenced state transition and prevents stale attempts from logging errors.
+    @Suppress("ReturnCount")
     private fun handleFailure(job: ClaimedPlaceParsingJob, exception: Throwable, startedAt: Instant): Result {
+        if (exception is StalePlaceParsingAttemptException) return Result.Skipped
         val reason = placeFailureReason(exception)
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
         if (exception is TerminalPlaceParsingException) {
-            jobPort.fail(job.postId, exception.title, reason)
+            if (!jobPort.fail(job.postId, job.attempt, exception.title, reason)) return Result.Skipped
             eventLogger.warn(
                 job.event("place.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
                 exception,
@@ -514,7 +526,7 @@ class ProcessPlaceParsingJobUseCase(
         val backoff = retryBackoffs.getOrNull(job.attempt - 1)
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(backoff)
-            jobPort.retry(job.postId, nextAttemptAt, reason)
+            if (!jobPort.retry(job.postId, job.attempt, nextAttemptAt, reason)) return Result.Skipped
             eventLogger.warn(
                 job.event(
                     "place.job.retry_scheduled",
@@ -547,7 +559,7 @@ class ProcessPlaceParsingJobUseCase(
             latestImageTranscripts = emptyList(),
             onEvaluation = { recordRuleTrace(job, TITLE_STAGE, it) },
         )
-        jobPort.fail(job.postId, title, reason)
+        if (!jobPort.fail(job.postId, job.attempt, title, reason)) return Result.Skipped
         eventLogger.error(
             job.event("place.job.failed", JOB_STAGE, FAILURE_OUTCOME, duration, failureFields(exception, reason)),
             exception,
@@ -559,6 +571,12 @@ class ProcessPlaceParsingJobUseCase(
         recordTrace(job, JOB_STAGE, "place.job.failed", FAILURE_OUTCOME, duration, mapOf("reason" to reason))
         return Result.Failed
     }
+
+    private fun ensureActive(job: ClaimedPlaceParsingJob, stage: ParsingProgressStage) {
+        if (!jobPort.updateProgress(job.postId, job.attempt, stage)) throw StalePlaceParsingAttemptException()
+    }
+
+    private class StalePlaceParsingAttemptException : RuntimeException()
 
     private fun elapsedMillis(startedAt: Instant): Long = Duration.between(startedAt, clock.instant()).toMillis()
 
