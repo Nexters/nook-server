@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.openai
 
+import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceCandidate
@@ -217,6 +218,37 @@ class OpenAiContentInferenceAdapterTest {
 
         assertEquals(listOf("원동미나리삼겹살", "서울역"), places.map { it.name })
         assertEquals(null, places.last().region)
+    }
+
+    @Test
+    fun `includes body-mentioned profile hints in text place extraction`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("sourceProfileHints")))
+            .andExpect(content().string(containsString("stuff_itaewon")))
+            .andExpect(content().string(containsString("STUFF")))
+            .andExpect(content().string(containsString("본문에 실제로 언급된 계정")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """{"places":[{"name":"STUFF","region":"이태원","addressHint":null,""" +
+                            """"queries":["이태원 STUFF"],"evidence":[]}]}""",
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val places = fixture.adapter.extract(
+            PlaceClueExtractor.Request(
+                body = "이태원 빈티지 숍 @stuff_itaewon",
+                hashtags = emptyList(),
+                sourceLocationTag = "이태원",
+                sourceProfileHints = listOf(SourceProfileHint("STUFF😊", "stuff_itaewon")),
+            ),
+        )
+
+        assertEquals("STUFF", places.single().name)
+        fixture.server.verify()
     }
 
     @Test

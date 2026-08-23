@@ -11,6 +11,7 @@ import org.every.nook.api.application.admin.AdminPostPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPostQueryPort
 import org.every.nook.api.application.admin.AdminPostSummary
 import org.every.nook.api.application.admin.AdminPostTitleRegenerationPort
+import org.every.nook.api.application.place.UnresolvedPlaceClue
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
@@ -27,6 +28,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.readValue
 
 @Component
 class AdminPersistenceAdapter(
@@ -79,6 +81,7 @@ class AdminPersistenceAdapter(
         val placeJobs = placeJobRepository.findAllByPostIdIn(posts.mapNotNull { it.id }).associateBy { it.postId }
         val filtered = posts.filter { post ->
             parsingStatus == null || placeJobs[requireNotNull(post.id)]?.status?.name == parsingStatus ||
+                placeJobs[post.id]?.parsingOutcome?.name == parsingStatus ||
                 contentJobs[post.id]?.status?.name == parsingStatus
         }
         val pagePosts = filtered.drop(offset).take(limit)
@@ -100,6 +103,7 @@ class AdminPersistenceAdapter(
                     savedUserCount = savedPostRepository.findDistinctUserIdsByPostId(postId).size.toLong(),
                     mappingReviewed = postId in reviewedIds,
                     createdAt = post.createdAt,
+                    placeParsingOutcome = placeJobs[postId]?.parsingOutcome?.name,
                 )
             },
             total = filtered.size.toLong(),
@@ -131,6 +135,13 @@ class AdminPersistenceAdapter(
             },
             manuallyOverridden = post.contentManuallyOverridden,
             places = places,
+            placeParsingOutcome = placeJob?.parsingOutcome?.name,
+            expectedPlaceCount = placeJob?.expectedPlaceCount,
+            extractedPlaceCount = placeJob?.extractedPlaceCount,
+            resolvedPlaceCount = placeJob?.resolvedPlaceCount,
+            unresolvedPlaceClues = placeJob?.unresolvedPlaceClues
+                ?.let { objectMapper.readValue<List<UnresolvedPlaceClue>>(it) }
+                .orEmpty(),
         )
     }
 

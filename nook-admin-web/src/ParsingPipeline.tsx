@@ -31,7 +31,7 @@ type PipelineNode = {
 };
 type PipelineEdge = { id: string; source: string; target: string; label?: string; kind: string };
 type RuntimeConfiguration = { key: string; configuredValue?: string; effectiveValue: string; source: string; description: string; warnings: string[] };
-type JobExecution = { status: string; stage?: string; progressPercent: number; attemptCount: number; failureReason?: string; nextAttemptAt?: string };
+type JobExecution = { status: string; stage?: string; progressPercent: number; attemptCount: number; failureReason?: string; nextAttemptAt?: string; outcome?: string; expectedPlaceCount?: number; extractedPlaceCount?: number; resolvedPlaceCount?: number; unresolvedPlaceClues?: Array<{ clue: { name: string; region?: string }; reason: string }> };
 type ProcessingTrace = { id: number; flow: string; stage: string; action: string; outcome: string; attempt?: number; durationMs?: number; details: Record<string, string>; createdAt: string };
 type ParsingExecution = { postId: number; title?: string; content: JobExecution; place?: JobExecution; traces: ProcessingTrace[] };
 type PipelineResponse = { nodes: PipelineNode[]; edges: PipelineEdge[]; configurations: RuntimeConfiguration[]; execution?: ParsingExecution };
@@ -169,7 +169,7 @@ function ExecutionSummary({ execution }: { execution: ParsingExecution }) {
 
 function JobSummary({ label, job }: { label: string; job?: JobExecution }) {
   if (!job) return <Box className="job-summary"><span>{label}</span><strong>미시작</strong></Box>;
-  return <Box className="job-summary"><span>{label} · 시도 {job.attemptCount}회</span><strong>{job.status} · {job.progressPercent}%</strong>{job.stage && <small>{job.stage}</small>}{job.failureReason && <small className="job-failure">{job.failureReason}</small>}</Box>;
+  return <Box className="job-summary"><span>{label} · 시도 {job.attemptCount}회</span><strong>{job.outcome ?? job.status} · {job.progressPercent}%</strong>{job.outcome === "PARTIAL" && <small className="job-failure">해결 {job.resolvedPlaceCount ?? 0}/{job.expectedPlaceCount ?? job.extractedPlaceCount ?? "?"}곳 · 미해결 {job.unresolvedPlaceClues?.map(({ clue }) => clue.name).join(", ") || "진단 없음"}</small>}{job.stage && <small>{job.stage}</small>}{job.failureReason && <small className="job-failure">{job.failureReason}</small>}</Box>;
 }
 
 function ConfigurationStrip({ configurations }: { configurations: RuntimeConfiguration[] }) {

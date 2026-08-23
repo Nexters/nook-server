@@ -138,6 +138,32 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
+    fun `passes tagged profile hints to text clue extraction without thumbnail OCR`() {
+        val hints = listOf(
+            SourceProfileHint("STUFF😊", "stuff_itaewon"),
+            SourceProfileHint("에스테틱스 갤러리", "aesthetics__gallery"),
+        )
+        val port = FakeJobPort(
+            body = "이태원 빈티지 숍 4곳 @aesthetics__gallery @stuff_itaewon",
+            sourceProfileHints = hints,
+        )
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { request ->
+                assertEquals(hints, request.sourceProfileHints)
+                assertEquals(emptyList(), request.imageTranscripts)
+                listOf(PlaceClue("에스테틱스 갤러리", "이태원", listOf("이태원 에스테틱스 갤러리")))
+            },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("aesthetics", "에스테틱스 갤러리", "서울 용산구 이태원동"))
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(517))
+        assertEquals(listOf("aesthetics"), port.completed.map(PlaceCandidate::externalPlaceId))
+    }
+
+    @Test
     fun `reuses stored text clues without another text inference call`() {
         val port = FakeJobPort(
             body = "저장된 장소",
