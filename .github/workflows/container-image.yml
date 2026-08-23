@@ -14,7 +14,7 @@ concurrency:
 env:
   GABIA_PUBLIC_REGISTRY: everynook.cr.gabiacloud.com
   API_IMAGE_REPOSITORY: nook/nook-api
-  WORKER_IMAGE_REPOSITORY: nook/nook-worker
+  WORKER_IMAGE_REPOSITORY: nook/nook-api
   ADMIN_WEB_IMAGE_REPOSITORY: nook/nook-admin-web
 
 jobs:
@@ -138,10 +138,10 @@ jobs:
             echo "EOF"
             echo "image=${public_image}:${version}"
             echo "worker-tags<<EOF"
-            echo "${worker_image}:${version}"
-            echo "${worker_image}:${latest_tag}"
+            echo "${worker_image}:worker-${version}"
+            echo "${worker_image}:worker-${latest_tag}"
             echo "EOF"
-            echo "worker-image=${worker_image}:${version}"
+            echo "worker-image=${worker_image}:worker-${version}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Build and push API image
