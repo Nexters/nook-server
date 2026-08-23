@@ -60,7 +60,7 @@ jobs:
       - name: Deploy requested version to dev
         env:
           DEV_IMAGE: everynook.cr.gabiacloud.com/nook/nook-api:${{ inputs.image_tag }}
-          DEV_WORKER_IMAGE: everynook.cr.gabiacloud.com/nook/nook-api:worker-${{ inputs.image_tag }}
+          DEV_WORKER_IMAGE: everynook.cr.gabiacloud.com/nook/nook-worker:${{ inputs.image_tag }}
           DEV_SSH_TARGET: ${{ secrets.DEV_SSH_TARGET }}
           GABIA_PUBLIC_REGISTRY: everynook.cr.gabiacloud.com
           GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
@@ -115,7 +115,7 @@ jobs:
         env:
           LIVE_ACTION: deploy
           LIVE_IMAGE: everynook.cr.gabiacloud.com/nook/nook-api:${{ inputs.image_tag }}
-          LIVE_WORKER_IMAGE: everynook.cr.gabiacloud.com/nook/nook-api:worker-${{ inputs.image_tag }}
+          LIVE_WORKER_IMAGE: everynook.cr.gabiacloud.com/nook/nook-worker:${{ inputs.image_tag }}
           LIVE_SSH_TARGET: ${{ secrets.LIVE_SSH_TARGET }}
           LIVE_SSH_KEY: ${{ steps.ssh.outputs.key-file }}
         run: |

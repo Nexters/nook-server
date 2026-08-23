@@ -9,6 +9,17 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface ParsingFollowUpJobJpaRepository : JpaRepository<ParsingFollowUpJobEntity, Long> {
+    fun countByStatusAndNextAttemptAtLessThanEqual(status: ParsingFollowUpJobStatus, now: Instant): Long
+
+    fun findFirstByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc(
+        status: ParsingFollowUpJobStatus,
+        now: Instant,
+    ): ParsingFollowUpJobEntity?
+
+    fun countByStatus(status: ParsingFollowUpJobStatus): Long
+
+    fun countByStatusAndUpdatedAtLessThanEqual(status: ParsingFollowUpJobStatus, cutoff: Instant): Long
+
     @Query(
         """
         SELECT job.id FROM ParsingFollowUpJobEntity job

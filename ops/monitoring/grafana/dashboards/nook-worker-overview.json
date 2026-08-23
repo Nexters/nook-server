@@ -36,9 +36,42 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
       "id": 4,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "nook_parsing_queue_ready_jobs{job=\"nook-worker\", env=\"$env\"}", "legendFormat": "{{queue}}", "refId": "A" }],
+      "title": "Ready Jobs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [{ "expr": "nook_parsing_queue_oldest_ready_age_seconds{job=\"nook-worker\", env=\"$env\"}", "legendFormat": "{{queue}}", "refId": "A" }],
+      "title": "Oldest Ready Job Age",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        { "expr": "nook_parsing_queue_processing_jobs{job=\"nook-worker\", env=\"$env\"}", "legendFormat": "{{queue}} processing", "refId": "A" },
+        { "expr": "nook_parsing_queue_stuck_processing_jobs{job=\"nook-worker\", env=\"$env\"}", "legendFormat": "{{queue}} stuck", "refId": "B" }
+      ],
+      "title": "Processing / Stuck Jobs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 16 },
+      "id": 7,
       "options": { "dedupStrategy": "none", "enableLogDetails": true, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
       "targets": [{ "expr": "{env=\"$env\", job=\"nook-worker\"} | json | line_format \"[{{.service_name}}] [{{.level}}] {{.message}}\"", "queryType": "range", "refId": "A" }],
       "title": "Worker Logs",
