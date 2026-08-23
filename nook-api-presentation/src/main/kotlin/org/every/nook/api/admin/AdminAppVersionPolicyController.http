@@ -1,0 +1,33 @@
+# Cloudflare Access 로그인은 브라우저에서 admin 호스트 접근 시 수행됩니다.
+# HTTP Client에서는 유효한 Access application JWT를 직접 입력합니다.
+@accessJwt = replace-with-cloudflare-access-jwt
+
+### 앱 버전 정책 목록
+GET {{baseUrl}}/api/admin/v1/app-version-policies
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### iOS 앱 버전 정책 생성 또는 수정
+PUT {{baseUrl}}/api/admin/v1/app-version-policies/IOS
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "minimumSupportedBuildNumber": 10,
+  "latestBuildNumber": 20,
+  "latestVersion": "1.2.0",
+  "storeUrl": "https://apps.apple.com/kr/app/nook/id0000000000",
+  "reason": "1.2.0 출시 후 최소 지원 빌드 조정"
+}
+
+### Android 앱 버전 정책 생성 또는 수정
+PUT {{baseUrl}}/api/admin/v1/app-version-policies/ANDROID
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "minimumSupportedBuildNumber": 10,
+  "latestBuildNumber": 20,
+  "latestVersion": "1.2.0",
+  "storeUrl": "https://play.google.com/store/apps/details?id=co.everynook.app",
+  "reason": "1.2.0 출시 후 최소 지원 빌드 조정"
+}

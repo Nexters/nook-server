@@ -28,6 +28,8 @@ class RequestLoggingFilterTest {
             setContent("""{"url":"https://example.com/post","accessToken":"secret"}""".toByteArray())
             addHeader(RequestLoggingFields.REQUEST_ID_HEADER, "req-test-1")
             addHeader("User-Agent", "Nook iOS")
+            addHeader("X-App-Platform", "IOS")
+            addHeader("X-App-Build-Number", "42")
             addHeader("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
         }
         val response = MockHttpServletResponse()
@@ -71,6 +73,8 @@ class RequestLoggingFilterTest {
         assertEquals("POST /api/v1/posts/{postId}", mdc[RequestLoggingFields.TRANSACTION_NAME])
         assertEquals("203.0.113.10", mdc[RequestLoggingFields.REQUEST_CLIENT_IP])
         assertEquals("Nook iOS", mdc["request.headers.user_agent"])
+        assertEquals("IOS", mdc["request.headers.x_app_platform"])
+        assertEquals("42", mdc["request.headers.x_app_build_number"])
         assertEquals("""{"url":"https://example.com/post","accessToken":"****"}""", mdc["request.body"])
         assertEquals("""{"success":{"id":17,"refreshToken":"****"}}""", mdc["response.body"])
         assertNotNull(mdc[RequestLoggingFields.TRANSACTION_DURATION_MS])
