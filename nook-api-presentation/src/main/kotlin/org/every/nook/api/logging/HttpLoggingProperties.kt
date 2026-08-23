@@ -24,7 +24,8 @@ data class HttpLoggingProperties(
             "X-Forwarded-For",
             "X-Real-IP",
             "X-App-Version",
-            "X-Platform",
+            "X-App-Platform",
+            "X-App-Build-Number",
             "X-Device-Id",
         ),
     )

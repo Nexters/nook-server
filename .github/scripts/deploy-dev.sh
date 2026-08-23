@@ -33,4 +33,7 @@ fi
 docker compose up -d --wait --wait-timeout 120
 docker compose ps
 curl -fsS http://127.0.0.1:8080/actuator/health
+
+docker image prune -a -f --filter "until=24h"
+docker builder prune -a -f --filter "until=24h"
 REMOTE_SCRIPT
