@@ -1,6 +1,7 @@
 package org.every.nook.api.application.place
 
 import mu.KotlinLogging
+import org.every.nook.api.application.processing.ParsingRuleEvaluation
 import org.every.nook.api.application.processing.warn
 
 internal fun placeParsingDiagnostics(
@@ -108,26 +109,22 @@ private fun PlaceClue.restoreAddressFromCard(transcripts: List<ImageTranscript>)
     )
 }
 
-internal fun List<PlaceClue>.filterGroundedTextClues(job: ClaimedPlaceParsingJob): List<PlaceClue> = filter { clue ->
-    (clue.isGroundedIn(job.body, job.hashtags) || clue.isGroundedByMentionedProfile(job)).also { grounded ->
-        if (!grounded) {
-            completenessLogger.warn {
-                "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
-                    "placeName=${clue.name}, region=${clue.region}, queries=${clue.queries}"
+internal fun List<PlaceClue>.filterGroundedTextClues(
+    job: ClaimedPlaceParsingJob,
+    onEvaluation: (ParsingRuleEvaluation) -> Unit = {},
+): List<PlaceClue> = filter { clue ->
+    TextClueGroundingPolicy().evaluate(
+        TextClueGroundingPolicy.Context(clue, job.body, job.hashtags, job.sourceProfileHints),
+    ).also { evaluation -> evaluation.ruleEvaluations.forEach(onEvaluation) }
+        .result
+        .also { grounded ->
+            if (!grounded) {
+                completenessLogger.warn {
+                    "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
+                        "placeName=${clue.name}, region=${clue.region}, queries=${clue.queries}"
+                }
             }
         }
-    }
-}
-
-private fun PlaceClue.isGroundedByMentionedProfile(job: ClaimedPlaceParsingJob): Boolean {
-    val bodyKey = job.body.orEmpty().lowercase()
-    val clueKey = name.lowercase().filter(Char::isLetterOrDigit)
-    return job.sourceProfileHints.any { hint ->
-        val displayNameKey = hint.displayName.lowercase().filter(Char::isLetterOrDigit)
-        bodyKey.contains("@${hint.username.lowercase()}") &&
-            clueKey.length >= MIN_PLACE_NAME_TEXT_LENGTH &&
-            (displayNameKey.contains(clueKey) || clueKey.contains(displayNameKey))
-    }
 }
 
 internal fun PlaceClue.hasExclusiveGroundedImageEvidence(clues: List<PlaceClue>): Boolean {
