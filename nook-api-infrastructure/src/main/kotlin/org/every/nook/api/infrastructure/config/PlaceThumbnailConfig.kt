@@ -1,8 +1,8 @@
 package org.every.nook.api.infrastructure.config
 
 import mu.KotlinLogging
-import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
+import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.place.NoOpPlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
@@ -110,6 +110,7 @@ class PlaceThumbnailConfig {
                 mediaStorage,
                 responseCache.ifAvailable,
                 processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
+                callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
             ),
             PlaceThumbnailProviderType.APIFY_NAVER_PLACE to apifyNaverProvider(
                 apifyNaverPlacePhotoRestClient,
@@ -117,6 +118,7 @@ class PlaceThumbnailConfig {
                 mediaStorage,
                 responseCache.ifAvailable,
                 processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
+                callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
             ),
             PlaceThumbnailProviderType.GOOGLE to googleProvider(
                 googlePlacePhotoRestClient,
@@ -177,6 +179,7 @@ class PlaceThumbnailConfig {
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
         responseCache: ScrapingProviderResponseCache?,
         processingMetrics: ProcessingMetrics,
+        callMeter: ExternalApiCallMeter,
     ): PlaceThumbnailProvider {
         val storage = mediaStorage.ifAvailable ?: run {
             logger.warn { "Apify Google Maps provider disabled: reason=missing_media_storage" }
@@ -189,6 +192,7 @@ class PlaceThumbnailConfig {
             mediaStorage = storage,
             responseCache = responseCache,
             metrics = processingMetrics,
+            callMeter = callMeter,
         )
     }
 
@@ -198,6 +202,7 @@ class PlaceThumbnailConfig {
         mediaStorage: ObjectProvider<PostMediaStoragePort>,
         responseCache: ScrapingProviderResponseCache?,
         processingMetrics: ProcessingMetrics,
+        callMeter: ExternalApiCallMeter,
     ): PlaceThumbnailProvider {
         val storage = mediaStorage.ifAvailable ?: run {
             logger.warn { "Apify Naver place provider disabled: reason=missing_media_storage" }
@@ -210,6 +215,7 @@ class PlaceThumbnailConfig {
             mediaStorage = storage,
             responseCache = responseCache,
             metrics = processingMetrics,
+            callMeter = callMeter,
         )
     }
 

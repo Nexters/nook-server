@@ -48,7 +48,7 @@ class ExternalApiUsagePersistenceAdapter(
                 return@execute UsageReservation(requireNotNull(it.id), it.idempotencyKey)
             }
             val now = clock.instant()
-            val price = priceRepository.findByProviderAndSkuAndEnabledTrue(command.provider, command.sku)
+            val price = priceRepository.findLockedByProviderAndSkuAndEnabledTrue(command.provider, command.sku)
             val unitPrice = price?.unitPriceKrw ?: BigDecimal.ZERO
             val unitSize = price?.unitSize ?: BigDecimal.ONE
             val estimatedCost = price?.let { incrementalCost(command, it, now) }

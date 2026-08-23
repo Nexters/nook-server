@@ -54,20 +54,24 @@ class OpenAiConfig {
     fun openAiCoverTitleExtractor(
         @Qualifier("openAiRestClient") restClient: RestClient,
         properties: OpenAiProperties,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): OpenAiCoverTitleExtractor = OpenAiCoverTitleExtractor(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
+        callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     )
 
     @Bean
     fun openAiPostTitleSelector(
         @Qualifier("openAiRestClient") restClient: RestClient,
         properties: OpenAiProperties,
+        callMeter: ObjectProvider<ExternalApiCallMeter>,
     ): OpenAiPostTitleSelector = OpenAiPostTitleSelector(
         restClient = restClient,
         objectMapper = jacksonObjectMapper(),
         properties = properties,
+        callMeter = callMeter.ifAvailable ?: ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     )
 
     @Bean("openAiImageTextExtractor")

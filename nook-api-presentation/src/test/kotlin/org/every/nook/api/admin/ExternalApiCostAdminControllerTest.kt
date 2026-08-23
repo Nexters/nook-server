@@ -1,4 +1,4 @@
-package org.every.nook.api.presentation.admin
+package org.every.nook.api.admin
 
 import org.every.nook.api.application.billing.ExternalApiBudgetStatus
 import org.every.nook.api.application.billing.ExternalApiCostDashboard

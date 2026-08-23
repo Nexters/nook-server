@@ -57,7 +57,8 @@ CREATE TABLE external_api_usage_events (
     PRIMARY KEY (id),
     UNIQUE KEY idx_u_idempotency_key (idempotency_key),
     KEY idx_provider_occurred_at (provider, occurred_at),
-    KEY idx_sku_occurred_at (sku, occurred_at)
+    KEY idx_sku_occurred_at (sku, occurred_at),
+    KEY idx_status_occurred_at (status, occurred_at)
 ) ENGINE=InnoDB COMMENT='외부 API 호출별 사용량 및 비용 원장';
 
 CREATE TABLE external_api_budget_alerts (

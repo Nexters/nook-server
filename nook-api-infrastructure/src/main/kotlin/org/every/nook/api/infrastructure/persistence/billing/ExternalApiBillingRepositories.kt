@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.billing
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.math.BigDecimal
@@ -10,6 +11,21 @@ import java.time.Instant
 
 interface ExternalApiUsageEventJpaRepository : JpaRepository<ExternalApiUsageEventEntity, Long> {
     fun findByIdempotencyKey(idempotencyKey: String): ExternalApiUsageEventEntity?
+
+    @Modifying
+    @Query(
+        "update ExternalApiUsageEventEntity e set e.status = :failedStatus, " +
+            "e.actualUnits = e.estimatedUnits, e.actualCostKrw = e.estimatedCostKrw, " +
+            "e.failureCode = :failureCode, e.settledAt = :settledAt " +
+            "where e.status = :reservedStatus and e.occurredAt < :cutoff",
+    )
+    fun expireReservations(
+        @Param("reservedStatus") reservedStatus: UsageEventStatus,
+        @Param("failedStatus") failedStatus: UsageEventStatus,
+        @Param("failureCode") failureCode: String,
+        @Param("cutoff") cutoff: Instant,
+        @Param("settledAt") settledAt: Instant,
+    ): Int
 
     @Query(
         "select coalesce(sum(coalesce(e.actualCostKrw, e.estimatedCostKrw)), 0) " +
@@ -61,6 +77,16 @@ interface ExternalApiPricePolicyJpaRepository : JpaRepository<ExternalApiPricePo
     fun findByProviderAndSku(provider: String, sku: String): ExternalApiPricePolicyEntity?
 
     fun findByProviderAndSkuAndEnabledTrue(provider: String, sku: String): ExternalApiPricePolicyEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        "select p from ExternalApiPricePolicyEntity p " +
+            "where p.provider = :provider and p.sku = :sku and p.enabled = true",
+    )
+    fun findLockedByProviderAndSkuAndEnabledTrue(
+        @Param("provider") provider: String,
+        @Param("sku") sku: String,
+    ): ExternalApiPricePolicyEntity?
 }
 
 interface ExternalApiBudgetPolicyJpaRepository : JpaRepository<ExternalApiBudgetPolicyEntity, Long> {

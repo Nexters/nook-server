@@ -1,4 +1,4 @@
-package org.every.nook.api.presentation.admin
+package org.every.nook.api.admin
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -18,7 +18,6 @@ import org.every.nook.api.presentation.admin.response.ExternalApiCostDashboardRe
 import org.every.nook.api.presentation.admin.response.ExternalApiCostPoliciesResponse
 import org.every.nook.api.presentation.admin.response.ExternalApiUsageSummaryResponse
 import org.every.nook.api.presentation.response.ApiResponse
-import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -35,8 +34,7 @@ import java.time.ZoneOffset
 @Tag(name = "Admin External API Cost")
 @Validated
 @RestController
-@PreAuthorize("@adminAccessGuard.isAdmin(authentication)")
-@RequestMapping("/api/v1/admin/external-api-costs")
+@RequestMapping("/api/admin/v1/external-api-costs")
 class ExternalApiCostAdminController(
     private val getDashboard: GetExternalApiCostDashboardUseCase,
     private val getUsage: GetExternalApiUsageSummaryUseCase,

@@ -52,6 +52,10 @@ class OfficialExternalApiPricingInitializer(
         usd("openai", "gpt-5-nano-input", "0.05", "0", usdKrwRate, OPENAI_PRICING, MILLION),
         usd("openai", "gpt-5-nano-cached-input", "0.005", "0", usdKrwRate, OPENAI_PRICING, MILLION),
         usd("openai", "gpt-5-nano-output", "0.4", "0", usdKrwRate, OPENAI_PRICING, MILLION),
+        usd("openai", "gpt-5-mini", "2", "0", usdKrwRate, OPENAI_PRICING, MILLION),
+        usd("openai", "gpt-5-mini-input", "0.25", "0", usdKrwRate, OPENAI_PRICING, MILLION),
+        usd("openai", "gpt-5-mini-cached-input", "0.025", "0", usdKrwRate, OPENAI_PRICING, MILLION),
+        usd("openai", "gpt-5-mini-output", "2", "0", usdKrwRate, OPENAI_PRICING, MILLION),
     )
 
     private fun usd(

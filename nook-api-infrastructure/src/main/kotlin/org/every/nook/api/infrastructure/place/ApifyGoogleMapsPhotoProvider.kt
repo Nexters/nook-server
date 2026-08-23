@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.place
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceThumbnailProvider
@@ -8,6 +9,7 @@ import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.measure
 import org.every.nook.api.domain.post.PostMedia
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -29,6 +31,7 @@ class ApifyGoogleMapsPhotoProvider(
     private val mediaStorage: PostMediaStoragePort,
     private val responseCache: ScrapingProviderResponseCache? = null,
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
     private val clock: Clock = Clock.systemUTC(),
 ) : PlaceThumbnailProvider {
     override fun fetch(request: PlaceThumbnailProvider.Request): PlaceSupplement? = fetchAll(listOf(request)).single()
@@ -52,13 +55,20 @@ class ApifyGoogleMapsPhotoProvider(
             "language" to "ko",
         )
         val response = measureThumbnailStage(metrics, clock, requests, ACTOR_STAGE) {
-            restClient.post()
-                .uri("/v2/acts/{actorId}/run-sync-get-dataset-items?format=json&clean=true", properties.actorId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
-                .body(input)
-                .retrieve()
-                .body(String::class.java)
+            callMeter.measure(
+                provider = "apify",
+                sku = "google-maps-actor",
+                feature = "place-thumbnail",
+                estimatedUnits = BigDecimal.valueOf(requests.size.toLong()),
+            ) {
+                restClient.post()
+                    .uri("/v2/acts/{actorId}/run-sync-get-dataset-items?format=json&clean=true", properties.actorId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header(AUTHORIZATION, "Bearer ${properties.apiToken}")
+                    .body(input)
+                    .retrieve()
+                    .body(String::class.java)
+            }
         }
         response?.let { responseCache?.save(PROVIDER, SOURCE_TYPE, input.hashCode().toString(), it) }
         val places = parsePlaces(response)

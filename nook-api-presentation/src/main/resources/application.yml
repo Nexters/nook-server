@@ -1,10 +1,8 @@
-admin:
-  security:
-    allowed-user-ids: ${ADMIN_ALLOWED_USER_IDS:}
-
 external-api-pricing:
   enabled: ${EXTERNAL_API_OFFICIAL_PRICING_ENABLED:true}
   usd-krw-rate: ${EXTERNAL_API_USD_KRW_RATE:1450}
+  reservation-timeout: ${EXTERNAL_API_RESERVATION_TIMEOUT:1h}
+  reservation-reconcile-interval: ${EXTERNAL_API_RESERVATION_RECONCILE_INTERVAL:10m}
 
 spring:
   application:

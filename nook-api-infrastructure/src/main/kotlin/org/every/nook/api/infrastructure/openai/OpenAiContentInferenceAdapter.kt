@@ -22,6 +22,7 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.math.BigDecimal
 
+@Suppress("TooManyFunctions")
 class OpenAiContentInferenceAdapter(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,

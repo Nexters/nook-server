@@ -21,6 +21,7 @@ import java.time.Instant
     indexes = [
         Index(name = "idx_provider_occurred_at", columnList = "provider,occurred_at"),
         Index(name = "idx_sku_occurred_at", columnList = "sku,occurred_at"),
+        Index(name = "idx_status_occurred_at", columnList = "status,occurred_at"),
     ],
 )
 class ExternalApiUsageEventEntity(

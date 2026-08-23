@@ -1,14 +1,17 @@
 package org.every.nook.api.infrastructure.clova
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.vision.VisionImageDownloader
 import org.slf4j.LoggerFactory
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import java.math.BigDecimal
 import java.time.Clock
 import java.util.Base64
 import java.util.UUID
@@ -19,6 +22,7 @@ class ClovaImageTextExtractor(
     private val properties: ClovaOcrProperties,
     private val imageDownloader: VisionImageDownloader,
     private val clock: Clock = Clock.systemUTC(),
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : ImageTextExtractor {
     override fun extract(request: ImageTextExtractor.Request): List<ImageTranscript> {
         require(request.images.size == 1) { "CLOVA OCR accepts one image per request" }
@@ -28,10 +32,8 @@ class ClovaImageTextExtractor(
         val startedAt = System.nanoTime()
         val image = request.images.single()
         val bytes = imageDownloader.download(image.imageUrl)
-        val response = restClient.post()
-            .uri(properties.invokeUrl)
-            .header("X-OCR-SECRET", properties.secretKey)
-            .body(
+        val response = callMeter.measure("clova-ocr", "general", "image-transcript", BigDecimal.ONE) {
+            restClient.post().uri(properties.invokeUrl).header("X-OCR-SECRET", properties.secretKey).body(
                 mapOf(
                     "version" to "V2",
                     "requestId" to UUID.randomUUID().toString(),
@@ -46,10 +48,8 @@ class ClovaImageTextExtractor(
                     ),
                     "enableTableDetection" to false,
                 ),
-            )
-            .retrieve()
-            .body(String::class.java)
-            ?: error("CLOVA OCR returned an empty response")
+            ).retrieve().body(String::class.java) ?: error("CLOVA OCR returned an empty response")
+        }
         val result = objectMapper.readTree(response).path("images").firstOrNull()
             ?: error("CLOVA OCR returned no image result")
         check(result.path("inferResult").asText() == "SUCCESS") {

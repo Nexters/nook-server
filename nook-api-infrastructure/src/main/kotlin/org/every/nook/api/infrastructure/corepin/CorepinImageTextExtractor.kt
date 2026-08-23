@@ -1,9 +1,11 @@
 package org.every.nook.api.infrastructure.corepin
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
 import org.every.nook.api.infrastructure.vision.VisionImageDownloader
 import org.slf4j.LoggerFactory
 import org.springframework.core.io.ByteArrayResource
@@ -11,12 +13,14 @@ import org.springframework.http.MediaType
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.ObjectMapper
+import java.math.BigDecimal
 
 class CorepinImageTextExtractor(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: CorepinOcrProperties,
     private val imageDownloader: VisionImageDownloader,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : ImageTextExtractor {
     override fun extract(request: ImageTextExtractor.Request): List<ImageTranscript> {
         require(request.images.size == 1) { "Corepin OCR accepts one image per request" }
@@ -29,14 +33,12 @@ class CorepinImageTextExtractor(
             add("format", "text")
             add("max_tokens", MAX_TOKENS.toString())
         }
-        val response = restClient.post()
-            .uri("/v1/ocr")
-            .header("Authorization", "Bearer ${properties.apiKey}")
-            .contentType(MediaType.MULTIPART_FORM_DATA)
-            .body(body)
-            .retrieve()
-            .body(String::class.java)
-            ?: error("Corepin OCR returned an empty response")
+        val response = callMeter.measure("corepin-ocr", "image-ocr", "image-transcript", BigDecimal.ONE) {
+            restClient.post().uri("/v1/ocr")
+                .header("Authorization", "Bearer ${properties.apiKey}")
+                .contentType(MediaType.MULTIPART_FORM_DATA).body(body).retrieve().body(String::class.java)
+                ?: error("Corepin OCR returned an empty response")
+        }
         val root = objectMapper.readTree(response)
         val texts = root.path("text").asText().lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
         logger.info(

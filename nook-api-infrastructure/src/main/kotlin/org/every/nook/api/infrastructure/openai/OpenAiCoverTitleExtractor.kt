@@ -1,24 +1,35 @@
 package org.every.nook.api.infrastructure.openai
 
+import org.every.nook.api.application.billing.NoOpExternalApiUsageMeter
 import org.every.nook.api.application.post.CoverTitleExtractor
+import org.every.nook.api.infrastructure.billing.ExternalApiCallMeter
+import org.every.nook.api.infrastructure.billing.SettledUsage
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import java.math.BigDecimal
 
 class OpenAiCoverTitleExtractor(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
+    private val callMeter: ExternalApiCallMeter = ExternalApiCallMeter(NoOpExternalApiUsageMeter),
 ) : CoverTitleExtractor {
     override fun extract(request: CoverTitleExtractor.Request): String? {
         require(properties.apiKey.isNotBlank()) { "OpenAI API key is not configured" }
-        val response = restClient.post()
-            .uri("/v1/responses")
-            .header("Authorization", "Bearer ${properties.apiKey}")
-            .body(request.toOpenAiRequest())
-            .retrieve()
-            .body(String::class.java)
-            ?: error("OpenAI returned an empty response")
+        val response = callMeter.measure(
+            provider = "openai",
+            sku = properties.model,
+            feature = "cover-title",
+            estimatedUnits = BigDecimal.valueOf(MAX_OUTPUT_TOKENS.toLong()),
+            metadata = mapOf("model" to properties.model),
+            usage = ::usage,
+        ) {
+            restClient.post().uri("/v1/responses")
+                .header("Authorization", "Bearer ${properties.apiKey}")
+                .body(request.toOpenAiRequest()).retrieve().body(String::class.java)
+                ?: error("OpenAI returned an empty response")
+        }
         val root = objectMapper.readTree(response)
         val content = root.path("output").flatMap { it.path("content").toList() }
         if (content.any { it.path("type").asText() == "refusal" }) {
@@ -55,6 +66,14 @@ class OpenAiCoverTitleExtractor(
     )
 
     private fun JsonNode.toCoverTitle(): String? = path("title").nullableText()
+
+    private fun usage(response: String): SettledUsage {
+        val usage = objectMapper.readTree(response).path("usage")
+        val input = usage.path("input_tokens").asLong(0)
+        val cached = usage.path("input_tokens_details").path("cached_tokens").asLong(0)
+        val output = usage.path("output_tokens").asLong(0)
+        return SettledUsage(BigDecimal.valueOf(input + output), input, cached, output)
+    }
 
     private fun JsonNode.nullableText(): String? = takeUnless { isNull || isMissingNode }
         ?.asText()
