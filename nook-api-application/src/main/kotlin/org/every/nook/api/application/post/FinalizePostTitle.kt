@@ -4,6 +4,7 @@ import mu.KotlinLogging
 import org.every.nook.api.application.place.ClaimedPlaceParsingJob
 import org.every.nook.api.application.place.ImageTranscript
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.processing.ParsingRuleEvaluation
 
 internal class FinalizePostTitle(private val selector: PostTitleSelector) {
     operator fun invoke(
@@ -11,6 +12,7 @@ internal class FinalizePostTitle(private val selector: PostTitleSelector) {
         places: List<PlaceCandidate>,
         declaredPlaceCount: Int?,
         latestImageTranscripts: List<ImageTranscript>,
+        onEvaluation: (ParsingRuleEvaluation) -> Unit = {},
     ): String {
         val transcripts = latestImageTranscripts.ifEmpty { job.imageTranscripts.orEmpty() }
         val request = PostTitleSelector.Request(
@@ -23,22 +25,19 @@ internal class FinalizePostTitle(private val selector: PostTitleSelector) {
                 PostTitleSelector.Place(place.name, place.address, place.city, place.category)
             },
         )
-        val fallback = fallbackPostTitle(request)
-        return runCatching {
+        val selected = runCatching {
             selector.select(request)
         }.onFailure { exception ->
             logger.warn(exception) { "Post title selection failed; using fallback: postId=${job.postId}" }
-        }.getOrNull()?.let { result ->
-            val selected = result.title.validPostTitle()
-                ?.take(MAX_FINAL_TITLE_LENGTH)
-                ?.takeUnless { result.source == PostTitleSelector.Source.NONE }
-                ?.takeIf { it.hasConsistentPlaceCount(request.declaredPlaceCount, request.places.size) }
+        }.getOrNull().also { result ->
             logger.info {
-                "Post title selected: postId=${job.postId}, source=${result.source}, " +
-                    "rejectedCoverReason=${result.rejectedCoverReason}, usedFallback=${selected == null}"
+                "Post title selected: postId=${job.postId}, source=${result?.source}, " +
+                    "rejectedCoverReason=${result?.rejectedCoverReason}"
             }
-            selected
-        } ?: fallback ?: DEFAULT_POST_TITLE
+        }
+        return PostTitleFinalizationPolicy().evaluate(PostTitleFinalizationPolicy.Context(request, selected))
+            .also { evaluation -> evaluation.ruleEvaluations.forEach(onEvaluation) }
+            .result
     }
 
     private companion object {

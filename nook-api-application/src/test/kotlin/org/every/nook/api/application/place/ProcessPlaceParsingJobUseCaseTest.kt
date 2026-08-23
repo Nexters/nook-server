@@ -3,6 +3,8 @@ package org.every.nook.api.application.place
 import org.every.nook.api.application.content.SourceProfileHint
 import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.ParsingProgressStage
+import org.every.nook.api.application.processing.ProcessingTraceEvent
+import org.every.nook.api.application.processing.ProcessingTracePort
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -12,9 +14,32 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @Suppress("LargeClass") // The scenarios share one cohesive orchestration fixture for the place parsing pipeline.
 class ProcessPlaceParsingJobUseCaseTest {
+    @Test
+    fun `records stable rule ids outcomes and input facts for policy decisions`() {
+        val traces = mutableListOf<ProcessingTraceEvent>()
+        val port = FakeJobPort(body = "본문에 원형들이 있습니다")
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(PlaceClue("원형들", null, listOf("원형들"))) },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(candidate("1", "원형들", "서울 종로구 창경궁로"))
+            },
+            tracePort = ProcessingTracePort(traces::add),
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+
+        val ruleTraces = traces.filter { it.action == "place.rule.evaluated" }
+        assertTrue(ruleTraces.isNotEmpty())
+        assertTrue(ruleTraces.all { it.details.getValue("ruleId").startsWith("place.") })
+        assertTrue(ruleTraces.all { it.details.getValue("ruleOutcome") in setOf("PASSED", "FAILED", "SKIPPED") })
+        assertTrue(ruleTraces.any { event -> event.details.keys.any { it.startsWith("fact.") } })
+    }
+
     @Test
     fun `selects the final title after resolving places`() {
         val transcript = ImageTranscript(1, listOf("서춘", "카페 4곳 모음"))
@@ -955,6 +980,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         imageTextExtractor: ImageTextExtractor = ImageTextExtractor { request ->
             request.images.map { ImageTranscript(it.imageIndex, listOf("전사 텍스트")) }
         },
+        tracePort: ProcessingTracePort = ProcessingTracePort { },
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = port,
         imageUrlPort = PlaceImageUrlPort { port.latestImageUrls },
@@ -965,6 +991,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         titleSelector = titleSelector,
         retryBackoffs = RETRY_BACKOFFS,
         processingTimeout = Duration.ofMinutes(1),
+        tracePort = tracePort,
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 

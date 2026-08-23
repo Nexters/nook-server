@@ -14,9 +14,12 @@ import org.every.nook.api.application.admin.AdminPostNotFoundException
 import org.every.nook.api.application.admin.AdminProcessingTrace
 import org.every.nook.api.application.admin.AdminRuntimeConfiguration
 import org.every.nook.api.application.place.HangulOcrRuleSpec
-import org.every.nook.api.application.place.PlaceCandidateRuleSpec
 import org.every.nook.api.application.place.PlaceParsingRuleSpec
 import org.every.nook.api.application.place.UnresolvedPlaceClue
+import org.every.nook.api.application.processing.ParsingRuleDefinition
+import org.every.nook.api.application.processing.ParsingStepId
+import org.every.nook.api.application.processing.PlaceParsingPolicyCatalog
+import org.every.nook.api.application.processing.displayValue
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.instagram.InstagramScrapingProviderMode
@@ -376,34 +379,8 @@ class AdminParsingPipelineAdapter(
             summary = "모델이 만든 장소명이나 검색어가 실제 본문 또는 해시태그에 존재하는지 확인합니다.",
             inputs = listOf("텍스트 장소 단서", "본문", "해시태그"),
             outputs = listOf("근거가 확인된 단서"),
-            decisions = listOf(
-                decision(
-                    1,
-                    "근거 키 생성",
-                    "정규화 키 길이가 ${PlaceCandidateRuleSpec.MIN_GROUNDING_KEY_LENGTH} 이상인가?",
-                    "lowercase().filter(isLetterOrDigit)",
-                    "본문 포함 여부 검사",
-                    "짧고 위험한 근거로 제외",
-                    "PlaceClueGrounding",
-                ),
-                decision(
-                    2,
-                    "원문 포함",
-                    "장소명 또는 검색어 키가 본문·해시태그 키에 포함되는가?",
-                    "evidenceKey.contains(clueKey)",
-                    "검색 대상 단서로 유지",
-                    "텍스트 단서에서 제거",
-                    "PlaceClueGrounding",
-                ),
-            ),
-            sections = listOf(
-                section(
-                    "Grounding",
-                    rule("정규화", "소문자 변환 후 문자와 숫자만 유지"),
-                    rule("최소 단서 길이", "${PlaceCandidateRuleSpec.MIN_GROUNDING_KEY_LENGTH}자"),
-                    rule("통과", "장소명 또는 검색어가 본문·해시태그 정규화 문자열에 포함"),
-                ),
-            ),
+            decisions = policyDecisions("text-clues"),
+            sections = policySections("text-clues"),
         ),
         node(
             id = "text-resolution",
@@ -416,8 +393,8 @@ class AdminParsingPipelineAdapter(
             summary = "검색 결과를 주소와 이름 근거로 좁히고, 하나로 확정되지 않을 때만 모델 선택을 사용합니다.",
             inputs = listOf("장소 단서", "Kakao·Naver 후보"),
             outputs = listOf("확정 장소", "해결하지 못한 단서"),
-            decisions = candidateDecisions(),
-            sections = candidateSections(),
+            decisions = policyDecisions("text-resolution"),
+            sections = policySections("text-resolution"),
             examples = listOf(
                 "‘카페 노티드 청담’ → ‘카페노티드청담’으로 정규화한 뒤 후보 이름과 주소 충돌 여부를 검사합니다.",
                 "strict 후보가 정확히 1개면 모델을 호출하지 않고 확정합니다. 0개 또는 여러 개면 grounded 후보를 확인합니다.",
@@ -435,48 +412,8 @@ class AdminParsingPipelineAdapter(
             summary = "텍스트만으로 장소를 충분히 찾았는지 판단해 이미지 OCR 비용을 제어합니다.",
             inputs = listOf("텍스트 단서 수", "해결 장소 수", "예상 장소 수", "이미지 수"),
             outputs = listOf("이미지 분석", "제목 확정으로 건너뛰기"),
-            decisions = listOf(
-                decision(
-                    1,
-                    "이미지 존재",
-                    "이미지가 한 장 이상 존재하는가?",
-                    "images.isNotEmpty()",
-                    "텍스트 충족도 검사",
-                    "이미지 분석 생략",
-                    "requiresImageAnalysis",
-                ),
-                decision(
-                    2,
-                    "텍스트 결과 없음",
-                    "텍스트 단서가 없거나 해결된 장소가 0개인가?",
-                    "textClueCount == 0 || textResolvedCount == 0",
-                    "이미지 OCR 실행",
-                    "예상 장소 수 검사",
-                    "requiresImageAnalysis",
-                ),
-                decision(
-                    3,
-                    "예상 개수 부족",
-                    "본문의 예상 장소 수가 있고 텍스트 단서 수가 더 적은가?",
-                    "textClueCount < expectedPlaceCount",
-                    "이미지 OCR 실행",
-                    "제목 확정으로 건너뛰기",
-                    "requiresImageAnalysis",
-                ),
-            ),
-            sections = listOf(
-                section(
-                    "이미지 분석 실행",
-                    rule("텍스트 단서 없음", "실행"),
-                    rule("텍스트 해결 장소 없음", "실행"),
-                    rule("예상 장소 수보다 텍스트 단서 부족", "실행"),
-                    rule("이미지 없음", "항상 생략"),
-                ),
-                section(
-                    "예상 장소 수",
-                    rule("본문 패턴", "2~${PlaceParsingRuleSpec.MAX_EXPECTED_PLACE_COUNT} 사이의 ‘N곳·N선·N군데’ 중 최댓값"),
-                ),
-            ),
+            decisions = policyDecisions("image-decision"),
+            sections = policySections("image-decision"),
             examples = listOf(
                 "자모 분해 뒤 길이가 6이고 편집 거리가 2라면 2 ≤ 2, 2×3 ≤ 6을 모두 만족해 통과합니다.",
                 "편집 거리가 2라도 자모 길이가 5라면 2×3 ≤ 5가 거짓이므로 유사 이름으로 인정하지 않습니다.",
@@ -602,8 +539,8 @@ class AdminParsingPipelineAdapter(
             summary = "텍스트 후보 판정과 같은 안전 규칙에 OCR 오차 허용 조건을 추가해 장소를 확정합니다.",
             inputs = listOf("이미지 장소 단서", "검색 후보"),
             outputs = listOf("확정 장소", "미해결 단서"),
-            decisions = candidateDecisions(includeOcr = true),
-            sections = candidateSections(),
+            decisions = policyDecisions("image-resolution"),
+            sections = policySections("image-resolution"),
             examples = listOf(
                 "OCR 이름 키가 3자 이상이면 후보 이름과 Levenshtein 거리를 계산하고 3 이하일 때 복구 근거로 사용할 수 있습니다.",
                 "이름이 비슷해도 명시된 구·군·시 또는 층·호수가 충돌하면 후보에서 제거합니다.",
@@ -620,42 +557,8 @@ class AdminParsingPipelineAdapter(
             summary = "관리자 수정 여부를 보존하면서 본문·커버·확정 장소 근거를 이용해 최종 제목을 선택합니다.",
             inputs = listOf("본문", "커버 OCR", "확정 장소", "이미지 OCR"),
             outputs = listOf("최종 게시글 제목"),
-            decisions = listOf(
-                decision(
-                    1,
-                    "관리자 수정 보존",
-                    "제목이 관리자에 의해 수정되었는가?",
-                    "manuallyOverridden == true",
-                    "기존 제목 유지 후 종료",
-                    "자동 후보 평가",
-                    "finalizePostTitle",
-                ),
-                decision(
-                    2,
-                    "장소 기반 제목",
-                    "확정 장소와 선언된 장소 수가 제목 근거를 충족하는가?",
-                    null,
-                    "장소 목록 기반 제목 생성",
-                    "본문·커버 후보 평가",
-                    "PostTitleFinalizer",
-                ),
-                decision(
-                    3,
-                    "Fallback",
-                    "본문 제목 후보가 비어 있지 않은가?",
-                    null,
-                    "본문 후보 채택",
-                    "커버 OCR 또는 기존 제목 유지",
-                    "PostTitleFinalizer",
-                ),
-            ),
-            sections = listOf(
-                section(
-                    "안전 규칙",
-                    rule("관리자 수정", "기존 관리자 교정 제목을 덮어쓰지 않음"),
-                    rule("장소 없음", "본문 또는 커버 기반 fallback 제목 사용"),
-                ),
-            ),
+            decisions = policyDecisions("title-finalization"),
+            sections = policySections("title-finalization"),
         ),
         node(
             id = "place-save",
@@ -759,79 +662,44 @@ class AdminParsingPipelineAdapter(
         ),
     )
 
-    private fun candidateSections(): List<AdminParsingRuleSection> = listOf(
-        section(
-            "이름 정규화·유사도",
-            rule("정규화", "소문자 변환 후 문자와 숫자만 유지"),
-            rule("포함 일치", "양쪽 이름 키가 ${PlaceCandidateRuleSpec.MIN_NAME_COMPATIBILITY_KEY_LENGTH}자 이상"),
-            rule(
-                "동일 길이 fuzzy",
-                "${PlaceCandidateRuleSpec.MIN_FUZZY_NAME_LENGTH}자 이상, " +
-                    "글자 차이 ${PlaceCandidateRuleSpec.MAX_NAME_CHARACTER_DIFFERENCE}개 이하",
-            ),
-            rule(
-                "OCR 편집 거리",
-                "${PlaceCandidateRuleSpec.MIN_NEAR_OCR_NAME_LENGTH}자 이상, " +
-                    "최대 ${PlaceCandidateRuleSpec.MAX_OCR_NAME_EDIT_DISTANCE}",
-            ),
-        ),
-        section(
-            "주소·근거",
-            rule("주소 키", "도로명/지번과 건물번호가 일치해야 함"),
-            rule("도로명 OCR", "구·군·시가 충돌하지 않고 도로명 편집 거리 1 이하"),
-            rule("층·호수", "힌트에 명시된 층·호수는 후보 주소와 같은 값이어야 함"),
-            rule("모델 선택", "strict/grounded 후보가 하나가 아닐 때만 사용하고, 선택 후 근거를 다시 검증"),
-        ),
-    )
-
-    private fun candidateDecisions(includeOcr: Boolean = false): List<AdminParsingDecisionStep> = buildList {
-        add(
-            decision(
-                1,
-                "검색 후보 호환성",
-                "이름 근거가 호환되고 주소·행정구역·층·호수의 명시적 충돌이 없는가?",
-                "compatibleName && !locationConflict",
-                "후보군에 유지",
-                "후보에서 제거",
-                "PlaceClueCandidateMatcher.compatibleWith",
-            ),
-        )
-        if (includeOcr) {
-            add(
-                decision(
-                    2,
-                    "OCR 이름 복구",
-                    "이름 키가 ${PlaceCandidateRuleSpec.MIN_NEAR_OCR_NAME_LENGTH}자 이상이고 편집 거리 ≤ ${PlaceCandidateRuleSpec.MAX_OCR_NAME_EDIT_DISTANCE}인가?",
-                    "levenshtein(clueName, candidateName) <= ${PlaceCandidateRuleSpec.MAX_OCR_NAME_EDIT_DISTANCE}",
-                    "이름 근거로 인정",
-                    "주소·검색 근거만으로 계속 평가",
-                    "PlaceClue.hasPlausibleOcrIdentity",
-                ),
+    private fun policyDecisions(stepId: String): List<AdminParsingDecisionStep> = policyRules(stepId)
+        .mapIndexed { index, definition ->
+            AdminParsingDecisionStep(
+                order = index + 1,
+                title = definition.title,
+                condition = definition.condition,
+                expression = definition.expression,
+                onPass = definition.onPassed.description,
+                onFail = definition.onFailed.description,
+                source = definition.source,
+                ruleId = definition.id.value,
             )
         }
-        val baseOrder = if (includeOcr) 3 else 2
-        add(
-            decision(
-                baseOrder,
-                "Strict/Grounded 확정",
-                "strict 후보가 1개이거나 grounded 후보가 1개로 유일한가?",
-                "unique(strictMatches) ?: unique(groundedMatches)",
-                "해당 장소 즉시 확정",
-                "모델 선택 단계로 이동",
-                "ProcessPlaceParsingJobUseCase.resolve",
-            ),
-        )
-        add(
-            decision(
-                baseOrder + 1,
-                "모델 선택 재검증",
-                "모델 선택 후보가 원문·주소·검색 근거를 다시 만족하는가?",
-                "selected in compatibleCandidates && clue.isSupportedBy(selected)",
-                "최종 장소로 확정",
-                "미해결 단서로 기록",
-                "ProcessPlaceParsingJobUseCase.resolve",
-            ),
-        )
+
+    private fun policySections(stepId: String): List<AdminParsingRuleSection> = policyRules(stepId)
+        .groupBy(ParsingRuleDefinition::section)
+        .map { (sectionTitle, definitions) ->
+            AdminParsingRuleSection(
+                title = sectionTitle,
+                rules = definitions.map { definition ->
+                    AdminParsingRule(
+                        label = definition.title,
+                        value = definition.condition,
+                        description = buildList {
+                            add("ruleId: ${definition.id.value}")
+                            definition.parameters.forEach { (key, value) -> add("$key=${value.displayValue()}") }
+                        }.joinToString(" · "),
+                    )
+                },
+            )
+        }
+
+    private fun policyRules(stepId: String): List<ParsingRuleDefinition> {
+        val catalog = PlaceParsingPolicyCatalog.catalog
+        val step = requireNotNull(catalog.step(ParsingStepId(stepId))) { "Unknown parsing policy step: $stepId" }
+        return step.ruleIds.map { ruleId ->
+            requireNotNull(catalog.rule(ruleId)) { "Unknown parsing policy rule: $ruleId" }
+        }
     }
 
     private fun googlePhotoSections(): List<AdminParsingRuleSection> = listOf(

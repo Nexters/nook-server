@@ -3,6 +3,8 @@ package org.every.nook.api.infrastructure.persistence.admin
 import org.every.nook.api.application.place.HangulOcrRuleSpec
 import org.every.nook.api.application.place.PlaceParsingDiagnostics
 import org.every.nook.api.application.processing.ParsingProgressStage
+import org.every.nook.api.application.processing.ParsingStepId
+import org.every.nook.api.application.processing.PlaceParsingPolicyCatalog
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.config.RuntimeConfigurationEntity
@@ -59,6 +61,14 @@ class AdminParsingPipelineAdapterTest {
         assertEquals("HangulOcrMatcher", hangulDecision.source)
         val photoRules = result.nodes.first { it.id == "thumbnail" }.sections.flatMap { it.rules }
         assertTrue(photoRules.any { it.value == GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE.toString() })
+
+        listOf("text-clues", "text-resolution", "image-decision", "image-resolution", "title-finalization")
+            .forEach { stepId ->
+                val catalog = PlaceParsingPolicyCatalog.catalog
+                val expectedRuleIds = requireNotNull(catalog.step(ParsingStepId(stepId))).ruleIds.map { it.value }
+                val exposedRuleIds = result.nodes.first { it.id == stepId }.decisions.map { it.ruleId }
+                assertEquals(expectedRuleIds, exposedRuleIds)
+            }
     }
 
     @Test
