@@ -16,6 +16,7 @@ import org.every.nook.api.application.admin.AdminRuntimeConfiguration
 import org.every.nook.api.application.place.HangulOcrRuleSpec
 import org.every.nook.api.application.place.PlaceCandidateRuleSpec
 import org.every.nook.api.application.place.PlaceParsingRuleSpec
+import org.every.nook.api.application.place.UnresolvedPlaceClue
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.instagram.InstagramScrapingProviderMode
@@ -174,6 +175,13 @@ class AdminParsingPipelineAdapter(
         attemptCount = attemptCount,
         failureReason = failureReason,
         nextAttemptAt = nextAttemptAt.takeIf { status == PlaceParsingStatus.PENDING && attemptCount > 0 },
+        outcome = parsingOutcome?.name,
+        expectedPlaceCount = expectedPlaceCount,
+        extractedPlaceCount = extractedPlaceCount,
+        resolvedPlaceCount = resolvedPlaceCount,
+        unresolvedPlaceClues = unresolvedPlaceClues
+            ?.let { objectMapper.readValue<List<UnresolvedPlaceClue>>(it) }
+            .orEmpty(),
     )
 
     private fun nodes(): List<AdminParsingNode> = listOf(

@@ -247,6 +247,7 @@ class ProcessPlaceParsingJobUseCase(
                 hashtags = job.hashtags,
                 sourceLocationTag = job.sourceLocationTag,
                 imageTranscripts = imageTranscripts,
+                sourceProfileHints = job.sourceProfileHints,
             ),
         )
     }.also { clues ->
@@ -331,17 +332,21 @@ class ProcessPlaceParsingJobUseCase(
             ),
         )
 
-        val selection = uniqueCandidate(matches, groundedMatches) ?: run {
-            if (selectionCandidates.isEmpty()) {
-                failResolution("No place candidate found: ${clue.name}")
+        val selection = uniqueCandidate(matches, groundedMatches)
+            ?: searchEvidenceCandidate(clue, selectionCandidates)
+            ?: run {
+                if (selectionCandidates.isEmpty()) {
+                    failResolution("No place candidate found: ${clue.name}")
+                }
+                val selected = measure(job, SELECT_STAGE) {
+                    candidateSelector.select(
+                        PlaceCandidateSelector.Request(clue = clue, candidates = selectionCandidates),
+                    )
+                } ?: failResolution(
+                    "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
+                )
+                CandidateSelection(selected, "openai")
             }
-            val selected = measure(job, SELECT_STAGE) {
-                candidateSelector.select(PlaceCandidateSelector.Request(clue = clue, candidates = selectionCandidates))
-            } ?: failResolution(
-                "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
-            )
-            CandidateSelection(selected, "openai")
-        }
         val selectedMatchedQueries = selectionCandidates.matchedQueriesFor(selection.place)
         if (!clue.isSupportedBy(selection.place, selectedMatchedQueries) &&
             !groundedCandidates.explicitNameSearchMatch.matches(selection.place)
@@ -408,12 +413,14 @@ class ProcessPlaceParsingJobUseCase(
                             .joinToString("\n") { "${it.provider}|${it.name}|${it.address}" },
                     ),
                 )
-                found.forEach { candidate ->
+                found.forEachIndexed { rank, candidate ->
                     val key = candidate.provider to candidate.externalPlaceId
                     val existing = candidatesById[key]
                     candidatesById[key] = PlaceCandidateSelector.Candidate(
                         place = candidate,
-                        matchedQueries = existing?.matchedQueries.orEmpty() + query,
+                        matchedQueries = (existing?.matchedQueries.orEmpty() + query).distinct(),
+                        matchedQueryRanks = existing?.matchedQueryRanks.orEmpty() + (query to rank),
+                        supportingProviders = existing?.supportingProviders.orEmpty() + candidate.provider,
                     )
                 }
                 if (strictMatches(clue, candidatesById.values).size == 1) {
@@ -618,7 +625,32 @@ private fun uniqueCandidate(
     else -> null
 }
 
-private data class CandidateSelection(val place: PlaceCandidate, val method: String)
+internal data class CandidateSelection(val place: PlaceCandidate, val method: String)
+
+internal fun searchEvidenceCandidate(
+    clue: PlaceClue,
+    candidates: List<PlaceCandidateSelector.Candidate>,
+): CandidateSelection? {
+    val clueName = clue.name.groundingKey()
+    val contextualQueries = clue.searchQueries()
+        .filter { query -> query.groundingKey() != clueName && query.groundingKey().length > clueName.length }
+        .toSet()
+    val eligible = candidates.filter { candidate ->
+        val topContextualQueries = candidate.matchedQueryRanks.count { (query, rank) ->
+            query in contextualQueries && rank == 0
+        }
+        topContextualQueries >= MIN_TOP_CONTEXTUAL_QUERY_SUPPORT &&
+            candidate.supportingProviders.size >= MIN_PROVIDER_SUPPORT
+    }
+    if (eligible.size != 1) return null
+    val selected = eligible.single()
+    val sameNameCandidates = candidates.filter { candidate ->
+        candidate.place.name.normalize() == selected.place.name.normalize() &&
+            candidate.matchedQueries.any(contextualQueries::contains)
+    }
+    return selected.takeIf { sameNameCandidates.size == 1 }
+        ?.let { CandidateSelection(it.place, "search_evidence") }
+}
 
 private fun logOcrDecision(
     logger: org.slf4j.Logger,
@@ -704,4 +736,6 @@ private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespac
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private const val MIN_GROUNDING_KEY_LENGTH = 2
+private const val MIN_TOP_CONTEXTUAL_QUERY_SUPPORT = 2
+private const val MIN_PROVIDER_SUPPORT = 2
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")

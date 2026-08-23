@@ -1,6 +1,7 @@
 package org.every.nook.api.application.admin
 
 import org.every.nook.api.application.place.PlaceOpeningHours
+import org.every.nook.api.application.place.UnresolvedPlaceClue
 import java.time.Instant
 
 data class AdminPage<T>(val items: List<T>, val total: Long)
@@ -16,6 +17,7 @@ data class AdminPostSummary(
     val savedUserCount: Long,
     val mappingReviewed: Boolean,
     val createdAt: Instant,
+    val placeParsingOutcome: String? = null,
 )
 
 data class AdminPostDetail(
@@ -35,6 +37,11 @@ data class AdminPostDetail(
     val media: List<AdminPostMedia> = emptyList(),
     val manuallyOverridden: Boolean = false,
     val places: List<AdminMappedPlace> = emptyList(),
+    val placeParsingOutcome: String? = null,
+    val expectedPlaceCount: Int? = null,
+    val extractedPlaceCount: Int? = null,
+    val resolvedPlaceCount: Int? = null,
+    val unresolvedPlaceClues: List<UnresolvedPlaceClue> = emptyList(),
 )
 
 data class AdminPostMedia(val mediaType: String, val mediaUrl: String, val sequence: Int)
@@ -127,6 +134,11 @@ data class AdminParsingJobExecution(
     val attemptCount: Int,
     val failureReason: String?,
     val nextAttemptAt: Instant?,
+    val outcome: String? = null,
+    val expectedPlaceCount: Int? = null,
+    val extractedPlaceCount: Int? = null,
+    val resolvedPlaceCount: Int? = null,
+    val unresolvedPlaceClues: List<UnresolvedPlaceClue> = emptyList(),
 )
 
 data class AdminMappedPlace(

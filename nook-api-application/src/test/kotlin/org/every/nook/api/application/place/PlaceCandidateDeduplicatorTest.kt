@@ -41,6 +41,32 @@ class PlaceCandidateDeduplicatorTest {
         )
     }
 
+    @Test
+    fun `merges generic branch labels at the same exact place address`() {
+        val kakao = candidate("KAKAO", "kakao-beaker", "비이커 성수점", "서울 성동구 연무장길 7")
+        val naver = candidate("NAVER", "naver-beaker", "비이커 성수플래그십스토어", "서울 성동구 연무장길 7")
+
+        val result = listOf(
+            PlaceCandidateSelector.Candidate(
+                kakao,
+                listOf("성수동 Beaker"),
+                mapOf("성수동 Beaker" to 0),
+                setOf("KAKAO"),
+            ),
+            PlaceCandidateSelector.Candidate(
+                naver,
+                listOf("Beaker 서울 성수"),
+                mapOf("Beaker 서울 성수" to 0),
+                setOf("NAVER"),
+            ),
+        ).distinctLogicalCandidates()
+
+        assertEquals(1, result.size)
+        assertEquals(setOf("KAKAO", "NAVER"), result.single().supportingProviders)
+        assertEquals(0, result.single().matchedQueryRanks["성수동 Beaker"])
+        assertEquals(0, result.single().matchedQueryRanks["Beaker 서울 성수"])
+    }
+
     private fun candidate(provider: String, id: String, name: String, address: String) = PlaceCandidate(
         provider = provider,
         externalPlaceId = id,
