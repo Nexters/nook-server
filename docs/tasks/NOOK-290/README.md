@@ -15,6 +15,8 @@ API 프로세스가 요청과 상태 조회만 담당하고, 콘텐츠·장소 �
 - API 런타임에서 parsing scheduler와 executor 제거
 - ops VM의 dev worker와 live VM의 live worker 배포 구성
 - worker health, Prometheus metric 및 로그 수집
+- Gabia Registry의 cross-repository blob mount 제약을 피하기 위해 API와 같은 image repository에서
+  `worker-dev-*`, `worker-prod-*` 전용 tag로 worker artifact 구분
 
 ## 제외 범위
 
