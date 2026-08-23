@@ -198,6 +198,9 @@ class OpenAiContentInferenceAdapter(
             "body" to body,
             "hashtags" to hashtags,
             "sourceLocationTag" to sourceLocationTag,
+            "sourceProfileHints" to sourceProfileHints.map { hint ->
+                mapOf("displayName" to hint.displayName, "username" to hint.username)
+            },
             "imageTranscripts" to imageTranscripts.map { transcript ->
                 mapOf(
                     "imageIndex" to transcript.imageIndex,
@@ -364,6 +367,10 @@ class OpenAiContentInferenceAdapter(
                 "짧은 이미지 상호명이 OCR 오독일 가능성이 있으면 name은 전사 원문대로 유지하되, " +
                 "검색어 하나에는 문맥상 가능한 한글 OCR 변형과 지역을 함께 사용할 수 있다. " +
                 "sourceLocationTag는 상호명과 결합한 지역 검색어에만 사용할 수 있다. " +
+                "sourceProfileHints는 본문에 실제로 언급된 계정의 상호명을 식별하는 보조 자료로만 사용한다. " +
+                "본문이 여러 장소를 명시적으로 나열하면서 @계정을 연속해 소개한 경우, username이 본문에 실제 등장하는 힌트의 " +
+                "displayName을 상호명 후보로 사용할 수 있다. 본문에 등장하지 않은 계정, 협찬·매거진·플랫폼 계정은 장소로 만들지 않는다. " +
+                "'앱에서 X를 검색'처럼 플랫폼과 실제 체험 장소가 함께 나오면 플랫폼이 아니라 X를 장소로 우선 검토한다. " +
                 "addressHint가 있으면 상호명과 전체 주소를 조합한 검색어를 포함하고 층·호 정보를 그대로 유지한다. " +
                 "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 60개 가게와 가게당 최대 4개 검색어만 반환한다."
         const val CANDIDATE_SELECTION_INSTRUCTIONS =

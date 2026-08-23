@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.admin
 
 import org.every.nook.api.application.place.HangulOcrRuleSpec
+import org.every.nook.api.application.place.PlaceParsingDiagnostics
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
@@ -94,6 +95,31 @@ class AdminParsingPipelineAdapterTest {
         assertEquals(2, execution.place?.attemptCount)
         assertTrue(requireNotNull(execution.place).progressPercent in 74..82)
         assertEquals(100, execution.content.progressPercent)
+    }
+
+    @Test
+    fun `post execution exposes partial place diagnostics`() {
+        val post = PostEntity("INSTAGRAM", "external", "https://instagram.com/p/external", title = "성수 편집숍")
+        val placeJob = PlaceParsingJobEntity(
+            postId = 520,
+            status = PlaceParsingStatus.COMPLETED,
+            parsingOutcome = PlaceParsingDiagnostics.Outcome.PARTIAL,
+            expectedPlaceCount = 7,
+            extractedPlaceCount = 7,
+            resolvedPlaceCount = 4,
+            unresolvedPlaceClues = """[{"clue":{"name":"Tune","region":"성수동",""" +
+                """"queries":["성수동 Tune"],"evidence":[],"addressHint":null},""" +
+                """"reason":"No place candidate selected: Tune"}]""",
+        )
+        `when`(postRepository.findById(520)).thenReturn(Optional.of(post))
+        `when`(placeJobRepository.findByPostId(520)).thenReturn(placeJob)
+        `when`(traceRepository.findAllByPostIdOrderByCreatedAtAscIdAsc(520)).thenReturn(emptyList())
+
+        val place = requireNotNull(adapter().get(520).execution?.place)
+
+        assertEquals("PARTIAL", place.outcome)
+        assertEquals(4, place.resolvedPlaceCount)
+        assertEquals("Tune", place.unresolvedPlaceClues.single().clue.name)
     }
 
     @Test

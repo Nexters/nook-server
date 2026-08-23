@@ -109,13 +109,24 @@ private fun PlaceClue.restoreAddressFromCard(transcripts: List<ImageTranscript>)
 }
 
 internal fun List<PlaceClue>.filterGroundedTextClues(job: ClaimedPlaceParsingJob): List<PlaceClue> = filter { clue ->
-    clue.isGroundedIn(job.body, job.hashtags).also { grounded ->
+    (clue.isGroundedIn(job.body, job.hashtags) || clue.isGroundedByMentionedProfile(job)).also { grounded ->
         if (!grounded) {
             completenessLogger.warn {
                 "Ungrounded text place clue skipped: postId=${job.postId}, attempt=${job.attempt}, " +
                     "placeName=${clue.name}, region=${clue.region}, queries=${clue.queries}"
             }
         }
+    }
+}
+
+private fun PlaceClue.isGroundedByMentionedProfile(job: ClaimedPlaceParsingJob): Boolean {
+    val bodyKey = job.body.orEmpty().lowercase()
+    val clueKey = name.lowercase().filter(Char::isLetterOrDigit)
+    return job.sourceProfileHints.any { hint ->
+        val displayNameKey = hint.displayName.lowercase().filter(Char::isLetterOrDigit)
+        bodyKey.contains("@${hint.username.lowercase()}") &&
+            clueKey.length >= MIN_PLACE_NAME_TEXT_LENGTH &&
+            (displayNameKey.contains(clueKey) || clueKey.contains(displayNameKey))
     }
 }
 

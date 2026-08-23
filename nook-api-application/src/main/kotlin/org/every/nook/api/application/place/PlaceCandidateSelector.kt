@@ -5,5 +5,10 @@ fun interface PlaceCandidateSelector {
 
     data class Request(val clue: PlaceClue, val candidates: List<Candidate>)
 
-    data class Candidate(val place: PlaceCandidate, val matchedQueries: List<String>)
+    data class Candidate(
+        val place: PlaceCandidate,
+        val matchedQueries: List<String>,
+        val matchedQueryRanks: Map<String, Int> = emptyMap(),
+        val supportingProviders: Set<String> = setOf(place.provider),
+    )
 }
