@@ -30,7 +30,12 @@ data class PlaceParsingDiagnostics(
     enum class Outcome { COMPLETED, PARTIAL }
 }
 
-data class UnresolvedPlaceClue(val clue: PlaceClue, val reason: String)
+data class UnresolvedPlaceClue(val clue: PlaceClue, val reason: String, val type: Type = Type.RESOLUTION_FAILED) {
+    enum class Type {
+        NOT_EXTRACTED,
+        RESOLUTION_FAILED,
+    }
+}
 
 fun interface PlaceImageUrlPort {
     fun findImageUrls(postId: Long): List<String>

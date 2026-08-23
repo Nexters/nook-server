@@ -39,6 +39,37 @@ class PlaceSearchEvidenceRecoveryTest {
         assertNull(searchEvidenceCandidate(clue, candidates))
     }
 
+    @Test
+    fun `selects a unique rank zero candidate whose full name is explicit in the query`() {
+        val clue = PlaceClue("바버샵", "서촌", listOf("바버샵 서촌"))
+        val candidates = listOf(
+            candidate("바버샵", "서울 종로구 자하문로12길 17", setOf("NAVER"), clue.queries),
+            candidate("바버샵 베스티스", "서울 종로구 필운대로 12", setOf("NAVER"), emptyList()).copy(
+                matchedQueries = clue.queries,
+                matchedQueryRanks = mapOf(clue.queries.single() to 1),
+            ),
+        )
+
+        val result = CandidateResolutionPolicy().evaluate(CandidateResolutionPolicy.Context(clue, candidates)).result
+
+        assertEquals("바버샵", result.selection?.place?.name)
+        assertEquals("explicit_query_name", result.selection?.method)
+    }
+
+    @Test
+    fun `does not select when multiple rank zero candidate names are explicit`() {
+        val query = "바버샵 서촌점 바버샵"
+        val clue = PlaceClue("서촌 헤어", "서촌", listOf(query))
+        val candidates = listOf(
+            candidate("바버샵", "서울 종로구 자하문로12길 17", setOf("NAVER"), listOf(query)),
+            candidate("바버샵 서촌점", "서울 종로구 필운대로 12", setOf("NAVER"), listOf(query)),
+        )
+
+        val result = CandidateResolutionPolicy().evaluate(CandidateResolutionPolicy.Context(clue, candidates)).result
+
+        assertNull(result.selection)
+    }
+
     private fun candidate(name: String, address: String, providers: Set<String>, topQueries: List<String>) =
         PlaceCandidateSelector.Candidate(
             place = PlaceCandidate(

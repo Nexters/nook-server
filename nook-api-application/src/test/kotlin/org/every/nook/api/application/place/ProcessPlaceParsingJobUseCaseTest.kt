@@ -19,6 +19,52 @@ import kotlin.test.assertTrue
 @Suppress("LargeClass") // The scenarios share one cohesive orchestration fixture for the place parsing pipeline.
 class ProcessPlaceParsingJobUseCaseTest {
     @Test
+    fun `records both unextracted and resolution failed diagnostics for a numbered source list`() {
+        val body = (1..12).joinToString("\n") { order ->
+            when (order) {
+                3 -> "3. Vintage Universe @vintage_unvs"
+                4 -> "4. Segra Vintage @vintage_unvs"
+                12 -> "12. 바버샵 @barbershop"
+                else -> "$order. 장소$order @place$order"
+            }
+        }
+        val clues = (1..12).filterNot { it == 4 }.map { order ->
+            when (order) {
+                3 -> PlaceClue("Vintage Universe", null, listOf("@vintage_unvs"))
+                12 -> PlaceClue("바버샵", null, listOf("바버샵 서촌"))
+                else -> PlaceClue("장소$order", null, listOf("장소$order"))
+            }
+        }
+        val port = FakeJobPort(body = body, textClues = clues)
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { error("stored text clues must be used") },
+            search = SearchPlaceCandidatesUseCase { request ->
+                val query = request.query
+                if (query.startsWith("바버샵")) {
+                    emptyList()
+                } else {
+                    listOf(candidate(query, query.removePrefix("@"), "서울 종로구"))
+                }
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(402))
+
+        val diagnostics = requireNotNull(port.diagnostics)
+        assertEquals(12, diagnostics.expectedPlaceCount)
+        assertEquals(11, diagnostics.extractedPlaceCount)
+        assertEquals(10, diagnostics.resolvedPlaceCount)
+        assertEquals(
+            setOf(
+                "Segra Vintage" to UnresolvedPlaceClue.Type.NOT_EXTRACTED,
+                "바버샵" to UnresolvedPlaceClue.Type.RESOLUTION_FAILED,
+            ),
+            diagnostics.unresolvedClues.map { it.clue.name to it.type }.toSet(),
+        )
+    }
+
+    @Test
     fun `records stable rule ids outcomes and input facts for policy decisions`() {
         val traces = mutableListOf<ProcessingTraceEvent>()
         val port = FakeJobPort(body = "본문에 원형들이 있습니다")
