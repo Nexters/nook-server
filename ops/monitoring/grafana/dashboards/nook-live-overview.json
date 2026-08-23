@@ -6,7 +6,20 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Worker Overview",
+      "tooltip": "live worker 지표로 이동",
+      "type": "link",
+      "url": "/d/nook-worker-overview/nook-worker-overview?var-env=live"
+    }
+  ],
   "liveNow": false,
   "panels": [
     {
