@@ -26,3 +26,10 @@ data class PlaceThumbnailProperties(
                 "3dd7bb6919492e58a76fe9012b82c0a44e4bfdf7bf0784cddd90dc9bbbee17f9.jpg"
     }
 }
+
+fun PlaceThumbnailProperties.Provider.toProviderChain(): List<PlaceThumbnailProviderType> = when (this) {
+    PlaceThumbnailProperties.Provider.POST_MEDIA -> listOf(PlaceThumbnailProviderType.POST_MEDIA)
+    PlaceThumbnailProperties.Provider.FIXED -> listOf(PlaceThumbnailProviderType.FIXED)
+    PlaceThumbnailProperties.Provider.GOOGLE -> listOf(PlaceThumbnailProviderType.GOOGLE)
+    PlaceThumbnailProperties.Provider.DISABLED -> emptyList()
+}

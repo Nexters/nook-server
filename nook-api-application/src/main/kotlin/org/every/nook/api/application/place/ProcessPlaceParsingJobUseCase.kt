@@ -4,8 +4,11 @@ import mu.KotlinLogging
 import org.every.nook.api.application.post.FinalizePostTitle
 import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.NoOpProcessingTracePort
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingTraceEvent
+import org.every.nook.api.application.processing.ProcessingTracePort
 import org.every.nook.api.application.processing.error
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.measure
@@ -15,6 +18,8 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 
+// Trace recording stays at orchestration decisions so operators see the exact path taken by a job.
+@Suppress("LongMethod", "TooManyFunctions")
 class ProcessPlaceParsingJobUseCase(
     private val jobPort: PlaceParsingJobPort,
     private val imageTextExtractor: ImageTextExtractor,
@@ -29,6 +34,7 @@ class ProcessPlaceParsingJobUseCase(
     private val processingTimeout: Duration,
     private val imageOcrConcurrency: Int = DEFAULT_IMAGE_OCR_CONCURRENCY,
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
+    private val tracePort: ProcessingTracePort = NoOpProcessingTracePort,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     private val finalizePostTitle = FinalizePostTitle(titleSelector)
@@ -37,6 +43,7 @@ class ProcessPlaceParsingJobUseCase(
         val job = jobPort.claim(postId, processingTimeout) ?: return Result.Skipped
         val startedAt = clock.instant()
         eventLogger.info(job.event("place.job.claimed", JOB_STAGE, SUCCESS_OUTCOME))
+        recordTrace(job, JOB_STAGE, "place.job.claimed", SUCCESS_OUTCOME)
         logger.info { "Place parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching { process(job, startedAt) }.getOrElse { exception ->
@@ -94,6 +101,19 @@ class ProcessPlaceParsingJobUseCase(
                     "place.unresolved_count" to diagnostics.unresolvedClues.size,
                 ),
             ),
+        )
+        recordTrace(
+            job,
+            JOB_STAGE,
+            "place.job.completed",
+            SUCCESS_OUTCOME,
+            duration,
+            mapOf(
+                "expectedPlaceCount" to diagnostics.expectedPlaceCount?.toString().orEmpty(),
+                "extractedPlaceCount" to diagnostics.extractedPlaceCount.toString(),
+                "resolvedPlaceCount" to places.size.toString(),
+                "unresolvedPlaceCount" to diagnostics.unresolvedClues.size.toString(),
+            ).filterValues(String::isNotEmpty),
         )
         return Result.Completed
     }
@@ -264,6 +284,13 @@ class ProcessPlaceParsingJobUseCase(
                     "Place clue skipped: postId=${job.postId}, placeName=${clue.name}, " +
                         "region=${clue.region}, reason=${exception.message}"
                 }
+                recordTrace(
+                    job,
+                    RESOLUTION_STAGE,
+                    "place.clue.rejected",
+                    FAILURE_OUTCOME,
+                    details = clue.traceDetails() + ("reason" to exception.message.orEmpty()),
+                )
                 null
             }
         }
@@ -290,6 +317,19 @@ class ProcessPlaceParsingJobUseCase(
                 "strictMatchCount=${matches.size}, groundedMatchCount=${groundedMatches.size}, " +
                 "candidates=$candidateDescriptions"
         }
+        recordTrace(
+            job,
+            MATCH_STAGE,
+            "place.candidates.matched",
+            if (selectionCandidates.isEmpty()) FAILURE_OUTCOME else SUCCESS_OUTCOME,
+            details = clue.traceDetails() + mapOf(
+                "candidateCount" to candidates.size.toString(),
+                "addressCompatibleCount" to selectionCandidates.size.toString(),
+                "strictMatchCount" to matches.size.toString(),
+                "groundedMatchCount" to groundedMatches.size.toString(),
+                "candidates" to candidates.descriptions(CANDIDATE_TRACE_LIMIT).joinToString("\n"),
+            ),
+        )
 
         val selection = uniqueCandidate(matches, groundedMatches) ?: run {
             if (selectionCandidates.isEmpty()) {
@@ -328,6 +368,18 @@ class ProcessPlaceParsingJobUseCase(
                 "externalPlaceId=${selection.place.externalPlaceId}, " +
                 "name=${selection.place.name}, address=${selection.place.address}"
         }
+        recordTrace(
+            job,
+            SELECT_STAGE,
+            "place.candidate.selected",
+            SUCCESS_OUTCOME,
+            details = mapOf(
+                "name" to selection.place.name,
+                "address" to selection.place.address,
+                "provider" to selection.place.provider,
+                "method" to selection.method,
+            ),
+        )
         return selection.place
     }
 
@@ -341,17 +393,29 @@ class ProcessPlaceParsingJobUseCase(
             .filter(String::isNotEmpty)
             .distinct()
             .forEach { query ->
-                measure(job, SEARCH_STAGE) {
+                val found = measure(job, SEARCH_STAGE) {
                     searchPlaceCandidates(SearchPlaceCandidatesUseCase.Command(queries = listOf(query)))
                 }
-                    .forEach { candidate ->
-                        val key = candidate.provider to candidate.externalPlaceId
-                        val existing = candidatesById[key]
-                        candidatesById[key] = PlaceCandidateSelector.Candidate(
-                            place = candidate,
-                            matchedQueries = existing?.matchedQueries.orEmpty() + query,
-                        )
-                    }
+                recordTrace(
+                    job,
+                    SEARCH_STAGE,
+                    "place.search.result",
+                    SUCCESS_OUTCOME,
+                    details = mapOf(
+                        "query" to query,
+                        "candidateCount" to found.size.toString(),
+                        "candidates" to found.take(CANDIDATE_TRACE_LIMIT)
+                            .joinToString("\n") { "${it.provider}|${it.name}|${it.address}" },
+                    ),
+                )
+                found.forEach { candidate ->
+                    val key = candidate.provider to candidate.externalPlaceId
+                    val existing = candidatesById[key]
+                    candidatesById[key] = PlaceCandidateSelector.Candidate(
+                        place = candidate,
+                        matchedQueries = existing?.matchedQueries.orEmpty() + query,
+                    )
+                }
                 if (strictMatches(clue, candidatesById.values).size == 1) {
                     return candidatesById.values.toList()
                 }
@@ -359,14 +423,23 @@ class ProcessPlaceParsingJobUseCase(
         return candidatesById.values.toList()
     }
 
-    private fun <T> measure(job: ClaimedPlaceParsingJob, stage: String, action: () -> T): T = metrics.measure(
-        flow = PLACE_FLOW,
-        stage = stage,
-        postId = job.postId,
-        attempt = job.attempt,
-        clock = clock,
-        action = action,
-    )
+    private fun <T> measure(job: ClaimedPlaceParsingJob, stage: String, action: () -> T): T {
+        val startedAt = clock.instant()
+        return runCatching {
+            metrics.measure(PLACE_FLOW, stage, job.postId, job.attempt, clock, action)
+        }.onSuccess {
+            recordTrace(job, stage, "place.stage.completed", SUCCESS_OUTCOME, elapsedMillis(startedAt))
+        }.onFailure { exception ->
+            recordTrace(
+                job,
+                stage,
+                "place.stage.failed",
+                FAILURE_OUTCOME,
+                elapsedMillis(startedAt),
+                mapOf("reason" to exception.message.orEmpty().take(FAILURE_REASON_TRACE_LIMIT)),
+            )
+        }.getOrThrow()
+    }
 
     private fun failResolution(message: String): Nothing = throw PlaceResolutionException(message)
 
@@ -383,6 +456,7 @@ class ProcessPlaceParsingJobUseCase(
                 "Place parsing failed without retry: postId=${job.postId}, attempt=${job.attempt}, " +
                     "durationMs=$duration, reason=$reason"
             }
+            recordTrace(job, JOB_STAGE, "place.job.failed", FAILURE_OUTCOME, duration, mapOf("reason" to reason))
             return Result.Failed
         }
 
@@ -404,6 +478,14 @@ class ProcessPlaceParsingJobUseCase(
                 "Place parsing retry scheduled: postId=${job.postId}, attempt=${job.attempt}, " +
                     "nextAttemptAt=$nextAttemptAt, durationMs=$duration, reason=$reason"
             }
+            recordTrace(
+                job,
+                JOB_STAGE,
+                "place.job.retry_scheduled",
+                FAILURE_OUTCOME,
+                duration,
+                mapOf("reason" to reason, "nextAttemptAt" to nextAttemptAt.toString()),
+            )
             return Result.Retry(nextAttemptAt)
         }
 
@@ -422,7 +504,43 @@ class ProcessPlaceParsingJobUseCase(
             "Place parsing failed permanently: postId=${job.postId}, attempt=${job.attempt}, " +
                 "durationMs=$duration, reason=$reason"
         }
+        recordTrace(job, JOB_STAGE, "place.job.failed", FAILURE_OUTCOME, duration, mapOf("reason" to reason))
         return Result.Failed
+    }
+
+    private fun elapsedMillis(startedAt: Instant): Long = Duration.between(startedAt, clock.instant()).toMillis()
+
+    private fun PlaceClue.traceDetails(): Map<String, String> = mapOf(
+        "placeName" to name,
+        "region" to region.orEmpty(),
+        "addressHint" to addressHint.orEmpty(),
+        "queries" to searchQueries().joinToString("\n"),
+    ).filterValues(String::isNotEmpty)
+
+    private fun recordTrace(
+        job: ClaimedPlaceParsingJob,
+        stage: String,
+        action: String,
+        outcome: String,
+        durationMs: Long? = null,
+        details: Map<String, String> = emptyMap(),
+    ) {
+        runCatching {
+            tracePort.record(
+                ProcessingTraceEvent(
+                    job.postId,
+                    PLACE_FLOW,
+                    stage,
+                    action,
+                    outcome,
+                    job.attempt,
+                    durationMs,
+                    details,
+                ),
+            )
+        }.onFailure { exception ->
+            logger.warn(exception) { "Failed to store place parsing trace: postId=${job.postId}" }
+        }
     }
 
     sealed interface Result {
@@ -439,10 +557,12 @@ class ProcessPlaceParsingJobUseCase(
         val logger = KotlinLogging.logger {}
         val eventLogger = LoggerFactory.getLogger(ProcessPlaceParsingJobUseCase::class.java)
 
-        const val MAX_PLACE_COUNT = 60
-        const val MAX_QUERY_COUNT = 4
-        const val MAX_IMAGE_COUNT = 20
+        const val MAX_PLACE_COUNT = PlaceParsingRuleSpec.MAX_PLACE_COUNT
+        const val MAX_QUERY_COUNT = PlaceParsingRuleSpec.MAX_QUERY_COUNT
+        const val MAX_IMAGE_COUNT = PlaceParsingRuleSpec.MAX_IMAGE_COUNT
         const val CANDIDATE_LOG_LIMIT = 5
+        const val CANDIDATE_TRACE_LIMIT = 10
+        const val FAILURE_REASON_TRACE_LIMIT = 500
         const val NO_PLACE_RESOLVED_REASON = "No place could be resolved from text"
         const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
         const val PLACE_FLOW = "place"
@@ -451,6 +571,8 @@ class ProcessPlaceParsingJobUseCase(
         const val IMAGE_CLUE_STAGE = "clue-image"
         const val SEARCH_STAGE = "search"
         const val SELECT_STAGE = "select"
+        const val MATCH_STAGE = "match"
+        const val RESOLUTION_STAGE = "resolution"
         const val COMPLETE_STAGE = "complete"
         const val TITLE_STAGE = "title-finalization"
         const val JOB_STAGE = "job"
@@ -558,7 +680,9 @@ private fun ocrReason(
 private fun expectedPlaceCount(body: String?): Int? = body?.let { content ->
     EXPECTED_PLACE_COUNT_PATTERN.findAll(content)
         .mapNotNull { match -> match.groupValues[1].toIntOrNull() }
-        .filter { count -> count in MIN_EXPECTED_PLACE_COUNT..MAX_EXPECTED_PLACE_COUNT }
+        .filter { count ->
+            count in PlaceParsingRuleSpec.MIN_EXPECTED_PLACE_COUNT..PlaceParsingRuleSpec.MAX_EXPECTED_PLACE_COUNT
+        }
         .maxOrNull()
 }
 
@@ -580,6 +704,4 @@ private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespac
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private const val MIN_GROUNDING_KEY_LENGTH = 2
-private const val MIN_EXPECTED_PLACE_COUNT = 2
-private const val MAX_EXPECTED_PLACE_COUNT = 80
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")

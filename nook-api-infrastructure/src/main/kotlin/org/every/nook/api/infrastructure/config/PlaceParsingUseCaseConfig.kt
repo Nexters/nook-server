@@ -21,6 +21,7 @@ import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingTracePort
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -39,6 +40,7 @@ class PlaceParsingUseCaseConfig {
         candidateSelector: PlaceCandidateSelector,
         titleSelector: PostTitleSelector,
         processingMetrics: ObjectProvider<ProcessingMetrics>,
+        processingTracePort: ProcessingTracePort,
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
         jobPort = jobPort,
@@ -52,6 +54,7 @@ class PlaceParsingUseCaseConfig {
         processingTimeout = properties.processingTimeout,
         imageOcrConcurrency = properties.imageOcrConcurrency,
         metrics = processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
+        tracePort = processingTracePort,
     )
 
     @Bean

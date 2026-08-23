@@ -7,9 +7,12 @@ import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.NoOpProcessingTracePort
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingTraceEvent
+import org.every.nook.api.application.processing.ProcessingTracePort
 import org.every.nook.api.application.processing.error
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.measure
@@ -21,6 +24,8 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 
+// Trace recording is part of this orchestration boundary to preserve stage order.
+@Suppress("LongMethod")
 class ProcessPostContentParsingJobUseCase(
     private val jobPort: PostContentParsingJobPort,
     private val extractPostContent: ExtractPostContentUseCase,
@@ -29,12 +34,14 @@ class ProcessPostContentParsingJobUseCase(
     private val processingTimeout: Duration,
     private val imageTextExtractor: ImageTextExtractor = ImageTextExtractor { emptyList() },
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
+    private val tracePort: ProcessingTracePort = NoOpProcessingTracePort,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     operator fun invoke(postId: Long): Result {
         val job = jobPort.claim(postId, processingTimeout) ?: return Result.Skipped
         val startedAt = clock.instant()
         eventLogger.info(job.event("content.job.claimed", JOB_STAGE, SUCCESS_OUTCOME))
+        recordTrace(job, JOB_STAGE, "content.job.claimed", SUCCESS_OUTCOME)
         logger.info { "Post content parsing started: postId=${job.postId}, attempt=${job.attempt}" }
 
         return runCatching {
@@ -70,6 +77,13 @@ class ProcessPostContentParsingJobUseCase(
                     ),
                 )
             }
+            recordTrace(
+                job,
+                INFERENCE_STAGE,
+                "content.inference.result",
+                SUCCESS_OUTCOME,
+                details = mapOf("placeClueCount" to inference.placeClues.size.toString()),
+            )
             val completedPost = providedPost.copy(
                 title = null,
             )
@@ -104,17 +118,34 @@ class ProcessPostContentParsingJobUseCase(
                 fields = mapOf("content.media_count" to post.media.size),
             ),
         )
+        recordTrace(
+            job,
+            JOB_STAGE,
+            "content.job.completed",
+            SUCCESS_OUTCOME,
+            duration,
+            mapOf("mediaCount" to post.media.size.toString()),
+        )
         return Result.Completed
     }
 
-    private fun <T> measure(job: ClaimedPostContentParsingJob, stage: String, action: () -> T): T = metrics.measure(
-        flow = CONTENT_FLOW,
-        stage = stage,
-        postId = job.postId,
-        attempt = job.attempt,
-        clock = clock,
-        action = action,
-    )
+    private fun <T> measure(job: ClaimedPostContentParsingJob, stage: String, action: () -> T): T {
+        val startedAt = clock.instant()
+        return runCatching {
+            metrics.measure(CONTENT_FLOW, stage, job.postId, job.attempt, clock, action)
+        }.onSuccess {
+            recordTrace(job, stage, "content.stage.completed", SUCCESS_OUTCOME, elapsedMillis(startedAt))
+        }.onFailure { exception ->
+            recordTrace(
+                job,
+                stage,
+                "content.stage.failed",
+                FAILURE_OUTCOME,
+                elapsedMillis(startedAt),
+                mapOf("reason" to exception.message.orEmpty().take(MAX_FAILURE_REASON_LENGTH)),
+            )
+        }.getOrThrow()
+    }
 
     private fun handleFailure(job: ClaimedPostContentParsingJob, exception: Throwable, startedAt: Instant): Result {
         val reason = exception.message.orEmpty()
@@ -131,6 +162,7 @@ class ProcessPostContentParsingJobUseCase(
                 "Post content parsing failed without retry: postId=${job.postId}, attempt=${job.attempt}, " +
                     "durationMs=$duration, reason=$reason"
             }
+            recordTrace(job, JOB_STAGE, "content.job.failed", FAILURE_OUTCOME, duration, mapOf("reason" to reason))
             return Result.Failed
         }
         val backoff = retryBackoffs.getOrNull(job.attempt - 1)
@@ -151,6 +183,14 @@ class ProcessPostContentParsingJobUseCase(
                 "Post content parsing retry scheduled: postId=${job.postId}, attempt=${job.attempt}, " +
                     "nextAttemptAt=$nextAttemptAt, durationMs=$duration, reason=$reason"
             }
+            recordTrace(
+                job,
+                JOB_STAGE,
+                "content.job.retry_scheduled",
+                FAILURE_OUTCOME,
+                duration,
+                mapOf("reason" to reason, "nextAttemptAt" to nextAttemptAt.toString()),
+            )
             return Result.Retry(nextAttemptAt)
         }
 
@@ -163,7 +203,36 @@ class ProcessPostContentParsingJobUseCase(
             "Post content parsing failed permanently: postId=${job.postId}, attempt=${job.attempt}, " +
                 "durationMs=$duration, reason=$reason"
         }
+        recordTrace(job, JOB_STAGE, "content.job.failed", FAILURE_OUTCOME, duration, mapOf("reason" to reason))
         return Result.Failed
+    }
+
+    private fun elapsedMillis(startedAt: Instant): Long = Duration.between(startedAt, clock.instant()).toMillis()
+
+    private fun recordTrace(
+        job: ClaimedPostContentParsingJob,
+        stage: String,
+        action: String,
+        outcome: String,
+        durationMs: Long? = null,
+        details: Map<String, String> = emptyMap(),
+    ) {
+        runCatching {
+            tracePort.record(
+                ProcessingTraceEvent(
+                    job.postId,
+                    CONTENT_FLOW,
+                    stage,
+                    action,
+                    outcome,
+                    job.attempt,
+                    durationMs,
+                    details,
+                ),
+            )
+        }.onFailure { exception ->
+            logger.warn(exception) { "Failed to store content parsing trace: postId=${job.postId}" }
+        }
     }
 
     private fun ExtractedPostContent.toSourceLocationTag(): String? = sourceLocationNames

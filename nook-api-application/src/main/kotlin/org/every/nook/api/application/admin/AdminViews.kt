@@ -39,6 +39,96 @@ data class AdminPostDetail(
 
 data class AdminPostMedia(val mediaType: String, val mediaUrl: String, val sequence: Int)
 
+data class AdminParsingPipeline(
+    val nodes: List<AdminParsingNode>,
+    val edges: List<AdminParsingEdge>,
+    val configurations: List<AdminRuntimeConfiguration>,
+    val execution: AdminParsingExecution? = null,
+)
+
+data class AdminParsingNode(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val lane: String,
+    val kind: String,
+    val position: AdminParsingPosition,
+    val summary: String,
+    val inputs: List<String>,
+    val outputs: List<String>,
+    val stages: List<String> = emptyList(),
+    val configurationKeys: List<String> = emptyList(),
+    val decisions: List<AdminParsingDecisionStep> = emptyList(),
+    val sections: List<AdminParsingRuleSection> = emptyList(),
+    val examples: List<String> = emptyList(),
+)
+
+data class AdminParsingPosition(val x: Int, val y: Int)
+
+data class AdminParsingEdge(
+    val id: String,
+    val source: String,
+    val target: String,
+    val label: String? = null,
+    val kind: String = "default",
+)
+
+data class AdminParsingRuleSection(
+    val title: String,
+    val description: String? = null,
+    val rules: List<AdminParsingRule>,
+)
+
+data class AdminParsingRule(val label: String, val value: String, val description: String? = null)
+
+data class AdminParsingDecisionStep(
+    val order: Int,
+    val title: String,
+    val condition: String,
+    val expression: String? = null,
+    val onPass: String,
+    val onFail: String,
+    val source: String,
+)
+
+data class AdminRuntimeConfiguration(
+    val key: String,
+    val configuredValue: String?,
+    val effectiveValue: String,
+    val source: String,
+    val description: String,
+    val warnings: List<String> = emptyList(),
+)
+
+data class AdminParsingExecution(
+    val postId: Long,
+    val title: String?,
+    val content: AdminParsingJobExecution,
+    val place: AdminParsingJobExecution?,
+    val traces: List<AdminProcessingTrace> = emptyList(),
+)
+
+data class AdminProcessingTrace(
+    val id: Long,
+    val flow: String,
+    val stage: String,
+    val action: String,
+    val outcome: String,
+    val attempt: Int?,
+    val durationMs: Long?,
+    val details: Map<String, String>,
+    val createdAt: Instant,
+)
+
+data class AdminParsingJobExecution(
+    val status: String,
+    val stage: String?,
+    val progressPercent: Int,
+    val attemptCount: Int,
+    val failureReason: String?,
+    val nextAttemptAt: Instant?,
+)
+
 data class AdminMappedPlace(
     val id: Long,
     val name: String,

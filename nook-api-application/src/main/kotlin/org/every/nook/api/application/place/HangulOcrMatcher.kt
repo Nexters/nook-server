@@ -7,7 +7,8 @@ internal object HangulOcrMatcher {
         val rightJamo = right.decomposeHangul()
         val maxLength = maxOf(leftJamo.length, rightJamo.length)
         val distance = leftJamo.editDistance(rightJamo)
-        return distance <= MAX_EDIT_DISTANCE && distance * MAX_ERROR_RATIO <= maxLength
+        return distance <= HangulOcrRuleSpec.MAX_EDIT_DISTANCE &&
+            distance * HangulOcrRuleSpec.MAX_ERROR_RATIO_DENOMINATOR <= maxLength
     }
 
     private fun String.decomposeHangul(): String = buildString {
@@ -50,8 +51,6 @@ internal object HangulOcrMatcher {
 
     private fun Char.isHangulSyllable(): Boolean = code in HANGUL_SYLLABLE_START..HANGUL_SYLLABLE_END
 
-    private const val MAX_EDIT_DISTANCE = 2
-    private const val MAX_ERROR_RATIO = 3
     private const val HANGUL_SYLLABLE_START = 0xAC00
     private const val HANGUL_SYLLABLE_END = 0xD7A3
     private const val CHOSEONG_COUNT = 19

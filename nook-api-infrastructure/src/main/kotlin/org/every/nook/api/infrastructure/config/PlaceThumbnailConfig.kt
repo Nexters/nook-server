@@ -20,6 +20,7 @@ import org.every.nook.api.infrastructure.place.PlaceThumbnailProperties
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProviderType
 import org.every.nook.api.infrastructure.place.PostMediaPlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.RuntimePlaceThumbnailProvider
+import org.every.nook.api.infrastructure.place.toProviderChain
 import org.every.nook.api.infrastructure.storage.MediaStorageProperties
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
@@ -124,15 +125,8 @@ class PlaceThumbnailConfig {
         return RuntimePlaceThumbnailProvider(
             providers = providers,
             configurationReader = configurationReader,
-            legacyChain = thumbnailProperties.provider.toChain(),
+            legacyChain = thumbnailProperties.provider.toProviderChain(),
         )
-    }
-
-    private fun PlaceThumbnailProperties.Provider.toChain(): List<PlaceThumbnailProviderType> = when (this) {
-        PlaceThumbnailProperties.Provider.POST_MEDIA -> listOf(PlaceThumbnailProviderType.POST_MEDIA)
-        PlaceThumbnailProperties.Provider.FIXED -> listOf(PlaceThumbnailProviderType.FIXED)
-        PlaceThumbnailProperties.Provider.GOOGLE -> listOf(PlaceThumbnailProviderType.GOOGLE)
-        PlaceThumbnailProperties.Provider.DISABLED -> emptyList()
     }
 
     private fun postMediaProvider(

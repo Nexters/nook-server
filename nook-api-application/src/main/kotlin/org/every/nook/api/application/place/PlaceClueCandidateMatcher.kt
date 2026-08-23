@@ -57,8 +57,12 @@ internal fun PlaceClue.hasPlausibleOcrIdentity(candidate: PlaceCandidate): Boole
 }
 
 private fun String.isNearOcrMatch(other: String): Boolean {
-    if (length < MIN_NEAR_OCR_NAME_LENGTH || other.length < MIN_NEAR_OCR_NAME_LENGTH) return false
-    if (kotlin.math.abs(length - other.length) > MAX_OCR_NAME_EDIT_DISTANCE) return false
+    if (length < PlaceCandidateRuleSpec.MIN_NEAR_OCR_NAME_LENGTH ||
+        other.length < PlaceCandidateRuleSpec.MIN_NEAR_OCR_NAME_LENGTH
+    ) {
+        return false
+    }
+    if (kotlin.math.abs(length - other.length) > PlaceCandidateRuleSpec.MAX_OCR_NAME_EDIT_DISTANCE) return false
     val distances = IntArray(other.length + 1) { it }
     forEachIndexed { leftIndex, left ->
         var previous = distances[0]
@@ -69,7 +73,7 @@ private fun String.isNearOcrMatch(other: String): Boolean {
             distances[rightIndex + 1] = minOf(distances[rightIndex + 1] + 1, distances[rightIndex] + 1, replaced)
         }
     }
-    return distances.last() <= MAX_OCR_NAME_EDIT_DISTANCE
+    return distances.last() <= PlaceCandidateRuleSpec.MAX_OCR_NAME_EDIT_DISTANCE
 }
 
 internal fun Collection<PlaceCandidateSelector.Candidate>.descriptions(limit: Int): List<String> =
@@ -81,16 +85,18 @@ private fun PlaceClue.hasCompatibleName(candidate: PlaceCandidate): Boolean {
     return (sequenceOf(name) + queries.asSequence())
         .map(String::groundingKey)
         .any { queryName ->
+            val addressContainsQuery = queryName.length >=
+                PlaceCandidateRuleSpec.MIN_NAME_COMPATIBILITY_KEY_LENGTH && candidateAddress.contains(queryName)
             candidateName == queryName ||
                 candidateName.isCompatibleName(queryName) ||
                 candidateName.isFuzzyNameMatch(queryName) ||
-                (queryName.length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH && candidateAddress.contains(queryName))
+                addressContainsQuery
         }
 }
 
 private fun PlaceClue.hasNameEvidence(candidate: PlaceCandidate, allowShortName: Boolean): Boolean {
     val candidateName = candidate.name.groundingKey()
-    val minimumLength = if (allowShortName) 1 else MIN_GROUNDING_KEY_LENGTH
+    val minimumLength = if (allowShortName) 1 else PlaceCandidateRuleSpec.MIN_GROUNDING_KEY_LENGTH
     return candidateName.length >= minimumLength && evidence.any { clueEvidence ->
         clueEvidence.evidenceText.groundingKey().contains(candidateName)
     }
@@ -102,28 +108,22 @@ private fun PlaceClue.hasCompatibleEvidence(candidate: PlaceCandidate): Boolean 
     val candidateAddressKeys = PlaceAddressMatcher.addressKeys(candidate.address)
     return evidence.asSequence().map(PlaceClueEvidence::evidenceText).any { evidenceText ->
         val normalizedEvidence = evidenceText.groundingKey()
-        val containsName = candidateName.length >= MIN_GROUNDING_KEY_LENGTH &&
+        val containsName = candidateName.length >= PlaceCandidateRuleSpec.MIN_GROUNDING_KEY_LENGTH &&
             normalizedEvidence.contains(candidateName)
-        val containsAddress = candidateAddress.length >= MIN_ADDRESS_GROUNDING_KEY_LENGTH &&
+        val containsAddress = candidateAddress.length >= PlaceCandidateRuleSpec.MIN_ADDRESS_GROUNDING_KEY_LENGTH &&
             normalizedEvidence.contains(candidateAddress)
         containsName || containsAddress ||
             candidateAddressKeys.any { it in PlaceAddressMatcher.addressKeys(evidenceText) }
     }
 }
 
-private fun String.isCompatibleName(other: String): Boolean = length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
-    other.length >= MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
+private fun String.isCompatibleName(other: String): Boolean = length >=
+    PlaceCandidateRuleSpec.MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
+    other.length >= PlaceCandidateRuleSpec.MIN_NAME_COMPATIBILITY_KEY_LENGTH &&
     (contains(other) || other.contains(this))
 
-private fun String.isFuzzyNameMatch(other: String): Boolean = length >= MIN_FUZZY_NAME_LENGTH &&
-    length == other.length && zip(other).count { (left, right) -> left != right } <= MAX_NAME_CHARACTER_DIFFERENCE
+private fun String.isFuzzyNameMatch(other: String): Boolean = length >= PlaceCandidateRuleSpec.MIN_FUZZY_NAME_LENGTH &&
+    length == other.length &&
+    zip(other).count { (left, right) -> left != right } <= PlaceCandidateRuleSpec.MAX_NAME_CHARACTER_DIFFERENCE
 
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
-
-private const val MIN_GROUNDING_KEY_LENGTH = 2
-private const val MIN_NAME_COMPATIBILITY_KEY_LENGTH = 3
-private const val MIN_FUZZY_NAME_LENGTH = 4
-private const val MAX_NAME_CHARACTER_DIFFERENCE = 1
-private const val MIN_NEAR_OCR_NAME_LENGTH = 3
-private const val MAX_OCR_NAME_EDIT_DISTANCE = 3
-private const val MIN_ADDRESS_GROUNDING_KEY_LENGTH = 6

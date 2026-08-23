@@ -8,6 +8,10 @@ interface AdminPostQueryPort {
     fun find(postId: Long): AdminPostDetail?
 }
 
+fun interface AdminParsingPipelinePort {
+    fun get(postId: Long?): AdminParsingPipeline
+}
+
 interface AdminPostCorrectionPort {
     fun update(command: UpdateCommand): AdminPostDetail?
 

@@ -1,0 +1,78 @@
+.pipeline-page { min-width: 0; }
+
+.pipeline-canvas-card {
+  position: relative;
+  height: min(68vh, 720px);
+  min-height: 520px;
+  overflow: hidden;
+  background: #f8f9fb;
+}
+
+.pipeline-loading { display: grid; height: 100%; place-items: center; }
+.pipeline-lane-labels { position: absolute; z-index: 3; top: 16px; left: 16px; display: flex; gap: 8px; pointer-events: none; }
+.pipeline-lane-labels span { padding: 5px 9px; border: 1px solid #e4e6e9; border-radius: 8px; color: #67707d; background: rgb(255 255 255 / 90%); font-size: 11px; font-weight: 700; }
+
+.pipeline-node {
+  width: 224px;
+  min-height: 146px;
+  padding: 16px;
+  border: 1px solid #caced4;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 9px 24px rgb(53 60 70 / 10%);
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.pipeline-node:hover,
+.pipeline-node:focus-visible { border-color: #558eff; box-shadow: 0 13px 32px rgb(53 111 229 / 18%); transform: translateY(-2px); }
+.pipeline-node--active { border: 2px solid #558eff; box-shadow: 0 12px 32px rgb(85 142 255 / 24%); }
+.pipeline-node--completed { border-color: #76cbae; }
+.pipeline-node--failed { border-color: #fa5947; background: #fff9f8; }
+.pipeline-node--waiting { opacity: .76; }
+.pipeline-node--decision { border-style: dashed; }
+.pipeline-node-lane { color: #848b96; font-family: "Roboto Mono", monospace !important; font-size: 9px !important; font-weight: 600 !important; letter-spacing: .07em !important; }
+.pipeline-node-title { margin-top: 3px !important; color: #1f1f1f; font-size: 15px !important; font-weight: 800 !important; }
+.pipeline-node-subtitle { margin-top: 5px !important; color: #67707d; font-size: 11px !important; }
+.pipeline-node-hint { margin-top: 13px !important; color: #558eff; font-size: 10px !important; font-weight: 700 !important; }
+.pipeline-state { flex: none; padding: 3px 6px; border-radius: 6px; color: #67707d; background: #f0f1f3; font-size: 9px; font-weight: 800; }
+.pipeline-state--completed { color: #16795a; background: #eaf8f3; }
+.pipeline-state--active { color: #356fe5; background: #edf3ff; }
+.pipeline-state--failed { color: #c33d30; background: #fff0ee; }
+.pipeline-config-preview { display: grid; gap: 2px; margin-top: 10px; padding: 7px 8px; overflow: hidden; border-radius: 8px; background: #f4f6fa; }
+.pipeline-config-preview span { color: #848b96; font-size: 9px; }
+.pipeline-config-preview strong { overflow: hidden; font: 600 9px "Roboto Mono", monospace; text-overflow: ellipsis; white-space: nowrap; }
+.pipeline-node .react-flow__handle { width: 8px; height: 8px; border: 2px solid #fff; background: #8aa7dd; }
+
+.rule-drawer { width: min(520px, 92vw); }
+.rule-drawer-header { display: flex; padding: 24px; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.rule-drawer-body { padding: 24px; }
+.rule-section { margin-top: 28px; }
+.rule-row { display: grid; grid-template-columns: minmax(110px, 35%) 1fr; gap: 3px 14px; padding: 12px 14px; border: 1px solid #e4e6e9; border-radius: 11px; background: #fafbfc; }
+.rule-row > :nth-child(3) { grid-column: 2; }
+.rule-config-card { margin-top: 22px; padding: 16px; border: 1px solid #bfd0f4; border-radius: 12px; background: #f5f8ff; }
+.decision-flow { display: grid; gap: 0; }
+.decision-step { position: relative; display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding-bottom: 20px; }
+.decision-step:not(:last-child)::before { position: absolute; top: 30px; bottom: 0; left: 14px; width: 2px; background: #dce5f7; content: ""; }
+.decision-order { z-index: 1; display: grid; width: 30px; height: 30px; border-radius: 50%; color: #fff; background: #558eff; font: 700 12px "Roboto Mono", monospace; place-items: center; }
+.decision-card { min-width: 0; padding: 16px; border: 1px solid #dce3ef; border-radius: 13px; background: #fafbfc; }
+.decision-source { max-width: 48%; font-family: "Roboto Mono", monospace !important; font-size: 9px !important; }
+.decision-source .MuiChip-label { overflow: hidden; text-overflow: ellipsis; }
+.decision-expression { margin-top: 10px; padding: 10px 12px; overflow-wrap: anywhere; border: 1px solid #d8e2f5; border-radius: 8px; color: #35527e; background: #f2f6fd; font: 600 11px/1.55 "Roboto Mono", monospace; }
+.decision-result { flex: 1; padding: 10px 11px; border-radius: 8px; font-size: 12px; }
+.decision-result span { display: block; margin-bottom: 3px; font-size: 9px; font-weight: 800; letter-spacing: .04em; }
+.decision-result--pass { color: #166d52; background: #eaf8f3; }
+.decision-result--fail { color: #885c20; background: #fff7e8; }
+.job-summary { display: grid; min-width: 180px; gap: 2px; padding: 11px 14px; border-radius: 11px; background: #f4f6fa; }
+.job-summary span, .job-summary small { color: #67707d; font-size: 11px; }
+.job-summary strong { font-size: 13px; }
+.job-summary .job-failure { max-width: 260px; color: #c33d30; }
+
+.react-flow__controls { overflow: hidden; border: 1px solid #e4e6e9 !important; border-radius: 10px !important; box-shadow: 0 6px 18px rgb(53 60 70 / 12%) !important; }
+.react-flow__minimap { overflow: hidden; border: 1px solid #e4e6e9; border-radius: 10px; box-shadow: 0 6px 18px rgb(53 60 70 / 10%); }
+
+@media (max-width: 760px) {
+  .pipeline-canvas-card { height: 62vh; min-height: 440px; }
+  .rule-row { grid-template-columns: 1fr; }
+  .rule-row > :nth-child(3) { grid-column: 1; }
+}

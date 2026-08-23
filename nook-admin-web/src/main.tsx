@@ -1,4 +1,5 @@
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
@@ -15,8 +16,10 @@ import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type D
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import React, { useEffect, useRef, useState } from "react";
-import { Admin, Datagrid, DateField, FunctionField, Layout, List, Menu, Resource, SelectInput, Show, SimpleShowLayout, TextField as RaTextField, TextInput, TopToolbar, type DataProvider, type LayoutProps, useNotify, useRecordContext, useRefresh } from "react-admin";
+import { Admin, CustomRoutes, Datagrid, DateField, FunctionField, Layout, List, Menu, Resource, SelectInput, Show, SimpleShowLayout, TextField as RaTextField, TextInput, TopToolbar, type DataProvider, type LayoutProps, useNotify, useRecordContext, useRefresh } from "react-admin";
 import { createRoot } from "react-dom/client";
+import { Route } from "react-router-dom";
+import { ParsingPipelinePage } from "./ParsingPipeline";
 import "./styles.css";
 
 const apiBase = (import.meta.env.VITE_ADMIN_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -91,12 +94,13 @@ const theme = createTheme({
   },
 });
 
-function App() { return <Admin dashboard={Dashboard} dataProvider={dataProvider} disableTelemetry layout={AdminLayout} theme={theme} title="Nook Admin"><Resource name="posts" options={{ label: "게시글 관리" }} icon={AssignmentTurnedInIcon} list={PostList} show={PostShow} /><Resource name="places" options={{ label: "장소 관리" }} icon={PlaceIcon} list={PlaceList} show={PlaceShow} /><Resource name="place-tags" options={{ label: "장소 태그 관리" }} icon={LocalOfferIcon} list={PlaceTagList} /><Resource name="app-version-policies" options={{ label: "앱 버전 관리" }} icon={SystemUpdateAltIcon} list={AppVersionPolicyList} /><Resource name="audit-logs" options={{ label: "감사 로그" }} icon={AssignmentTurnedInIcon} list={AuditLogList} /></Admin>; }
+function App() { return <Admin dashboard={Dashboard} dataProvider={dataProvider} disableTelemetry layout={AdminLayout} theme={theme} title="Nook Admin"><CustomRoutes><Route path="/parsing-pipeline" element={<ParsingPipelinePage />} /></CustomRoutes><Resource name="posts" options={{ label: "게시글 관리" }} icon={AssignmentTurnedInIcon} list={PostList} show={PostShow} /><Resource name="places" options={{ label: "장소 관리" }} icon={PlaceIcon} list={PlaceList} show={PlaceShow} /><Resource name="place-tags" options={{ label: "장소 태그 관리" }} icon={LocalOfferIcon} list={PlaceTagList} /><Resource name="app-version-policies" options={{ label: "앱 버전 관리" }} icon={SystemUpdateAltIcon} list={AppVersionPolicyList} /><Resource name="audit-logs" options={{ label: "감사 로그" }} icon={AssignmentTurnedInIcon} list={AuditLogList} /></Admin>; }
 function AdminLayout(props: LayoutProps) { return <Layout {...props} menu={AdminMenu} />; }
-function AdminMenu() { return <Menu><Box className="nook-brand"><Box className="nook-brand-mark">N</Box><Box className="nook-brand-copy"><span className="nook-brand-title">Nook Admin</span><span className="nook-brand-caption">Operations</span></Box></Box><Menu.DashboardItem leftIcon={<DashboardIcon />} /><Menu.ResourceItem name="posts" /><Menu.ResourceItem name="places" /><Menu.ResourceItem name="place-tags" /><Menu.ResourceItem name="app-version-policies" /><Menu.ResourceItem name="audit-logs" /></Menu>; }
+function AdminMenu() { return <Menu><Box className="nook-brand"><Box className="nook-brand-mark">N</Box><Box className="nook-brand-copy"><span className="nook-brand-title">Nook Admin</span><span className="nook-brand-caption">Operations</span></Box></Box><Menu.DashboardItem leftIcon={<DashboardIcon />} /><Menu.Item to="/parsing-pipeline" primaryText="파싱 파이프라인" leftIcon={<AccountTreeIcon />} /><Menu.ResourceItem name="posts" /><Menu.ResourceItem name="places" /><Menu.ResourceItem name="place-tags" /><Menu.ResourceItem name="app-version-policies" /><Menu.ResourceItem name="audit-logs" /></Menu>; }
 
 function Dashboard() {
   const destinations = [
+    { href: "#/parsing-pipeline", eyebrow: "PARSING", title: "파싱 파이프라인", description: "전체 처리 흐름과 실제 판정 규칙, 현재 provider 설정을 탐색합니다.", icon: <AccountTreeIcon /> },
     { href: "#/posts", eyebrow: "CONTENT", title: "게시글 검수", description: "파싱 상태와 장소 매핑을 확인하고 필요한 교정을 진행합니다.", icon: <AssignmentTurnedInIcon /> },
     { href: "#/places", eyebrow: "PLACE", title: "장소 관리", description: "공용 장소 정보와 연결된 게시글, 사용자 영향 범위를 확인합니다.", icon: <PlaceIcon /> },
     { href: "#/place-tags", eyebrow: "TAG", title: "장소 태그 관리", description: "태그 이름과 매칭 키워드, 노출 여부와 순서를 관리합니다.", icon: <LocalOfferIcon /> },
@@ -134,7 +138,7 @@ function PhotoGallery({ urls, name }: { urls: string[]; name: string }) {
 
 function PostList() { return <List filters={[<TextInput key="query" source="query" label="제목·작성자·URL 검색" alwaysOn />]}><Datagrid rowClick="show" bulkActionButtons={false}><RaTextField source="id" label="ID" sx={{ fontFamily: '"Roboto Mono", monospace', color: "text.secondary" }} /><FunctionField label="제목" render={(record: PostDetail) => <SparkleTitle post={record} />} /><RaTextField source="authorIdentifier" label="작성자" sx={{ fontFamily: '"Roboto Mono", monospace' }} /><FunctionField label="게시글 파싱" render={(record: { contentParsingStatus?: string }) => <StatusChip value={record.contentParsingStatus} />} /><FunctionField label="장소 파싱" render={(record: { placeParsingStatus?: string }) => <StatusChip value={record.placeParsingStatus} />} /><RaTextField source="placeCount" label="장소 수" /><RaTextField source="savedUserCount" label="저장 사용자" /><FunctionField label="검수" render={(record: { mappingReviewed: boolean }) => <StatusChip value={record.mappingReviewed ? "완료" : "미검수"} />} /><FunctionField label="작업" sortable={false} render={(record: PostDetail) => <RegenerateTitleButton post={record} compact />} /><DateField source="createdAt" label="생성일" showTime /></Datagrid></List>; }
 function PostShow() { return <Show actions={<PostActions />}><SimpleShowLayout><PostPanel /></SimpleShowLayout></Show>; }
-function PostActions() { const record = useRecordContext<PostDetail>(); return <TopToolbar>{record && <Button href={record.canonicalUrl} target="_blank" endIcon={<OpenInNewIcon />}>원문 열기</Button>}</TopToolbar>; }
+function PostActions() { const record = useRecordContext<PostDetail>(); return <TopToolbar>{record && <Button href={`#/parsing-pipeline?postId=${record.id}`} startIcon={<AccountTreeIcon />}>파싱 흐름 보기</Button>}{record && <Button href={record.canonicalUrl} target="_blank" endIcon={<OpenInNewIcon />}>원문 열기</Button>}</TopToolbar>; }
 
 function PostPanel() {
   const record = useRecordContext<PostDetail>(); const [open, setOpen] = useState(false); const [editing, setEditing] = useState(false); if (!record?.places) return null;
