@@ -16,7 +16,7 @@ groups:
             model:
               datasource: { type: prometheus, uid: prometheus }
               editorMode: code
-              expr: 'up{job="nook-worker", env="dev"}'
+              expr: 'max(up{job="nook-worker", env="dev"})'
               refId: A
           - refId: B
             datasourceUid: __expr__
@@ -46,7 +46,7 @@ groups:
             model:
               datasource: { type: prometheus, uid: prometheus }
               editorMode: code
-              expr: 'up{job="nook-worker", env="live"}'
+              expr: 'max(up{job="nook-worker", env="live"})'
               refId: A
           - refId: B
             datasourceUid: __expr__
