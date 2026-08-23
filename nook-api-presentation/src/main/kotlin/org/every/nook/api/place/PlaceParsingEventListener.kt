@@ -103,7 +103,7 @@ class PlaceParsingEventListener(
 
                 ProcessPlaceParsingJobUseCase.Result.Failed -> sendPush(
                     event.postId,
-                    SendPostProcessingPushUseCase.Outcome.FAILED,
+                    SendPostProcessingPushUseCase.Outcome.COMPLETED,
                 )
 
                 ProcessPlaceParsingJobUseCase.Result.Skipped,

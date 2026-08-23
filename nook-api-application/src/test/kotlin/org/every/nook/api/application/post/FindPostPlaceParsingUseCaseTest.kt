@@ -2,6 +2,7 @@ package org.every.nook.api.application.post
 
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.error.PostNotFoundException
+import org.every.nook.api.application.post.model.PlaceParsingFailureReasonView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
 import org.every.nook.api.application.post.port.PostPlaceParsingSnapshot
@@ -82,5 +83,23 @@ class FindPostPlaceParsingUseCaseTest {
         val result = useCase(FindPostPlaceParsingUseCase.Query(7, 11))
 
         assertNull(result.failureReason)
+    }
+
+    @Test
+    fun `maps an internal final failure reason to a public message`() {
+        val useCase = FindPostPlaceParsingUseCase(
+            FindPostPlaceParsingPort { _, postId ->
+                PostPlaceParsingSnapshot(
+                    postId = postId,
+                    placeParsingStatus = PlaceParsingStatus.FAILED,
+                    failureReason = "Selected place is not grounded in image evidence: 신신",
+                    places = emptyList(),
+                )
+            },
+        )
+
+        val result = useCase(FindPostPlaceParsingUseCase.Query(7, 11))
+
+        assertEquals(PlaceParsingFailureReasonView.PLACE_NOT_FOUND, result.failureReason)
     }
 }

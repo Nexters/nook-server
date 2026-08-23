@@ -1,10 +1,10 @@
 package org.every.nook.api.application.post
 
 import org.every.nook.api.application.post.error.PostNotFoundException
+import org.every.nook.api.application.post.model.PlaceParsingFailureReasonView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PlaceView
 import org.every.nook.api.application.post.port.FindPostPlaceParsingPort
-import org.every.nook.api.domain.place.PlaceParsingStatus
 
 class FindPostPlaceParsingUseCase(private val findPostPlaceParsingPort: FindPostPlaceParsingPort) {
     operator fun invoke(query: Query): Result {
@@ -16,8 +16,7 @@ class FindPostPlaceParsingUseCase(private val findPostPlaceParsingPort: FindPost
         return Result(
             postId = snapshot.postId,
             placeParsingStatus = PlaceParsingStatusView.from(snapshot.placeParsingStatus),
-            failureReason = snapshot.failureReason
-                .takeIf { snapshot.placeParsingStatus == PlaceParsingStatus.FAILED },
+            failureReason = PlaceParsingFailureReasonView.from(snapshot.placeParsingStatus),
             places = snapshot.places.map { relatedPlace ->
                 PlaceView.from(
                     relatedPlace.place,
