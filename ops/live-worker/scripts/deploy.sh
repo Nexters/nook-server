@@ -5,7 +5,7 @@ image="${1:?immutable live worker image is required}"
 root_dir="/opt/nook/live-worker"
 
 [[ -f "${root_dir}/.env" ]] || { echo "Missing ${root_dir}/.env" >&2; exit 1; }
-[[ "${image}" =~ ^everynook\.cr\.gabiacloud\.com/nook/nook-api:worker-prod- ]] || {
+[[ "${image}" =~ ^everynook\.cr\.gabiacloud\.com/nook/nook-worker:prod- ]] || {
   echo "Invalid live worker image: ${image}" >&2
   exit 1
 }
