@@ -12,7 +12,7 @@ import "./parsing-pipeline.css";
 
 type Rule = { label: string; value: string; description?: string };
 type RuleSection = { title: string; description?: string; rules: Rule[] };
-type DecisionStep = { order: number; title: string; condition: string; expression?: string; onPass: string; onFail: string; source: string };
+type DecisionStep = { order: number; title: string; condition: string; expression?: string; onPass: string; onFail: string; source: string; ruleId?: string };
 type PipelineNode = {
   id: string;
   title: string;
@@ -130,12 +130,14 @@ function ExecutionTimeline({ traces }: { traces: ProcessingTrace[] }) {
 }
 
 function TraceRow({ trace }: { trace: ProcessingTrace }) {
-  const failed = trace.outcome.toLowerCase() === "failure";
+  const outcome = trace.outcome.toLowerCase();
+  const failed = outcome === "failure" || outcome === "failed";
+  const skipped = outcome === "skipped";
   const detailEntries = Object.entries(trace.details ?? {}).filter(([, value]) => value !== "");
   return <Accordion variant="outlined" disableGutters sx={{ borderRadius: "10px !important", "&:before": { display: "none" } }}>
     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
       <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ width: "100%", alignItems: { md: "center" } }}>
-        <Chip size="small" color={failed ? "error" : "success"} variant={failed ? "filled" : "outlined"} label={failed ? "실패" : "성공"} />
+        <Chip size="small" color={failed ? "error" : skipped ? "default" : "success"} variant={failed ? "filled" : "outlined"} label={failed ? "불충족" : skipped ? "건너뜀" : "통과"} />
         <Box sx={{ flex: 1 }}><Typography variant="subtitle2">{traceLabel(trace.action, trace.stage)}</Typography><Typography variant="caption" color="text.secondary" className="mono-text">{trace.flow} · {trace.stage}</Typography></Box>
         <Typography variant="caption" color="text.secondary">{trace.attempt ? `${trace.attempt}차 시도 · ` : ""}{trace.durationMs !== undefined && trace.durationMs !== null ? `${trace.durationMs.toLocaleString()}ms · ` : ""}{new Date(trace.createdAt).toLocaleTimeString("ko-KR")}</Typography>
       </Stack>
@@ -151,13 +153,16 @@ function traceLabel(action: string, stage: string) {
     "content.job.claimed": "콘텐츠 파싱 시작", "content.job.completed": "콘텐츠 파싱 완료", "content.job.failed": "콘텐츠 파싱 실패", "content.job.retry_scheduled": "콘텐츠 파싱 재시도 예약",
     "content.inference.result": "AI 장소 단서 추출", "content.stage.completed": `${stageLabel(stage)} 완료`, "content.stage.failed": `${stageLabel(stage)} 실패`,
     "place.job.claimed": "장소 파싱 시작", "place.job.completed": "장소 파싱 완료", "place.job.failed": "장소 파싱 실패", "place.job.retry_scheduled": "장소 파싱 재시도 예약",
-    "place.search.result": "지도 장소 검색 결과", "place.candidates.matched": "장소 후보 판정", "place.candidate.selected": "장소 후보 선택", "place.clue.rejected": "장소 단서 처리 실패", "place.stage.completed": `${stageLabel(stage)} 완료`, "place.stage.failed": `${stageLabel(stage)} 실패`,
+    "place.search.result": "지도 장소 검색 결과", "place.candidates.matched": "장소 후보 판정", "place.candidate.selected": "장소 후보 선택", "place.clue.rejected": "장소 단서 처리 실패", "place.rule.evaluated": "정책 규칙 판정", "place.stage.completed": `${stageLabel(stage)} 완료`, "place.stage.failed": `${stageLabel(stage)} 실패`,
   };
   return labels[action] ?? action;
 }
 
 function stageLabel(stage: string) { return ({ extract: "원문 수집", inference: "AI 추론", complete: "저장", search: "장소 검색", select: "후보 선택", "title-finalization": "제목 결정", "clue-text": "텍스트 장소 추출", "image-transcript": "이미지 OCR", "clue-image": "이미지 장소 추출" } as Record<string, string>)[stage] ?? stage; }
-function detailLabel(key: string) { return ({ placeName: "추출 상호명", region: "추출 지역", addressHint: "추출 주소", queries: "검색어", query: "실행 검색어", candidateCount: "검색 후보 수", candidates: "후보 목록", addressCompatibleCount: "주소 호환 후보 수", strictMatchCount: "엄격 일치 수", groundedMatchCount: "근거 일치 수", reason: "실패 사유", name: "선택 장소", address: "선택 주소", provider: "Provider", method: "선택 방식", placeClueCount: "추출 장소 수", resolvedPlaceCount: "해결 장소 수", unresolvedPlaceCount: "미해결 장소 수" } as Record<string, string>)[key] ?? key; }
+function detailLabel(key: string) {
+  if (key.startsWith("fact.")) return `입력 사실 · ${key.slice(5)}`;
+  return ({ ruleId: "정책 ruleId", ruleOutcome: "판정 결과", nextStepId: "다음 단계", placeName: "추출 상호명", region: "추출 지역", addressHint: "추출 주소", queries: "검색어", query: "실행 검색어", candidateCount: "검색 후보 수", candidates: "후보 목록", addressCompatibleCount: "주소 호환 후보 수", strictMatchCount: "엄격 일치 수", groundedMatchCount: "근거 일치 수", reason: "판정 사유", name: "선택 장소", address: "선택 주소", provider: "Provider", method: "선택 방식", placeClueCount: "추출 장소 수", resolvedPlaceCount: "해결 장소 수", unresolvedPlaceCount: "미해결 장소 수" } as Record<string, string>)[key] ?? key;
+}
 
 function ExecutionSummary({ execution }: { execution: ParsingExecution }) {
   return <Card variant="outlined"><CardContent><Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: { md: "center" } }}>
@@ -200,7 +205,7 @@ function RuleDrawer({ node, configurations, onClose }: { node?: PipelineNode; co
 function DecisionFlow({ decisions }: { decisions: DecisionStep[] }) {
   return <Box className="decision-flow">{decisions.map((decision) => <Box className="decision-step" key={`${decision.order}-${decision.title}`}>
     <span className="decision-order">{decision.order}</span>
-    <Box className="decision-card"><Stack direction="row" sx={{ justifyContent: "space-between", gap: 1 }}><Typography variant="h6">{decision.title}</Typography><Chip size="small" label={decision.source} className="decision-source" /></Stack>
+    <Box className="decision-card"><Stack direction="row" sx={{ justifyContent: "space-between", gap: 1 }}><Typography variant="h6">{decision.title}</Typography><Stack direction="row" spacing={.5}>{decision.ruleId && <Chip size="small" variant="outlined" label={decision.ruleId} className="mono-text" />}<Chip size="small" label={decision.source} className="decision-source" /></Stack></Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>IF</Typography><Typography variant="subtitle2">{decision.condition}</Typography>
       {decision.expression && <Box className="decision-expression">{decision.expression}</Box>}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.25 }}><Box className="decision-result decision-result--pass"><span>통과</span>{decision.onPass}</Box><Box className="decision-result decision-result--fail"><span>불충족</span>{decision.onFail}</Box></Stack>

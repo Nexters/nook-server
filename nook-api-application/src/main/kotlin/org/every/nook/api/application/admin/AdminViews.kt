@@ -96,6 +96,7 @@ data class AdminParsingDecisionStep(
     val onPass: String,
     val onFail: String,
     val source: String,
+    val ruleId: String? = null,
 )
 
 data class AdminRuntimeConfiguration(

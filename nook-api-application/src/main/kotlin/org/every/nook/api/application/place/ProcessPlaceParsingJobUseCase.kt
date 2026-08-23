@@ -6,12 +6,14 @@ import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.NoOpProcessingTracePort
 import org.every.nook.api.application.processing.ParsingProgressStage
+import org.every.nook.api.application.processing.ParsingRuleEvaluation
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingTraceEvent
 import org.every.nook.api.application.processing.ProcessingTracePort
 import org.every.nook.api.application.processing.error
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.measure
+import org.every.nook.api.application.processing.traceDetails
 import org.every.nook.api.application.processing.warn
 import org.slf4j.LoggerFactory
 import java.time.Clock
@@ -54,15 +56,28 @@ class ProcessPlaceParsingJobUseCase(
     private fun process(job: ClaimedPlaceParsingJob, startedAt: Instant): Result {
         val expectedPlaceCount = expectedPlaceCount(job.body)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_CLUES)
-        val textClues = (job.textClues ?: extractClues(job)).filterGroundedTextClues(job)
+        val textClues = (job.textClues ?: extractClues(job)).filterGroundedTextClues(job) { evaluation ->
+            recordRuleTrace(job, TEXT_CLUE_STAGE, evaluation)
+        }
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_RESOLUTION)
         val textResolution = resolveClues(job, textClues, expectedPlaceCount, useEvidenceImageSequence = false)
-        logOcrDecision(eventLogger, job, textClues.size, textResolution.places.size, expectedPlaceCount)
+        val imageDecision = ImageAnalysisPolicy().evaluate(
+            ImageAnalysisPolicy.Context(
+                textClueCount = textClues.size,
+                textResolvedCount = textResolution.places.size,
+                expectedPlaceCount = expectedPlaceCount,
+                imageCount = job.imageUrls.take(MAX_IMAGE_COUNT).size,
+            ),
+        ).also { evaluation ->
+            evaluation.ruleEvaluations.forEach { recordRuleTrace(job, OCR_STAGE, it) }
+        }.result
+        logOcrDecision(eventLogger, job, textClues.size, textResolution.places.size, expectedPlaceCount, imageDecision)
         val imageResolution = resolveImageClues(
             job = job,
             textClueCount = textClues.size,
             textResolvedCount = textResolution.places.size,
             expectedPlaceCount = expectedPlaceCount,
+            imageAnalysisRequired = imageDecision.required,
         )
         val places = (textResolution.places + imageResolution?.places.orEmpty())
             .distinctBy { it.provider to it.externalPlaceId }
@@ -79,7 +94,11 @@ class ProcessPlaceParsingJobUseCase(
         )
         jobPort.updateProgress(job.postId, ParsingProgressStage.TITLE_FINALIZATION)
         val titleTranscripts = imageResolution?.imageTranscripts.orEmpty()
-        val title = measure(job, TITLE_STAGE) { finalizePostTitle(job, places, expectedPlaceCount, titleTranscripts) }
+        val title = measure(job, TITLE_STAGE) {
+            finalizePostTitle(job, places, expectedPlaceCount, titleTranscripts) {
+                recordRuleTrace(job, TITLE_STAGE, it)
+            }
+        }
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_SAVE)
         measure(job, COMPLETE_STAGE) { jobPort.complete(job.postId, title, places, diagnostics) }
         val duration = Duration.between(startedAt, clock.instant()).toMillis()
@@ -132,6 +151,7 @@ class ProcessPlaceParsingJobUseCase(
                 places = emptyList(),
                 declaredPlaceCount = expectedPlaceCount,
                 latestImageTranscripts = imageResolution?.imageTranscripts.orEmpty(),
+                onEvaluation = { recordRuleTrace(job, TITLE_STAGE, it) },
             )
         }
         val reason = failure?.message ?: if (imageResolution == null) {
@@ -148,11 +168,12 @@ class ProcessPlaceParsingJobUseCase(
         textClueCount: Int,
         textResolvedCount: Int,
         expectedPlaceCount: Int?,
+        imageAnalysisRequired: Boolean,
     ): ClueResolution? {
         val images = job.imageUrls.take(MAX_IMAGE_COUNT).mapIndexed { index, imageUrl ->
             ImageTextExtractor.ImageInput(imageIndex = index + 1, imageUrl = imageUrl)
         }
-        if (images.isEmpty() || !requiresImageAnalysis(textClueCount, textResolvedCount, expectedPlaceCount)) {
+        if (!imageAnalysisRequired) {
             return null
         }
         logger.info {
@@ -307,10 +328,15 @@ class ProcessPlaceParsingJobUseCase(
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
                 "addressHint=${clue.addressHint}, queries=${clue.searchQueries()}, candidateCount=${candidates.size}"
         }
-        val selectionCandidates = candidates.compatibleWith(clue).distinctLogicalCandidates()
-        val matches = strictMatches(clue, selectionCandidates)
-        val groundedCandidates = selectionCandidates.groundedCandidateMatches(clue)
-        val groundedMatches = groundedCandidates.matches
+        val candidatePolicy = CandidateResolutionPolicy()
+        val automaticEvaluation = candidatePolicy.evaluate(CandidateResolutionPolicy.Context(clue, candidates))
+            .also { evaluation ->
+                evaluation.ruleEvaluations.forEach { recordRuleTrace(job, MATCH_STAGE, it) }
+            }
+        val automaticResult = automaticEvaluation.result
+        val selectionCandidates = automaticResult.compatibleCandidates
+        val matches = automaticResult.strictMatches
+        val groundedMatches = automaticResult.groundedMatches
         val candidateDescriptions = selectionCandidates.descriptions(CANDIDATE_LOG_LIMIT)
         logger.info {
             "Place candidate matching completed: placeName=${clue.name}, region=${clue.region}, " +
@@ -332,8 +358,7 @@ class ProcessPlaceParsingJobUseCase(
             ),
         )
 
-        val selection = uniqueCandidate(matches, groundedMatches)
-            ?: searchEvidenceCandidate(clue, selectionCandidates)
+        val selection = automaticResult.selection
             ?: run {
                 if (selectionCandidates.isEmpty()) {
                     failResolution("No place candidate found: ${clue.name}")
@@ -342,15 +367,20 @@ class ProcessPlaceParsingJobUseCase(
                     candidateSelector.select(
                         PlaceCandidateSelector.Request(clue = clue, candidates = selectionCandidates),
                     )
-                } ?: failResolution(
+                }
+                candidatePolicy.evaluateModelSelection(selected).also { recordRuleTrace(job, SELECT_STAGE, it) }
+                selected ?: failResolution(
                     "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
                 )
                 CandidateSelection(selected, "openai")
             }
-        val selectedMatchedQueries = selectionCandidates.matchedQueriesFor(selection.place)
-        if (!clue.isSupportedBy(selection.place, selectedMatchedQueries) &&
-            !groundedCandidates.explicitNameSearchMatch.matches(selection.place)
-        ) {
+        val validation = candidatePolicy.evaluateSelectionValidation(
+            clue,
+            selection,
+            selectionCandidates,
+            automaticResult.explicitNameSearchMatch,
+        ).also { recordRuleTrace(job, SELECT_STAGE, it) }
+        if (validation.outcome != org.every.nook.api.application.processing.ParsingRuleOutcome.PASSED) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
         eventLogger.info(
@@ -501,6 +531,7 @@ class ProcessPlaceParsingJobUseCase(
             places = emptyList(),
             declaredPlaceCount = expectedPlaceCount(job.body),
             latestImageTranscripts = emptyList(),
+            onEvaluation = { recordRuleTrace(job, TITLE_STAGE, it) },
         )
         jobPort.fail(job.postId, title, reason)
         eventLogger.error(
@@ -548,6 +579,16 @@ class ProcessPlaceParsingJobUseCase(
         }.onFailure { exception ->
             logger.warn(exception) { "Failed to store place parsing trace: postId=${job.postId}" }
         }
+    }
+
+    private fun recordRuleTrace(job: ClaimedPlaceParsingJob, stage: String, evaluation: ParsingRuleEvaluation) {
+        recordTrace(
+            job = job,
+            stage = stage,
+            action = "place.rule.evaluated",
+            outcome = evaluation.outcome.name.lowercase(),
+            details = evaluation.traceDetails(),
+        )
     }
 
     sealed interface Result {
@@ -616,48 +657,13 @@ internal fun PlaceClue.sourceMediaSequence(
     return clueSequence + coverOffset
 }
 
-private fun uniqueCandidate(
-    strictMatches: List<PlaceCandidateSelector.Candidate>,
-    groundedMatches: List<PlaceCandidateSelector.Candidate>,
-): CandidateSelection? = when {
-    strictMatches.size == 1 -> CandidateSelection(strictMatches.single().place, "strict_match")
-    groundedMatches.size == 1 -> CandidateSelection(groundedMatches.single().place, "grounded_match")
-    else -> null
-}
-
-internal data class CandidateSelection(val place: PlaceCandidate, val method: String)
-
-internal fun searchEvidenceCandidate(
-    clue: PlaceClue,
-    candidates: List<PlaceCandidateSelector.Candidate>,
-): CandidateSelection? {
-    val clueName = clue.name.groundingKey()
-    val contextualQueries = clue.searchQueries()
-        .filter { query -> query.groundingKey() != clueName && query.groundingKey().length > clueName.length }
-        .toSet()
-    val eligible = candidates.filter { candidate ->
-        val topContextualQueries = candidate.matchedQueryRanks.count { (query, rank) ->
-            query in contextualQueries && rank == 0
-        }
-        topContextualQueries >= MIN_TOP_CONTEXTUAL_QUERY_SUPPORT &&
-            candidate.supportingProviders.size >= MIN_PROVIDER_SUPPORT
-    }
-    if (eligible.size != 1) return null
-    val selected = eligible.single()
-    val sameNameCandidates = candidates.filter { candidate ->
-        candidate.place.name.normalize() == selected.place.name.normalize() &&
-            candidate.matchedQueries.any(contextualQueries::contains)
-    }
-    return selected.takeIf { sameNameCandidates.size == 1 }
-        ?.let { CandidateSelection(it.place, "search_evidence") }
-}
-
 private fun logOcrDecision(
     logger: org.slf4j.Logger,
     job: ClaimedPlaceParsingJob,
     textClueCount: Int,
     textResolvedCount: Int,
     expectedPlaceCount: Int?,
+    decision: ImageAnalysisPolicy.Decision,
 ) {
     logger.info(
         job.event(
@@ -665,13 +671,8 @@ private fun logOcrDecision(
             "ocr",
             "success",
             fields = mapOf(
-                "ocr.required" to requiresImageAnalysis(textClueCount, textResolvedCount, expectedPlaceCount),
-                "ocr.reason" to ocrReason(
-                    textClueCount,
-                    textResolvedCount,
-                    expectedPlaceCount,
-                    job.imageUrls.isEmpty(),
-                ),
+                "ocr.required" to decision.required,
+                "ocr.reason" to decision.reason,
                 "place.text_clue_count" to textClueCount,
                 "place.text_resolved_count" to textResolvedCount,
                 "place.expected_count" to expectedPlaceCount,
@@ -689,25 +690,14 @@ internal fun PlaceClue.isGroundedIn(body: String?, hashtags: List<String>): Bool
     return (listOf(name) + queries)
         .asSequence()
         .map(String::groundingKey)
-        .filter { it.length >= MIN_GROUNDING_KEY_LENGTH }
+        .filter { it.length >= TextClueGroundingPolicy.MIN_GROUNDING_KEY_LENGTH }
         .any { clueText -> sources.any { source -> source.contains(clueText) } }
 }
 
 internal fun requiresImageAnalysis(textClueCount: Int, textResolvedCount: Int, expectedPlaceCount: Int?): Boolean =
-    textClueCount == 0 || textResolvedCount == 0 || expectedPlaceCount?.let { textClueCount < it } == true
-
-private fun ocrReason(
-    textClueCount: Int,
-    textResolvedCount: Int,
-    expectedPlaceCount: Int?,
-    imagesEmpty: Boolean,
-): String = when {
-    imagesEmpty -> "no_images"
-    textClueCount == 0 -> "no_text_place_clue"
-    textResolvedCount == 0 -> "no_text_place_resolved"
-    expectedPlaceCount != null && textClueCount < expectedPlaceCount -> "expected_place_clue_shortfall"
-    else -> "text_place_clues_sufficient"
-}
+    ImageAnalysisPolicy().evaluate(
+        ImageAnalysisPolicy.Context(textClueCount, textResolvedCount, expectedPlaceCount, imageCount = 1),
+    ).result.required
 
 private fun expectedPlaceCount(body: String?): Int? = body?.let { content ->
     EXPECTED_PLACE_COUNT_PATTERN.findAll(content)
@@ -718,24 +708,6 @@ private fun expectedPlaceCount(body: String?): Int? = body?.let { content ->
         .maxOrNull()
 }
 
-private fun strictMatches(
-    clue: PlaceClue,
-    candidates: Collection<PlaceCandidateSelector.Candidate>,
-): List<PlaceCandidateSelector.Candidate> {
-    val normalizedName = clue.name.normalize()
-    val normalizedRegion = clue.region?.normalize()?.takeIf(String::isNotEmpty)
-    return candidates.filter { candidate ->
-        candidate.place.name.normalize() == normalizedName &&
-            (normalizedRegion == null || candidate.place.address.normalize().contains(normalizedRegion)) &&
-            PlaceAddressMatcher.isCompatible(clue.addressHint, candidate.place.address)
-    }
-}
-
-private fun String.normalize(): String = lowercase().filterNot(Char::isWhitespace)
-
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
-private const val MIN_GROUNDING_KEY_LENGTH = 2
-private const val MIN_TOP_CONTEXTUAL_QUERY_SUPPORT = 2
-private const val MIN_PROVIDER_SUPPORT = 2
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
