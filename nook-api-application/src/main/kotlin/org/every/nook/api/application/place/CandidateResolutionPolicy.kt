@@ -24,7 +24,8 @@ internal class CandidateResolutionPolicy :
         val strictMatches = compatibleCandidates.strictMatches(context.clue)
         val groundedCandidates = compatibleCandidates.groundedCandidateMatches(context.clue)
         val groundedMatches = groundedCandidates.matches
-        val facts = MatchFacts(effectiveContext, strictMatches, groundedMatches)
+        val explicitQueryNameMatches = compatibleCandidates.explicitQueryNameMatches()
+        val facts = MatchFacts(effectiveContext, strictMatches, groundedMatches, explicitQueryNameMatches)
         val evaluations = mutableListOf<ParsingRuleEvaluation>()
         val compatible = COMPATIBLE_CANDIDATE_RULE.evaluate(facts).also(evaluations::add)
         if (compatible.outcome == ParsingRuleOutcome.FAILED) {
@@ -33,10 +34,22 @@ internal class CandidateResolutionPolicy :
         }
         val strict = UNIQUE_STRICT_RULE.evaluate(facts).also(evaluations::add)
         if (strict.outcome == ParsingRuleOutcome.PASSED) {
-            evaluations += listOf(UNIQUE_GROUNDED_RULE, SEARCH_EVIDENCE_RULE)
+            evaluations += listOf(UNIQUE_EXPLICIT_QUERY_NAME_RULE, UNIQUE_GROUNDED_RULE, SEARCH_EVIDENCE_RULE)
                 .map { it.skipped("strict 후보 확정") }
             return result(
                 CandidateSelection(strictMatches.single().place, "strict_match"),
+                compatibleCandidates,
+                strictMatches,
+                groundedCandidates,
+                evaluations,
+            )
+        }
+        val explicitQueryName = UNIQUE_EXPLICIT_QUERY_NAME_RULE.evaluate(facts).also(evaluations::add)
+        if (explicitQueryName.outcome == ParsingRuleOutcome.PASSED) {
+            evaluations += listOf(UNIQUE_GROUNDED_RULE, SEARCH_EVIDENCE_RULE)
+                .map { it.skipped("명시적 검색어 후보 확정") }
+            return result(
+                CandidateSelection(explicitQueryNameMatches.single().place, "explicit_query_name"),
                 compatibleCandidates,
                 strictMatches,
                 groundedCandidates,
@@ -92,6 +105,7 @@ internal class CandidateResolutionPolicy :
         val context: Context,
         val strictMatches: List<PlaceCandidateSelector.Candidate>,
         val groundedMatches: List<PlaceCandidateSelector.Candidate>,
+        val explicitQueryNameMatches: List<PlaceCandidateSelector.Candidate>,
         val searchEvidenceSelection: CandidateSelection? = null,
     )
 
@@ -126,6 +140,7 @@ internal class CandidateResolutionPolicy :
             listOf(
                 COMPATIBLE_CANDIDATE_DEFINITION,
                 UNIQUE_STRICT_DEFINITION,
+                UNIQUE_EXPLICIT_QUERY_NAME_DEFINITION,
                 UNIQUE_GROUNDED_DEFINITION,
                 SEARCH_EVIDENCE_DEFINITION,
                 MODEL_SELECTION_DEFINITION,
@@ -146,6 +161,14 @@ internal class CandidateResolutionPolicy :
             "Strict 후보 확정",
             "상호명, 지역, 주소가 엄격하게 일치하는 후보가 정확히 하나인가?",
             "strictMatches.size == 1",
+            "해당 장소 즉시 확정",
+            "grounded 후보 확인",
+        )
+        private val UNIQUE_EXPLICIT_QUERY_NAME_DEFINITION = definition(
+            "place.candidate.unique-explicit-query-name",
+            "명시적 검색어 후보 확정",
+            "검색 결과 1위 후보의 전체 상호명이 명시적 검색어에 포함되고 그런 후보가 정확히 하나인가?",
+            "explicitQueryNameMatches.size == 1",
             "해당 장소 즉시 확정",
             "grounded 후보 확인",
         )
@@ -193,6 +216,9 @@ internal class CandidateResolutionPolicy :
             it.context.candidates.isNotEmpty()
         }
         private val UNIQUE_STRICT_RULE = booleanMatchRule(UNIQUE_STRICT_DEFINITION) { it.strictMatches.size == 1 }
+        private val UNIQUE_EXPLICIT_QUERY_NAME_RULE = booleanMatchRule(UNIQUE_EXPLICIT_QUERY_NAME_DEFINITION) {
+            it.explicitQueryNameMatches.size == 1
+        }
         private val UNIQUE_GROUNDED_RULE = booleanMatchRule(UNIQUE_GROUNDED_DEFINITION) {
             it.groundedMatches.size == 1
         }
@@ -258,6 +284,16 @@ internal class CandidateResolutionPolicy :
                         "Grounded 후보 수",
                         ParsingFactValue.Count(facts.groundedMatches.size),
                     ),
+                    ParsingFact(
+                        "explicit-query-name-match-count",
+                        "명시적 검색어 후보 수",
+                        ParsingFactValue.Count(facts.explicitQueryNameMatches.size),
+                    ),
+                    ParsingFact(
+                        "explicit-query-name-matches",
+                        "명시적 검색어 후보",
+                        ParsingFactValue.TextList(facts.explicitQueryNameMatches.map { it.place.name }),
+                    ),
                     ParsingFact("condition-matched", "조건 충족", ParsingFactValue.Flag(matched)),
                 ),
                 reason = if (matched) definition.onPassed.description else definition.onFailed.description,
@@ -303,7 +339,8 @@ internal class CandidateResolutionPolicy :
             evaluations,
         )
 
-        private fun remainingAutomaticRules() = listOf(UNIQUE_STRICT_RULE, UNIQUE_GROUNDED_RULE, SEARCH_EVIDENCE_RULE)
+        private fun remainingAutomaticRules() =
+            listOf(UNIQUE_STRICT_RULE, UNIQUE_EXPLICIT_QUERY_NAME_RULE, UNIQUE_GROUNDED_RULE, SEARCH_EVIDENCE_RULE)
 
         private fun ParsingRule<MatchFacts>.skipped(reason: String) = ParsingRuleEvaluation(
             definition.id,
@@ -314,6 +351,18 @@ internal class CandidateResolutionPolicy :
         )
     }
 }
+
+private fun Collection<PlaceCandidateSelector.Candidate>.explicitQueryNameMatches():
+    List<PlaceCandidateSelector.Candidate> =
+    filter { candidate ->
+        val candidateName = candidate.place.name.groundingKey()
+        candidateName.length >= MIN_EXPLICIT_CANDIDATE_NAME_LENGTH &&
+            count { it.place.name.groundingKey() == candidateName } == 1 &&
+            candidate.matchedQueryRanks.any { (query, rank) ->
+                val queryKey = query.groundingKey()
+                rank == 0 && queryKey.length > candidateName.length && queryKey.contains(candidateName)
+            }
+    }
 
 internal data class CandidateSelection(val place: PlaceCandidate, val method: String)
 
@@ -341,6 +390,8 @@ private fun PlaceCandidate?.toOutcome() = (this != null).toOutcome()
 private fun String.normalizedName(): String = lowercase().filterNot(Char::isWhitespace)
 
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
+
+private const val MIN_EXPLICIT_CANDIDATE_NAME_LENGTH = 3
 
 internal fun searchEvidenceCandidate(
     clue: PlaceClue,

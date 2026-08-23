@@ -31,7 +31,8 @@ type PipelineNode = {
 };
 type PipelineEdge = { id: string; source: string; target: string; label?: string; kind: string };
 type RuntimeConfiguration = { key: string; configuredValue?: string; effectiveValue: string; source: string; description: string; warnings: string[] };
-type JobExecution = { status: string; stage?: string; progressPercent: number; attemptCount: number; failureReason?: string; nextAttemptAt?: string; outcome?: string; expectedPlaceCount?: number; extractedPlaceCount?: number; resolvedPlaceCount?: number; unresolvedPlaceClues?: Array<{ clue: { name: string; region?: string }; reason: string }> };
+type UnresolvedPlaceClue = { clue: { name: string; region?: string }; reason: string; type?: "NOT_EXTRACTED" | "RESOLUTION_FAILED" };
+type JobExecution = { status: string; stage?: string; progressPercent: number; attemptCount: number; failureReason?: string; nextAttemptAt?: string; outcome?: string; expectedPlaceCount?: number; extractedPlaceCount?: number; resolvedPlaceCount?: number; unresolvedPlaceClues?: UnresolvedPlaceClue[] };
 type ProcessingTrace = { id: number; flow: string; stage: string; action: string; outcome: string; attempt?: number; durationMs?: number; details: Record<string, string>; createdAt: string };
 type ParsingExecution = { postId: number; title?: string; content: JobExecution; place?: JobExecution; traces: ProcessingTrace[] };
 type PipelineResponse = { nodes: PipelineNode[]; edges: PipelineEdge[]; configurations: RuntimeConfiguration[]; execution?: ParsingExecution };
@@ -158,7 +159,7 @@ function traceLabel(action: string, stage: string) {
   return labels[action] ?? action;
 }
 
-function stageLabel(stage: string) { return ({ extract: "원문 수집", inference: "AI 추론", complete: "저장", search: "장소 검색", select: "후보 선택", "title-finalization": "제목 결정", "clue-text": "텍스트 장소 추출", "image-transcript": "이미지 OCR", "clue-image": "이미지 장소 추출" } as Record<string, string>)[stage] ?? stage; }
+function stageLabel(stage: string) { return ({ extract: "원문 수집", inference: "AI 추론", complete: "저장", search: "장소 검색", select: "후보 선택", "source-coverage": "원문 장소 커버리지", "title-finalization": "제목 결정", "clue-text": "텍스트 장소 추출", "image-transcript": "이미지 OCR", "clue-image": "이미지 장소 추출" } as Record<string, string>)[stage] ?? stage; }
 function detailLabel(key: string) {
   if (key.startsWith("fact.")) return `입력 사실 · ${key.slice(5)}`;
   return ({ ruleId: "정책 ruleId", ruleOutcome: "판정 결과", nextStepId: "다음 단계", placeName: "추출 상호명", region: "추출 지역", addressHint: "추출 주소", queries: "검색어", query: "실행 검색어", candidateCount: "검색 후보 수", candidates: "후보 목록", addressCompatibleCount: "주소 호환 후보 수", strictMatchCount: "엄격 일치 수", groundedMatchCount: "근거 일치 수", reason: "판정 사유", name: "선택 장소", address: "선택 주소", provider: "Provider", method: "선택 방식", placeClueCount: "추출 장소 수", resolvedPlaceCount: "해결 장소 수", unresolvedPlaceCount: "미해결 장소 수" } as Record<string, string>)[key] ?? key;
@@ -174,7 +175,11 @@ function ExecutionSummary({ execution }: { execution: ParsingExecution }) {
 
 function JobSummary({ label, job }: { label: string; job?: JobExecution }) {
   if (!job) return <Box className="job-summary"><span>{label}</span><strong>미시작</strong></Box>;
-  return <Box className="job-summary"><span>{label} · 시도 {job.attemptCount}회</span><strong>{job.outcome ?? job.status} · {job.progressPercent}%</strong>{job.outcome === "PARTIAL" && <small className="job-failure">해결 {job.resolvedPlaceCount ?? 0}/{job.expectedPlaceCount ?? job.extractedPlaceCount ?? "?"}곳 · 미해결 {job.unresolvedPlaceClues?.map(({ clue }) => clue.name).join(", ") || "진단 없음"}</small>}{job.stage && <small>{job.stage}</small>}{job.failureReason && <small className="job-failure">{job.failureReason}</small>}</Box>;
+  return <Box className="job-summary"><span>{label} · 시도 {job.attemptCount}회</span><strong>{job.outcome ?? job.status} · {job.progressPercent}%</strong>{job.outcome === "PARTIAL" && <small className="job-failure">해결 {job.resolvedPlaceCount ?? 0}/{job.expectedPlaceCount ?? job.extractedPlaceCount ?? "?"}곳 · 미해결 {job.unresolvedPlaceClues?.map((item) => `[${unresolvedTypeLabel(item.type)}] ${item.clue.name}`).join(", ") || "진단 없음"}</small>}{job.stage && <small>{job.stage}</small>}{job.failureReason && <small className="job-failure">{job.failureReason}</small>}</Box>;
+}
+
+function unresolvedTypeLabel(type?: UnresolvedPlaceClue["type"]) {
+  return type === "NOT_EXTRACTED" ? "단서 미추출" : "후보 선택 실패";
 }
 
 function ConfigurationStrip({ configurations }: { configurations: RuntimeConfiguration[] }) {

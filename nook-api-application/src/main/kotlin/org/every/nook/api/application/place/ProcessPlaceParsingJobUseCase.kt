@@ -54,10 +54,17 @@ class ProcessPlaceParsingJobUseCase(
     }
 
     private fun process(job: ClaimedPlaceParsingJob, startedAt: Instant): Result {
-        val expectedPlaceCount = expectedPlaceCount(job.body)
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_CLUES)
-        val textClues = (job.textClues ?: extractClues(job)).filterGroundedTextClues(job) { evaluation ->
-            recordRuleTrace(job, TEXT_CLUE_STAGE, evaluation)
+        val extractedTextClues = job.textClues ?: extractClues(job)
+        val initialCoverage = SourcePlaceCoveragePolicy().evaluate(
+            SourcePlaceCoveragePolicy.Context(job.body, extractedTextClues),
+        ).result
+        val expectedPlaceCount = maxExpectedPlaceCount(
+            expectedPlaceCount(job.body),
+            initialCoverage.expectedPlaceCount,
+        )
+        val textClues = extractedTextClues.filterGroundedTextClues(job) { clue, evaluation ->
+            recordRuleTrace(job, TEXT_CLUE_STAGE, evaluation, clue)
         }
         jobPort.updateProgress(job.postId, ParsingProgressStage.PLACE_TEXT_RESOLUTION)
         val textResolution = resolveClues(job, textClues, expectedPlaceCount, useEvidenceImageSequence = false)
@@ -85,12 +92,19 @@ class ProcessPlaceParsingJobUseCase(
         if (places.isEmpty()) {
             failWithFinalizedTitle(job, textResolution, imageResolution, expectedPlaceCount)
         }
+        val finalCoverage = SourcePlaceCoveragePolicy().evaluate(
+            SourcePlaceCoveragePolicy.Context(job.body, textResolution.clues + imageResolution?.clues.orEmpty()),
+        ).also { evaluation ->
+            evaluation.ruleEvaluations.forEach { recordRuleTrace(job, COVERAGE_STAGE, it) }
+        }.result
         val diagnostics = placeParsingDiagnostics(
             textExpectedPlaceCount = expectedPlaceCount,
             imageExpectedPlaceCount = imageResolution?.expectedPlaceCount,
             extractedPlaceCount = textResolution.clueCount + (imageResolution?.clueCount ?: 0),
             resolvedPlaceCount = places.size,
-            unresolvedClues = textResolution.unresolvedClues + imageResolution?.unresolvedClues.orEmpty(),
+            unresolvedClues = textResolution.unresolvedClues +
+                imageResolution?.unresolvedClues.orEmpty() +
+                finalCoverage.unresolvedClues(),
         )
         jobPort.updateProgress(job.postId, ParsingProgressStage.TITLE_FINALIZATION)
         val titleTranscripts = imageResolution?.imageTranscripts.orEmpty()
@@ -316,7 +330,7 @@ class ProcessPlaceParsingJobUseCase(
                 null
             }
         }
-        return ClueResolution(places, lastFailure, clues.size, expectedPlaceCount, unresolvedClues)
+        return ClueResolution(places, lastFailure, clues.size, expectedPlaceCount, unresolvedClues, clues)
     }
 
     private fun resolve(job: ClaimedPlaceParsingJob, clue: PlaceClue): PlaceCandidate {
@@ -331,7 +345,7 @@ class ProcessPlaceParsingJobUseCase(
         val candidatePolicy = CandidateResolutionPolicy()
         val automaticEvaluation = candidatePolicy.evaluate(CandidateResolutionPolicy.Context(clue, candidates))
             .also { evaluation ->
-                evaluation.ruleEvaluations.forEach { recordRuleTrace(job, MATCH_STAGE, it) }
+                evaluation.ruleEvaluations.forEach { recordRuleTrace(job, MATCH_STAGE, it, clue) }
             }
         val automaticResult = automaticEvaluation.result
         val selectionCandidates = automaticResult.compatibleCandidates
@@ -368,7 +382,7 @@ class ProcessPlaceParsingJobUseCase(
                         PlaceCandidateSelector.Request(clue = clue, candidates = selectionCandidates),
                     )
                 }
-                candidatePolicy.evaluateModelSelection(selected).also { recordRuleTrace(job, SELECT_STAGE, it) }
+                candidatePolicy.evaluateModelSelection(selected).also { recordRuleTrace(job, SELECT_STAGE, it, clue) }
                 selected ?: failResolution(
                     "No place candidate selected: ${clue.name}, strictMatchCount=${matches.size}",
                 )
@@ -379,7 +393,7 @@ class ProcessPlaceParsingJobUseCase(
             selection,
             selectionCandidates,
             automaticResult.explicitNameSearchMatch,
-        ).also { recordRuleTrace(job, SELECT_STAGE, it) }
+        ).also { recordRuleTrace(job, SELECT_STAGE, it, clue) }
         if (validation.outcome != org.every.nook.api.application.processing.ParsingRuleOutcome.PASSED) {
             failResolution("Selected place is not grounded in image evidence: ${clue.name}")
         }
@@ -581,13 +595,18 @@ class ProcessPlaceParsingJobUseCase(
         }
     }
 
-    private fun recordRuleTrace(job: ClaimedPlaceParsingJob, stage: String, evaluation: ParsingRuleEvaluation) {
+    private fun recordRuleTrace(
+        job: ClaimedPlaceParsingJob,
+        stage: String,
+        evaluation: ParsingRuleEvaluation,
+        clue: PlaceClue? = null,
+    ) {
         recordTrace(
             job = job,
             stage = stage,
             action = "place.rule.evaluated",
             outcome = evaluation.outcome.name.lowercase(),
-            details = evaluation.traceDetails(),
+            details = evaluation.traceDetails() + clue?.traceDetails().orEmpty(),
         )
     }
 
@@ -625,6 +644,7 @@ class ProcessPlaceParsingJobUseCase(
         const val TITLE_STAGE = "title-finalization"
         const val JOB_STAGE = "job"
         const val OCR_STAGE = "ocr"
+        const val COVERAGE_STAGE = "source-coverage"
         const val SUCCESS_OUTCOME = "success"
         const val FAILURE_OUTCOME = "failure"
         const val DEFAULT_IMAGE_OCR_CONCURRENCY = 4
@@ -640,6 +660,7 @@ class ProcessPlaceParsingJobUseCase(
         val clueCount: Int,
         val expectedPlaceCount: Int?,
         val unresolvedClues: List<UnresolvedPlaceClue>,
+        val clues: List<PlaceClue>,
         val imageTranscripts: List<ImageTranscript> = emptyList(),
     )
 }
@@ -707,6 +728,8 @@ private fun expectedPlaceCount(body: String?): Int? = body?.let { content ->
         }
         .maxOrNull()
 }
+
+private fun maxExpectedPlaceCount(vararg counts: Int?): Int? = counts.filterNotNull().maxOrNull()
 
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
