@@ -13,4 +13,4 @@ root_dir="/opt/nook/dev-worker"
 cd "${root_dir}"
 IMAGE="${image}" docker compose pull worker
 IMAGE="${image}" docker compose up -d --wait --wait-timeout 120 worker
-curl -fsS http://127.0.0.1:18081/actuator/health
+curl -fsS http://192.168.0.21:18081/actuator/health

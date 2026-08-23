@@ -44,7 +44,7 @@ scrape_configs:
         replacement: nook-worker
     static_configs:
       - targets:
-          - localhost:18081
+          - 192.168.0.21:18081
         labels:
           env: dev
           service: nook-worker
