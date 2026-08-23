@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.admin
 
 import org.every.nook.api.application.place.HangulOcrRuleSpec
 import org.every.nook.api.application.place.PlaceParsingDiagnostics
+import org.every.nook.api.application.place.UnresolvedPlaceClue
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ParsingStepId
 import org.every.nook.api.application.processing.PlaceParsingPolicyCatalog
@@ -62,7 +63,14 @@ class AdminParsingPipelineAdapterTest {
         val photoRules = result.nodes.first { it.id == "thumbnail" }.sections.flatMap { it.rules }
         assertTrue(photoRules.any { it.value == GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE.toString() })
 
-        listOf("text-clues", "text-resolution", "image-decision", "image-resolution", "title-finalization")
+        listOf(
+            "text-clues",
+            "source-coverage",
+            "text-resolution",
+            "image-decision",
+            "image-resolution",
+            "title-finalization",
+        )
             .forEach { stepId ->
                 val catalog = PlaceParsingPolicyCatalog.catalog
                 val expectedRuleIds = requireNotNull(catalog.step(ParsingStepId(stepId))).ruleIds.map { it.value }
@@ -130,6 +138,7 @@ class AdminParsingPipelineAdapterTest {
         assertEquals("PARTIAL", place.outcome)
         assertEquals(4, place.resolvedPlaceCount)
         assertEquals("Tune", place.unresolvedPlaceClues.single().clue.name)
+        assertEquals(UnresolvedPlaceClue.Type.RESOLUTION_FAILED, place.unresolvedPlaceClues.single().type)
     }
 
     @Test

@@ -2,6 +2,7 @@ package org.every.nook.api.application.processing
 
 import org.every.nook.api.application.place.CandidateResolutionPolicy
 import org.every.nook.api.application.place.ImageAnalysisPolicy
+import org.every.nook.api.application.place.SourcePlaceCoveragePolicy
 import org.every.nook.api.application.place.TextClueGroundingPolicy
 import org.every.nook.api.application.post.PostTitleFinalizationPolicy
 
@@ -13,6 +14,7 @@ object PlaceParsingPolicyCatalog {
             description = "장소 단서 검증부터 제목 확정까지 실제 실행되는 판정 정책입니다.",
             steps = listOf(
                 TextClueGroundingPolicy.STEP,
+                SourcePlaceCoveragePolicy.STEP,
                 CandidateResolutionPolicy.STEP,
                 ImageAnalysisPolicy.STEP,
                 CandidateResolutionPolicy.STEP.copy(
@@ -23,7 +25,8 @@ object PlaceParsingPolicyCatalog {
                 PostTitleFinalizationPolicy.STEP,
             ),
             edges = listOf(
-                edge("text-clues", "text-resolution"),
+                edge("text-clues", "source-coverage"),
+                edge("source-coverage", "text-resolution"),
                 edge("text-resolution", "image-decision"),
                 edge("image-decision", "image-resolution", "이미지 분석 필요"),
                 edge("image-decision", "title-finalization", "텍스트 결과 충분"),
@@ -35,6 +38,7 @@ object PlaceParsingPolicyCatalog {
     val rules: List<ParsingRuleDefinition> by lazy {
         listOf(
             TextClueGroundingPolicy.RULES,
+            SourcePlaceCoveragePolicy.RULES,
             CandidateResolutionPolicy.RULES,
             ImageAnalysisPolicy.RULES,
             PostTitleFinalizationPolicy.RULES,

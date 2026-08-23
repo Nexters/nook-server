@@ -111,11 +111,11 @@ private fun PlaceClue.restoreAddressFromCard(transcripts: List<ImageTranscript>)
 
 internal fun List<PlaceClue>.filterGroundedTextClues(
     job: ClaimedPlaceParsingJob,
-    onEvaluation: (ParsingRuleEvaluation) -> Unit = {},
+    onEvaluation: (PlaceClue, ParsingRuleEvaluation) -> Unit = { _, _ -> },
 ): List<PlaceClue> = filter { clue ->
     TextClueGroundingPolicy().evaluate(
         TextClueGroundingPolicy.Context(clue, job.body, job.hashtags, job.sourceProfileHints),
-    ).also { evaluation -> evaluation.ruleEvaluations.forEach(onEvaluation) }
+    ).also { evaluation -> evaluation.ruleEvaluations.forEach { onEvaluation(clue, it) } }
         .result
         .also { grounded ->
             if (!grounded) {
