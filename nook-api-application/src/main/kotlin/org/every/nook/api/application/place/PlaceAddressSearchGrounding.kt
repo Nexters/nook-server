@@ -28,7 +28,9 @@ internal fun PlaceClue.hasGroundedExplicitNameSearch(
     candidate: PlaceCandidate,
     matchedQueries: Collection<String>,
 ): Boolean {
-    val identity = name.normalizedIdentity().takeIf { it.length >= MIN_SEARCH_IDENTITY_LENGTH } ?: return false
+    val identity = name.normalizedIdentity()
+        .takeIf { it.length >= PlaceCandidateRuleSpec.MIN_SEARCH_IDENTITY_LENGTH }
+        ?: return false
     val matchedByExplicitName = matchedQueries.any { query -> query.normalizedIdentity() == identity }
     val groundedInEvidence = evidence.any { clueEvidence ->
         clueEvidence.evidenceText.normalizedIdentity().contains(identity)
@@ -77,5 +79,3 @@ private fun PlaceCandidateSelector.Candidate.refersTo(place: PlaceCandidate): Bo
 private fun String.normalizedAddressQuery(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private fun String.normalizedIdentity(): String = lowercase().filter(Char::isLetterOrDigit)
-
-private const val MIN_SEARCH_IDENTITY_LENGTH = 2

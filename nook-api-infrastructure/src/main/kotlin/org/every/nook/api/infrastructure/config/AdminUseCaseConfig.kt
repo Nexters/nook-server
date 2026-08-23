@@ -1,12 +1,14 @@
 package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.admin.AdminAuditLogPort
+import org.every.nook.api.application.admin.AdminParsingPipelinePort
 import org.every.nook.api.application.admin.AdminPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPlaceQueryPort
 import org.every.nook.api.application.admin.AdminPostCorrectionPort
 import org.every.nook.api.application.admin.AdminPostPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPostQueryPort
 import org.every.nook.api.application.admin.AdminPostTitleRegenerationPort
+import org.every.nook.api.application.admin.GetAdminParsingPipelineUseCase
 import org.every.nook.api.application.admin.GetAdminPlaceUseCase
 import org.every.nook.api.application.admin.GetAdminPostUseCase
 import org.every.nook.api.application.admin.ListAdminAuditLogsUseCase
@@ -26,6 +28,9 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class AdminUseCaseConfig {
+    @Bean
+    fun getAdminParsingPipelineUseCase(port: AdminParsingPipelinePort) = GetAdminParsingPipelineUseCase(port)
+
     @Bean
     fun listAdminPostsUseCase(port: AdminPostQueryPort) = ListAdminPostsUseCase(port)
 

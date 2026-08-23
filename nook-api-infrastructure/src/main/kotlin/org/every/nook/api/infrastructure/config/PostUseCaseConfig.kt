@@ -27,6 +27,7 @@ import org.every.nook.api.application.post.port.UpdatePostMediaUrlPort
 import org.every.nook.api.application.post.port.UpdatePostMemoPort
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.ProcessingTracePort
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -61,6 +62,7 @@ class PostUseCaseConfig {
         postContentInference: PostContentInference,
         imageTextExtractor: ImageTextExtractor,
         processingMetrics: ObjectProvider<ProcessingMetrics>,
+        processingTracePort: ProcessingTracePort,
         properties: PostContentParsingProperties,
     ): ProcessPostContentParsingJobUseCase = ProcessPostContentParsingJobUseCase(
         jobPort = jobPort,
@@ -70,6 +72,7 @@ class PostUseCaseConfig {
         retryBackoffs = properties.retryBackoffs,
         processingTimeout = properties.processingTimeout,
         metrics = processingMetrics.ifAvailable ?: NoOpProcessingMetrics,
+        tracePort = processingTracePort,
     )
 
     @Bean

@@ -22,6 +22,22 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+object GooglePlacePhotoRuleSpec {
+    const val STRICT_NEARBY_DISTANCE_METERS = 30.0
+    const val MIN_MATCH_SCORE = 45
+    const val EXACT_NAME_SCORE = 60
+    const val CONTAINS_NAME_SCORE = 45
+    const val TOKEN_NAME_SCORE = 30
+    const val CATEGORY_MATCH_SCORE = 20
+    const val PHOTO_BONUS_SCORE = 8
+    const val NO_PHOTO_PENALTY = -12
+    const val MAX_MATCH_DISTANCE_METERS = 500.0
+    const val FAR_MATCH_DISTANCE_METERS = 2_000.0
+    const val CLOSE_MATCH_DISTANCE_METERS = 100.0
+    const val REGION_MISMATCH_DISTANCE_METERS = 20_000.0
+    const val REGION_MISMATCH_PENALTY = 60
+}
+
 @Suppress("TooManyFunctions")
 class GooglePlacePhotoProvider(
     private val restClient: RestClient,
@@ -525,19 +541,19 @@ class GooglePlacePhotoProvider(
         const val LOCATION_BIAS_RADIUS_METERS = 1_000.0
         const val NEARBY_SEARCH_RADIUS_METERS = 120.0
         const val NEARBY_SEARCH_RESULT_SIZE = 10
-        const val STRICT_NEARBY_DISTANCE_METERS = 30.0
-        const val MIN_MATCH_SCORE = 45
-        const val EXACT_NAME_SCORE = 60
-        const val CONTAINS_NAME_SCORE = 45
-        const val TOKEN_NAME_SCORE = 30
-        const val CATEGORY_MATCH_SCORE = 20
-        const val PHOTO_BONUS_SCORE = 8
-        const val NO_PHOTO_PENALTY = -12
-        const val MAX_MATCH_DISTANCE_METERS = 500.0
-        const val FAR_MATCH_DISTANCE_METERS = 2_000.0
-        const val CLOSE_MATCH_DISTANCE_METERS = 100.0
-        const val REGION_MISMATCH_DISTANCE_METERS = 20_000.0
-        const val REGION_MISMATCH_PENALTY = 60
+        const val STRICT_NEARBY_DISTANCE_METERS = GooglePlacePhotoRuleSpec.STRICT_NEARBY_DISTANCE_METERS
+        const val MIN_MATCH_SCORE = GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE
+        const val EXACT_NAME_SCORE = GooglePlacePhotoRuleSpec.EXACT_NAME_SCORE
+        const val CONTAINS_NAME_SCORE = GooglePlacePhotoRuleSpec.CONTAINS_NAME_SCORE
+        const val TOKEN_NAME_SCORE = GooglePlacePhotoRuleSpec.TOKEN_NAME_SCORE
+        const val CATEGORY_MATCH_SCORE = GooglePlacePhotoRuleSpec.CATEGORY_MATCH_SCORE
+        const val PHOTO_BONUS_SCORE = GooglePlacePhotoRuleSpec.PHOTO_BONUS_SCORE
+        const val NO_PHOTO_PENALTY = GooglePlacePhotoRuleSpec.NO_PHOTO_PENALTY
+        const val MAX_MATCH_DISTANCE_METERS = GooglePlacePhotoRuleSpec.MAX_MATCH_DISTANCE_METERS
+        const val FAR_MATCH_DISTANCE_METERS = GooglePlacePhotoRuleSpec.FAR_MATCH_DISTANCE_METERS
+        const val CLOSE_MATCH_DISTANCE_METERS = GooglePlacePhotoRuleSpec.CLOSE_MATCH_DISTANCE_METERS
+        const val REGION_MISMATCH_DISTANCE_METERS = GooglePlacePhotoRuleSpec.REGION_MISMATCH_DISTANCE_METERS
+        const val REGION_MISMATCH_PENALTY = GooglePlacePhotoRuleSpec.REGION_MISMATCH_PENALTY
         const val NEARBY_QUERY_LABEL = "__nearby__"
         const val EARTH_RADIUS_METERS = 6_371_000.0
         const val SEARCH_STAGE = "google-place-match"

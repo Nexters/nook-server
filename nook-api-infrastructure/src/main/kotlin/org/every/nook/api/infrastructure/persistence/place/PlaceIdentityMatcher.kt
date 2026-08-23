@@ -8,6 +8,13 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+object PlaceIdentityRuleSpec {
+    const val MIN_NAME_KEY_LENGTH = 3
+    const val MAX_DISTANCE_METERS = 30.0
+    const val ADJACENT_ADDRESS_MAX_DISTANCE_METERS = 10.0
+    const val MAX_BUILDING_NUMBER_DIFFERENCE = 2
+}
+
 @Component
 class PlaceIdentityMatcher {
     fun matches(existing: PlaceEntity, candidate: PlaceCandidate): Boolean {
@@ -81,10 +88,10 @@ class PlaceIdentityMatcher {
     private fun String.identityKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
     private companion object {
-        const val MIN_NAME_KEY_LENGTH = 3
-        const val MAX_DISTANCE_METERS = 30.0
-        const val ADJACENT_ADDRESS_MAX_DISTANCE_METERS = 10.0
-        const val MAX_BUILDING_NUMBER_DIFFERENCE = 2
+        const val MIN_NAME_KEY_LENGTH = PlaceIdentityRuleSpec.MIN_NAME_KEY_LENGTH
+        const val MAX_DISTANCE_METERS = PlaceIdentityRuleSpec.MAX_DISTANCE_METERS
+        const val ADJACENT_ADDRESS_MAX_DISTANCE_METERS = PlaceIdentityRuleSpec.ADJACENT_ADDRESS_MAX_DISTANCE_METERS
+        const val MAX_BUILDING_NUMBER_DIFFERENCE = PlaceIdentityRuleSpec.MAX_BUILDING_NUMBER_DIFFERENCE
         const val EARTH_RADIUS_METERS = 6_371_000.0
         const val LOT_NUMBER_GROUP = 3
         val ROAD_ADDRESS = Regex("([가-힣A-Za-z0-9·-]+(?:대로|로|길))\\s*(\\d+(?:-\\d+)?)")

@@ -1,0 +1,8 @@
+# Cloudflare Access 로그인은 브라우저에서 admin 호스트 접근 시 수행됩니다.
+# 로컬에서는 admin access test 설정으로 실행합니다.
+
+### 전체 파싱 파이프라인과 현재 설정
+GET {{baseUrl}}/api/admin/v1/parsing-pipeline
+
+### 게시글 실행 상태를 포함한 파싱 파이프라인
+GET {{baseUrl}}/api/admin/v1/parsing-pipeline?postId=1

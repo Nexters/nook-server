@@ -277,6 +277,38 @@ class PlaceAddressMatcherTest {
     }
 
     @Test
+    fun `recovers a unique base store name when the clue appends its region`() {
+        val clue = PlaceClue(
+            name = "타바타 용산",
+            region = "서울 용산구",
+            queries = listOf("타바타 용산"),
+            addressHint = "서울 용산구 원효로1가 48-15",
+        )
+        val candidate = candidate("타바타", "서울 용산구 원효로89길 23 1층")
+        val candidates = listOf(PlaceCandidateSelector.Candidate(candidate, listOf("타바타 용산")))
+
+        assertEquals(listOf(candidate), candidates.compatibleWith(clue).map(PlaceCandidateSelector.Candidate::place))
+        assertTrue(clue.isSupportedBy(candidate, listOf("타바타 용산")))
+    }
+
+    @Test
+    fun `does not strip an unrelated store name suffix during address mismatch recovery`() {
+        val clue = PlaceClue(
+            name = "타바타 키친",
+            region = "서울 용산구",
+            queries = listOf("타바타 키친"),
+            addressHint = "서울 용산구 원효로1가 48-15",
+        )
+        val candidate = candidate("타바타", "서울 용산구 원효로89길 23 1층")
+
+        assertTrue(
+            listOf(PlaceCandidateSelector.Candidate(candidate, listOf("타바타 키친")))
+                .compatibleWith(clue)
+                .isEmpty(),
+        )
+    }
+
+    @Test
     fun `does not recover an exact name result from a conflicting district`() {
         val clue = PlaceClue(
             name = "Ordinary Noise Club",

@@ -31,6 +31,13 @@ class GetAdminPostUseCase(private val port: AdminPostQueryPort) {
     operator fun invoke(postId: Long): AdminPostDetail = port.find(postId) ?: throw AdminPostNotFoundException()
 }
 
+class GetAdminParsingPipelineUseCase(private val port: AdminParsingPipelinePort) {
+    operator fun invoke(postId: Long?): AdminParsingPipeline {
+        require(postId == null || postId > 0) { "Post id must be positive" }
+        return port.get(postId)
+    }
+}
+
 class UpdateAdminPostUseCase(private val port: AdminPostCorrectionPort) {
     operator fun invoke(command: Command): AdminPostDetail {
         require(command.postId > 0)

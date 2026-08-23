@@ -11,6 +11,7 @@ internal fun PlaceClue.isSafeExactNameSearchResult(
     matchedQueries: Collection<String>,
 ): Boolean {
     val clueName = name.recoveryKey()
+    val candidateName = candidate.name.recoveryKey()
     val locationHints = listOfNotNull(region, addressHint).filter(String::isNotBlank)
     val hasAdministrativeAreaConflict = locationHints.any { hint ->
         PlaceLocationConflictMatcher.hasAdministrativeAreaConflict(hint, candidate.address)
@@ -18,11 +19,26 @@ internal fun PlaceClue.isSafeExactNameSearchResult(
     val hasLocationDetailConflict = addressHint?.let { hint ->
         PlaceLocationConflictMatcher.hasLocationDetailConflict(hint, candidate.address)
     } == true
-    return candidate.name.recoveryKey() == clueName &&
+    val hasCompatibleSearchedName = candidateName == clueName ||
+        isRegionQualifiedName(clueName, candidateName, locationHints)
+    return hasCompatibleSearchedName &&
         matchedQueries.any { query -> query.recoveryKey() == clueName } &&
         !hasAdministrativeAreaConflict &&
         !hasLocationDetailConflict
 }
+
+private fun isRegionQualifiedName(clueName: String, candidateName: String, locationHints: List<String>): Boolean {
+    if (candidateName.length < MIN_BRANCH_NAME_RECOVERY_LENGTH || !clueName.startsWith(candidateName)) return false
+    val suffix = clueName.removePrefix(candidateName)
+    return suffix.isNotEmpty() && locationHints
+        .flatMap(::locationAliases)
+        .any { alias -> alias == suffix }
+}
+
+private fun locationAliases(value: String): List<String> = ADMINISTRATIVE_NAME_PATTERN.findAll(value)
+    .map { match -> match.groupValues[1].recoveryKey() }
+    .filter(String::isNotEmpty)
+    .toList()
 
 internal fun PlaceClue.isSafeNameAtExplicitAddressSearchResult(
     candidate: PlaceCandidate,
@@ -98,3 +114,4 @@ private object PlaceLocationConflictMatcher {
 private fun String.recoveryKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private const val MIN_BRANCH_NAME_RECOVERY_LENGTH = 3
+private val ADMINISTRATIVE_NAME_PATTERN = Regex("([가-힣0-9]+?)(?:특별시|광역시|특별자치시|특별자치도|도|시|구|군|읍|면|동|리)")
