@@ -57,7 +57,7 @@ class ParsingQueueMetricsCollector(
 
         init {
             register(meterRegistry, "nook.parsing.queue.ready.jobs", queue, readyJobs)
-            register(meterRegistry, "nook.parsing.queue.oldest.ready.age", queue, oldestReadyAgeSeconds)
+            register(meterRegistry, "nook.parsing.queue.oldest.ready.age.seconds", queue, oldestReadyAgeSeconds)
             register(meterRegistry, "nook.parsing.queue.processing.jobs", queue, processingJobs)
             register(meterRegistry, "nook.parsing.queue.stuck.processing.jobs", queue, stuckProcessingJobs)
             register(meterRegistry, "nook.parsing.queue.failed.jobs", queue, failedJobs)

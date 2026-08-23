@@ -32,7 +32,7 @@ class ParsingQueueMetricsCollectorTest {
         collector.collect()
 
         assertEquals(3.0, gauge("nook.parsing.queue.ready.jobs", "content"))
-        assertEquals(75.0, gauge("nook.parsing.queue.oldest.ready.age", "content"))
+        assertEquals(75.0, gauge("nook.parsing.queue.oldest.ready.age.seconds", "content"))
         assertEquals(1.0, gauge("nook.parsing.queue.stuck.processing.jobs", "content"))
         assertEquals(Duration.ofMinutes(15), port.timeouts?.content)
     }
