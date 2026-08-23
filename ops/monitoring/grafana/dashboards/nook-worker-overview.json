@@ -1,6 +1,20 @@
 {
   "annotations": { "list": [] },
   "editable": true,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "API Overview",
+      "tooltip": "선택한 환경의 API 지표로 이동",
+      "type": "link",
+      "url": "/d/nook-${env}-overview/nook-${env}-overview"
+    }
+  ],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
