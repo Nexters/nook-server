@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.save
 
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
+import org.every.nook.api.application.post.model.PlaceParsingFailureReasonView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.model.SavedPostMediaType
@@ -175,7 +176,7 @@ class SavedPostQueryPersistenceAdapterTest {
         assertEquals("저장된 원문", detail.body)
         assertEquals("https://www.instagram.com/p/FAILED_PLACE/", detail.canonicalUrl)
         assertEquals(PlaceParsingStatusView.FAILED, detail.placeParsingStatus)
-        assertEquals("No place candidate found", detail.placeParsingFailureReason)
+        assertEquals(PlaceParsingFailureReasonView.PLACE_NOT_FOUND, detail.placeParsingFailureReason)
         assertEquals(emptyList(), detail.places)
     }
 

@@ -51,7 +51,10 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                         group_post.group_id,
                         saved_post.id AS saved_post_id,
                         saved_post.created_at AS saved_at,
-                        post_media.media_url AS post_media_url,
+                        CASE
+                            WHEN post_media.media_type = 'IMAGE' THEN post_media.media_url
+                            WHEN post_media.media_type = 'VIDEO' THEN post_media.thumbnail_url
+                        END AS post_media_url,
                         (
                             SELECT place.thumbnail_url
                             FROM user_saved_post_places saved_post_place
@@ -67,17 +70,23 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                     INNER JOIN posts post ON post.id = saved_post.post_id
                     LEFT JOIN post_media post_media
                         ON post_media.post_id = saved_post.post_id
-                        AND post_media.media_type = 'IMAGE'
-                    LEFT JOIN post_media earlier_image
-                        ON earlier_image.post_id = post_media.post_id
-                        AND earlier_image.media_type = 'IMAGE'
-                        AND earlier_image.display_order < post_media.display_order
+                        AND (
+                            post_media.media_type = 'IMAGE'
+                            OR (post_media.media_type = 'VIDEO' AND post_media.thumbnail_url IS NOT NULL)
+                        )
+                    LEFT JOIN post_media earlier_media
+                        ON earlier_media.post_id = post_media.post_id
+                        AND (
+                            earlier_media.media_type = 'IMAGE'
+                            OR (earlier_media.media_type = 'VIDEO' AND earlier_media.thumbnail_url IS NOT NULL)
+                        )
+                        AND earlier_media.display_order < post_media.display_order
                     WHERE user_group.user_id = :userId
                       AND user_group.deleted_at IS NULL
                       AND group_post.deleted_at IS NULL
                       AND saved_post.deleted_at IS NULL
                       AND saved_post.user_id = :userId
-                      AND earlier_image.id IS NULL
+                      AND earlier_media.id IS NULL
                 ) thumbnail_candidate
                 WHERE thumbnail_candidate.post_media_url IS NOT NULL
                    OR thumbnail_candidate.place_thumbnail_url IS NOT NULL

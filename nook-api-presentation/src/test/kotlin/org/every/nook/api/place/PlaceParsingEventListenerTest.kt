@@ -13,6 +13,12 @@ import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
 import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
+import org.every.nook.api.application.push.PushMessage
+import org.every.nook.api.application.push.PushNotificationSender
+import org.every.nook.api.application.push.PushPlatform
+import org.every.nook.api.application.push.PushSendResult
+import org.every.nook.api.application.push.PushToken
+import org.every.nook.api.application.push.PushTokenPort
 import org.every.nook.api.application.push.SendPostProcessingPushUseCase
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
@@ -32,42 +38,58 @@ class PlaceParsingEventListenerTest {
     private val jobPort = FakeJobPort()
     private val storePlaceThumbnail = mock(StorePlaceThumbnailUseCase::class.java)
     private val storePlaceTags = mock(StorePlaceTagsUseCase::class.java)
-    private val sendPostProcessingPush = mock(SendPostProcessingPushUseCase::class.java)
+    private val pushSender = RecordingPushNotificationSender()
+    private val sendPostProcessingPush = SendPostProcessingPushUseCase(FakePushTokenPort(), pushSender)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val retryTaskScheduler = mock(TaskScheduler::class.java)
-    private val listener = PlaceParsingEventListener(
-        processPlaceParsingJob = ProcessPlaceParsingJobUseCase(
-            jobPort = jobPort,
-            imageTextExtractor = org.every.nook.api.application.place.ImageTextExtractor { emptyList() },
-            clueExtractor = PlaceClueExtractor {
-                listOf(org.every.nook.api.application.place.PlaceClue("롯지190", null, listOf("롯지190")))
-            },
-            searchPlaceCandidates = SearchPlaceCandidatesUseCase {
-                listOf(
-                    PlaceCandidate(
-                        provider = "KAKAO",
-                        externalPlaceId = "1",
-                        name = "롯지190",
-                        address = "서울 서대문구",
-                        latitude = BigDecimal("37.0"),
-                        longitude = BigDecimal("127.0"),
-                        category = null,
-                        phoneNumber = null,
-                        providerUrl = null,
-                    ),
-                )
-            },
-            candidateSelector = PlaceCandidateSelector { null },
-            retryBackoffs = listOf(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(3)),
-            processingTimeout = PROCESSING_TIMEOUT,
-            clock = Clock.fixed(NOW, ZoneOffset.UTC),
-        ),
+
+    private val processPlaceParsingJob = ProcessPlaceParsingJobUseCase(
+        jobPort = jobPort,
+        imageTextExtractor = org.every.nook.api.application.place.ImageTextExtractor { emptyList() },
+        clueExtractor = PlaceClueExtractor {
+            listOf(org.every.nook.api.application.place.PlaceClue("롯지190", null, listOf("롯지190")))
+        },
+        searchPlaceCandidates = SearchPlaceCandidatesUseCase {
+            listOf(
+                PlaceCandidate(
+                    provider = "KAKAO",
+                    externalPlaceId = "1",
+                    name = "롯지190",
+                    address = "서울 서대문구",
+                    latitude = BigDecimal("37.0"),
+                    longitude = BigDecimal("127.0"),
+                    category = null,
+                    phoneNumber = null,
+                    providerUrl = null,
+                ),
+            )
+        },
+        candidateSelector = PlaceCandidateSelector { null },
+        retryBackoffs = listOf(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(3)),
+        processingTimeout = PROCESSING_TIMEOUT,
+        clock = Clock.fixed(NOW, ZoneOffset.UTC),
+    )
+    private val listener = listener(processPlaceParsingJob)
+
+    private fun listener(processPlaceParsingJob: ProcessPlaceParsingJobUseCase) = PlaceParsingEventListener(
+        processPlaceParsingJob = processPlaceParsingJob,
         findOutstandingJobs = FindOutstandingPlaceParsingJobsUseCase(jobPort, PROCESSING_TIMEOUT),
         storePlaceThumbnail = storePlaceThumbnail,
         storePlaceTags = storePlaceTags,
         sendPostProcessingPush = sendPostProcessingPush,
         eventPublisher = eventPublisher,
         retryTaskScheduler = retryTaskScheduler,
+        clock = Clock.fixed(NOW, ZoneOffset.UTC),
+    )
+
+    private fun failingProcessPlaceParsingJob() = ProcessPlaceParsingJobUseCase(
+        jobPort = jobPort,
+        imageTextExtractor = org.every.nook.api.application.place.ImageTextExtractor { emptyList() },
+        clueExtractor = PlaceClueExtractor { error("provider failure") },
+        searchPlaceCandidates = SearchPlaceCandidatesUseCase { emptyList() },
+        candidateSelector = PlaceCandidateSelector { null },
+        retryBackoffs = listOf(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(3)),
+        processingTimeout = PROCESSING_TIMEOUT,
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
     )
 
@@ -102,12 +124,45 @@ class PlaceParsingEventListenerTest {
         assertEquals(NOW.plusSeconds(3), instantCaptor.value)
     }
 
+    @Test
+    fun `sends a completed push when only place parsing fails`() {
+        jobPort.attempt = 4
+        val failedJobListener = listener(failingProcessPlaceParsingJob())
+
+        failedJobListener.process(PlaceParsingJobRequestedEvent(postId = 11))
+
+        assertEquals("11", pushSender.message?.data?.get("postId"))
+        assertEquals("COMPLETED", pushSender.message?.data?.get("outcome"))
+    }
+
+    private class FakePushTokenPort : PushTokenPort {
+        override fun register(userId: Long, token: String, platform: PushPlatform) = Unit
+
+        override fun delete(userId: Long, token: String) = Unit
+
+        override fun findEnabledTokensByPostId(postId: Long): List<PushToken> =
+            listOf(PushToken("token-1", PushPlatform.IOS))
+
+        override fun disable(tokens: Collection<String>, reason: String) = Unit
+    }
+
+    private class RecordingPushNotificationSender : PushNotificationSender {
+        var message: PushMessage? = null
+            private set
+
+        override fun send(tokens: List<String>, message: PushMessage): PushSendResult {
+            this.message = message
+            return PushSendResult(successCount = tokens.size, failureCount = 0, invalidTokens = emptyList())
+        }
+    }
+
     private class FakeJobPort : PlaceParsingJobPort {
         var completed = false
         var outstanding = emptyList<OutstandingPlaceParsingJob>()
+        var attempt = 1
 
         override fun claim(postId: Long, processingTimeout: Duration): ClaimedPlaceParsingJob =
-            ClaimedPlaceParsingJob(postId, 1, "롯지190", emptyList(), null)
+            ClaimedPlaceParsingJob(postId, attempt, "롯지190", emptyList(), null)
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = outstanding
 

@@ -7,6 +7,7 @@ import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagCatalogSnapshot
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.snapshot
+import org.every.nook.api.application.post.model.PlaceParsingFailureReasonView
 import org.every.nook.api.application.post.model.PlaceParsingStatusView
 import org.every.nook.api.application.post.model.PostProcessingView
 import org.every.nook.api.application.post.model.SavedPostDetail
@@ -216,8 +217,9 @@ class SavedPostQueryPersistenceAdapter(
             placeParsingStatus = PlaceParsingStatusView.from(
                 parsingJob?.status.effectiveFor(savedPostPlaces.isNotEmpty()) ?: PlaceParsingStatus.PENDING,
             ),
-            placeParsingFailureReason = parsingJob?.failureReason
-                .takeIf { parsingJob?.status == PlaceParsingStatus.FAILED && savedPostPlaces.isEmpty() },
+            placeParsingFailureReason = PlaceParsingFailureReasonView.from(
+                parsingJob?.status.effectiveFor(savedPostPlaces.isNotEmpty()) ?: PlaceParsingStatus.PENDING,
+            ),
             places = savedPostPlaces.toSavedPostPlaces(
                 placesById,
                 bookmarkedPlaceIds,
