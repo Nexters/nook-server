@@ -1076,33 +1076,39 @@ class ProcessPlaceParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = emptyList()
 
-        override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
+        override fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean {
             progressStages += stage
+            return true
         }
 
-        override fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>) {
+        override fun storeImageTranscripts(postId: Long, attempt: Int, transcripts: List<ImageTranscript>): Boolean {
             storedImageTranscripts = transcripts
+            return true
         }
 
         override fun complete(
             postId: Long,
+            attempt: Int,
             title: String?,
             places: List<PlaceCandidate>,
             diagnostics: PlaceParsingDiagnostics,
-        ) {
+        ): Boolean {
             completedTitle = title
             completed = places
             this.diagnostics = diagnostics
+            return true
         }
 
-        override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
+        override fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String): Boolean {
             this.nextAttemptAt = nextAttemptAt
             retryReason = reason
+            return true
         }
 
-        override fun fail(postId: Long, title: String, reason: String) {
+        override fun fail(postId: Long, attempt: Int, title: String, reason: String): Boolean {
             failedTitle = title
             failedReason = reason
+            return true
         }
     }
 

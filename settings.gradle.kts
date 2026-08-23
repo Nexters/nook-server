@@ -17,4 +17,5 @@ include(
     "nook-api-domain",
     "nook-api-infrastructure",
     "nook-api-presentation",
+    "nook-api-worker",
 )

@@ -194,31 +194,36 @@ class ProcessPostContentParsingJobUseCaseTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPostContentParsingJob> = emptyList()
 
-        override fun updateProgress(postId: Long, stage: ParsingProgressStage) {
+        override fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean {
             calls += "progress:${stage.name}"
+            return true
         }
 
         override fun complete(
             postId: Long,
+            attempt: Int,
             post: Post,
             textPlaceClues: List<PlaceClue>,
             imageTranscripts: List<ImageTranscript>,
             sourceProfileHints: List<SourceProfileHint>,
-        ) {
+        ): Boolean {
             calls += "complete"
             completedPost = post
             completedTextPlaceClues = textPlaceClues
             completedImageTranscripts = imageTranscripts
             completedSourceProfileHints = sourceProfileHints
+            return true
         }
 
-        override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
+        override fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String): Boolean {
             retryAt = nextAttemptAt
             failureReason = reason
+            return true
         }
 
-        override fun fail(postId: Long, reason: String) {
+        override fun fail(postId: Long, attempt: Int, reason: String): Boolean {
             failureReason = reason
+            return true
         }
     }
 

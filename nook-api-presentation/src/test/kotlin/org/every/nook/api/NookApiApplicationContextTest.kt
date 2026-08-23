@@ -54,6 +54,9 @@ class NookApiApplicationContextTest {
         assertNotNull(applicationContext.getBean(ObjectMapper::class.java))
         assertNotNull(applicationContext.getBean("placeParsingPersistenceAdapter"))
         assertNotNull(applicationContext.getBean("postContentParsingPersistenceAdapter"))
+        assertFalse(applicationContext.containsBean("placeParsingEventListener"))
+        assertFalse(applicationContext.containsBean("postContentParsingEventListener"))
+        assertFalse(applicationContext.containsBean("parsingFollowUpJobDispatcher"))
     }
 
     @Test

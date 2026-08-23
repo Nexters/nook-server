@@ -14,6 +14,7 @@ concurrency:
 env:
   GABIA_PUBLIC_REGISTRY: everynook.cr.gabiacloud.com
   API_IMAGE_REPOSITORY: nook/nook-api
+  WORKER_IMAGE_REPOSITORY: nook/nook-worker
   ADMIN_WEB_IMAGE_REPOSITORY: nook/nook-admin-web
 
 jobs:
@@ -55,7 +56,7 @@ jobs:
               nook-admin-web/*|ops/admin-web/*)
                 admin_web_changed=true
                 ;;
-              Dockerfile|Dockerfile.runtime|Dockerfile.batch|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|config/*|nook-api-*/*|.github/scripts/deploy-dev.sh|.github/scripts/deploy-live.sh|ops/live-runtime/*)
+              Dockerfile|Dockerfile.runtime|Dockerfile.batch|Dockerfile.worker|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|config/*|nook-api-*/*|.github/scripts/deploy-dev.sh|.github/scripts/deploy-live.sh|.github/scripts/deploy-dev-worker.sh|.github/scripts/deploy-live-worker.sh|ops/live-runtime/*|ops/dev-worker/*|ops/live-worker/*)
                 api_changed=true
                 ;;
               .github/workflows/container-image.yml)
@@ -82,6 +83,7 @@ jobs:
 
     outputs:
       image: ${{ steps.image.outputs.image }}
+      worker-image: ${{ steps.image.outputs.worker-image }}
 
     steps:
       - name: Check out repository
@@ -97,7 +99,7 @@ jobs:
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Build API application
-        run: ./gradlew :nook-api-presentation:bootJar
+        run: ./gradlew :nook-api-presentation:bootJar :nook-api-worker:bootJar
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -127,6 +129,7 @@ jobs:
           fi
 
           public_image="${GABIA_PUBLIC_REGISTRY}/${API_IMAGE_REPOSITORY}"
+          worker_image="${GABIA_PUBLIC_REGISTRY}/${WORKER_IMAGE_REPOSITORY}"
 
           {
             echo "tags<<EOF"
@@ -134,6 +137,11 @@ jobs:
             echo "${public_image}:${latest_tag}"
             echo "EOF"
             echo "image=${public_image}:${version}"
+            echo "worker-tags<<EOF"
+            echo "${worker_image}:${version}"
+            echo "${worker_image}:${latest_tag}"
+            echo "EOF"
+            echo "worker-image=${worker_image}:${version}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Build and push API image
@@ -145,6 +153,16 @@ jobs:
           tags: ${{ steps.image.outputs.tags }}
           cache-from: type=gha,scope=api-runtime
           cache-to: type=gha,mode=min,scope=api-runtime
+
+      - name: Build and push Worker image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: nook-api-worker/build/libs
+          file: Dockerfile.runtime
+          push: true
+          tags: ${{ steps.image.outputs.worker-tags }}
+          cache-from: type=gha,scope=worker-runtime
+          cache-to: type=gha,mode=min,scope=worker-runtime
 
   build-admin-web:
     name: Build and Push Admin Web
@@ -226,6 +244,14 @@ jobs:
           GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
         run: .github/scripts/deploy-dev.sh
 
+      - name: Deploy dev worker on ops VM
+        env:
+          DEV_WORKER_IMAGE: ${{ needs.build-api.outputs.worker-image }}
+          GABIA_PUBLIC_REGISTRY: ${{ env.GABIA_PUBLIC_REGISTRY }}
+          GABIA_REGISTRY_USERNAME: ${{ secrets.GABIA_REGISTRY_USERNAME }}
+          GABIA_REGISTRY_PASSWORD: ${{ secrets.GABIA_REGISTRY_PASSWORD }}
+        run: .github/scripts/deploy-dev-worker.sh
+
   deploy-live-api:
     name: Deploy Live API
     runs-on: [self-hosted, nook-ops]
@@ -275,6 +301,13 @@ jobs:
           LIVE_SSH_TARGET: ${{ secrets.LIVE_SSH_TARGET }}
           LIVE_SSH_KEY: ${{ steps.ssh.outputs.key-file }}
         run: .github/scripts/deploy-live.sh
+
+      - name: Deploy live worker
+        env:
+          LIVE_WORKER_IMAGE: ${{ needs.build-api.outputs.worker-image }}
+          LIVE_SSH_TARGET: ${{ secrets.LIVE_SSH_TARGET }}
+          LIVE_SSH_KEY: ${{ steps.ssh.outputs.key-file }}
+        run: .github/scripts/deploy-live-worker.sh
 
   deploy-dev-admin-web:
     name: Deploy Dev Admin Web

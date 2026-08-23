@@ -18,6 +18,7 @@
 - `nook-api-infrastructure`: JPA 및 외부 시스템 어댑터
 - `nook-api-presentation`: HTTP API와 API 애플리케이션 진입점
 - `nook-api-batch`: 배치 작업과 배치 애플리케이션 진입점
+- `nook-api-worker`: 콘텐츠·장소 파싱과 영속 후속 작업 실행 진입점
 
 의존성 규칙은 [모듈 구조](docs/architectures/module-structure.md)를 참고합니다.
 
@@ -53,6 +54,12 @@ API 애플리케이션을 실행합니다.
 ./gradlew :nook-api-batch:bootRun
 ```
 
+파싱 worker를 실행합니다. API만 실행하면 파싱 작업은 DB에 등록되지만 처리되지 않습니다.
+
+```shell
+./gradlew :nook-api-worker:bootRun
+```
+
 ## 검증
 
 ```shell
@@ -71,6 +78,12 @@ docker build -t nook-api -f Dockerfile .
 
 ```shell
 docker build -t nook-batch -f Dockerfile.batch .
+```
+
+Worker 이미지:
+
+```shell
+docker build -t nook-worker -f Dockerfile.worker .
 ```
 
 실행 환경에서 `SPRING_PROFILES_ACTIVE`, DB 설정, JWT 비밀키와 사용하는 소셜 provider 설정을 주입합니다.

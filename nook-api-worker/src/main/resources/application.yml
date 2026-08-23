@@ -1,0 +1,205 @@
+spring:
+  application:
+    name: nook-worker
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  lifecycle:
+    timeout-per-shutdown-phase: 60s
+
+springdoc:
+  paths-to-exclude:
+    - /api/admin/**
+
+server:
+  shutdown: graceful
+  forward-headers-strategy: framework
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:${server.port:8080}}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        "service.name": ${spring.application.name:nook-api}
+        "service.env": ${APP_ENV:${spring.profiles.active:local}}
+      stacktrace:
+        max-length: 20000
+  level:
+    org.every.nook.api.logging.RequestLoggingFilter: info
+
+app:
+  admin:
+    access:
+      enabled: ${ADMIN_ACCESS_ENABLED:false}
+      team-domain: ${ADMIN_ACCESS_TEAM_DOMAIN:}
+      audience: ${ADMIN_ACCESS_AUDIENCE:}
+  logging:
+    http:
+      body:
+        request-enabled: ${HTTP_LOG_REQUEST_BODY_ENABLED:false}
+        response-enabled: ${HTTP_LOG_RESPONSE_BODY_ENABLED:false}
+        max-bytes: ${HTTP_LOG_BODY_MAX_BYTES:16384}
+        max-flattened-fields: ${HTTP_LOG_BODY_MAX_FLATTENED_FIELDS:80}
+        max-depth: ${HTTP_LOG_BODY_MAX_DEPTH:5}
+        max-array-items: ${HTTP_LOG_BODY_MAX_ARRAY_ITEMS:10}
+
+place-parsing:
+  image-text-provider: ${PLACE_PARSING_IMAGE_TEXT_PROVIDER:openai}
+  worker:
+    retry-backoffs: ${PLACE_PARSING_RETRY_BACKOFFS:3s,3s,3s}
+    processing-timeout: ${PLACE_PARSING_PROCESSING_TIMEOUT:10m}
+    image-ocr-concurrency: ${PLACE_PARSING_IMAGE_OCR_CONCURRENCY:4}
+
+post-content-parsing:
+  worker:
+    retry-backoffs: ${POST_CONTENT_PARSING_RETRY_BACKOFFS:3s,3s,3s}
+    media-retry-backoff: ${POST_MEDIA_RETRY_BACKOFF:3s}
+    processing-timeout: ${POST_CONTENT_PARSING_PROCESSING_TIMEOUT:15m}
+
+parsing:
+  dispatcher-interval: ${PARSING_DISPATCHER_INTERVAL:10s}
+  dispatcher-batch-size: ${PARSING_DISPATCHER_BATCH_SIZE:20}
+  place-concurrency: ${PLACE_PARSING_WORKER_CONCURRENCY:2}
+  content-concurrency: ${POST_CONTENT_PARSING_WORKER_CONCURRENCY:2}
+  follow-up:
+    dispatcher-interval: ${PARSING_FOLLOW_UP_DISPATCHER_INTERVAL:5s}
+    batch-size: ${PARSING_FOLLOW_UP_BATCH_SIZE:10}
+    processing-timeout: ${PARSING_FOLLOW_UP_PROCESSING_TIMEOUT:5m}
+    retry-backoff: ${PARSING_FOLLOW_UP_RETRY_BACKOFF:10s}
+    max-attempts: ${PARSING_FOLLOW_UP_MAX_ATTEMPTS:4}
+
+external:
+  corepin-ocr:
+    base-url: ${COREPIN_OCR_BASE_URL:https://api.corepin.ai}
+    api-key: ${COREPIN_API_KEY:}
+    connect-timeout: ${COREPIN_OCR_CONNECT_TIMEOUT:3s}
+    read-timeout: ${COREPIN_OCR_READ_TIMEOUT:30s}
+    max-image-bytes: ${COREPIN_OCR_MAX_IMAGE_BYTES:10485760}
+  clova-ocr:
+    invoke-url: ${CLOVA_OCR_INVOKE_URL:}
+    secret-key: ${CLOVA_OCR_SECRET_KEY:}
+    connect-timeout: ${CLOVA_OCR_CONNECT_TIMEOUT:3s}
+    read-timeout: ${CLOVA_OCR_READ_TIMEOUT:30s}
+    max-image-bytes: ${CLOVA_OCR_MAX_IMAGE_BYTES:10485760}
+  place-thumbnail:
+    provider: ${PLACE_THUMBNAIL_PROVIDER:post_media}
+    fixed-url: ${PLACE_THUMBNAIL_FIXED_URL:https://d6idqwsn9nndw.cloudfront.net/post-media/sha256/3d/3dd7bb6919492e58a76fe9012b82c0a44e4bfdf7bf0784cddd90dc9bbbee17f9.jpg}
+  openai:
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-5-nano}
+    image-text-model: ${OPENAI_IMAGE_TEXT_MODEL:gpt-5-mini}
+    max-concurrent-requests: ${OPENAI_MAX_CONCURRENT_REQUESTS:4}
+    rate-limit-retry-backoffs: ${OPENAI_RATE_LIMIT_RETRY_BACKOFFS:1s,2s,4s}
+    connect-timeout: ${OPENAI_CONNECT_TIMEOUT:3s}
+    read-timeout: ${OPENAI_READ_TIMEOUT:30s}
+  kakao-local:
+    base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${KAKAO_REST_API_KEY:}
+    connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:3s}
+    read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:5s}
+  naver-api-hub:
+    base-url: ${NAVER_API_HUB_BASE_URL:https://naverapihub.apigw.ntruss.com}
+    client-id: ${NAVER_API_HUB_CLIENT_ID:}
+    client-secret: ${NAVER_API_HUB_CLIENT_SECRET:}
+    connect-timeout: ${NAVER_API_HUB_CONNECT_TIMEOUT:3s}
+    read-timeout: ${NAVER_API_HUB_READ_TIMEOUT:5s}
+  google-place-photo:
+    base-url: ${GOOGLE_PLACE_BASE_URL:https://places.googleapis.com}
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+    max-width-px: ${GOOGLE_PLACE_PHOTO_MAX_WIDTH_PX:600}
+    connect-timeout: ${GOOGLE_PLACE_PHOTO_CONNECT_TIMEOUT:3s}
+    read-timeout: ${GOOGLE_PLACE_PHOTO_READ_TIMEOUT:5s}
+  apify-google-maps:
+    base-url: ${APIFY_GOOGLE_MAPS_BASE_URL:https://api.apify.com}
+    api-token: ${APIFY_API_TOKEN:}
+    actor-id: ${APIFY_GOOGLE_MAPS_ACTOR_ID:compass~crawler-google-places}
+    batch-size: ${APIFY_GOOGLE_MAPS_BATCH_SIZE:20}
+    storage-concurrency: ${APIFY_GOOGLE_MAPS_STORAGE_CONCURRENCY:6}
+    connect-timeout: ${APIFY_GOOGLE_MAPS_CONNECT_TIMEOUT:3s}
+    read-timeout: ${APIFY_GOOGLE_MAPS_READ_TIMEOUT:300s}
+  apify-naver-place-photo:
+    base-url: ${APIFY_NAVER_PLACE_PHOTO_BASE_URL:https://api.apify.com}
+    api-token: ${APIFY_API_TOKEN:}
+    search-actor-id: ${APIFY_NAVER_PLACE_SEARCH_ACTOR_ID:delicious_zebu~naver-map-search-results-scraper}
+    photo-actor-id: ${APIFY_NAVER_PLACE_PHOTO_ACTOR_ID:oxygenated_quagmire~naver-place-photos}
+    max-results: ${APIFY_NAVER_PLACE_MAX_RESULTS:5}
+    batch-size: ${APIFY_NAVER_PLACE_BATCH_SIZE:20}
+    storage-concurrency: ${APIFY_NAVER_PLACE_STORAGE_CONCURRENCY:6}
+    connect-timeout: ${APIFY_NAVER_PLACE_CONNECT_TIMEOUT:3s}
+    read-timeout: ${APIFY_NAVER_PLACE_READ_TIMEOUT:300s}
+  google-cloud-vision:
+    base-url: ${GOOGLE_CLOUD_VISION_BASE_URL:https://vision.googleapis.com}
+    api-key: ${GOOGLE_CLOUD_VISION_API_KEY:${GOOGLE_MAPS_API_KEY:}}
+    feature-type: ${GOOGLE_CLOUD_VISION_FEATURE_TYPE:DOCUMENT_TEXT_DETECTION}
+    connect-timeout: ${GOOGLE_CLOUD_VISION_CONNECT_TIMEOUT:3s}
+    read-timeout: ${GOOGLE_CLOUD_VISION_READ_TIMEOUT:30s}
+  bright-data:
+    base-url: ${BRIGHT_DATA_BASE_URL:https://api.brightdata.com}
+    api-token: ${BRIGHT_DATA_API_TOKEN:}
+    posts-dataset-id: ${BRIGHT_DATA_POSTS_DATASET_ID:gd_lk5ns7kz21pck8jpis}
+    reels-dataset-id: ${BRIGHT_DATA_REELS_DATASET_ID:gd_lyclm20il4r5helnj}
+    connect-timeout: ${BRIGHT_DATA_CONNECT_TIMEOUT:3s}
+    read-timeout: ${BRIGHT_DATA_READ_TIMEOUT:60s}
+  apify:
+    base-url: ${APIFY_BASE_URL:https://api.apify.com}
+    api-token: ${APIFY_API_TOKEN:}
+    actor-id: ${APIFY_ACTOR_ID:shu8hvrXbJbY3Eb9W}
+    connect-timeout: ${APIFY_CONNECT_TIMEOUT:3s}
+    read-timeout: ${APIFY_READ_TIMEOUT:120s}
+  media-storage:
+    enabled: ${MEDIA_STORAGE_ENABLED:false}
+    bucket: ${AWS_S3_BUCKET:}
+    region: ${AWS_REGION:ap-northeast-2}
+    cloud-front-base-url: ${AWS_CLOUDFRONT_BASE_URL:}
+    connect-timeout: ${MEDIA_DOWNLOAD_CONNECT_TIMEOUT:3s}
+    read-timeout: ${MEDIA_DOWNLOAD_READ_TIMEOUT:30s}
+    max-image-bytes: ${MEDIA_MAX_IMAGE_BYTES:20971520}
+    max-video-bytes: ${MEDIA_MAX_VIDEO_BYTES:104857600}
+    max-redirects: ${MEDIA_MAX_REDIRECTS:3}
+    profile-image-upload-expires: ${PROFILE_IMAGE_UPLOAD_EXPIRES:10m}
+
+auth:
+  kakao:
+    app-id: ${KAKAO_APP_ID:}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+  jwt:
+    issuer: nook-api
+    access-secret: ${JWT_ACCESS_SECRET}
+    refresh-secret: ${JWT_REFRESH_SECRET}
+    access-ttl: 30m
+    refresh-ttl: 30d
+    signup-ttl: 10m
+  apple:
+    client-id: ${APPLE_CLIENT_ID:}
+    team-id: ${APPLE_TEAM_ID:}
+    key-id: ${APPLE_KEY_ID:}
+    private-key: ${APPLE_PRIVATE_KEY:}

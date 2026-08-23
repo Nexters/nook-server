@@ -5,12 +5,12 @@ import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
+import org.every.nook.api.application.processing.ParsingFollowUpJobPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -22,7 +22,7 @@ class ConnectPostPlacePersistenceAdapter(
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val sharedBookmarkSyncRepository: SharedPlaceBookmarkSyncJpaRepository,
     private val parsingJobRepository: PlaceParsingJobJpaRepository,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val followUpJobPort: ParsingFollowUpJobPort,
 ) : ConnectPostPlacePort {
     @Transactional
     override fun connect(userId: Long, savedPostId: Long, candidate: PlaceCandidate): ConnectPostPlacePort.Result {
@@ -50,14 +50,14 @@ class ConnectPostPlacePersistenceAdapter(
         bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
         sharedBookmarkSyncRepository.insertForActiveSubscribers(savedPostId = savedPostId, placeId = placeId)
         if (shouldRequestThumbnail) {
-            eventPublisher.publishEvent(
+            followUpJobPort.enqueue(
                 PlaceThumbnailsRequestedEvent(
                     postId = savedPost.postId,
                     requests = listOf(PlaceThumbnailProvider.Request(candidate, sourcePostId = savedPost.postId)),
                 ),
             )
         }
-        eventPublisher.publishEvent(
+        followUpJobPort.enqueue(
             PlaceTagsRequestedEvent(
                 savedPost.postId,
                 listOf(PlaceTagsRequestedEvent.Place(placeId, candidate)),
