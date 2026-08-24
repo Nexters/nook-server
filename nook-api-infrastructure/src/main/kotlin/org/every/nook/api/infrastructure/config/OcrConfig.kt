@@ -9,6 +9,7 @@ import org.every.nook.api.infrastructure.corepin.CorepinOcrProperties
 import org.every.nook.api.infrastructure.ocr.OcrProviderType
 import org.every.nook.api.infrastructure.ocr.RuntimeImageTextExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiImageTextExtractor
+import org.every.nook.api.infrastructure.providerusage.ExternalProviderUsageInterceptorFactory
 import org.every.nook.api.infrastructure.vision.VisionImageDownloader
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -26,21 +27,25 @@ class OcrConfig {
     fun ocrImageRestClient(): RestClient = RestClient.create()
 
     @Bean("corepinOcrRestClient")
-    fun corepinOcrRestClient(properties: CorepinOcrProperties): RestClient {
+    fun corepinOcrRestClient(
+        properties: CorepinOcrProperties,
+        usage: ExternalProviderUsageInterceptorFactory,
+    ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
         }
-        return RestClient.builder().baseUrl(properties.baseUrl).requestFactory(requestFactory).build()
+        return RestClient.builder().baseUrl(properties.baseUrl).requestFactory(requestFactory)
+            .requestInterceptor(usage.create("COREPIN")).build()
     }
 
     @Bean("clovaOcrRestClient")
-    fun clovaOcrRestClient(properties: ClovaOcrProperties): RestClient {
+    fun clovaOcrRestClient(properties: ClovaOcrProperties, usage: ExternalProviderUsageInterceptorFactory): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
         }
-        return RestClient.builder().requestFactory(requestFactory).build()
+        return RestClient.builder().requestFactory(requestFactory).requestInterceptor(usage.create("CLOVA_OCR")).build()
     }
 
     @Bean("corepinImageTextExtractor")
