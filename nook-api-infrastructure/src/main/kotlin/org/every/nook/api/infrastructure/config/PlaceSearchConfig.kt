@@ -15,6 +15,7 @@ import org.every.nook.api.infrastructure.place.NaverPlaceMapper
 import org.every.nook.api.infrastructure.place.NaverPlaceProperties
 import org.every.nook.api.infrastructure.place.NaverPlaceSearchProvider
 import org.every.nook.api.infrastructure.place.PrioritizedPlaceSearchProvider
+import org.every.nook.api.infrastructure.providerusage.ExternalProviderUsageInterceptorFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -34,7 +35,10 @@ class PlaceSearchConfig {
     fun naverPlaceMapper(): NaverPlaceMapper = NaverPlaceMapper()
 
     @Bean("kakaoPlaceRestClient")
-    fun kakaoPlaceRestClient(properties: KakaoPlaceProperties): RestClient {
+    fun kakaoPlaceRestClient(
+        properties: KakaoPlaceProperties,
+        usage: ExternalProviderUsageInterceptorFactory,
+    ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
@@ -42,11 +46,15 @@ class PlaceSearchConfig {
         return RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
+            .requestInterceptor(usage.create("KAKAO_LOCAL"))
             .build()
     }
 
     @Bean("naverPlaceRestClient")
-    fun naverPlaceRestClient(properties: NaverPlaceProperties): RestClient {
+    fun naverPlaceRestClient(
+        properties: NaverPlaceProperties,
+        usage: ExternalProviderUsageInterceptorFactory,
+    ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
@@ -54,6 +62,7 @@ class PlaceSearchConfig {
         return RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
+            .requestInterceptor(usage.create("NAVER_LOCAL"))
             .build()
     }
 

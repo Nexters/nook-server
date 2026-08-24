@@ -21,6 +21,7 @@ import org.every.nook.api.infrastructure.place.PlaceThumbnailProviderType
 import org.every.nook.api.infrastructure.place.PostMediaPlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.RuntimePlaceThumbnailProvider
 import org.every.nook.api.infrastructure.place.toProviderChain
+import org.every.nook.api.infrastructure.providerusage.ExternalProviderUsageInterceptorFactory
 import org.every.nook.api.infrastructure.storage.MediaStorageProperties
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
@@ -40,39 +41,51 @@ import tools.jackson.module.kotlin.jacksonObjectMapper
 )
 class PlaceThumbnailConfig {
     @Bean("googlePlacePhotoRestClient")
-    fun googlePlacePhotoRestClient(properties: GooglePlacePhotoProperties): RestClient {
+    fun googlePlacePhotoRestClient(
+        properties: GooglePlacePhotoProperties,
+        usage: ObjectProvider<ExternalProviderUsageInterceptorFactory>,
+    ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
         }
-        return RestClient.builder()
+        val builder = RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
-            .build()
+        usage.ifAvailable?.let { builder.requestInterceptor(it.create("GOOGLE_PLACES")) }
+        return builder.build()
     }
 
     @Bean("apifyGoogleMapsRestClient")
-    fun apifyGoogleMapsRestClient(properties: ApifyGoogleMapsProperties): RestClient {
+    fun apifyGoogleMapsRestClient(
+        properties: ApifyGoogleMapsProperties,
+        usage: ObjectProvider<ExternalProviderUsageInterceptorFactory>,
+    ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
         }
-        return RestClient.builder()
+        val builder = RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
-            .build()
+        usage.ifAvailable?.let { builder.requestInterceptor(it.create("APIFY_GOOGLE_MAPS")) }
+        return builder.build()
     }
 
     @Bean("apifyNaverPlacePhotoRestClient")
-    fun apifyNaverPlacePhotoRestClient(properties: ApifyNaverPlacePhotoProperties): RestClient {
+    fun apifyNaverPlacePhotoRestClient(
+        properties: ApifyNaverPlacePhotoProperties,
+        usage: ObjectProvider<ExternalProviderUsageInterceptorFactory>,
+    ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
         }
-        return RestClient.builder()
+        val builder = RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
-            .build()
+        usage.ifAvailable?.let { builder.requestInterceptor(it.create("APIFY_NAVER_PLACE")) }
+        return builder.build()
     }
 
     @Bean
