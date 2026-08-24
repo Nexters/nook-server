@@ -4,6 +4,7 @@ import os
 import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Callable, Iterator, TextIO
@@ -11,10 +12,13 @@ from typing import Callable, Iterator, TextIO
 
 CONTAINER_NAME = os.getenv("ERROR_LOG_CONTAINER_NAME", "nook-dev-api")
 WEBHOOK_URL = os.getenv("ERROR_LOG_SLACK_WEBHOOK_URL", "")
+ENVIRONMENT = os.getenv("ERROR_LOG_ENV", "live")
+GRAFANA_BASE_URL = os.getenv("ERROR_LOG_GRAFANA_BASE_URL", "")
 LOG_LEVEL_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}.*\s(?P<level>TRACE|DEBUG|INFO|WARN|ERROR)\s+")
 MAX_BYTES = int(os.getenv("ERROR_LOG_MAX_BYTES", "3500"))
 FLUSH_SECONDS = float(os.getenv("ERROR_LOG_FLUSH_SECONDS", "2"))
 POLL_SECONDS = float(os.getenv("ERROR_LOG_POLL_SECONDS", "1"))
+SLACK_SECTION_MAX_CHARS = 2900
 
 
 def docker_container_log_path() -> Path:
@@ -30,17 +34,84 @@ def docker_container_log_path() -> Path:
     raise RuntimeError(f"container not found: {CONTAINER_NAME}")
 
 
-def post_to_slack(lines: list[str]) -> None:
+def context_value(entry: dict, *keys: str) -> str | None:
+    for key in keys:
+        value = entry.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
+def grafana_url(request_id: str | None) -> str | None:
+    if not GRAFANA_BASE_URL or not request_id:
+        return None
+    dashboard_uid = f"nook-{ENVIRONMENT}-logs"
+    query = urllib.parse.urlencode(
+        {
+            "from": "now-15m",
+            "to": "now",
+            "var-level": "ERROR",
+            "var-requestIdText": request_id,
+        },
+    )
+    return f"{GRAFANA_BASE_URL.rstrip('/')}/d/{dashboard_uid}/{dashboard_uid}?{query}"
+
+
+def slack_text(value: str | None) -> str:
+    return (value or "-").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def truncate_body(body: str) -> str:
+    encoded = body.encode()
+    byte_limit = min(MAX_BYTES, SLACK_SECTION_MAX_CHARS)
+    if len(encoded) <= byte_limit:
+        return body
+    return encoded[:byte_limit].decode(errors="ignore").rstrip() + "\n... truncated"
+
+
+def slack_payload(lines: list[str], context: dict[str, str | None]) -> dict:
+    body = truncate_body("".join(lines).strip())
+    service_name = slack_text(context.get("service_name"))
+    request_id = slack_text(context.get("request_id"))
+    user_id = slack_text(context.get("user_id"))
+    url_path = slack_text(context.get("url_path"))
+    fields = [
+        {"type": "mrkdwn", "text": f"*Service Name*\n{service_name}"},
+        {"type": "mrkdwn", "text": f"*Request ID*\n{request_id}"},
+        {"type": "mrkdwn", "text": f"*User ID*\n{user_id}"},
+        {"type": "mrkdwn", "text": f"*URL Path*\n{url_path}"},
+    ]
+    blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": f":rotating_light: *{slack_text(CONTAINER_NAME)} ERROR log*"}},
+        {"type": "section", "fields": fields},
+        {"type": "section", "text": {"type": "mrkdwn", "text": f"```{body}```"}},
+    ]
+    link = grafana_url(context.get("request_id"))
+    if link:
+        blocks.append(
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Grafana에서 전체 요청 로그 보기"},
+                        "url": link,
+                    },
+                ],
+            },
+        )
+    return {
+        "text": f"{CONTAINER_NAME} ERROR log - request ID: {context.get('request_id') or '-'}",
+        "blocks": blocks,
+    }
+
+
+def post_to_slack(lines: list[str], context: dict[str, str | None]) -> None:
     if not WEBHOOK_URL:
         return
-    body = "".join(lines).strip()
-    if not body:
+    if not "".join(lines).strip():
         return
-    if len(body.encode()) > MAX_BYTES:
-        body = body.encode()[:MAX_BYTES].decode(errors="ignore").rstrip() + "\n... truncated"
-    payload = {
-        "text": f":rotating_light: *{CONTAINER_NAME} ERROR log*\n```{body}```",
-    }
+    payload = slack_payload(lines, context)
     data = json.dumps(payload).encode()
     request = urllib.request.Request(
         WEBHOOK_URL,
@@ -62,19 +133,28 @@ def read_json_log_line(raw_line: str) -> str:
         return raw_line
 
 
-def parse_log_entry(line: str) -> tuple[str | None, str]:
+def parse_log_entry(line: str) -> tuple[str | None, str, dict[str, str | None]]:
     try:
         entry = json.loads(line)
     except json.JSONDecodeError:
         match = LOG_LEVEL_PATTERN.search(line)
-        return (match.group("level") if match else None, line)
+        return (match.group("level") if match else None, line, {})
 
     if not isinstance(entry, dict):
-        return None, line
+        return None, line, {}
 
     level = entry.get("level")
     if not isinstance(level, str):
-        return None, line
+        return None, line, {}
+
+    method = context_value(entry, "request_method", "http_method", "request.method", "http.method")
+    path = context_value(entry, "http_route", "request_path", "http.route", "request.path")
+    context = {
+        "service_name": context_value(entry, "service_name", "service.name") or CONTAINER_NAME,
+        "request_id": context_value(entry, "request_id", "request.id"),
+        "user_id": context_value(entry, "user_id", "user.id"),
+        "url_path": " ".join(value for value in (method, path) if value) or None,
+    }
 
     header_parts = [
         str(value)
@@ -94,7 +174,7 @@ def parse_log_entry(line: str) -> tuple[str | None, str]:
     if stack_trace:
         body = f"{body}\n{stack_trace}" if body else str(stack_trace)
 
-    return level, f"{body.rstrip()}\n" if body else line
+    return level, f"{body.rstrip()}\n" if body else line, context
 
 
 def opened_file_matches_path(fp: TextIO, log_path: Path) -> bool:
@@ -155,27 +235,29 @@ def follow_current_container_log(
 
 def main() -> None:
     buffer: list[str] = []
+    error_context: dict[str, str | None] = {}
     last_append_at = 0.0
     for line in follow_current_container_log():
         if line is None:
             if buffer and time.monotonic() - last_append_at >= FLUSH_SECONDS:
-                post_to_slack(buffer)
+                post_to_slack(buffer, error_context)
                 buffer = []
             continue
-        level, formatted_line = parse_log_entry(line)
+        level, formatted_line, context = parse_log_entry(line)
         if level:
             if buffer:
-                post_to_slack(buffer)
+                post_to_slack(buffer, error_context)
                 buffer = []
             if level == "ERROR":
                 buffer = [formatted_line]
+                error_context = context
                 last_append_at = time.monotonic()
             continue
         if buffer:
             buffer.append(line)
             last_append_at = time.monotonic()
         if buffer and time.monotonic() - last_append_at >= FLUSH_SECONDS:
-            post_to_slack(buffer)
+            post_to_slack(buffer, error_context)
             buffer = []
 
 
