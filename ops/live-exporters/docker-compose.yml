@@ -1,3 +1,17 @@
+x-error-log-forwarder: &error-log-forwarder
+  image: python:3.13-alpine
+  command:
+    - python
+    - /app/forward_error_logs.py
+  environment:
+    ERROR_LOG_SLACK_WEBHOOK_URL: ${ERROR_LOG_SLACK_WEBHOOK_URL:?}
+    ERROR_LOG_MAX_BYTES: ${ERROR_LOG_MAX_BYTES:-3500}
+    ERROR_LOG_FLUSH_SECONDS: ${ERROR_LOG_FLUSH_SECONDS:-2}
+  volumes:
+    - ./error-log-forwarder/forward_error_logs.py:/app/forward_error_logs.py:ro
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  restart: unless-stopped
+
 services:
   node-exporter:
     image: quay.io/prometheus/node-exporter:latest
@@ -25,3 +39,21 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
+
+  error-log-forwarder-blue:
+    <<: *error-log-forwarder
+    container_name: nook-live-error-log-forwarder-blue
+    environment:
+      ERROR_LOG_CONTAINER_NAME: nook-live-api-blue
+      ERROR_LOG_SLACK_WEBHOOK_URL: ${ERROR_LOG_SLACK_WEBHOOK_URL:?}
+      ERROR_LOG_MAX_BYTES: ${ERROR_LOG_MAX_BYTES:-3500}
+      ERROR_LOG_FLUSH_SECONDS: ${ERROR_LOG_FLUSH_SECONDS:-2}
+
+  error-log-forwarder-green:
+    <<: *error-log-forwarder
+    container_name: nook-live-error-log-forwarder-green
+    environment:
+      ERROR_LOG_CONTAINER_NAME: nook-live-api-green
+      ERROR_LOG_SLACK_WEBHOOK_URL: ${ERROR_LOG_SLACK_WEBHOOK_URL:?}
+      ERROR_LOG_MAX_BYTES: ${ERROR_LOG_MAX_BYTES:-3500}
+      ERROR_LOG_FLUSH_SECONDS: ${ERROR_LOG_FLUSH_SECONDS:-2}
