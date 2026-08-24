@@ -23,6 +23,7 @@ import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingTracePort
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -86,8 +87,10 @@ class PlaceParsingUseCaseConfig {
     fun findOutstandingPlaceParsingJobsUseCase(
         jobPort: PlaceParsingJobPort,
         properties: PlaceParsingProperties,
+        @Value("\${parsing.dispatcher-batch-size:20}") batchSize: Int,
     ): FindOutstandingPlaceParsingJobsUseCase = FindOutstandingPlaceParsingJobsUseCase(
         jobPort = jobPort,
         processingTimeout = properties.processingTimeout,
+        batchSize = batchSize,
     )
 }

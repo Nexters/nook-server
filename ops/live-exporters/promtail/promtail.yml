@@ -41,3 +41,35 @@ scrape_configs:
         replacement: live
       - target_label: job
         replacement: nook-api
+
+  - job_name: nook-live-worker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 10s
+    pipeline_stages:
+      - docker: {}
+      - json:
+          expressions:
+            level: level
+      - labels:
+          level:
+    relabel_configs:
+      - source_labels:
+          - __meta_docker_container_name
+        regex: /nook-live-worker
+        action: keep
+      - source_labels:
+          - __meta_docker_container_id
+        target_label: __path__
+        replacement: /var/lib/docker/containers/$1/$1-json.log
+      - source_labels:
+          - __meta_docker_container_name
+        regex: /(.+)
+        target_label: container
+      - source_labels:
+          - __meta_docker_container_log_stream
+        target_label: stream
+      - target_label: env
+        replacement: live
+      - target_label: job
+        replacement: nook-worker

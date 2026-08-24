@@ -166,23 +166,32 @@ class PlaceParsingEventListenerTest {
 
         override fun findOutstanding(processingTimeout: Duration): List<OutstandingPlaceParsingJob> = outstanding
 
+        override fun updateProgress(
+            postId: Long,
+            attempt: Int,
+            stage: org.every.nook.api.application.processing.ParsingProgressStage,
+        ) = true
+
         override fun storeImageTranscripts(
             postId: Long,
+            attempt: Int,
             transcripts: List<org.every.nook.api.application.place.ImageTranscript>,
-        ) = Unit
+        ) = true
 
         override fun complete(
             postId: Long,
+            attempt: Int,
             title: String?,
             places: List<PlaceCandidate>,
             diagnostics: PlaceParsingDiagnostics,
-        ) {
+        ): Boolean {
             completed = true
+            return true
         }
 
-        override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) = Unit
+        override fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String) = true
 
-        override fun fail(postId: Long, title: String, reason: String) = Unit
+        override fun fail(postId: Long, attempt: Int, title: String, reason: String) = true
     }
 
     private companion object {

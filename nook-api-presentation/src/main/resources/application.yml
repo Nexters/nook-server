@@ -74,7 +74,7 @@ place-parsing:
   image-text-provider: ${PLACE_PARSING_IMAGE_TEXT_PROVIDER:openai}
   worker:
     retry-backoffs: ${PLACE_PARSING_RETRY_BACKOFFS:3s,3s,3s}
-    processing-timeout: ${PLACE_PARSING_PROCESSING_TIMEOUT:1m}
+    processing-timeout: ${PLACE_PARSING_PROCESSING_TIMEOUT:10m}
     image-ocr-concurrency: ${PLACE_PARSING_IMAGE_OCR_CONCURRENCY:4}
 
 post-content-parsing:

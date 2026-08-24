@@ -91,13 +91,13 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (level) (rate({env=\"live\", job=\"nook-api\", level=~\"${level:regex}\"}[$__interval]))",
-          "legendFormat": "{{level}}",
+          "expr": "sum by (job, level) (rate({env=\"live\", job=~\"${service:regex}\", level=~\"${level:regex}\"}[$__interval]))",
+          "legendFormat": "{{job}} {{level}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "API Log Rate by Level",
+      "title": "Log Rate by Service & Level",
       "type": "timeseries"
     },
     {
@@ -158,7 +158,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({env=\"live\", job=\"nook-api\", level=\"ERROR\"}[$__range])) or on() vector(0)",
+          "expr": "sum(count_over_time({env=\"live\", job=~\"${service:regex}\", level=\"ERROR\"}[$__range])) or on() vector(0)",
           "queryType": "instant",
           "refId": "A"
         }
@@ -220,7 +220,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({env=\"live\", job=\"nook-api\", level=\"WARN\"}[$__range])) or on() vector(0)",
+          "expr": "sum(count_over_time({env=\"live\", job=~\"${service:regex}\", level=\"WARN\"}[$__range])) or on() vector(0)",
           "queryType": "instant",
           "refId": "A"
         }
@@ -257,12 +257,12 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{env=\"live\", job=\"nook-api\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | label_format log_type=\"{{ if contains \\\"req:\\\" .message }}API{{ else }}Server{{ end }}\" | log_type=~\"${logType:regex}\" | line_format \"[{{.service_name}}] [{{.level}}]  {{.message}}\"",
+          "expr": "{env=\"live\", job=~\"${service:regex}\", level=~\"${level:regex}\"} |= \"${requestIdText}\" |= \"${userIdText}\" |= \"${routeText}\" |= \"${statusText}\" |= \"${keywordText}\" | json | label_format log_type=\"{{ if eq .job \\\"nook-worker\\\" }}Worker{{ else }}{{ if contains \\\"req:\\\" .message }}API{{ else }}Server{{ end }}{{ end }}\" | log_type=~\"${logType:regex}\" | line_format \"[{{.job}}] [{{.level}}] {{.message}}\"",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Server & API Logs",
+      "title": "API & Worker Logs",
       "type": "logs"
     }
   ],
@@ -275,6 +275,23 @@
   ],
   "templating": {
     "list": [
+      {
+        "allValue": "nook-api|nook-worker",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": false,
+        "name": "service",
+        "options": [
+          { "selected": true, "text": "All", "value": "$__all" },
+          { "selected": false, "text": "API", "value": "nook-api" },
+          { "selected": false, "text": "Worker", "value": "nook-worker" }
+        ],
+        "query": "nook-api,nook-worker",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
       {
         "allValue": "TRACE|DEBUG|INFO|WARN|ERROR",
         "current": {
@@ -324,7 +341,7 @@
         "type": "custom"
       },
       {
-        "allValue": "API|Server",
+        "allValue": "API|Server|Worker",
         "current": {
           "selected": true,
           "text": "All",
@@ -350,9 +367,14 @@
             "selected": false,
             "text": "Server",
             "value": "Server"
+          },
+          {
+            "selected": false,
+            "text": "Worker",
+            "value": "Worker"
           }
         ],
-        "query": "API,Server",
+        "query": "API,Server,Worker",
         "skipUrlSync": false,
         "type": "custom"
       },
@@ -436,6 +458,6 @@
   "timezone": "browser",
   "title": "Nook Live Logs",
   "uid": "nook-live-logs",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

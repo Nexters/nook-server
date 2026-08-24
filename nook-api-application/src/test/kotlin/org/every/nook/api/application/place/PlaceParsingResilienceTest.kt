@@ -1,6 +1,7 @@
 package org.every.nook.api.application.place
 
 import org.every.nook.api.application.content.SourceProfileHint
+import org.every.nook.api.application.processing.ParsingProgressStage
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -436,26 +437,33 @@ class PlaceParsingResilienceTest {
 
         override fun findOutstanding(processingTimeout: Duration) = emptyList<OutstandingPlaceParsingJob>()
 
-        override fun storeImageTranscripts(postId: Long, transcripts: List<ImageTranscript>) {
+        override fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage) = true
+
+        override fun storeImageTranscripts(postId: Long, attempt: Int, transcripts: List<ImageTranscript>): Boolean {
             storedImageTranscripts = transcripts
+            return true
         }
 
         override fun complete(
             postId: Long,
+            attempt: Int,
             title: String?,
             places: List<PlaceCandidate>,
             diagnostics: PlaceParsingDiagnostics,
-        ) {
+        ): Boolean {
             completed = places
             this.diagnostics = diagnostics
+            return true
         }
 
-        override fun retry(postId: Long, nextAttemptAt: Instant, reason: String) {
+        override fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String): Boolean {
             this.nextAttemptAt = nextAttemptAt
+            return true
         }
 
-        override fun fail(postId: Long, title: String, reason: String) {
+        override fun fail(postId: Long, attempt: Int, title: String, reason: String): Boolean {
             failedReason = reason
+            return true
         }
     }
 

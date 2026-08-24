@@ -24,9 +24,9 @@ if [[ -f "${state_file}" ]]; then
 fi
 
 case "${ACTIVE_SLOT}" in
-  blue) candidate_slot="green"; previous_image="${BLUE_IMAGE}" ;;
-  green) candidate_slot="blue"; previous_image="${GREEN_IMAGE}" ;;
-  "") candidate_slot="blue"; previous_image="" ;;
+  blue) candidate_slot="green"; previous_slot="blue"; previous_image="${BLUE_IMAGE}" ;;
+  green) candidate_slot="blue"; previous_slot="green"; previous_image="${GREEN_IMAGE}" ;;
+  "") candidate_slot="blue"; previous_slot=""; previous_image="" ;;
   *) echo "Invalid ACTIVE_SLOT in ${state_file}: ${ACTIVE_SLOT}" >&2; exit 1 ;;
 esac
 
@@ -85,6 +85,10 @@ done
 ACTIVE_SLOT="${candidate_slot}"
 PREVIOUS_IMAGE="${previous_image}"
 write_state
+
+if [[ -n "${previous_slot}" ]]; then
+  docker compose -f "${compose_file}" --env-file "${state_file}" stop "${previous_slot}"
+fi
 
 printf 'ACTIVE_SLOT=%s\nCURRENT_IMAGE=%s\nPREVIOUS_IMAGE=%s\n' \
   "${ACTIVE_SLOT}" "${image}" "${PREVIOUS_IMAGE}"

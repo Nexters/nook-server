@@ -1,0 +1,249 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: nook-worker-alerts
+    folder: Nook
+    interval: 1m
+    rules:
+      - uid: nook_dev_worker_down
+        title: Dev worker down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: 'max(up{job="nook-worker", env="dev"})'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [1], type: lt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: KeepLast
+        for: 2m
+        annotations: { summary: dev parsing worker가 응답하지 않습니다., description: ops VM의 dev worker metric target이 2분 동안 DOWN 상태입니다. }
+        labels: { env: dev, service: nook-worker, severity: critical }
+        isPaused: false
+
+      - uid: nook_live_worker_down
+        title: Live worker down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: 'max(up{job="nook-worker", env="live"})'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [1], type: lt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: KeepLast
+        for: 2m
+        annotations: { summary: live parsing worker가 응답하지 않습니다., description: live VM의 worker metric target이 2분 동안 DOWN 상태입니다. }
+        labels: { env: live, service: nook-worker, severity: critical }
+        isPaused: false
+
+      - uid: nook_dev_worker_queue_lag
+        title: Dev worker queue lag
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: 'max(nook_parsing_queue_oldest_ready_age_seconds{job="nook-worker", env="dev"})'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [900], type: gt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 10m
+        annotations: { summary: dev worker의 파싱 대기열이 지연되고 있습니다., description: 가장 오래된 실행 가능 job이 15분 이상 대기하는 상태가 10분 동안 지속됐습니다. }
+        labels: { env: dev, service: nook-worker, severity: warning }
+        isPaused: false
+
+      - uid: nook_live_worker_queue_lag
+        title: Live worker queue lag
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: 'max(nook_parsing_queue_oldest_ready_age_seconds{job="nook-worker", env="live"})'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [300], type: gt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 10m
+        annotations: { summary: live worker의 파싱 대기열이 지연되고 있습니다., description: 가장 오래된 실행 가능 job이 5분 이상 대기하는 상태가 10분 동안 지속됐습니다. }
+        labels: { env: live, service: nook-worker, severity: critical }
+        isPaused: false
+
+      - uid: nook_dev_worker_stuck_jobs
+        title: Dev worker stuck jobs
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: 'sum(nook_parsing_queue_stuck_processing_jobs{job="nook-worker", env="dev"})'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [0], type: gt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 2m
+        annotations: { summary: dev worker에 timeout을 넘긴 PROCESSING job이 있습니다., description: 처리 timeout을 넘긴 job이 2분 동안 남아 있습니다. }
+        labels: { env: dev, service: nook-worker, severity: warning }
+        isPaused: false
+
+      - uid: nook_live_worker_stuck_jobs
+        title: Live worker stuck jobs
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: 'sum(nook_parsing_queue_stuck_processing_jobs{job="nook-worker", env="live"})'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [0], type: gt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 2m
+        annotations: { summary: live worker에 timeout을 넘긴 PROCESSING job이 있습니다., description: 처리 timeout을 넘긴 job이 2분 동안 남아 있습니다. }
+        labels: { env: live, service: nook-worker, severity: critical }
+        isPaused: false
+
+      - uid: nook_dev_worker_error_logs
+        title: Dev worker error logs
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              expr: 'sum(count_over_time({env="dev", job="nook-worker", level="ERROR"}[5m]))'
+              queryType: range
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [0], type: gt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 1m
+        annotations: { summary: dev worker에서 ERROR 로그가 감지됐습니다., description: 최근 5분 동안 dev parsing worker에 ERROR 로그가 기록됐습니다. }
+        labels: { env: dev, service: nook-worker, severity: warning }
+        isPaused: false
+
+      - uid: nook_live_worker_error_logs
+        title: Live worker error logs
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              expr: 'sum(count_over_time({env="live", job="nook-worker", level="ERROR"}[5m]))'
+              queryType: range
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { datasource: { type: __expr__, uid: __expr__ }, expression: A, reducer: last, refId: B, type: reduce }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions: [{ evaluator: { params: [0], type: gt }, operator: { type: and }, query: { params: [C] }, reducer: { params: [], type: last }, type: query }]
+              datasource: { type: __expr__, uid: __expr__ }
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: KeepLast
+        for: 1m
+        annotations: { summary: live worker에서 ERROR 로그가 감지됐습니다., description: 최근 5분 동안 live parsing worker에 ERROR 로그가 기록됐습니다. }
+        labels: { env: live, service: nook-worker, severity: critical }
+        isPaused: false

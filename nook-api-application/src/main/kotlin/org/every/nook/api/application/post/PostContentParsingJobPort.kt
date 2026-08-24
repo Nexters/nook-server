@@ -13,19 +13,23 @@ interface PostContentParsingJobPort {
 
     fun findOutstanding(processingTimeout: Duration): List<OutstandingPostContentParsingJob>
 
-    fun updateProgress(postId: Long, stage: ParsingProgressStage) = Unit
+    fun findOutstanding(processingTimeout: Duration, limit: Int): List<OutstandingPostContentParsingJob> =
+        findOutstanding(processingTimeout).take(limit)
+
+    fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean
 
     fun complete(
         postId: Long,
+        attempt: Int,
         post: Post,
         textPlaceClues: List<PlaceClue>,
         imageTranscripts: List<ImageTranscript> = emptyList(),
         sourceProfileHints: List<SourceProfileHint> = emptyList(),
-    )
+    ): Boolean
 
-    fun retry(postId: Long, nextAttemptAt: Instant, reason: String)
+    fun retry(postId: Long, attempt: Int, nextAttemptAt: Instant, reason: String): Boolean
 
-    fun fail(postId: Long, reason: String)
+    fun fail(postId: Long, attempt: Int, reason: String): Boolean
 }
 
 data class ClaimedPostContentParsingJob(val postId: Long, val attempt: Int, val canonicalUrl: String)
