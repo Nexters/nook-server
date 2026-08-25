@@ -1,6 +1,7 @@
 package org.every.nook.api.admin
 
 import org.every.nook.api.application.providerusage.ExternalProviderUsageQuery
+import org.every.nook.api.application.providerusage.GetExternalProviderOverviewUseCase
 import org.every.nook.api.application.providerusage.GetExternalProviderUsageUseCase
 import org.every.nook.api.presentation.response.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
@@ -11,7 +12,10 @@ import java.time.Instant
 
 @RestController
 @RequestMapping("/api/admin/v1/external-provider-usage")
-class AdminExternalProviderUsageController(private val getUsage: GetExternalProviderUsageUseCase) {
+class AdminExternalProviderUsageController(
+    private val getUsage: GetExternalProviderUsageUseCase,
+    private val getOverview: GetExternalProviderOverviewUseCase,
+) {
     @GetMapping
     fun get(
         @RequestParam from: Instant,
@@ -31,6 +35,11 @@ class AdminExternalProviderUsageController(private val getUsage: GetExternalProv
                 limit = limit.coerceIn(MIN_LIMIT, MAX_LIMIT),
             ),
         ),
+    )
+
+    @GetMapping("/overview")
+    fun overview(@RequestParam from: Instant, @RequestParam to: Instant): ApiResponse<*> = ApiResponse.success(
+        getOverview(ExternalProviderUsageQuery(from = from, to = to)),
     )
 
     private companion object {

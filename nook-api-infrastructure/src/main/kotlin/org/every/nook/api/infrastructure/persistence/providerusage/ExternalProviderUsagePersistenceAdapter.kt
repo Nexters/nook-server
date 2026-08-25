@@ -138,6 +138,8 @@ class ExternalProviderUsagePersistenceAdapter(
                 estimatedCostUsd = events.sumCostsUsd(),
                 estimatedCostKrw = events.sumCosts(),
                 pricingStatus = if (events.all { it.pricingStatus == PRICED }) PRICED else PARTIAL,
+                lastCalledAt = events.maxOfOrNull { it.occurredAt },
+                lastFailureAt = events.filter { it.status == FAILED }.maxOfOrNull { it.occurredAt },
             )
         }.sortedByDescending { it.calls }
 

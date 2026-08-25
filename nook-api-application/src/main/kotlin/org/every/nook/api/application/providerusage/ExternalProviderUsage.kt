@@ -56,6 +56,8 @@ data class ExternalProviderUsageSummary(
         val estimatedCostUsd: BigDecimal?,
         val estimatedCostKrw: BigDecimal?,
         val pricingStatus: String,
+        val lastCalledAt: Instant?,
+        val lastFailureAt: Instant?,
     )
 
     data class Event(
@@ -82,4 +84,76 @@ fun interface ExternalProviderUsageQueryPort {
 
 class GetExternalProviderUsageUseCase(private val port: ExternalProviderUsageQueryPort) {
     operator fun invoke(query: ExternalProviderUsageQuery) = port.get(query)
+}
+
+data class ExternalProviderCatalogEntry(
+    val provider: String,
+    val displayName: String,
+    val category: String,
+    val purpose: String,
+    val runtimes: List<String>,
+    val credentialConfigured: Boolean,
+    val operationalState: String,
+    val stateReason: String,
+    val policy: String,
+    val pricingStatus: String,
+)
+
+fun interface ExternalProviderCatalogPort {
+    fun get(): List<ExternalProviderCatalogEntry>
+}
+
+data class ExternalProviderOverview(val from: Instant, val to: Instant, val providers: List<Provider>) {
+    data class Provider(
+        val provider: String,
+        val displayName: String,
+        val category: String,
+        val purpose: String,
+        val runtimes: List<String>,
+        val credentialConfigured: Boolean,
+        val operationalState: String,
+        val stateReason: String,
+        val policy: String,
+        val calls: Long,
+        val failures: Long,
+        val estimatedCostUsd: BigDecimal?,
+        val estimatedCostKrw: BigDecimal?,
+        val pricingStatus: String,
+        val lastCalledAt: Instant?,
+        val lastFailureAt: Instant?,
+    )
+}
+
+class GetExternalProviderOverviewUseCase(
+    private val catalog: ExternalProviderCatalogPort,
+    private val usage: ExternalProviderUsageQueryPort,
+) {
+    operator fun invoke(query: ExternalProviderUsageQuery): ExternalProviderOverview {
+        val summaries = usage.get(query).providers.associateBy { it.provider }
+        return ExternalProviderOverview(
+            from = query.from,
+            to = query.to,
+            providers = catalog.get().map { entry ->
+                val summary = summaries[entry.provider]
+                ExternalProviderOverview.Provider(
+                    provider = entry.provider,
+                    displayName = entry.displayName,
+                    category = entry.category,
+                    purpose = entry.purpose,
+                    runtimes = entry.runtimes,
+                    credentialConfigured = entry.credentialConfigured,
+                    operationalState = entry.operationalState,
+                    stateReason = entry.stateReason,
+                    policy = entry.policy,
+                    calls = summary?.calls ?: 0,
+                    failures = summary?.failures ?: 0,
+                    estimatedCostUsd = summary?.estimatedCostUsd,
+                    estimatedCostKrw = summary?.estimatedCostKrw,
+                    pricingStatus = summary?.pricingStatus ?: entry.pricingStatus,
+                    lastCalledAt = summary?.lastCalledAt,
+                    lastFailureAt = summary?.lastFailureAt,
+                )
+            },
+        )
+    }
 }
