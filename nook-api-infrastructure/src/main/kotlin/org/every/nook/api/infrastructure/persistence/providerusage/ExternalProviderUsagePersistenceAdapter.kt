@@ -92,10 +92,11 @@ class ExternalProviderUsagePersistenceAdapter(
         return ExternalProviderUsageSummary(
             from = query.from,
             to = query.to,
-            totalCalls = all.size.toLong(),
-            failedCalls = all.count { it.status == FAILED }.toLong(),
+            totalCalls = all.sumUnits(),
+            failedCalls = all.filter { it.status == FAILED }.sumUnits(),
+            estimatedCostUsd = all.sumCostsUsd(),
             estimatedCostKrw = all.sumCosts(),
-            unpricedCalls = all.count { it.pricingStatus != PRICED }.toLong(),
+            unpricedCalls = all.filter { it.pricingStatus == UNPRICED }.sumUnits(),
             providers = all.toProviderSummaries(),
             recentEvents = recent.map { it.toView() },
         )
@@ -114,13 +115,27 @@ class ExternalProviderUsagePersistenceAdapter(
         }.fold(BigDecimal.ZERO, BigDecimal::add)
     }
 
+    private fun List<ExternalProviderUsageEntity>.sumCostsUsd(): BigDecimal? {
+        val priced = filter { it.status == SUCCEEDED && it.sourceUnitPrice != null }
+        if (priced.isEmpty()) return null
+        return priced.groupBy { "${it.provider}:${it.sku}" }.map { (key, events) ->
+            val used = events.map { it.units }.fold(BigDecimal.ZERO, BigDecimal::add)
+            val billable = used.subtract(OfficialProviderPrices.freeMonthlyUnits(key)).max(BigDecimal.ZERO)
+            billable.multiply(requireNotNull(events.first().sourceUnitPrice))
+        }.fold(BigDecimal.ZERO, BigDecimal::add)
+    }
+
+    private fun List<ExternalProviderUsageEntity>.sumUnits(): Long =
+        map { it.units }.fold(BigDecimal.ZERO, BigDecimal::add).toLong()
+
     private fun List<ExternalProviderUsageEntity>.toProviderSummaries() = groupBy { it.provider }
         .map { (provider, events) ->
             ExternalProviderUsageSummary.ProviderSummary(
                 provider = provider,
-                calls = events.size.toLong(),
-                failures = events.count { it.status == FAILED }.toLong(),
+                calls = events.sumUnits(),
+                failures = events.filter { it.status == FAILED }.sumUnits(),
                 units = events.map { it.units }.fold(BigDecimal.ZERO, BigDecimal::add),
+                estimatedCostUsd = events.sumCostsUsd(),
                 estimatedCostKrw = events.sumCosts(),
                 pricingStatus = if (events.all { it.pricingStatus == PRICED }) PRICED else PARTIAL,
             )
@@ -137,6 +152,7 @@ class ExternalProviderUsagePersistenceAdapter(
         durationMs = durationMs,
         httpStatus = httpStatus,
         failureType = failureCode,
+        estimatedCostUsd = sourceUnitPrice?.multiply(units),
         estimatedCostKrw = estimatedCostKrw,
         pricingStatus = pricingStatus,
         occurredAt = occurredAt,
@@ -167,6 +183,10 @@ private object OfficialProviderPrices {
         "GOOGLE_PLACES:PLACE_DETAILS_PRO" to BigDecimal("17").divide(perThousand),
         "GOOGLE_PLACES:PLACE_DETAILS_PHOTOS" to BigDecimal("7").divide(perThousand),
         "BRIGHT_DATA:WEB_SCRAPER_SUCCESS_RECORD" to BigDecimal("1.50").divide(perThousand),
+        "APIFY:INSTAGRAM_SCRAPER" to BigDecimal("2.30").divide(perThousand),
+        "APIFY_GOOGLE_MAPS:GOOGLE_MAPS_SCRAPER" to BigDecimal("3.00").divide(perThousand),
+        "APIFY_NAVER_PLACE:NAVER_PLACE_PHOTO_SCRAPER" to BigDecimal("0.50").divide(perThousand),
+        "APIFY_NAVER_PLACE:NAVER_MAP_SEARCH_RESULTS_SCRAPER" to BigDecimal("1.50").divide(perThousand),
     )
     private val monthlyFreeUnits = mapOf(
         "GOOGLE_VISION:TEXT_DETECTION" to BigDecimal("1000"),

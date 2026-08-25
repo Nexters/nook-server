@@ -26,7 +26,9 @@
   - https://developers.google.com/maps/billing-and-pricing/pricing
 - Bright Data Web Scraper API PAYG: 월 5,000 successful records 무료, 이후 $1.50 / 1,000 records
   - https://brightdata.com/pricing/web-scraper
-- Apify는 Actor별 pay-per-event 또는 실제 CU/traffic 과금이 달라 기본 단가를 두지 않는다.
+- Apify Instagram Scraper $2.30, Google Maps Scraper $3.00,
+  Naver Map Search Results Scraper $1.50, Naver Place Photo Scraper $0.50 / 1,000 calls
+  - Actor별 현재 계약 단가를 적용하며 변경 시 가격 정책을 갱신한다.
   - https://apify.com/pricing
 - Kakao Local은 통합 월 무료 quota를 호출량으로만 추적한다.
   - https://developers.kakao.com/docs/en/getting-started/quota
@@ -49,4 +51,3 @@ USD 예상 원화 비용은 운영 설정 환율을 사용한다. 환율이 없�
 - 미정가 호출도 누락 없이 어드민에 표시된다.
 - 가격·예산 변경은 사유와 함께 감사 로그에 남는다.
 - `pnpm --dir nook-admin-web build`와 `./gradlew check`가 통과한다.
-

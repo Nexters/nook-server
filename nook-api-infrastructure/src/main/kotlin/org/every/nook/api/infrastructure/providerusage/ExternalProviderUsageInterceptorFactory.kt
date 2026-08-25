@@ -76,15 +76,28 @@ private class UsageInterceptor(
         return "${request.method}_${path.ifBlank { "root" }}".take(MAX_OPERATION_LENGTH)
     }
 
-    private fun sku(provider: String, operation: String, status: String): String = when {
-        provider == OPENAI -> "GPT_5_NANO_REQUEST_UNPRICED"
-        provider == GOOGLE_VISION -> "TEXT_DETECTION"
-        provider == GOOGLE_PLACES && operation.contains("searchNearby", ignoreCase = true) -> "NEARBY_SEARCH_PRO"
-        provider == GOOGLE_PLACES && operation.contains("searchText", ignoreCase = true) -> "TEXT_SEARCH_PRO"
-        provider == GOOGLE_PLACES && operation.contains("media", ignoreCase = true) -> "PLACE_DETAILS_PHOTOS"
-        provider == GOOGLE_PLACES -> "PLACE_DETAILS_PRO"
-        provider == BRIGHT_DATA && status == SUCCEEDED -> "WEB_SCRAPER_SUCCESS_RECORD"
+    private fun sku(provider: String, operation: String, status: String): String = when (provider) {
+        OPENAI -> "GPT_5_NANO_REQUEST_UNPRICED"
+        APIFY -> "INSTAGRAM_SCRAPER"
+        APIFY_GOOGLE_MAPS -> "GOOGLE_MAPS_SCRAPER"
+        APIFY_NAVER_PLACE -> apifyNaverSku(operation)
+        GOOGLE_VISION -> "TEXT_DETECTION"
+        GOOGLE_PLACES -> googlePlacesSku(operation)
+        BRIGHT_DATA -> if (status == SUCCEEDED) "WEB_SCRAPER_SUCCESS_RECORD" else "REQUEST_UNPRICED"
         else -> "REQUEST_UNPRICED"
+    }
+
+    private fun apifyNaverSku(operation: String): String = when {
+        operation.contains(NAVER_PHOTO_ACTOR, ignoreCase = true) -> "NAVER_PLACE_PHOTO_SCRAPER"
+        operation.contains(NAVER_SEARCH_ACTOR, ignoreCase = true) -> "NAVER_MAP_SEARCH_RESULTS_SCRAPER"
+        else -> "REQUEST_UNPRICED"
+    }
+
+    private fun googlePlacesSku(operation: String): String = when {
+        operation.contains("searchNearby", ignoreCase = true) -> "NEARBY_SEARCH_PRO"
+        operation.contains("searchText", ignoreCase = true) -> "TEXT_SEARCH_PRO"
+        operation.contains("media", ignoreCase = true) -> "PLACE_DETAILS_PHOTOS"
+        else -> "PLACE_DETAILS_PRO"
     }
 
     private companion object {
@@ -93,6 +106,11 @@ private class UsageInterceptor(
         const val FAILED = "FAILED"
         const val SUCCEEDED = "SUCCEEDED"
         const val OPENAI = "OPENAI"
+        const val APIFY = "APIFY"
+        const val APIFY_GOOGLE_MAPS = "APIFY_GOOGLE_MAPS"
+        const val APIFY_NAVER_PLACE = "APIFY_NAVER_PLACE"
+        const val NAVER_PHOTO_ACTOR = "naver-place-photos"
+        const val NAVER_SEARCH_ACTOR = "naver-map-search-results-scraper"
         const val GOOGLE_VISION = "GOOGLE_VISION"
         const val GOOGLE_PLACES = "GOOGLE_PLACES"
         const val BRIGHT_DATA = "BRIGHT_DATA"
