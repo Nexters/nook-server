@@ -21,7 +21,7 @@ CREATE TABLE external_provider_usage_limit_notifications
     id                  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '상한 단계 알림 발송 이력 식별자',
     limit_policy_id     BIGINT       NOT NULL COMMENT '외부 API 상한 정책 식별자',
     period_start        DATE         NOT NULL COMMENT '월간 집계 시작일',
-    threshold_percent   SMALLINT     NOT NULL COMMENT '50, 80, 95 또는 100 임계치',
+    threshold_percent   INT          NOT NULL COMMENT '50, 80, 95 또는 100 임계치',
     notified_at         TIMESTAMP(6) NOT NULL COMMENT 'Slack 발송 성공 시각',
     created_at          TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성 시각',
     updated_at          TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
@@ -33,4 +33,3 @@ CREATE TABLE external_provider_usage_limit_notifications
     CONSTRAINT chk_external_provider_usage_limit_threshold
         CHECK (threshold_percent IN (50, 80, 95, 100))
 ) ENGINE = InnoDB COMMENT = '외부 API 월간 상한 단계별 Slack 알림 성공 이력';
-
