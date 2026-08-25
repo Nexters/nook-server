@@ -42,6 +42,7 @@ data class ExternalProviderUsageSummary(
     val to: Instant,
     val totalCalls: Long,
     val failedCalls: Long,
+    val estimatedCostUsd: BigDecimal?,
     val estimatedCostKrw: BigDecimal?,
     val unpricedCalls: Long,
     val providers: List<ProviderSummary>,
@@ -52,6 +53,7 @@ data class ExternalProviderUsageSummary(
         val calls: Long,
         val failures: Long,
         val units: BigDecimal,
+        val estimatedCostUsd: BigDecimal?,
         val estimatedCostKrw: BigDecimal?,
         val pricingStatus: String,
     )
@@ -67,6 +69,7 @@ data class ExternalProviderUsageSummary(
         val durationMs: Long,
         val httpStatus: Int?,
         val failureType: String?,
+        val estimatedCostUsd: BigDecimal?,
         val estimatedCostKrw: BigDecimal?,
         val pricingStatus: String,
         val occurredAt: Instant,

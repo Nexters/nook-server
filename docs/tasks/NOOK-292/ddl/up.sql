@@ -98,4 +98,12 @@ VALUES
     ('GOOGLE_PLACES', 'PLACE_DETAILS_PHOTOS', 'CALL', 'USD', 7.00, 1000, 1000,
      'https://developers.google.com/maps/billing-and-pricing/pricing', 'PRICED', TRUE),
     ('BRIGHT_DATA', 'WEB_SCRAPER_SUCCESS_RECORD', 'RECORD', 'USD', 1.50, 1000, 5000,
-     'https://brightdata.com/pricing/web-scraper', 'PRICED', TRUE);
+     'https://brightdata.com/pricing/web-scraper', 'PRICED', TRUE),
+    ('APIFY', 'INSTAGRAM_SCRAPER', 'CALL', 'USD', 2.30, 1000, 0,
+     'https://apify.com/pricing', 'PRICED', TRUE),
+    ('APIFY_GOOGLE_MAPS', 'GOOGLE_MAPS_SCRAPER', 'CALL', 'USD', 3.00, 1000, 0,
+     'https://apify.com/compass/crawler-google-places', 'PRICED', TRUE),
+    ('APIFY_NAVER_PLACE', 'NAVER_MAP_SEARCH_RESULTS_SCRAPER', 'CALL', 'USD', 1.50, 1000, 0,
+     'https://apify.com/delicious_zebu/naver-map-search-results-scraper', 'PRICED', TRUE),
+    ('APIFY_NAVER_PLACE', 'NAVER_PLACE_PHOTO_SCRAPER', 'CALL', 'USD', 0.50, 1000, 0,
+     'https://apify.com/oxygenated_quagmire/naver-place-photos', 'PRICED', TRUE);
