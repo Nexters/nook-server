@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository
 import java.time.Instant
 
 interface ExternalProviderUsageJpaRepository : JpaRepository<ExternalProviderUsageEntity, Long> {
+    fun existsByProviderAndSku(provider: String, sku: String): Boolean
+
     fun findAllByOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(
         from: Instant,
         to: Instant,

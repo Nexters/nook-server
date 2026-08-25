@@ -4,6 +4,22 @@
 GET {{baseUrl}}/api/admin/v1/external-provider-usage?from=2026-08-01T00:00:00Z&to=2026-09-01T00:00:00Z&offset=0&limit=100
 Accept: application/json
 
+### SKU별 무료 quota·상한 사용량
+GET {{baseUrl}}/api/admin/v1/external-provider-usage/skus?from=2026-08-01T00:00:00Z&to=2026-09-01T00:00:00Z
+Accept: application/json
+
+### SKU 월 호출량 상한 설정
+PUT {{baseUrl}}/api/admin/v1/external-provider-usage/limits
+Content-Type: application/json
+
+{
+  "provider": "APIFY_GOOGLE_MAPS",
+  "sku": "GOOGLE_MAPS_SCRAPER",
+  "limitType": "CALLS",
+  "monthlyLimit": 10000,
+  "enabled": true
+}
+
 ### 외부 API 연동·운영 현황
 GET {{baseUrl}}/api/admin/v1/external-provider-usage/overview?from=2026-08-01T00:00:00Z&to=2026-09-01T00:00:00Z
 Accept: application/json
