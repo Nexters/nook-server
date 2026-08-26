@@ -32,7 +32,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobE
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.processing.ProcessingTraceJpaRepository
-import org.every.nook.api.infrastructure.place.GooglePlacePhotoRuleSpec
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProperties
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProviderType
 import org.every.nook.api.infrastructure.place.toProviderChain
@@ -650,15 +649,6 @@ class AdminParsingPipelineAdapter(
                 ),
                 decision(
                     2,
-                    "Google 후보 선택",
-                    "최고 후보 점수가 최소 ${GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE}점 이상인가?",
-                    "max(score) >= ${GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE}",
-                    "후보 사진 조회",
-                    "다음 provider로 이동",
-                    "GooglePlacePhotoProvider",
-                ),
-                decision(
-                    3,
                     "결과 채택",
                     "반환된 사진 목록이 비어 있지 않은가?",
                     "photos.isNotEmpty()",
@@ -667,10 +657,16 @@ class AdminParsingPipelineAdapter(
                     "PlaceThumbnailProviderChain",
                 ),
             ),
-            sections = googlePhotoSections(),
+            sections = listOf(
+                section(
+                    "Fallback",
+                    rule("다음 provider", "호출 실패 또는 사진이 비어 있을 때"),
+                    rule("종료", "사진을 얻은 첫 provider에서 종료하고 앞 provider의 부가정보는 병합"),
+                ),
+            ),
             examples = listOf(
-                "이름 완전 일치 +50, 주소 일치 +30, 100m 이내 +25, 사진 있음 +10이면 총 115점으로 선택 기준을 통과합니다.",
-                "최고 점수가 ${GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE}점 미만이면 Google 결과를 버리고 다음 provider로 이동합니다.",
+                "Apify Naver Place가 사진을 반환하면 저장하고 provider 순회를 종료합니다.",
+                "현재 provider가 사진을 반환하지 않으면 다음 provider로 이동합니다.",
             ),
         ),
     )
@@ -714,39 +710,6 @@ class AdminParsingPipelineAdapter(
             requireNotNull(catalog.rule(ruleId)) { "Unknown parsing policy rule: $ruleId" }
         }
     }
-
-    private fun googlePhotoSections(): List<AdminParsingRuleSection> = listOf(
-        section(
-            "Google 후보 점수",
-            rule("최소 선택 점수", GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE.toString()),
-            rule("이름 완전 일치", "+${GooglePlacePhotoRuleSpec.EXACT_NAME_SCORE}"),
-            rule("이름 포함", "+${GooglePlacePhotoRuleSpec.CONTAINS_NAME_SCORE}"),
-            rule("이름 토큰 일치", "+${GooglePlacePhotoRuleSpec.TOKEN_NAME_SCORE}"),
-            rule("카테고리 일치", "+${GooglePlacePhotoRuleSpec.CATEGORY_MATCH_SCORE}"),
-            rule("주소 일치 / 도시 일치", "+30 / +10"),
-            rule(
-                "거리",
-                "≤${GooglePlacePhotoRuleSpec.CLOSE_MATCH_DISTANCE_METERS.toInt()}m +25 · " +
-                    "≤${GooglePlacePhotoRuleSpec.MAX_MATCH_DISTANCE_METERS.toInt()}m +15 · " +
-                    "≤${GooglePlacePhotoRuleSpec.FAR_MATCH_DISTANCE_METERS.toInt()}m +5",
-            ),
-            rule(
-                "사진 있음 / 없음",
-                "+${GooglePlacePhotoRuleSpec.PHOTO_BONUS_SCORE} / " +
-                    GooglePlacePhotoRuleSpec.NO_PHOTO_PENALTY,
-            ),
-            rule(
-                "지역 불일치",
-                ">${GooglePlacePhotoRuleSpec.REGION_MISMATCH_DISTANCE_METERS.toInt()}m이고 " +
-                    "도시 불일치 시 -${GooglePlacePhotoRuleSpec.REGION_MISMATCH_PENALTY}",
-            ),
-        ),
-        section(
-            "Fallback",
-            rule("다음 provider", "호출 실패 또는 사진이 비어 있을 때"),
-            rule("종료", "사진을 얻은 첫 provider에서 종료하고 앞 provider의 부가정보는 병합"),
-        ),
-    )
 
     private fun edges(): List<AdminParsingEdge> = listOf(
         edge("request", "content-fetch"),

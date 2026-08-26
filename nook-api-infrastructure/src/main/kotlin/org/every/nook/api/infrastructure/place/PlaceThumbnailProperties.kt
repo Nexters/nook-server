@@ -16,7 +16,6 @@ data class PlaceThumbnailProperties(
     enum class Provider {
         POST_MEDIA,
         FIXED,
-        GOOGLE,
         DISABLED,
     }
 
@@ -30,6 +29,5 @@ data class PlaceThumbnailProperties(
 fun PlaceThumbnailProperties.Provider.toProviderChain(): List<PlaceThumbnailProviderType> = when (this) {
     PlaceThumbnailProperties.Provider.POST_MEDIA -> listOf(PlaceThumbnailProviderType.POST_MEDIA)
     PlaceThumbnailProperties.Provider.FIXED -> listOf(PlaceThumbnailProviderType.FIXED)
-    PlaceThumbnailProperties.Provider.GOOGLE -> listOf(PlaceThumbnailProviderType.GOOGLE)
     PlaceThumbnailProperties.Provider.DISABLED -> emptyList()
 }

@@ -12,13 +12,11 @@ import org.every.nook.api.infrastructure.openai.OpenAiProperties
 import org.every.nook.api.infrastructure.persistence.config.RuntimeConfigurationJpaRepository
 import org.every.nook.api.infrastructure.place.ApifyGoogleMapsProperties
 import org.every.nook.api.infrastructure.place.ApifyNaverPlacePhotoProperties
-import org.every.nook.api.infrastructure.place.GooglePlacePhotoProperties
 import org.every.nook.api.infrastructure.place.KakaoPlaceProperties
 import org.every.nook.api.infrastructure.place.NaverPlaceProperties
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProperties
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProviderType
 import org.every.nook.api.infrastructure.place.toProviderChain
-import org.every.nook.api.infrastructure.vision.GoogleCloudVisionProperties
 import org.springframework.stereotype.Component
 
 @Component
@@ -31,11 +29,9 @@ class ExternalProviderCatalogAdapter(
     private val kakao: KakaoPlaceProperties,
     private val apifyGoogle: ApifyGoogleMapsProperties,
     private val apifyNaver: ApifyNaverPlacePhotoProperties,
-    private val googlePlaces: GooglePlacePhotoProperties,
     private val corepin: CorepinOcrProperties,
     private val clova: ClovaOcrProperties,
     private val openAi: OpenAiProperties,
-    private val googleVision: GoogleCloudVisionProperties,
     private val thumbnail: PlaceThumbnailProperties,
 ) : ExternalProviderCatalogPort {
     override fun get(): List<ExternalProviderCatalogEntry> = buildList {
@@ -44,7 +40,6 @@ class ExternalProviderCatalogAdapter(
         addAll(thumbnailEntries())
         addAll(ocrEntries())
         add(openAiEntry())
-        add(googleVisionEntry())
     }
 
     private fun instagramEntries(): List<ExternalProviderCatalogEntry> {
@@ -138,15 +133,6 @@ class ExternalProviderCatalogAdapter(
                 PlaceThumbnailProviderType.APIFY_NAVER_PLACE,
                 selected,
             ),
-            thumbnailEntry(
-                "GOOGLE_PLACES",
-                "Google Places",
-                "장소 사진·부가정보",
-                "Google Places 사진 조회",
-                googlePlaces.apiKey.isNotBlank(),
-                PlaceThumbnailProviderType.GOOGLE,
-                selected,
-            ),
         )
     }
 
@@ -237,17 +223,6 @@ class ExternalProviderCatalogAdapter(
         )
     }
 
-    private fun googleVisionEntry(): ExternalProviderCatalogEntry = entry(
-        "GOOGLE_VISION",
-        "Google Cloud Vision",
-        "OCR·추론",
-        "Google Document Text Detection 구현체",
-        googleVision.apiKey.isNotBlank(),
-        STANDBY,
-        "구현과 설정은 존재하지만 현재 runtime OCR chain에는 연결되지 않음",
-        "호출 경로에 선택되지 않아 자동 호출되지 않음",
-    )
-
     private fun entry(
         provider: String,
         name: String,
@@ -274,7 +249,6 @@ class ExternalProviderCatalogAdapter(
     private companion object {
         const val ACTIVE = "ACTIVE"
         const val FALLBACK = "FALLBACK"
-        const val STANDBY = "STANDBY"
         const val DISABLED = "DISABLED"
         const val MISCONFIGURED = "MISCONFIGURED"
     }

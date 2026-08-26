@@ -4,7 +4,6 @@ enum class PlaceThumbnailProviderType {
     POST_MEDIA,
     APIFY_GOOGLE,
     APIFY_NAVER_PLACE,
-    GOOGLE,
     FIXED,
     DISABLED,
     ;

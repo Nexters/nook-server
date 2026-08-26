@@ -135,12 +135,6 @@ external:
     client-secret: ${NAVER_API_HUB_CLIENT_SECRET:}
     connect-timeout: ${NAVER_API_HUB_CONNECT_TIMEOUT:3s}
     read-timeout: ${NAVER_API_HUB_READ_TIMEOUT:5s}
-  google-place-photo:
-    base-url: ${GOOGLE_PLACE_BASE_URL:https://places.googleapis.com}
-    api-key: ${GOOGLE_MAPS_API_KEY:}
-    max-width-px: ${GOOGLE_PLACE_PHOTO_MAX_WIDTH_PX:600}
-    connect-timeout: ${GOOGLE_PLACE_PHOTO_CONNECT_TIMEOUT:3s}
-    read-timeout: ${GOOGLE_PLACE_PHOTO_READ_TIMEOUT:5s}
   apify-google-maps:
     base-url: ${APIFY_GOOGLE_MAPS_BASE_URL:https://api.apify.com}
     api-token: ${APIFY_API_TOKEN:}
@@ -159,12 +153,6 @@ external:
     storage-concurrency: ${APIFY_NAVER_PLACE_STORAGE_CONCURRENCY:6}
     connect-timeout: ${APIFY_NAVER_PLACE_CONNECT_TIMEOUT:3s}
     read-timeout: ${APIFY_NAVER_PLACE_READ_TIMEOUT:300s}
-  google-cloud-vision:
-    base-url: ${GOOGLE_CLOUD_VISION_BASE_URL:https://vision.googleapis.com}
-    api-key: ${GOOGLE_CLOUD_VISION_API_KEY:${GOOGLE_MAPS_API_KEY:}}
-    feature-type: ${GOOGLE_CLOUD_VISION_FEATURE_TYPE:DOCUMENT_TEXT_DETECTION}
-    connect-timeout: ${GOOGLE_CLOUD_VISION_CONNECT_TIMEOUT:3s}
-    read-timeout: ${GOOGLE_CLOUD_VISION_READ_TIMEOUT:30s}
   bright-data:
     base-url: ${BRIGHT_DATA_BASE_URL:https://api.brightdata.com}
     api-token: ${BRIGHT_DATA_API_TOKEN:}

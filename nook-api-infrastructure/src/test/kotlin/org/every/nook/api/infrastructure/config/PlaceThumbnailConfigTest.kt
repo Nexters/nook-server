@@ -31,15 +31,4 @@ class PlaceThumbnailConfigTest {
                 assertIs<RuntimePlaceThumbnailProvider>(context.getBean(PlaceThumbnailProvider::class.java))
             }
     }
-
-    @Test
-    fun `creates runtime provider when legacy Google provider is selected`() {
-        contextRunner
-            .withPropertyValues(
-                "external.place-thumbnail.provider=google",
-            )
-            .run { context ->
-                assertIs<RuntimePlaceThumbnailProvider>(context.getBean(PlaceThumbnailProvider::class.java))
-            }
-    }
 }

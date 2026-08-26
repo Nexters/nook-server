@@ -18,7 +18,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostEntity
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.processing.ProcessingTraceEntity
 import org.every.nook.api.infrastructure.persistence.processing.ProcessingTraceJpaRepository
-import org.every.nook.api.infrastructure.place.GooglePlacePhotoRuleSpec
 import org.every.nook.api.infrastructure.place.PlaceThumbnailProperties
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -60,9 +59,6 @@ class AdminParsingPipelineAdapterTest {
                 .contains("distance <= ${HangulOcrRuleSpec.MAX_EDIT_DISTANCE}"),
         )
         assertEquals("HangulOcrMatcher", hangulDecision.source)
-        val photoRules = result.nodes.first { it.id == "thumbnail" }.sections.flatMap { it.rules }
-        assertTrue(photoRules.any { it.value == GooglePlacePhotoRuleSpec.MIN_MATCH_SCORE.toString() })
-
         listOf(
             "text-clues",
             "source-coverage",
@@ -83,10 +79,10 @@ class AdminParsingPipelineAdapterTest {
     fun `invalid thumbnail chain exposes environment fallback warning`() {
         configure("place.thumbnail.provider-chain", "UNKNOWN")
 
-        val configuration = adapter(PlaceThumbnailProperties.Provider.GOOGLE).get(null)
+        val configuration = adapter(PlaceThumbnailProperties.Provider.POST_MEDIA).get(null)
             .configurations.first { it.key == "place.thumbnail.provider-chain" }
 
-        assertEquals("GOOGLE", configuration.effectiveValue)
+        assertEquals("POST_MEDIA", configuration.effectiveValue)
         assertEquals("ENVIRONMENT_FALLBACK", configuration.source)
         assertTrue(configuration.warnings.isNotEmpty())
     }
