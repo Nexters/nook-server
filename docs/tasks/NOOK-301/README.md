@@ -13,6 +13,7 @@
 - 기존 수동 집계 테이블은 개발 DB에서만 제거한다.
 - 사용하지 않는 Google Cloud Vision OCR과 Google Places Photo provider 구현을 제거한다.
 - Apify Google Maps Scraper는 별도 provider이므로 유지한다.
+- 개발 환경의 Google 전용 credential과 빌링 상태 표시도 함께 정리한다.
 
 ## 제외 범위
 
