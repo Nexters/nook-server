@@ -15,6 +15,7 @@ class ExternalProviderSkuUsagePersistenceAdapter(
     private val usageRepository: ExternalProviderUsageJpaRepository,
     private val priceRepository: ExternalProviderPricePolicyJpaRepository,
     private val limitRepository: ExternalProviderUsageLimitJpaRepository,
+    private val billingRepository: ExternalProviderBillingSnapshotJpaRepository,
 ) : ExternalProviderSkuUsagePort,
     ExternalProviderLimitSavePort {
     @Transactional(readOnly = true)
@@ -22,6 +23,11 @@ class ExternalProviderSkuUsagePersistenceAdapter(
         val events = usageRepository.findAllByOccurredAtGreaterThanEqualAndOccurredAtLessThan(query.from, query.to)
         val prices = priceRepository.findAllByEnabledTrue().associateBy { it.key() }
         val limits = limitRepository.findAll().groupBy { it.key() }
+        val billing = billingRepository.findAllByPeriodStartAndPeriodEnd(
+            query.from.atZone(SEOUL).toLocalDate(),
+            query.to.atZone(SEOUL).toLocalDate(),
+        ).filter { it.provider == APIFY_BILLING && it.sku != ACCOUNT_TOTAL }
+            .associateBy { it.sku }
         val keys = (prices.keys + events.map { it.key() } + limits.keys).sortedWith(
             compareBy(
                 { it.provider },
@@ -37,6 +43,7 @@ class ExternalProviderSkuUsagePersistenceAdapter(
                     events.filter { it.key() == key },
                     prices[key],
                     limits[key].orEmpty(),
+                    billing[key.sku],
                 )
             },
         )
@@ -73,6 +80,7 @@ class ExternalProviderSkuUsagePersistenceAdapter(
         events: List<ExternalProviderUsageEntity>,
         price: ExternalProviderPricePolicyEntity?,
         limits: List<ExternalProviderUsageLimitEntity>,
+        billing: ExternalProviderBillingSnapshotEntity?,
     ): ExternalProviderSkuUsageOverview.Sku {
         val calls = events.fold(BigDecimal.ZERO) { total, event -> total + event.units }
         val succeeded = events.filter { it.status == SUCCEEDED }.fold(BigDecimal.ZERO) { total, event ->
@@ -80,12 +88,13 @@ class ExternalProviderSkuUsagePersistenceAdapter(
         }
         val free = price?.freeMonthlyUnits ?: BigDecimal.ZERO
         val billable = succeeded.subtract(free).max(BigDecimal.ZERO)
-        val estimatedCost = price?.let {
+        val calculatedCost = price?.let {
             billable.multiply(it.sourceUnitPrice).divide(it.unitSize, COST_SCALE, RoundingMode.HALF_UP)
         } ?: events.filter { it.status == SUCCEEDED && it.sourceUnitPrice != null }
             .map { requireNotNull(it.sourceUnitPrice).multiply(it.units) }
             .takeIf { it.isNotEmpty() }
             ?.fold(BigDecimal.ZERO, BigDecimal::add)
+        val estimatedCost = billing?.costUsd ?: calculatedCost
         return ExternalProviderSkuUsageOverview.Sku(
             provider = key.provider,
             sku = key.sku,
@@ -96,7 +105,11 @@ class ExternalProviderSkuUsagePersistenceAdapter(
             freeQuotaPercent = free.takeIf { it > BigDecimal.ZERO }
                 ?.let { succeeded.percentOf(it) },
             estimatedCostUsd = estimatedCost,
-            pricingStatus = price?.pricingStatus ?: events.firstOrNull()?.pricingStatus ?: UNPRICED,
+            pricingStatus = if (billing != null) {
+                OFFICIAL_BILLING
+            } else {
+                price?.pricingStatus ?: events.firstOrNull()?.pricingStatus ?: UNPRICED
+            },
             sourceUnitPrice = price?.sourceUnitPrice,
             priceUnitSize = price?.unitSize,
             sourceUrl = price?.sourceUrl,
@@ -133,11 +146,15 @@ class ExternalProviderSkuUsagePersistenceAdapter(
         const val SUCCEEDED = "SUCCEEDED"
         const val CALLS = "CALLS"
         const val UNPRICED = "UNPRICED"
+        const val OFFICIAL_BILLING = "OFFICIAL_BILLING"
+        const val APIFY_BILLING = "APIFY_BILLING"
+        const val ACCOUNT_TOTAL = "ACCOUNT_TOTAL"
         const val COST_SCALE = 8
         const val PERCENT_SCALE = 2
         val HUNDRED = BigDecimal("100")
         val THRESHOLDS = listOf(50, 80, 95, 100)
         val LIMIT_TYPES = setOf(CALLS, "COST_USD")
         val CODE_PATTERN = Regex("[A-Z0-9_]{1,100}")
+        val SEOUL = java.time.ZoneId.of("Asia/Seoul")
     }
 }

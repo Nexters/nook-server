@@ -1,7 +1,9 @@
 package org.every.nook.api.admin
 
+import org.every.nook.api.application.providerusage.ExternalProviderBillingPeriod
 import org.every.nook.api.application.providerusage.ExternalProviderSkuUsageQuery
 import org.every.nook.api.application.providerusage.ExternalProviderUsageQuery
+import org.every.nook.api.application.providerusage.GetExternalProviderBillingUseCase
 import org.every.nook.api.application.providerusage.GetExternalProviderOverviewUseCase
 import org.every.nook.api.application.providerusage.GetExternalProviderSkuUsageUseCase
 import org.every.nook.api.application.providerusage.GetExternalProviderUsageUseCase
@@ -23,7 +25,12 @@ class AdminExternalProviderUsageController(
     private val getOverview: GetExternalProviderOverviewUseCase,
     private val getSkuUsage: GetExternalProviderSkuUsageUseCase,
     private val saveLimit: SaveExternalProviderLimitUseCase,
+    private val getBilling: GetExternalProviderBillingUseCase,
 ) {
+    @GetMapping("/billing")
+    fun billing(@RequestParam from: java.time.LocalDate, @RequestParam to: java.time.LocalDate): ApiResponse<*> =
+        ApiResponse.success(getBilling(ExternalProviderBillingPeriod(from, to)))
+
     @GetMapping
     fun get(
         @RequestParam from: Instant,

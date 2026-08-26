@@ -6,6 +6,9 @@ Accept: application/json
 
 ### SKU별 무료 quota·상한 사용량
 GET {{baseUrl}}/api/admin/v1/external-provider-usage/skus?from=2026-08-01T00:00:00Z&to=2026-09-01T00:00:00Z
+
+### 공식 빌링 스냅샷
+GET {{baseUrl}}/api/admin/v1/external-provider-usage/billing?from=2026-08-01&to=2026-09-01
 Accept: application/json
 
 ### SKU 월 호출량 상한 설정

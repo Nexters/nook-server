@@ -96,6 +96,9 @@ parsing:
     max-attempts: ${PARSING_FOLLOW_UP_MAX_ATTEMPTS:4}
 
 external-provider:
+  billing:
+    sync-enabled: ${EXTERNAL_PROVIDER_BILLING_SYNC_ENABLED:false}
+    sync-cron: ${EXTERNAL_PROVIDER_BILLING_SYNC_CRON:0 0 * * * *}
   limits:
     alert-enabled: ${EXTERNAL_PROVIDER_LIMIT_ALERT_ENABLED:false}
     alert-interval: ${EXTERNAL_PROVIDER_LIMIT_ALERT_INTERVAL:1m}
