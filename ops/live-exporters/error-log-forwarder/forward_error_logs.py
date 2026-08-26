@@ -12,7 +12,7 @@ from typing import Callable, Iterator, TextIO
 
 CONTAINER_NAME = os.getenv("ERROR_LOG_CONTAINER_NAME", "nook-dev-api")
 WEBHOOK_URL = os.getenv("ERROR_LOG_SLACK_WEBHOOK_URL", "")
-ENVIRONMENT = os.getenv("ERROR_LOG_ENV", "dev")
+ENVIRONMENT = os.getenv("ERROR_LOG_ENV", "live")
 GRAFANA_BASE_URL = os.getenv("ERROR_LOG_GRAFANA_BASE_URL", "")
 LOG_LEVEL_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}.*\s(?P<level>TRACE|DEBUG|INFO|WARN|ERROR)\s+")
 MAX_BYTES = int(os.getenv("ERROR_LOG_MAX_BYTES", "3500"))
