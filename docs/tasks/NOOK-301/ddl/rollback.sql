@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS openai_token_usage_events;
+
 -- 제거된 호출 이벤트, 수동 가격 정책, 사용량 상한 데이터는 복원하지 않는다.
 -- 테이블 구조가 필요하면 NOOK-292 및 NOOK-299 DDL을 별도로 적용한다.
 -- 제거된 미사용 Google Cloud 빌링 상태는 복원하지 않는다.

@@ -12,6 +12,8 @@ import org.every.nook.api.application.place.PlaceTagExtractor
 import org.every.nook.api.application.post.CoverTitleExtractor
 import org.every.nook.api.application.post.PostContentInference
 import org.every.nook.api.application.post.PostTitleSelector
+import org.every.nook.api.application.providerusage.OpenAiTokenUsage
+import org.every.nook.api.application.providerusage.OpenAiTokenUsageRecorder
 import org.every.nook.api.domain.place.PlaceTag
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
@@ -70,6 +72,9 @@ class OpenAiContentInferenceAdapterTest {
 
         assertEquals(listOf(PlaceTag.QUIET.name, PlaceTag.SOLO_DINING.name), tags.single().tags.map { it.tag })
         assertEquals(0.92, tags.single().tags.first().confidence)
+        assertEquals("place_tags", fixture.recordedUsage.single().feature)
+        assertEquals("gpt-test-2026-08-27", fixture.recordedUsage.single().model)
+        assertEquals(150, fixture.recordedUsage.single().totalTokens)
         fixture.server.verify()
     }
 
@@ -486,16 +491,20 @@ class OpenAiContentInferenceAdapterTest {
         val restClient = builder.build()
         val objectMapper = jacksonObjectMapper()
         val properties = OpenAiProperties(apiKey = "test-key")
+        val recordedUsage = mutableListOf<OpenAiTokenUsage>()
+        val tokenUsageTracker = OpenAiTokenUsageTracker(OpenAiTokenUsageRecorder(recordedUsage::add))
         return AdapterFixture(
             adapter = OpenAiContentInferenceAdapter(
                 restClient = restClient,
                 objectMapper = objectMapper,
                 properties = properties,
+                tokenUsageTracker = tokenUsageTracker,
             ),
-            titleSelector = OpenAiPostTitleSelector(restClient, objectMapper, properties),
-            coverTitleExtractor = OpenAiCoverTitleExtractor(restClient, objectMapper, properties),
-            imageTextExtractor = OpenAiImageTextExtractor(restClient, objectMapper, properties),
+            titleSelector = OpenAiPostTitleSelector(restClient, objectMapper, properties, tokenUsageTracker),
+            coverTitleExtractor = OpenAiCoverTitleExtractor(restClient, objectMapper, properties, tokenUsageTracker),
+            imageTextExtractor = OpenAiImageTextExtractor(restClient, objectMapper, properties, tokenUsageTracker),
             server = server,
+            recordedUsage = recordedUsage,
         )
     }
 
@@ -517,12 +526,20 @@ class OpenAiContentInferenceAdapterTest {
         val coverTitleExtractor: OpenAiCoverTitleExtractor,
         val imageTextExtractor: OpenAiImageTextExtractor,
         val server: MockRestServiceServer,
+        val recordedUsage: List<OpenAiTokenUsage>,
     )
 
     private companion object {
         fun response(output: String): String =
             """
             {
+              "model": "gpt-test-2026-08-27",
+              "usage": {
+                "input_tokens": 120,
+                "input_tokens_details": {"cached_tokens": 40},
+                "output_tokens": 30,
+                "total_tokens": 150
+              },
               "output": [{
                 "type": "message",
                 "content": [{"type":"output_text","text":${jacksonObjectMapper().writeValueAsString(output)}}]

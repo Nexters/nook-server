@@ -14,11 +14,14 @@
 - 사용하지 않는 Google Cloud Vision OCR과 Google Places Photo provider 구현을 제거한다.
 - Apify Google Maps Scraper는 별도 provider이므로 유지한다.
 - 개발 환경의 Google 전용 credential과 빌링 상태 표시도 함께 정리한다.
+- OpenAI Responses API 성공 응답의 공식 토큰 usage를 기능·모델·일자별로 저장한다.
+- 어드민에서 선택 월의 전체·입력·출력·캐시 토큰, 구성, 일별 추이와 기능·모델별 사용량을 표시한다.
 
 ## 제외 범위
 
-- 애플리케이션 외부 호출별 DB 기록
+- 범용 외부 API 호출 이력 DB 기록
 - 단가 기반 비용 추정
+- OpenAI 토큰의 비용 환산과 실패 응답의 사용량 추정
 - 호출량·금액 상한, 차단, 임계치 알림
 - 라이브 DB 및 라이브 배포
 

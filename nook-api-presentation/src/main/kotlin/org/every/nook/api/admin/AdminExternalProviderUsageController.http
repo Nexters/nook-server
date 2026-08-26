@@ -7,3 +7,7 @@ Accept: application/json
 ### 외부 API 연동·운영 현황
 GET {{baseUrl}}/api/admin/v1/external-provider-usage/overview
 Accept: application/json
+
+### OpenAI 토큰 사용량
+GET {{baseUrl}}/api/admin/v1/external-provider-usage/openai-tokens?from=2026-08-01&to=2026-09-01
+Accept: application/json
