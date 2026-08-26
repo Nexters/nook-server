@@ -13,6 +13,7 @@ class OpenAiImageTextExtractor(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
+    private val tokenUsageTracker: OpenAiTokenUsageTracker,
 ) : ImageTextExtractor {
     override fun extract(request: ImageTextExtractor.Request): List<ImageTranscript> {
         val startedAt = System.nanoTime()
@@ -27,6 +28,7 @@ class OpenAiImageTextExtractor(
             .body(String::class.java)
             ?: error("OpenAI returned an empty response")
         val root = objectMapper.readTree(response)
+        tokenUsageTracker.record(root, FEATURE, properties.imageTextModel)
         val content = root.path("output").flatMap { it.path("content").toList() }
         if (content.any { it.path("type").asText() == "refusal" }) {
             error("OpenAI refused the request")
@@ -94,6 +96,7 @@ class OpenAiImageTextExtractor(
 
     private companion object {
         val logger = LoggerFactory.getLogger(OpenAiImageTextExtractor::class.java)
+        const val FEATURE = "image_text_extraction"
         const val NANOS_PER_MILLISECOND = 1_000_000
         const val MAX_BATCH_SIZE = 5
         const val MAX_IMAGE_COUNT = 20

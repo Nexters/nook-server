@@ -19,9 +19,9 @@ class RuntimePlaceThumbnailProviderTest {
     fun `uses configured providers in order and stops after photos`() {
         val calls = mutableListOf<String>()
         val provider = provider(
-            value = "GOOGLE, APIFY_GOOGLE, FIXED",
+            value = "APIFY_NAVER_PLACE, APIFY_GOOGLE, FIXED",
             delegates = mapOf(
-                PlaceThumbnailProviderType.GOOGLE to recording(calls, "GOOGLE", null),
+                PlaceThumbnailProviderType.APIFY_NAVER_PLACE to recording(calls, "APIFY_NAVER_PLACE", null),
                 PlaceThumbnailProviderType.APIFY_GOOGLE to recording(
                     calls,
                     "APIFY_GOOGLE",
@@ -37,7 +37,7 @@ class RuntimePlaceThumbnailProviderTest {
 
         val result = provider.fetch(REQUEST)
 
-        assertEquals(listOf("GOOGLE", "APIFY_GOOGLE"), calls)
+        assertEquals(listOf("APIFY_NAVER_PLACE", "APIFY_GOOGLE"), calls)
         assertEquals(listOf("https://cdn.example/naver.jpg"), result?.photoUrls)
     }
 
@@ -45,9 +45,9 @@ class RuntimePlaceThumbnailProviderTest {
     fun `keeps supplement metadata while falling back for photos`() {
         val hours = PlaceOpeningHours("Asia/Seoul")
         val provider = provider(
-            value = "GOOGLE,FIXED",
+            value = "APIFY_GOOGLE,FIXED",
             delegates = mapOf(
-                PlaceThumbnailProviderType.GOOGLE to PlaceThumbnailProvider {
+                PlaceThumbnailProviderType.APIFY_GOOGLE to PlaceThumbnailProvider {
                     PlaceSupplement(hours, emptyList(), googlePlaceId = "google-id")
                 },
                 PlaceThumbnailProviderType.FIXED to PlaceThumbnailProvider {

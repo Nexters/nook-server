@@ -1,0 +1,13 @@
+### TODO 로그인 API가 구현되면 이 위치에 로그인 요청을 추가한다.
+
+### 공급자 공식 빌링 스냅샷
+GET {{baseUrl}}/api/admin/v1/external-provider-usage/billing?from=2026-08-01&to=2026-09-01
+Accept: application/json
+
+### 외부 API 연동·운영 현황
+GET {{baseUrl}}/api/admin/v1/external-provider-usage/overview
+Accept: application/json
+
+### OpenAI 토큰 사용량
+GET {{baseUrl}}/api/admin/v1/external-provider-usage/openai-tokens?from=2026-08-01&to=2026-09-01
+Accept: application/json
