@@ -6,7 +6,6 @@ import org.every.nook.api.infrastructure.openai.OpenAiImageTextExtractor
 import org.every.nook.api.infrastructure.openai.OpenAiPostTitleSelector
 import org.every.nook.api.infrastructure.openai.OpenAiProperties
 import org.every.nook.api.infrastructure.openai.OpenAiRateLimitInterceptor
-import org.every.nook.api.infrastructure.providerusage.ExternalProviderUsageInterceptorFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -19,7 +18,7 @@ import tools.jackson.module.kotlin.jacksonObjectMapper
 @EnableConfigurationProperties(OpenAiProperties::class)
 class OpenAiConfig {
     @Bean("openAiRestClient")
-    fun openAiRestClient(properties: OpenAiProperties, usage: ExternalProviderUsageInterceptorFactory): RestClient {
+    fun openAiRestClient(properties: OpenAiProperties): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
@@ -33,7 +32,6 @@ class OpenAiConfig {
                     retryBackoffs = properties.rateLimitRetryBackoffs,
                 ),
             )
-            .requestInterceptor(usage.create("OPENAI"))
             .build()
     }
 

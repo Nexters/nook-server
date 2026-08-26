@@ -99,11 +99,6 @@ external-provider:
   billing:
     sync-enabled: ${EXTERNAL_PROVIDER_BILLING_SYNC_ENABLED:false}
     sync-cron: ${EXTERNAL_PROVIDER_BILLING_SYNC_CRON:0 0 * * * *}
-  limits:
-    alert-enabled: ${EXTERNAL_PROVIDER_LIMIT_ALERT_ENABLED:false}
-    alert-interval: ${EXTERNAL_PROVIDER_LIMIT_ALERT_INTERVAL:1m}
-    slack-webhook-url: ${EXTERNAL_PROVIDER_LIMIT_SLACK_WEBHOOK_URL:}
-
 external:
   corepin-ocr:
     base-url: ${COREPIN_OCR_BASE_URL:https://api.corepin.ai}

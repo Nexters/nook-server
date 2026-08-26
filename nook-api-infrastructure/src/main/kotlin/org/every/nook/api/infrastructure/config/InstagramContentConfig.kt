@@ -12,7 +12,6 @@ import org.every.nook.api.infrastructure.instagram.BrightDataProperties
 import org.every.nook.api.infrastructure.instagram.InstagramPostContentExtractor
 import org.every.nook.api.infrastructure.instagram.InstagramPostSourceResolver
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
-import org.every.nook.api.infrastructure.providerusage.ExternalProviderUsageInterceptorFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -34,10 +33,7 @@ class InstagramContentConfig {
     fun apifyInstagramMapper(): ApifyInstagramMapper = ApifyInstagramMapper()
 
     @Bean
-    fun brightDataRestClient(
-        properties: BrightDataProperties,
-        usage: ExternalProviderUsageInterceptorFactory,
-    ): RestClient {
+    fun brightDataRestClient(properties: BrightDataProperties): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
@@ -45,12 +41,11 @@ class InstagramContentConfig {
         return RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
-            .requestInterceptor(usage.create("BRIGHT_DATA"))
             .build()
     }
 
     @Bean
-    fun apifyRestClient(properties: ApifyProperties, usage: ExternalProviderUsageInterceptorFactory): RestClient {
+    fun apifyRestClient(properties: ApifyProperties): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
@@ -58,7 +53,6 @@ class InstagramContentConfig {
         return RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
-            .requestInterceptor(usage.create("APIFY"))
             .build()
     }
 

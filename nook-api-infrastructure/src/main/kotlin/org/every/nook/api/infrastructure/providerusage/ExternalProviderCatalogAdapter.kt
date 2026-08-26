@@ -77,7 +77,6 @@ class ExternalProviderCatalogAdapter(
                 state = brightState,
                 reason = "현재 Instagram 모드: ${mode.name}",
                 policy = "실패 또는 timeout 시 설정에 따라 Apify로 fallback",
-                pricing = "PRICED",
             ),
             entry(
                 provider = "APIFY",
@@ -88,7 +87,6 @@ class ExternalProviderCatalogAdapter(
                 state = apifyState,
                 reason = "현재 Instagram 모드: ${mode.name}",
                 policy = "실패 또는 timeout 시 설정에 따라 Bright Data로 fallback",
-                pricing = "PRICED",
             ),
         )
     }
@@ -103,7 +101,6 @@ class ExternalProviderCatalogAdapter(
             ACTIVE,
             "장소 검색의 우선 Provider",
             "Naver 최고 점수가 80점 미만이거나 호출 실패 시 Kakao 호출",
-            "UNPRICED",
         ),
         entry(
             "KAKAO_LOCAL",
@@ -114,7 +111,6 @@ class ExternalProviderCatalogAdapter(
             FALLBACK,
             "Naver 결과 신뢰도가 부족할 때 조건부 호출",
             "Naver 최고 점수가 80점 이상이면 호출하지 않음",
-            "QUOTA_ONLY",
         ),
     )
 
@@ -179,7 +175,6 @@ class ExternalProviderCatalogAdapter(
             state,
             "현재 장소 사진 chain: $chain",
             "앞선 Provider가 사진을 반환하지 않거나 실패하면 다음 Provider 호출",
-            "PRICED",
         )
     }
 
@@ -219,7 +214,6 @@ class ExternalProviderCatalogAdapter(
             state,
             "현재 OCR chain: ${selected.joinToString(" → ")}",
             "모든 이미지에서 텍스트를 얻지 못하거나 실패하면 다음 OCR Provider 호출",
-            "UNPRICED",
         )
     }
 
@@ -240,7 +234,6 @@ class ExternalProviderCatalogAdapter(
             ACTIVE,
             role,
             "동시 요청 제한과 1s/2s/4s rate-limit 재시도 적용",
-            "PRICED",
         )
     }
 
@@ -253,7 +246,6 @@ class ExternalProviderCatalogAdapter(
         STANDBY,
         "구현과 설정은 존재하지만 현재 runtime OCR chain에는 연결되지 않음",
         "호출 경로에 선택되지 않아 자동 호출되지 않음",
-        "PRICED",
     )
 
     private fun entry(
@@ -265,7 +257,6 @@ class ExternalProviderCatalogAdapter(
         state: String,
         reason: String,
         policy: String,
-        pricing: String,
     ) = ExternalProviderCatalogEntry(
         provider = provider,
         displayName = name,
@@ -276,7 +267,6 @@ class ExternalProviderCatalogAdapter(
         operationalState = if (configured) state else MISCONFIGURED,
         stateReason = if (configured) reason else "필수 credential이 설정되지 않음",
         policy = policy,
-        pricingStatus = pricing,
     )
 
     private fun value(key: String): String? = configurations.findByConfigurationKey(key)?.configurationValue

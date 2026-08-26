@@ -1,6 +1,5 @@
 package org.every.nook.api.infrastructure.config
 
-import org.every.nook.api.infrastructure.providerusage.ExternalProviderUsageInterceptorFactory
 import org.every.nook.api.infrastructure.vision.GoogleCloudVisionImageTextExtractor
 import org.every.nook.api.infrastructure.vision.GoogleCloudVisionProperties
 import org.every.nook.api.infrastructure.vision.VisionImageDownloader
@@ -16,10 +15,7 @@ import tools.jackson.module.kotlin.jacksonObjectMapper
 @EnableConfigurationProperties(GoogleCloudVisionProperties::class)
 class GoogleCloudVisionConfig {
     @Bean("googleCloudVisionRestClient")
-    fun googleCloudVisionRestClient(
-        properties: GoogleCloudVisionProperties,
-        usage: ExternalProviderUsageInterceptorFactory,
-    ): RestClient {
+    fun googleCloudVisionRestClient(properties: GoogleCloudVisionProperties): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(properties.connectTimeout)
             setReadTimeout(properties.readTimeout)
@@ -27,7 +23,6 @@ class GoogleCloudVisionConfig {
         return RestClient.builder()
             .baseUrl(properties.baseUrl)
             .requestFactory(requestFactory)
-            .requestInterceptor(usage.create("GOOGLE_VISION"))
             .build()
     }
 
