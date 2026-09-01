@@ -10,6 +10,7 @@ class OpenAiPostTitleSelector(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
+    private val tokenUsageTracker: OpenAiTokenUsageTracker,
 ) : PostTitleSelector {
     override fun select(request: PostTitleSelector.Request): PostTitleSelector.Result {
         require(properties.apiKey.isNotBlank()) { "OpenAI API key is not configured" }
@@ -21,6 +22,7 @@ class OpenAiPostTitleSelector(
             .body(String::class.java)
             ?: error("OpenAI returned an empty response")
         val root = objectMapper.readTree(response)
+        tokenUsageTracker.record(root, FEATURE, properties.model)
         val content = root.path("output").flatMap { it.path("content").toList() }
         if (content.any { it.path("type").asText() == "refusal" }) {
             error("OpenAI refused the request")
@@ -90,6 +92,7 @@ class OpenAiPostTitleSelector(
 
     private companion object {
         val logger = KotlinLogging.logger {}
+        const val FEATURE = "post_title_selection"
         const val MAX_OUTPUT_TOKENS = 800
         const val MAX_TITLE_LENGTH = 25
         const val MAX_EVIDENCE_COUNT = 5

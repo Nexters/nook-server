@@ -302,3 +302,7 @@ body {
   color: #356fe5;
   background: #edf3ff;
 }
+.usage-table { overflow-x: auto; }
+.usage-table table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.usage-table th, .usage-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e4e6e9; vertical-align: middle; }
+.usage-table th { color: #67707d; font-size: 12px; font-weight: 700; }

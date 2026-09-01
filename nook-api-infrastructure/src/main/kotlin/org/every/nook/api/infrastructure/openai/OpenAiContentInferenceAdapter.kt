@@ -22,6 +22,7 @@ class OpenAiContentInferenceAdapter(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
+    private val tokenUsageTracker: OpenAiTokenUsageTracker,
 ) : PostContentInference,
     PostTitleInference,
     PlaceClueExtractor,
@@ -166,6 +167,7 @@ class OpenAiContentInferenceAdapter(
             .body(String::class.java)
             ?: error("OpenAI returned an empty response")
         val root = objectMapper.readTree(response)
+        tokenUsageTracker.record(root, name, model)
         val content = root.path("output")
             .flatMap { it.path("content").toList() }
         if (content.any { it.path("type").asText() == "refusal" }) {

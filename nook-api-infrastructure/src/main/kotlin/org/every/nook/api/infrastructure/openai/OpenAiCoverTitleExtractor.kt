@@ -9,6 +9,7 @@ class OpenAiCoverTitleExtractor(
     private val restClient: RestClient,
     private val objectMapper: ObjectMapper,
     private val properties: OpenAiProperties,
+    private val tokenUsageTracker: OpenAiTokenUsageTracker,
 ) : CoverTitleExtractor {
     override fun extract(request: CoverTitleExtractor.Request): String? {
         require(properties.apiKey.isNotBlank()) { "OpenAI API key is not configured" }
@@ -20,6 +21,7 @@ class OpenAiCoverTitleExtractor(
             .body(String::class.java)
             ?: error("OpenAI returned an empty response")
         val root = objectMapper.readTree(response)
+        tokenUsageTracker.record(root, FEATURE, properties.model)
         val content = root.path("output").flatMap { it.path("content").toList() }
         if (content.any { it.path("type").asText() == "refusal" }) {
             error("OpenAI refused the request")
@@ -62,6 +64,7 @@ class OpenAiCoverTitleExtractor(
         ?.ifBlank { null }
 
     private companion object {
+        const val FEATURE = "cover_title_extraction"
         const val MAX_OUTPUT_TOKENS = 300
         const val INSTRUCTIONS =
             "입력은 Instagram 첫 이미지에서 OCR로 전사한 문자열 배열이다. " +
