@@ -18,6 +18,7 @@ data class ExternalProviderBillingSnapshot(
 
 data class ExternalProviderBillingSyncResult(
     val provider: String,
+    val period: ExternalProviderBillingPeriod,
     val snapshots: List<ExternalProviderBillingSnapshot>,
 )
 

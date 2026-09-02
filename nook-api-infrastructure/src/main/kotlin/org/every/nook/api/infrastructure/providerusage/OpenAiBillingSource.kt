@@ -51,7 +51,7 @@ class OpenAiBillingSource(
         val snapshots = lineItemCosts.map { (lineItem, cost) ->
             snapshot(lineItem, cost, period, now)
         } + snapshot(ACCOUNT_TOTAL, totalCost, period, now)
-        return ExternalProviderBillingSyncResult(provider, snapshots)
+        return ExternalProviderBillingSyncResult(provider, period, snapshots)
     }
 
     private fun get(period: ExternalProviderBillingPeriod, page: String?): JsonNode {
