@@ -25,26 +25,21 @@ class ExternalProviderBillingPersistenceAdapter(
 
     @Transactional
     override fun replace(result: ExternalProviderBillingSyncResult, succeededAt: Instant) {
-        result.snapshots.forEach { snapshot ->
-            val entity = snapshots.findByProviderAndSkuAndPeriodStartAndPeriodEnd(
-                snapshot.provider,
-                snapshot.sku,
-                snapshot.period.start,
-                snapshot.period.end,
-            )?.apply {
-                update(snapshot.usageUnits, snapshot.costUsd, snapshot.source, snapshot.sourceUpdatedAt)
-            } ?: ExternalProviderBillingSnapshotEntity(
-                provider = snapshot.provider,
-                sku = snapshot.sku,
-                periodStart = snapshot.period.start,
-                periodEnd = snapshot.period.end,
-                usageUnits = snapshot.usageUnits,
-                costUsd = snapshot.costUsd,
-                source = snapshot.source,
-                sourceUpdatedAt = snapshot.sourceUpdatedAt,
-            )
-            snapshots.save(entity)
-        }
+        snapshots.deleteAllByProviderAndPeriod(result.provider, result.period.start, result.period.end)
+        snapshots.saveAll(
+            result.snapshots.map { snapshot ->
+                ExternalProviderBillingSnapshotEntity(
+                    provider = snapshot.provider,
+                    sku = snapshot.sku,
+                    periodStart = snapshot.period.start,
+                    periodEnd = snapshot.period.end,
+                    usageUnits = snapshot.usageUnits,
+                    costUsd = snapshot.costUsd,
+                    source = snapshot.source,
+                    sourceUpdatedAt = snapshot.sourceUpdatedAt,
+                )
+            },
+        )
         val state = states.findByProvider(result.provider) ?: ExternalProviderBillingSyncStateEntity(result.provider)
         state.succeeded(succeededAt)
         states.save(state)
