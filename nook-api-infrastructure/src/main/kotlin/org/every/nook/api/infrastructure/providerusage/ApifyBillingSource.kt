@@ -22,7 +22,7 @@ class ApifyBillingSource(
     override fun fetch(period: ExternalProviderBillingPeriod, now: Instant): ExternalProviderBillingSyncResult {
         check(apiToken.isNotBlank()) { "Apify API token is not configured" }
         val snapshots = actors.distinctBy { it.actorId }.map { actor -> actorSnapshot(actor, period, now) }
-        return ExternalProviderBillingSyncResult(provider, snapshots)
+        return ExternalProviderBillingSyncResult(provider, period, snapshots)
     }
 
     private fun actorSnapshot(

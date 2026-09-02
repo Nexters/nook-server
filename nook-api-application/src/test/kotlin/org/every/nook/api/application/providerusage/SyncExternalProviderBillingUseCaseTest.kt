@@ -25,7 +25,7 @@ class SyncExternalProviderBillingUseCaseTest {
         override val enabled: Boolean = enabled
 
         override fun fetch(period: ExternalProviderBillingPeriod, now: Instant) =
-            ExternalProviderBillingSyncResult(provider, emptyList())
+            ExternalProviderBillingSyncResult(provider, period, emptyList())
     }
 
     private class RecordingStore : ExternalProviderBillingStore {
