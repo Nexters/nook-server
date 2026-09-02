@@ -7,6 +7,7 @@ import java.time.Duration
 data class OpenAiProperties(
     val baseUrl: String = "https://api.openai.com",
     val apiKey: String = "",
+    val adminKey: String = "",
     val model: String = "gpt-5-nano",
     val placeClueModel: String = "gpt-5-mini",
     val imageTextModel: String = "gpt-5-mini",

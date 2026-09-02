@@ -23,6 +23,8 @@ data class ExternalProviderBillingSyncResult(
 
 interface ExternalProviderBillingSource {
     val provider: String
+    val enabled: Boolean
+        get() = true
 
     fun fetch(period: ExternalProviderBillingPeriod, now: Instant): ExternalProviderBillingSyncResult
 }
@@ -42,7 +44,7 @@ class SyncExternalProviderBillingUseCase(
     operator fun invoke(period: ExternalProviderBillingPeriod, now: Instant): SyncSummary {
         var succeeded = 0
         var failed = 0
-        sources.forEach { source ->
+        sources.filter { it.enabled }.forEach { source ->
             val provider = source.provider
             store.markAttempted(provider, now)
             runCatching {
