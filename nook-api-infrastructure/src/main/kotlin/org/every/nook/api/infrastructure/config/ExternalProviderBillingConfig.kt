@@ -6,9 +6,12 @@ import org.every.nook.api.application.providerusage.ExternalProviderBillingStore
 import org.every.nook.api.application.providerusage.GetExternalProviderBillingUseCase
 import org.every.nook.api.application.providerusage.SyncExternalProviderBillingUseCase
 import org.every.nook.api.infrastructure.instagram.ApifyProperties
+import org.every.nook.api.infrastructure.openai.OpenAiProperties
 import org.every.nook.api.infrastructure.place.ApifyGoogleMapsProperties
 import org.every.nook.api.infrastructure.place.ApifyNaverPlacePhotoProperties
 import org.every.nook.api.infrastructure.providerusage.ApifyBillingSource
+import org.every.nook.api.infrastructure.providerusage.OpenAiBillingSource
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.SimpleClientHttpRequestFactory
@@ -39,6 +42,16 @@ class ExternalProviderBillingConfig {
             ),
         )
     }
+
+    @Bean
+    fun openAiBillingSource(
+        @Qualifier("openAiRestClient") restClient: RestClient,
+        properties: OpenAiProperties,
+    ): ExternalProviderBillingSource = OpenAiBillingSource(
+        restClient = restClient,
+        objectMapper = jacksonObjectMapper(),
+        adminKey = properties.adminKey,
+    )
 
     @Bean
     fun syncExternalProviderBillingUseCase(
