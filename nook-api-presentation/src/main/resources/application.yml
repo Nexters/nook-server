@@ -105,6 +105,7 @@ external:
   openai:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com}
     api-key: ${OPENAI_API_KEY:}
+    admin-key: ${OPENAI_ADMIN_KEY:}
     model: ${OPENAI_MODEL:gpt-5-nano}
     image-text-model: ${OPENAI_IMAGE_TEXT_MODEL:gpt-5-mini}
     max-concurrent-requests: ${OPENAI_MAX_CONCURRENT_REQUESTS:4}
