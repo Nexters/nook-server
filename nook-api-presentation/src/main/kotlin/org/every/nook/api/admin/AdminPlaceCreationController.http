@@ -1,0 +1,20 @@
+# Cloudflare Access 로그인은 브라우저에서 admin 호스트 접근 시 수행됩니다.
+# HTTP Client에서는 유효한 Access application JWT를 직접 입력합니다.
+@accessJwt = replace-with-cloudflare-access-jwt
+
+### 장소 직접 등록 (주소는 완전한 도로명 또는 지번 주소)
+POST {{baseUrl}}/api/admin/v1/places
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "name": "누크 카페",
+  "address": "서울특별시 성동구 아차산로 17",
+  "category": "카페",
+  "phoneNumber": "02-1234-5678",
+  "thumbnailUrl": "https://example.com/place.jpg",
+  "photoUrls": ["https://example.com/place-2.jpg"],
+  "representativeTags": ["COZY", "DATE"],
+  "openingHours": null,
+  "reason": "운영자 확인 후 신규 장소 등록"
+}
