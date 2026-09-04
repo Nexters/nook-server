@@ -19,6 +19,53 @@ import kotlin.test.assertTrue
 @Suppress("LargeClass") // The scenarios share one cohesive orchestration fixture for the place parsing pipeline.
 class ProcessPlaceParsingJobUseCaseTest {
     @Test
+    fun `uses a manual place only after external candidates have no compatible match`() {
+        val port = FakeJobPort(body = "매미지옥 숙소")
+        val manual = candidate("MANUAL", "manual-1", "매미지옥", "강원 양양군 강현면 뒷나루2길 20-1")
+        var manualSearchCount = 0
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor {
+                listOf(
+                    PlaceClue(
+                        name = "매미지옥",
+                        region = "양양",
+                        queries = listOf("매미지옥 양양"),
+                        addressHint = "강원 양양군 강현면 뒷나루2길 20-1",
+                    ),
+                )
+            },
+            search = SearchPlaceCandidatesUseCase { emptyList() },
+            manualSearch = ManualPlaceCandidateSearchPort { name ->
+                manualSearchCount += 1
+                assertEquals("매미지옥", name)
+                listOf(manual)
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(791))
+        assertEquals(1, manualSearchCount)
+        assertEquals(listOf(manual.externalPlaceId), port.completed.map(PlaceCandidate::externalPlaceId))
+    }
+
+    @Test
+    fun `does not search manual places when an external candidate is compatible`() {
+        val port = FakeJobPort(body = "매미지옥 숙소")
+        val external = candidate("KAKAO", "external-1", "매미지옥", "강원 양양군 강현면 뒷나루2길 20-1")
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor {
+                listOf(PlaceClue("매미지옥", "양양", listOf("매미지옥 양양")))
+            },
+            search = SearchPlaceCandidatesUseCase { listOf(external) },
+            manualSearch = ManualPlaceCandidateSearchPort { error("manual fallback must not be called") },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(791))
+        assertEquals(listOf(external.externalPlaceId), port.completed.map(PlaceCandidate::externalPlaceId))
+    }
+
+    @Test
     fun `records both unextracted and resolution failed diagnostics for a numbered source list`() {
         val body = (1..12).joinToString("\n") { order ->
             when (order) {
@@ -1020,6 +1067,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         extractor: PlaceClueExtractor,
         search: SearchPlaceCandidatesUseCase,
         selector: PlaceCandidateSelector = PlaceCandidateSelector { null },
+        manualSearch: ManualPlaceCandidateSearchPort = ManualPlaceCandidateSearchPort { emptyList() },
         titleSelector: PostTitleSelector = PostTitleSelector {
             PostTitleSelector.Result(null, PostTitleSelector.Source.NONE, emptyList(), null)
         },
@@ -1033,6 +1081,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         imageTextExtractor = imageTextExtractor,
         clueExtractor = extractor,
         searchPlaceCandidates = search,
+        manualPlaceCandidateSearchPort = manualSearch,
         candidateSelector = selector,
         titleSelector = titleSelector,
         retryBackoffs = RETRY_BACKOFFS,
