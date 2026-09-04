@@ -4,9 +4,11 @@ import org.every.nook.api.application.admin.AdminAuditLogPort
 import org.every.nook.api.application.admin.AdminLinkedPost
 import org.every.nook.api.application.admin.AdminPage
 import org.every.nook.api.application.admin.AdminPlaceCorrectionPort
+import org.every.nook.api.application.admin.AdminPlaceCreationPort
 import org.every.nook.api.application.admin.AdminPlaceDetail
 import org.every.nook.api.application.admin.AdminPlaceQueryPort
 import org.every.nook.api.application.admin.AdminPlaceSummary
+import org.every.nook.api.application.admin.DuplicateAdminPlaceException
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
@@ -14,6 +16,7 @@ import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -28,7 +31,8 @@ class AdminPlacePersistenceAdapter(
     private val objectMapper: ObjectMapper,
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
 ) : AdminPlaceQueryPort,
-    AdminPlaceCorrectionPort {
+    AdminPlaceCorrectionPort,
+    AdminPlaceCreationPort {
     @Transactional(readOnly = true)
     override fun search(query: String, limit: Int): List<AdminPlaceSummary> = placeRepository.findAll().asSequence()
         .filter { it.name.contains(query, true) || it.address.contains(query, true) }
@@ -120,6 +124,53 @@ class AdminPlacePersistenceAdapter(
         return findPlace(command.placeId)
     }
 
+    @Transactional
+    override fun create(command: AdminPlaceCreationPort.CreateCommand): AdminPlaceDetail {
+        val duplicate = placeRepository.findAllByLatitudeAndLongitude(command.latitude, command.longitude)
+            .any { place ->
+                place.name.adminIdentityKey() == command.name.adminIdentityKey() &&
+                    place.address.adminIdentityKey() == command.address.adminIdentityKey()
+            }
+        if (duplicate) {
+            throw DuplicateAdminPlaceException()
+        }
+
+        val place = PlaceEntity(
+            provider = command.provider,
+            externalPlaceId = command.externalPlaceId,
+            name = command.name,
+            address = command.address,
+            city = command.city,
+            latitude = command.latitude,
+            longitude = command.longitude,
+            category = command.category,
+            phoneNumber = command.phoneNumber,
+            thumbnailUrl = command.thumbnailUrl,
+            photoUrls = command.photoUrls,
+            representativeTags = emptyList(),
+            openingHours = command.openingHours,
+        ).also { entity -> entity.updateRepresentativeTags(command.representativeTags, tagCatalogPort.findAll()) }
+        val saved = try {
+            placeRepository.saveAndFlush(place)
+        } catch (exception: DataIntegrityViolationException) {
+            throw DuplicateAdminPlaceException(exception)
+        }
+        val placeId = requireNotNull(saved.id)
+        auditLogPort.append(
+            AdminAuditLogPort.Entry(
+                actor = command.actor,
+                action = "PLACE_CREATED",
+                targetType = "PLACE",
+                targetId = placeId.toString(),
+                reason = command.reason,
+                beforeValue = null,
+                afterValue = objectMapper.writeValueAsString(createdValue(saved)),
+                requestId = command.requestId,
+            ),
+        )
+        return requireNotNull(findPlace(placeId))
+    }
+
     private fun PlaceEntity.toSummary(includeImpact: Boolean): AdminPlaceSummary {
         val placeId = requireNotNull(id)
         return AdminPlaceSummary(
@@ -153,4 +204,13 @@ class AdminPlacePersistenceAdapter(
         "representativeTags" to place.representativeTags,
         "openingHours" to place.openingHours,
     )
+
+    private fun createdValue(place: PlaceEntity) = editableValue(place) + mapOf(
+        "provider" to place.provider,
+        "externalPlaceId" to place.externalPlaceId,
+        "latitude" to place.latitude.toPlainString(),
+        "longitude" to place.longitude.toPlainString(),
+    )
 }
+
+private fun String.adminIdentityKey(): String = lowercase().filter(Char::isLetterOrDigit)
