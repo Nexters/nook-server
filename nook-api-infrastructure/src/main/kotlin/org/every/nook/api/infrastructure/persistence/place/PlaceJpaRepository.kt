@@ -18,6 +18,8 @@ interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
         maximumLongitude: BigDecimal,
     ): List<PlaceEntity>
 
+    fun findAllByLatitudeAndLongitude(latitude: BigDecimal, longitude: BigDecimal): List<PlaceEntity>
+
     @Modifying
     @Query(
         value = """

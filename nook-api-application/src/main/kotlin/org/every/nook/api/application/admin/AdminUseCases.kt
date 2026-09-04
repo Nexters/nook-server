@@ -14,6 +14,8 @@ import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.place.PlaceTagCategory
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostMedia
+import java.math.RoundingMode
+import java.security.MessageDigest
 import java.util.UUID
 
 class ListAdminPostsUseCase(private val port: AdminPostQueryPort) {
@@ -149,6 +151,99 @@ class ListAdminPlacesUseCase(private val port: AdminPlaceQueryPort) {
 class GetAdminPlaceUseCase(private val port: AdminPlaceQueryPort) {
     operator fun invoke(placeId: Long): AdminPlaceDetail =
         port.findPlace(placeId) ?: throw AdminPlaceNotFoundException()
+}
+
+class CreateAdminPlaceUseCase(
+    private val addressResolver: AdminPlaceAddressResolver,
+    private val creationPort: AdminPlaceCreationPort,
+    private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
+) {
+    operator fun invoke(command: Command): AdminPlaceDetail {
+        val name = command.name.trim()
+        val requestedAddress = command.address.trim()
+        require(name.isNotEmpty()) { "Place name must not be blank" }
+        require(name.length <= Place.MAX_NAME_LENGTH) { "Place name is too long" }
+        require(requestedAddress.isNotEmpty()) { "Place address must not be blank" }
+        require(requestedAddress.length <= Place.MAX_ADDRESS_LENGTH) { "Place address is too long" }
+        require(command.category == null || command.category.length <= Place.MAX_CATEGORY_LENGTH)
+        require(command.phoneNumber == null || command.phoneNumber.length <= Place.MAX_PHONE_NUMBER_LENGTH)
+        require(command.thumbnailUrl == null || command.thumbnailUrl.length <= MAX_ADMIN_URL_LENGTH)
+        require(command.photoUrls.size <= MAX_ADMIN_PLACE_PHOTO_COUNT)
+        require(command.photoUrls.all { it.isNotBlank() && it.length <= MAX_ADMIN_URL_LENGTH })
+        require(command.reason.isNotBlank()) { "Creation reason must not be blank" }
+
+        val enabledTags = tagCatalogPort.findAll().filter { it.enabled }.map { it.tag }.toSet()
+        val representativeTags = command.representativeTags
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinct()
+            .take(MAX_ADMIN_PLACE_TAG_COUNT)
+        require(representativeTags.all(enabledTags::contains)) { "Only enabled place tags can be selected" }
+
+        // Resolve before entering the persistence transaction so an external call never holds a DB transaction open.
+        val resolved = addressResolver.resolve(requestedAddress) ?: throw AdminPlaceAddressNotFoundException()
+        val canonicalAddress = resolved.address.trim()
+        require(canonicalAddress.isNotEmpty() && canonicalAddress.length <= Place.MAX_ADDRESS_LENGTH)
+        val latitude = resolved.latitude.setScale(COORDINATE_SCALE, RoundingMode.HALF_UP)
+        val longitude = resolved.longitude.setScale(COORDINATE_SCALE, RoundingMode.HALF_UP)
+        org.every.nook.api.domain.place.GeoPoint(latitude, longitude)
+        val externalPlaceId = manualIdentity(name, canonicalAddress, latitude, longitude)
+        return creationPort.create(
+            AdminPlaceCreationPort.CreateCommand(
+                provider = MANUAL_PLACE_PROVIDER,
+                externalPlaceId = externalPlaceId,
+                name = name,
+                address = canonicalAddress,
+                latitude = latitude,
+                longitude = longitude,
+                city = org.every.nook.api.domain.place.KoreanCityNameExtractor.extract(canonicalAddress),
+                category = command.category?.trim()?.ifEmpty { null },
+                phoneNumber = command.phoneNumber?.trim()?.ifEmpty { null },
+                thumbnailUrl = command.thumbnailUrl?.trim()?.ifEmpty { null },
+                photoUrls = command.photoUrls.map(String::trim).filter(String::isNotEmpty).distinct(),
+                representativeTags = representativeTags,
+                openingHours = command.openingHours,
+                actor = command.actor,
+                reason = command.reason.trim(),
+                requestId = command.requestId,
+            ),
+        )
+    }
+
+    data class Command(
+        val name: String,
+        val address: String,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+        val category: String? = null,
+        val phoneNumber: String? = null,
+        val thumbnailUrl: String? = null,
+        val photoUrls: List<String> = emptyList(),
+        val representativeTags: List<String> = emptyList(),
+        val openingHours: org.every.nook.api.application.place.PlaceOpeningHours? = null,
+    )
+
+    private fun manualIdentity(
+        name: String,
+        address: String,
+        latitude: java.math.BigDecimal,
+        longitude: java.math.BigDecimal,
+    ): String {
+        val identity = listOf(
+            name.lowercase().filter(Char::isLetterOrDigit),
+            address.lowercase().filter(Char::isLetterOrDigit),
+            latitude.stripTrailingZeros().toPlainString(),
+            longitude.stripTrailingZeros().toPlainString(),
+        ).joinToString("|")
+        return MessageDigest.getInstance("SHA-256").digest(identity.toByteArray())
+            .joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private companion object {
+        const val MANUAL_PLACE_PROVIDER = "MANUAL"
+        const val COORDINATE_SCALE = 7
+    }
 }
 
 class UpdateAdminPlaceUseCase(
@@ -380,6 +475,14 @@ enum class AdminErrorCode(
     POST_NOT_FOUND("ADMIN_POST_NOT_FOUND", "게시글을 찾을 수 없습니다.", ErrorType.NOT_FOUND),
     PLACE_NOT_FOUND("ADMIN_PLACE_NOT_FOUND", "장소를 찾을 수 없습니다.", ErrorType.NOT_FOUND),
     PLACE_TAG_NOT_FOUND("ADMIN_PLACE_TAG_NOT_FOUND", "장소 태그를 찾을 수 없습니다.", ErrorType.NOT_FOUND),
+    PLACE_ADDRESS_NOT_FOUND("ADMIN_PLACE_ADDRESS_NOT_FOUND", "입력한 주소를 정확한 위치로 변환할 수 없습니다.", ErrorType.INVALID_REQUEST),
+    PLACE_ADDRESS_PROVIDER_ERROR("ADMIN_PLACE_ADDRESS_PROVIDER_ERROR", "주소 변환 서비스 호출에 실패했습니다.", ErrorType.BAD_GATEWAY),
+    PLACE_ADDRESS_PROVIDER_TIMEOUT(
+        "ADMIN_PLACE_ADDRESS_PROVIDER_TIMEOUT",
+        "주소 변환 서비스 응답이 지연되고 있습니다.",
+        ErrorType.GATEWAY_TIMEOUT,
+    ),
+    DUPLICATE_PLACE("ADMIN_DUPLICATE_PLACE", "동일한 이름, 주소, 좌표의 장소가 이미 존재합니다.", ErrorType.CONFLICT),
 }
 
 class AdminPostNotFoundException : NookException(AdminErrorCode.POST_NOT_FOUND)
@@ -387,6 +490,17 @@ class AdminPostNotFoundException : NookException(AdminErrorCode.POST_NOT_FOUND)
 class AdminPlaceNotFoundException : NookException(AdminErrorCode.PLACE_NOT_FOUND)
 
 class AdminPlaceTagNotFoundException : NookException(AdminErrorCode.PLACE_TAG_NOT_FOUND)
+
+class AdminPlaceAddressNotFoundException : NookException(AdminErrorCode.PLACE_ADDRESS_NOT_FOUND)
+
+class AdminPlaceAddressProviderException(cause: Throwable? = null) :
+    NookException(AdminErrorCode.PLACE_ADDRESS_PROVIDER_ERROR, cause = cause)
+
+class AdminPlaceAddressProviderTimeoutException(cause: Throwable? = null) :
+    NookException(AdminErrorCode.PLACE_ADDRESS_PROVIDER_TIMEOUT, cause = cause)
+
+class DuplicateAdminPlaceException(cause: Throwable? = null) :
+    NookException(AdminErrorCode.DUPLICATE_PLACE, cause = cause)
 
 private fun Int.validOffset(): Int = coerceAtLeast(0)
 

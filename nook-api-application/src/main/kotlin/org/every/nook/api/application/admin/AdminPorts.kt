@@ -1,6 +1,7 @@
 package org.every.nook.api.application.admin
 
 import org.every.nook.api.domain.place.PlaceTagCategory
+import java.math.BigDecimal
 
 interface AdminPostQueryPort {
     fun listPosts(query: String?, parsingStatus: String?, offset: Int, limit: Int): AdminPage<AdminPostSummary>
@@ -66,6 +67,35 @@ interface AdminPlaceCorrectionPort {
         val placeId: Long,
         val name: String,
         val address: String,
+        val actor: AdminActor,
+        val reason: String,
+        val requestId: String?,
+        val city: String? = null,
+        val category: String? = null,
+        val phoneNumber: String? = null,
+        val thumbnailUrl: String? = null,
+        val photoUrls: List<String> = emptyList(),
+        val representativeTags: List<String> = emptyList(),
+        val openingHours: org.every.nook.api.application.place.PlaceOpeningHours? = null,
+    )
+}
+
+fun interface AdminPlaceAddressResolver {
+    fun resolve(address: String): ResolvedAddress?
+
+    data class ResolvedAddress(val address: String, val latitude: BigDecimal, val longitude: BigDecimal)
+}
+
+fun interface AdminPlaceCreationPort {
+    fun create(command: CreateCommand): AdminPlaceDetail
+
+    data class CreateCommand(
+        val provider: String,
+        val externalPlaceId: String,
+        val name: String,
+        val address: String,
+        val latitude: BigDecimal,
+        val longitude: BigDecimal,
         val actor: AdminActor,
         val reason: String,
         val requestId: String?,
