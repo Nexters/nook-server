@@ -29,6 +29,8 @@ class ProcessPlaceParsingJobUseCase(
     private val clueExtractor: PlaceClueExtractor,
     private val searchPlaceCandidates: SearchPlaceCandidatesUseCase,
     private val candidateSelector: PlaceCandidateSelector,
+    private val manualPlaceCandidateSearchPort: ManualPlaceCandidateSearchPort =
+        ManualPlaceCandidateSearchPort { emptyList() },
     titleSelector: PostTitleSelector = PostTitleSelector {
         PostTitleSelector.Result(null, PostTitleSelector.Source.NONE, emptyList(), null)
     },
@@ -346,13 +348,25 @@ class ProcessPlaceParsingJobUseCase(
         if (clue.name.isBlank() || clue.searchQueries().isEmpty()) {
             failResolution("Invalid place clue")
         }
-        val candidates = searchCandidates(job, clue)
+        var candidates = searchCandidates(job, clue)
         logger.info {
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
                 "addressHint=${clue.addressHint}, queries=${clue.searchQueries()}, candidateCount=${candidates.size}"
         }
         val candidatePolicy = CandidateResolutionPolicy()
-        val automaticEvaluation = candidatePolicy.evaluate(CandidateResolutionPolicy.Context(clue, candidates))
+        val fallbackResult = ManualPlaceCandidateFallback(manualPlaceCandidateSearchPort)
+            .evaluate(clue, candidates, candidatePolicy)
+        candidates = fallbackResult.candidates
+        fallbackResult.manualCandidateCount?.let { candidateCount ->
+            recordTrace(
+                job,
+                SEARCH_STAGE,
+                "place.manual-search.result",
+                if (candidateCount == 0) FAILURE_OUTCOME else SUCCESS_OUTCOME,
+                details = mapOf("name" to clue.name, "candidateCount" to candidateCount.toString()),
+            )
+        }
+        val automaticEvaluation = fallbackResult.evaluation
             .also { evaluation ->
                 evaluation.ruleEvaluations.forEach { recordRuleTrace(job, MATCH_STAGE, it, clue) }
             }
