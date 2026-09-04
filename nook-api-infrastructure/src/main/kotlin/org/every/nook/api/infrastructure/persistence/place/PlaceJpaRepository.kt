@@ -11,6 +11,8 @@ import java.math.BigDecimal
 interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
     fun findByProviderAndExternalPlaceId(provider: String, externalPlaceId: String): PlaceEntity?
 
+    fun findAllByProviderAndNameIgnoreCaseOrderByIdAsc(provider: String, name: String): List<PlaceEntity>
+
     fun findAllByLatitudeBetweenAndLongitudeBetween(
         minimumLatitude: BigDecimal,
         maximumLatitude: BigDecimal,

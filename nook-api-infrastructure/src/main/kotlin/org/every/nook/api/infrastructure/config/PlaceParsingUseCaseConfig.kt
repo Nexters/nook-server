@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCase
 import org.every.nook.api.application.place.ImageTextExtractor
+import org.every.nook.api.application.place.ManualPlaceCandidateSearchPort
 import org.every.nook.api.application.place.PlaceCandidateSelector
 import org.every.nook.api.application.place.PlaceClueExtractor
 import org.every.nook.api.application.place.PlaceImageUrlPort
@@ -38,6 +39,7 @@ class PlaceParsingUseCaseConfig {
         imageTextExtractor: ImageTextExtractor,
         clueExtractor: PlaceClueExtractor,
         searchPlaceCandidates: SearchPlaceCandidatesUseCase,
+        manualPlaceCandidateSearchPort: ManualPlaceCandidateSearchPort,
         candidateSelector: PlaceCandidateSelector,
         titleSelector: PostTitleSelector,
         processingMetrics: ObjectProvider<ProcessingMetrics>,
@@ -49,6 +51,7 @@ class PlaceParsingUseCaseConfig {
         imageTextExtractor = imageTextExtractor,
         clueExtractor = clueExtractor,
         searchPlaceCandidates = searchPlaceCandidates,
+        manualPlaceCandidateSearchPort = manualPlaceCandidateSearchPort,
         candidateSelector = candidateSelector,
         titleSelector = titleSelector,
         retryBackoffs = properties.retryBackoffs,
