@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.port.PlaceBookmarkUpdateResult
 import org.every.nook.api.application.place.port.UpdatePlaceBookmarkPort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -8,16 +9,16 @@ import org.springframework.transaction.annotation.Transactional
 class PlaceBookmarkPersistenceAdapter(private val bookmarkRepository: UserPlaceBookmarkJpaRepository) :
     UpdatePlaceBookmarkPort {
     @Transactional
-    override fun update(userId: Long, placeId: Long, bookmarked: Boolean): Boolean {
+    override fun update(userId: Long, placeId: Long, bookmarked: Boolean): PlaceBookmarkUpdateResult {
         if (bookmarkRepository.isAccessible(userId, placeId) == 0L) {
-            return false
+            return PlaceBookmarkUpdateResult(accessible = false, changed = false)
         }
 
-        if (bookmarked) {
-            bookmarkRepository.insertIgnore(userId, placeId)
+        val changed = if (bookmarked) {
+            bookmarkRepository.insertIgnore(userId, placeId) > 0
         } else {
-            bookmarkRepository.deleteByUserIdAndPlaceId(userId, placeId)
+            bookmarkRepository.deleteByUserIdAndPlaceId(userId, placeId) > 0
         }
-        return true
+        return PlaceBookmarkUpdateResult(accessible = true, changed = changed)
     }
 }

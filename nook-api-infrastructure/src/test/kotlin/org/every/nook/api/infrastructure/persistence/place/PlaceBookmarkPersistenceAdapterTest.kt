@@ -15,20 +15,24 @@ class PlaceBookmarkPersistenceAdapterTest {
     @Test
     fun `bookmark identity uses only user and place`() {
         `when`(repository.isAccessible(7, 17)).thenReturn(1L)
+        `when`(repository.insertIgnore(7, 17)).thenReturn(1)
 
         val updated = adapter.update(userId = 7, placeId = 17, bookmarked = true)
 
-        assertTrue(updated)
+        assertTrue(updated.accessible)
+        assertTrue(updated.changed)
         verify(repository).insertIgnore(7, 17)
     }
 
     @Test
     fun `unbookmark removes the place from the user bookmark set`() {
         `when`(repository.isAccessible(7, 17)).thenReturn(1L)
+        `when`(repository.deleteByUserIdAndPlaceId(7, 17)).thenReturn(1L)
 
         val updated = adapter.update(userId = 7, placeId = 17, bookmarked = false)
 
-        assertTrue(updated)
+        assertTrue(updated.accessible)
+        assertTrue(updated.changed)
         verify(repository).deleteByUserIdAndPlaceId(7, 17)
     }
 
@@ -38,7 +42,8 @@ class PlaceBookmarkPersistenceAdapterTest {
 
         val updated = adapter.update(userId = 7, placeId = 17, bookmarked = true)
 
-        assertFalse(updated)
+        assertFalse(updated.accessible)
+        assertFalse(updated.changed)
         verify(repository, never()).insertIgnore(7, 17)
     }
 }

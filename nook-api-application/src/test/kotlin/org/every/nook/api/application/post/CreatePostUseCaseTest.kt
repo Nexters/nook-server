@@ -1,5 +1,8 @@
 package org.every.nook.api.application.post
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventName
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
+import org.every.nook.api.application.analytics.UserAnalyticsTargetType
 import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.content.PrivatePostException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
@@ -203,6 +206,53 @@ class CreatePostUseCaseTest {
         assertEquals(PostProcessingStatusView.COMPLETED, result.processingStatus)
         assertEquals(null, result.processingStage)
         assertEquals(100, result.processingPercent)
+    }
+
+    @Test
+    fun `does not record a post save when an active saved post is requested again`() {
+        val events = mutableListOf<List<Any?>>()
+        val useCase = CreatePostUseCase(
+            groupOwnershipPort = GroupOwnershipPort { _, _ -> true },
+            postSourceResolver = PostSourceResolver { SOURCE },
+            findExistingPostPort = FindExistingPostPort {
+                ExistingPost(PostContentParsingStatus.COMPLETED, PlaceParsingStatus.COMPLETED)
+            },
+            reusePostPort = ReusePostPort { _, _, _, _ ->
+                CreatedPost(11, PostContentParsingStatus.COMPLETED, PlaceParsingStatus.COMPLETED, saveChanged = false)
+            },
+            createPostPort = CreatePostPort { _, _, _, _ -> error("new post must not be persisted") },
+            analyticsRecorder = UserAnalyticsEventRecorder { record ->
+                events += listOf(record.eventName, record.memberId, record.targetType, record.targetId)
+            },
+        )
+
+        useCase(CreatePostUseCase.Command(7, "https://www.instagram.com/p/ABC123/", groupIds = listOf(1)))
+
+        assertEquals(emptyList<List<Any?>>(), events)
+    }
+
+    @Test
+    fun `records a changed post save with the saved post identifier`() {
+        val events = mutableListOf<List<Any?>>()
+        val useCase = CreatePostUseCase(
+            groupOwnershipPort = GroupOwnershipPort { _, _ -> true },
+            postSourceResolver = PostSourceResolver { SOURCE },
+            findExistingPostPort = FindExistingPostPort { null },
+            reusePostPort = ReusePostPort { _, _, _, _ -> error("existing post must not be reused") },
+            createPostPort = CreatePostPort { _, _, _, _ ->
+                CreatedPost(11, PostContentParsingStatus.PENDING, null, saveChanged = true)
+            },
+            analyticsRecorder = UserAnalyticsEventRecorder { record ->
+                events += listOf(record.eventName, record.memberId, record.targetType, record.targetId)
+            },
+        )
+
+        useCase(CreatePostUseCase.Command(7, "https://www.instagram.com/p/ABC123/", groupIds = listOf(1)))
+
+        assertEquals<List<List<Any?>>>(
+            listOf(listOf(UserAnalyticsEventName.POST_SAVE, 7L, UserAnalyticsTargetType.POST, 11L)),
+            events,
+        )
     }
 
     private fun useCase(

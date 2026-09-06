@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
 import org.every.nook.api.application.group.CreateGroupUseCase
 import org.every.nook.api.application.group.DeleteGroupUseCase
 import org.every.nook.api.application.group.ListGroupPlacesUseCase
@@ -33,13 +34,15 @@ class GroupUseCaseConfig {
     fun listGroupPostsUseCase(
         groupPostQueryPort: GroupPostQueryPort,
         groupReadAccessPort: GroupReadAccessPort,
-    ): ListGroupPostsUseCase = ListGroupPostsUseCase(groupPostQueryPort, groupReadAccessPort)
+        analyticsRecorder: UserAnalyticsEventRecorder,
+    ): ListGroupPostsUseCase = ListGroupPostsUseCase(groupPostQueryPort, groupReadAccessPort, analyticsRecorder)
 
     @Bean
     fun listGroupPlacesUseCase(
         groupPlaceQueryPort: GroupPlaceQueryPort,
         groupReadAccessPort: GroupReadAccessPort,
-    ): ListGroupPlacesUseCase = ListGroupPlacesUseCase(groupPlaceQueryPort, groupReadAccessPort)
+        analyticsRecorder: UserAnalyticsEventRecorder,
+    ): ListGroupPlacesUseCase = ListGroupPlacesUseCase(groupPlaceQueryPort, groupReadAccessPort, analyticsRecorder)
 
     @Bean
     fun replaceSavedPostGroupsUseCase(

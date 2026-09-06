@@ -1,5 +1,8 @@
 package org.every.nook.api.application.auth
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventName
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
+import org.every.nook.api.application.analytics.UserAnalyticsRecord
 import org.every.nook.api.application.auth.port.RefreshTokenRepository
 import org.every.nook.api.application.auth.port.SocialIdentityProvider
 import org.every.nook.api.application.auth.port.StoredRefreshToken
@@ -23,12 +26,14 @@ class AuthenticateSocialUserUseCaseTest {
     private val groupPort = AuthFakeGroupPort()
     private val tokenProvider = AuthFakeTokenProvider()
     private val refreshTokenRepository = AuthFakeRefreshTokenRepository()
+    private val analyticsEvents = mutableListOf<UserAnalyticsRecord>()
     private val useCase = AuthenticateSocialUserUseCase(
         socialIdentityProvider = socialIdentityProvider,
         memberRepository = memberRepository,
         groupPort = groupPort,
         issueLoginTokens = IssueLoginTokens(tokenProvider, refreshTokenRepository),
         transactionRunner = AuthDirectTransactionRunner,
+        analyticsRecorder = UserAnalyticsEventRecorder(analyticsEvents::add),
     )
 
     @Test
@@ -41,6 +46,7 @@ class AuthenticateSocialUserUseCaseTest {
         assertEquals(SocialProvider.KAKAO, memberRepository.accounts.single().provider)
         assertEquals("subject", memberRepository.accounts.single().providerSubject)
         assertEquals(AuthFakeGroup(1, "내 아카이브", GroupColor.BLUE), groupPort.groups.single())
+        assertEquals(UserAnalyticsEventName.SIGN_UP, analyticsEvents.single().eventName)
     }
 
     @Test
@@ -59,6 +65,7 @@ class AuthenticateSocialUserUseCaseTest {
         assertEquals("refresh-7", result.tokens.refreshToken)
         assertEquals(1, memberRepository.members.size)
         assertTrue(groupPort.groups.isEmpty())
+        assertTrue(analyticsEvents.isEmpty())
     }
 }
 
