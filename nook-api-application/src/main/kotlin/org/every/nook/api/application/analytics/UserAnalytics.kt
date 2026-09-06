@@ -104,7 +104,12 @@ class ReliableUserAnalyticsEventRecorder(
     }
 }
 
-data class UserAnalyticsPeriod(val start: LocalDate, val endInclusive: LocalDate, val activationThreshold: Int)
+data class UserAnalyticsPeriod(
+    val start: LocalDate,
+    val endInclusive: LocalDate,
+    val activationThreshold: Int,
+    val activeDate: LocalDate = endInclusive,
+)
 
 data class UserAnalyticsOverview(
     val from: LocalDate,
@@ -132,7 +137,9 @@ data class UserAnalyticsOverview(
 class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQueryPort, private val clock: Clock) {
     operator fun invoke(period: UserAnalyticsPeriod): UserAnalyticsOverview {
         validate(period)
-        val observedThrough = minOf(period.endInclusive, clock.instant().atZone(ADMIN_ZONE).toLocalDate())
+        val today = clock.instant().atZone(ADMIN_ZONE).toLocalDate()
+        val observedThrough = minOf(period.endInclusive, today)
+        val activeDate = minOf(period.activeDate, today)
         val events = loadEvents(period)
         val signUps = signUps(events)
         val activationByMember = activations(events, signUps, period.activationThreshold)
@@ -149,7 +156,7 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
                 activatedUsers = activationByMember.size.toLong(),
                 returnedUsers = returnEvents.map(UserAnalyticsEvent::memberId).distinct().size.toLong(),
             ),
-            activeUsers = activeUsers(queryPort, observedThrough),
+            activeUsers = activeUsers(queryPort, activeDate),
             daily = daily(period, signUps, activationByMember, events),
             retention = retention(activationByMember, events, observedThrough),
             behaviors = behaviors(returnEvents),
@@ -205,10 +212,7 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
             }.toLong(),
             activatedUsers = activationByMember.values.count { it == date }.toLong(),
             activeUsers = events.asSequence()
-                .filter { event ->
-                    event.eventName in RETURN_EVENTS &&
-                        event.occurredAt.atZone(ADMIN_ZONE).toLocalDate() == date
-                }
+                .filter { event -> event.occurredAt.atZone(ADMIN_ZONE).toLocalDate() == date }
                 .map(UserAnalyticsEvent::memberId)
                 .distinct()
                 .count()
