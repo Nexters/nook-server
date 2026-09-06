@@ -37,9 +37,12 @@ class AdminUserAnalyticsController(private val getOverview: GetUserAnalyticsOver
         @Min(1)
         @Max(MAX_ACTIVATION_THRESHOLD)
         activationThreshold: Int,
+        @Parameter(description = "DAU, WAU, MAU를 계산할 기준일. 생략하면 조회 종료일을 사용합니다.")
+        @RequestParam(required = false)
+        activeDate: LocalDate? = null,
     ): ApiResponse<UserAnalyticsOverviewResponse> = ApiResponse.success(
         UserAnalyticsOverviewResponse.from(
-            getOverview(UserAnalyticsPeriod(from, to, activationThreshold)),
+            getOverview(UserAnalyticsPeriod(from, to, activationThreshold, activeDate ?: to)),
         ),
     )
 
@@ -61,7 +64,7 @@ data class UserAnalyticsOverviewResponse(
     val firstEventAt: Instant?,
     @field:Schema(description = "가입·활성화·재방문 퍼널")
     val funnel: FunnelResponse,
-    @field:Schema(description = "조회 종료일 기준 서버 관측 활성 사용자")
+    @field:Schema(description = "선택한 활성 기준일의 서버 관측 활성 사용자")
     val activeUsers: ActiveUsersResponse,
     @field:Schema(description = "일별 가입·활성화·행동 사용자 추이")
     val daily: List<DailyResponse>,

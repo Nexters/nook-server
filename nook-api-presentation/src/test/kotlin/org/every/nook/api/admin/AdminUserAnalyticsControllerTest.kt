@@ -23,10 +23,12 @@ class AdminUserAnalyticsControllerTest {
             from = LocalDate.parse("2026-09-01"),
             to = LocalDate.parse("2026-09-06"),
             activationThreshold = 5,
+            activeDate = LocalDate.parse("2026-09-03"),
         ).success
 
         assertEquals(LocalDate.parse("2026-09-01"), response?.from)
         assertEquals(LocalDate.parse("2026-09-06"), response?.to)
+        assertEquals(LocalDate.parse("2026-09-03"), response?.activeUsers?.asOf)
         assertEquals(5, response?.activationThreshold)
         assertEquals(0, response?.activeUsers?.daily)
         assertEquals(0, response?.activeUsers?.weekly)

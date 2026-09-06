@@ -28,34 +28,60 @@ export function UserAnalyticsPage() {
   const defaults = useMemo(() => defaultPeriod(), []);
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
+  const [activeDate, setActiveDate] = useState(defaults.to);
   const [threshold, setThreshold] = useState(3);
   const [overview, setOverview] = useState<UserAnalyticsOverview>();
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const query = new URLSearchParams({ from, to, activationThreshold: String(threshold) });
+    const controller = new AbortController();
+    const query = new URLSearchParams({ from, to, activeDate, activationThreshold: String(threshold) });
     setOverview(undefined);
     setError("");
-    api<UserAnalyticsOverview>(`/user-analytics?${query}`)
+    api<UserAnalyticsOverview>(`/user-analytics?${query}`, { signal: controller.signal, cache: "no-store" })
       .then(setOverview)
-      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "사용자 행동 분석을 불러오지 못했습니다."));
-  }, [from, to, threshold]);
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setError(cause instanceof Error ? cause.message : "사용자 행동 분석을 불러오지 못했습니다.");
+      });
+    return () => controller.abort();
+  }, [from, to, activeDate, threshold]);
 
   return <Stack spacing={3} sx={{ width: "100%", maxWidth: 1500 }}>
-    <Stack direction={{ xs: "column", lg: "row" }} sx={{ justifyContent: "space-between", gap: 2 }}>
-      <Box>
-        <Typography variant="overline" color="primary.main" sx={{ fontWeight: 700, letterSpacing: ".08em" }}>USER JOURNEY</Typography>
-        <Typography variant="h4">사용자 행동 분석</Typography>
-        <Typography color="text.secondary">신규 가입자가 저장을 시작하고 다시 돌아오는 흐름을 확인합니다.</Typography>
-      </Box>
+    <Box>
+      <Typography variant="overline" color="primary.main" sx={{ fontWeight: 700, letterSpacing: ".08em" }}>USER JOURNEY</Typography>
+      <Typography variant="h4">사용자 행동 분석</Typography>
+      <Typography color="text.secondary">한 날짜의 활성 사용자와 기간별 가입·저장·재방문 흐름을 나누어 확인합니다.</Typography>
+    </Box>
+    <Card variant="outlined"><CardContent>
+      <Stack direction={{ xs: "column", md: "row" }} sx={{ justifyContent: "space-between", alignItems: { md: "flex-start" }, gap: 2, mb: 2 }}>
+        <Box>
+          <Typography variant="h6">날짜 기준 활성 사용자</Typography>
+          <Typography variant="body2" color="text.secondary">선택한 하루의 DAU와 그날을 끝으로 하는 7일 WAU·30일 MAU입니다.</Typography>
+        </Box>
+        <TextField label="활성 기준일" type="date" size="small" value={activeDate} onChange={(event) => setActiveDate(event.target.value)} slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: defaults.to } }} />
+      </Stack>
+      {overview ? <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, gap: 1.5 }}>
+        <Metric label="일간 활성 사용자 · DAU" value={`${count.format(overview.activeUsers.daily)}명`} helper={overview.activeUsers.asOf} tone="primary.main" />
+        <Metric label="주간 활성 사용자 · WAU" value={`${count.format(overview.activeUsers.weekly)}명`} helper="기준일 포함 최근 7일" tone="success.main" />
+        <Metric label="월간 활성 사용자 · MAU" value={`${count.format(overview.activeUsers.monthly)}명`} helper="기준일 포함 최근 30일" tone="warning.main" />
+      </Box> : !error && <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={28} /></Box>}
+    </CardContent></Card>
+    <Box>
+      <Stack direction={{ xs: "column", lg: "row" }} sx={{ justifyContent: "space-between", alignItems: { lg: "flex-end" }, gap: 2 }}>
+        <Box>
+          <Typography variant="h6">기간별 사용자 흐름</Typography>
+          <Typography variant="body2" color="text.secondary">기간 안의 날짜별 DAU와 가입 cohort의 활성화·재방문을 조회합니다.</Typography>
+        </Box>
       <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ alignItems: { md: "center" } }}>
-        <TextField label="시작일" type="date" size="small" value={from} onChange={(event) => setFrom(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-        <TextField label="종료일" type="date" size="small" value={to} onChange={(event) => setTo(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+        <TextField label="기간 시작일" type="date" size="small" value={from} onChange={(event) => setFrom(event.target.value)} slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: to } }} />
+        <TextField label="기간 종료일" type="date" size="small" value={to} onChange={(event) => setTo(event.target.value)} slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: from, max: defaults.to } }} />
         <TextField select label="활성화 기준" size="small" value={threshold} onChange={(event) => setThreshold(Number(event.target.value))} sx={{ minWidth: 150 }}>
           {[1, 3, 5, 10].map((value) => <MenuItem value={value} key={value}>서로 다른 저장 {value}개</MenuItem>)}
         </TextField>
       </Stack>
-    </Stack>
+      </Stack>
+    </Box>
     {error ? <Alert severity="error">{error}</Alert> : !overview ? <Box sx={{ py: 8, textAlign: "center" }}><CircularProgress /></Box> : <Dashboard overview={overview} />}
   </Stack>;
 }
@@ -69,15 +95,6 @@ function Dashboard({ overview }: { overview: UserAnalyticsOverview }) {
       신규 유입은 앱 최초 실행이 아닌 신규 가입 기준입니다. 조회 행동은 사용자·대상·날짜별로 중복 제거됩니다.
       {overview.firstEventAt && ` 선택 기간 첫 이벤트: ${new Date(overview.firstEventAt).toLocaleString("ko-KR")}`}
     </Alert>
-    <Box>
-      <Typography variant="h6">활성 사용자</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>가입·저장·조회 등 서버가 관측한 이벤트가 있는 고유 회원입니다.</Typography>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, gap: 1.5 }}>
-        <Metric label="일간 활성 사용자 · DAU" value={`${count.format(overview.activeUsers.daily)}명`} helper={overview.activeUsers.asOf} tone="primary.main" />
-        <Metric label="주간 활성 사용자 · WAU" value={`${count.format(overview.activeUsers.weekly)}명`} helper="기준일 포함 최근 7일" tone="success.main" />
-        <Metric label="월간 활성 사용자 · MAU" value={`${count.format(overview.activeUsers.monthly)}명`} helper="기준일 포함 최근 30일" tone="warning.main" />
-      </Box>
-    </Box>
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(4, minmax(0, 1fr))" }, gap: 1.5 }}>
       <Metric label="신규 가입" value={`${count.format(overview.funnel.signUps)}명`} helper={`${overview.from} ~ ${overview.to}`} tone="primary.main" />
       <Metric label={`저장 ${overview.activationThreshold}개 활성화`} value={`${count.format(overview.funnel.activatedUsers)}명`} helper={`가입자의 ${percent.format(activationRate)}%`} tone="success.main" />
