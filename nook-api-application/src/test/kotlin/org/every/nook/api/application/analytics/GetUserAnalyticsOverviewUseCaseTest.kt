@@ -53,7 +53,7 @@ class GetUserAnalyticsOverviewUseCaseTest {
     }
 
     @Test
-    fun `calculates daily weekly and monthly active users at the observed date`() {
+    fun `calculates daily weekly and monthly active users at a separately selected date`() {
         val events = listOf(
             event(UserAnalyticsEventName.SIGN_UP, 1, null, null, "2026-09-06T00:00:00Z"),
             event(UserAnalyticsEventName.ARCHIVE_VIEW, 2, null, null, "2026-09-01T00:00:00Z"),
@@ -63,12 +63,20 @@ class GetUserAnalyticsOverviewUseCaseTest {
         val overview = GetUserAnalyticsOverviewUseCase(
             UserAnalyticsEventQueryPort { _, _ -> events },
             Clock.fixed(Instant.parse("2026-09-06T01:00:00Z"), ZoneOffset.UTC),
-        )(UserAnalyticsPeriod(LocalDate.parse("2026-08-01"), LocalDate.parse("2026-09-06"), 3))
+        )(
+            UserAnalyticsPeriod(
+                start = LocalDate.parse("2026-08-01"),
+                endInclusive = LocalDate.parse("2026-09-06"),
+                activationThreshold = 3,
+                activeDate = LocalDate.parse("2026-09-01"),
+            ),
+        )
 
-        assertEquals(LocalDate.parse("2026-09-06"), overview.activeUsers.asOf)
+        assertEquals(LocalDate.parse("2026-09-01"), overview.activeUsers.asOf)
         assertEquals(1, overview.activeUsers.daily)
-        assertEquals(2, overview.activeUsers.weekly)
-        assertEquals(3, overview.activeUsers.monthly)
+        assertEquals(1, overview.activeUsers.weekly)
+        assertEquals(2, overview.activeUsers.monthly)
+        assertEquals(1, overview.daily.single { it.date == LocalDate.parse("2026-09-06") }.activeUsers)
     }
 
     private fun event(
