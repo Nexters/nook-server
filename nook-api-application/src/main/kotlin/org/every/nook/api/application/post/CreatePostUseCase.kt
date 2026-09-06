@@ -1,5 +1,9 @@
 package org.every.nook.api.application.post
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventName
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
+import org.every.nook.api.application.analytics.UserAnalyticsRecord
+import org.every.nook.api.application.analytics.UserAnalyticsTargetType
 import org.every.nook.api.application.content.PostSourceResolver
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.error.GroupNotFoundException
@@ -21,31 +25,43 @@ class CreatePostUseCase(
     private val findExistingPostPort: FindExistingPostPort,
     private val reusePostPort: ReusePostPort,
     private val createPostPort: CreatePostPort,
+    private val analyticsRecorder: UserAnalyticsEventRecorder = UserAnalyticsEventRecorder.NONE,
 ) {
     operator fun invoke(command: Command): Result {
         val groupIds = command.groupIds.toSet()
         validateGroups(command.userId, groupIds)
         val source = postSourceResolver.resolve(command.url) ?: throw UnsupportedPostUrlException()
         val existingPost = findExistingPostPort.find(source)
-        if (existingPost != null) {
-            return reusePostPort.reuse(
+        val savedPost = if (existingPost != null) {
+            reusePostPort.reuse(
                 userId = command.userId,
                 source = source,
                 memo = command.memo,
                 groupIds = groupIds,
-            ).toResult()
+            )
+        } else {
+            createPostPort.create(
+                userId = command.userId,
+                post = Post(
+                    source = source,
+                    canonicalUrl = command.url.toCanonicalUrl(),
+                ),
+                memo = command.memo,
+                groupIds = groupIds,
+            )
         }
-        val created = createPostPort.create(
-            userId = command.userId,
-            post = Post(
-                source = source,
-                canonicalUrl = command.url.toCanonicalUrl(),
-            ),
-            memo = command.memo,
-            groupIds = groupIds,
-        )
 
-        return created.toResult()
+        if (savedPost.saveChanged) {
+            analyticsRecorder.record(
+                UserAnalyticsRecord(
+                    eventName = UserAnalyticsEventName.POST_SAVE,
+                    memberId = command.userId,
+                    targetType = UserAnalyticsTargetType.POST,
+                    targetId = savedPost.postId,
+                ),
+            )
+        }
+        return savedPost.toResult()
     }
 
     private fun CreatedPost.toResult(): Result {

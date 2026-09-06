@@ -12,10 +12,12 @@ data class CreatedPost(
     val postId: Long,
     val contentParsingStatus: PostContentParsingStatus,
     val placeParsingStatus: PlaceParsingStatus?,
+    val saveChanged: Boolean = true,
 ) {
     constructor(postId: Long, placeParsingStatus: PlaceParsingStatus) : this(
         postId = postId,
         contentParsingStatus = PostContentParsingStatus.COMPLETED,
         placeParsingStatus = placeParsingStatus,
+        saveChanged = true,
     )
 }

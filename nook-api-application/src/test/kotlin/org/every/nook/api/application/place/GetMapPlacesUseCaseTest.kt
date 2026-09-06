@@ -1,5 +1,7 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventName
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
 import org.every.nook.api.application.place.port.PlaceMapQueryPort
 import org.every.nook.api.domain.place.GeoBounds
 import java.math.BigDecimal
@@ -13,6 +15,7 @@ class GetMapPlacesUseCaseTest {
     @Test
     fun `queries map places with validated bounds`() {
         var capturedBounds: GeoBounds? = null
+        val events = mutableListOf<UserAnalyticsEventName>()
         val expected = listOf(
             MapPlaceView(
                 id = 17,
@@ -36,6 +39,7 @@ class GetMapPlacesUseCaseTest {
                 override fun findRecent(userId: Long, cursor: RecentPlaceCursor?, limit: Int): List<RecentPlaceView> =
                     emptyList()
             },
+            UserAnalyticsEventRecorder { record -> events += record.eventName },
         )
 
         val result = useCase(
@@ -50,6 +54,7 @@ class GetMapPlacesUseCaseTest {
 
         assertEquals(expected, result)
         assertEquals(BigDecimal("37.6"), capturedBounds?.northLatitude)
+        assertEquals(listOf(UserAnalyticsEventName.MAP_VIEW), events)
     }
 
     @Test

@@ -124,6 +124,7 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
             UPDATE user_saved_posts
             SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP(6)
             WHERE user_id = :userId AND post_id = :postId
+              AND deleted_at IS NOT NULL
         """,
         nativeQuery = true,
     )

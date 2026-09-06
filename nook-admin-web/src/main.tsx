@@ -7,6 +7,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PlaceIcon from "@mui/icons-material/Place";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import PaidIcon from "@mui/icons-material/Paid";
+import InsightsIcon from "@mui/icons-material/Insights";
 import AddIcon from "@mui/icons-material/Add";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -22,6 +23,7 @@ import { createRoot } from "react-dom/client";
 import { Route } from "react-router-dom";
 import { ParsingPipelinePage } from "./ParsingPipeline";
 import { ExternalProviderUsagePage } from "./ExternalProviderUsage";
+import { UserAnalyticsPage } from "./UserAnalytics";
 import "./styles.css";
 
 const apiBase = (import.meta.env.VITE_ADMIN_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -97,12 +99,13 @@ const theme = createTheme({
   },
 });
 
-function App() { return <Admin dashboard={Dashboard} dataProvider={dataProvider} disableTelemetry layout={AdminLayout} theme={theme} title="Nook Admin"><CustomRoutes><Route path="/parsing-pipeline" element={<ParsingPipelinePage />} /><Route path="/external-provider-usage" element={<ExternalProviderUsagePage />} /></CustomRoutes><Resource name="posts" options={{ label: "게시글 관리" }} icon={AssignmentTurnedInIcon} list={PostList} show={PostShow} /><Resource name="places" options={{ label: "장소 관리" }} icon={PlaceIcon} list={PlaceList} show={PlaceShow} /><Resource name="place-tags" options={{ label: "장소 태그 관리" }} icon={LocalOfferIcon} list={PlaceTagList} /><Resource name="app-version-policies" options={{ label: "앱 버전 관리" }} icon={SystemUpdateAltIcon} list={AppVersionPolicyList} /><Resource name="audit-logs" options={{ label: "감사 로그" }} icon={AssignmentTurnedInIcon} list={AuditLogList} /></Admin>; }
+function App() { return <Admin dashboard={Dashboard} dataProvider={dataProvider} disableTelemetry layout={AdminLayout} theme={theme} title="Nook Admin"><CustomRoutes><Route path="/parsing-pipeline" element={<ParsingPipelinePage />} /><Route path="/external-provider-usage" element={<ExternalProviderUsagePage />} /><Route path="/user-analytics" element={<UserAnalyticsPage />} /></CustomRoutes><Resource name="posts" options={{ label: "게시글 관리" }} icon={AssignmentTurnedInIcon} list={PostList} show={PostShow} /><Resource name="places" options={{ label: "장소 관리" }} icon={PlaceIcon} list={PlaceList} show={PlaceShow} /><Resource name="place-tags" options={{ label: "장소 태그 관리" }} icon={LocalOfferIcon} list={PlaceTagList} /><Resource name="app-version-policies" options={{ label: "앱 버전 관리" }} icon={SystemUpdateAltIcon} list={AppVersionPolicyList} /><Resource name="audit-logs" options={{ label: "감사 로그" }} icon={AssignmentTurnedInIcon} list={AuditLogList} /></Admin>; }
 function AdminLayout(props: LayoutProps) { return <Layout {...props} menu={AdminMenu} />; }
-function AdminMenu() { return <Menu><Box className="nook-brand"><Box className="nook-brand-mark">N</Box><Box className="nook-brand-copy"><span className="nook-brand-title">Nook Admin</span><span className="nook-brand-caption">Operations</span></Box></Box><Menu.DashboardItem leftIcon={<DashboardIcon />} /><Menu.Item to="/parsing-pipeline" primaryText="파싱 파이프라인" leftIcon={<AccountTreeIcon />} /><Menu.Item to="/external-provider-usage" primaryText="외부 API 사용량" leftIcon={<PaidIcon />} /><Menu.ResourceItem name="posts" /><Menu.ResourceItem name="places" /><Menu.ResourceItem name="place-tags" /><Menu.ResourceItem name="app-version-policies" /><Menu.ResourceItem name="audit-logs" /></Menu>; }
+function AdminMenu() { return <Menu><Box className="nook-brand"><Box className="nook-brand-mark">N</Box><Box className="nook-brand-copy"><span className="nook-brand-title">Nook Admin</span><span className="nook-brand-caption">Operations</span></Box></Box><Menu.DashboardItem leftIcon={<DashboardIcon />} /><Menu.Item to="/user-analytics" primaryText="사용자 행동 분석" leftIcon={<InsightsIcon />} /><Menu.Item to="/parsing-pipeline" primaryText="파싱 파이프라인" leftIcon={<AccountTreeIcon />} /><Menu.Item to="/external-provider-usage" primaryText="외부 API 사용량" leftIcon={<PaidIcon />} /><Menu.ResourceItem name="posts" /><Menu.ResourceItem name="places" /><Menu.ResourceItem name="place-tags" /><Menu.ResourceItem name="app-version-policies" /><Menu.ResourceItem name="audit-logs" /></Menu>; }
 
 function Dashboard() {
   const destinations = [
+    { href: "#/user-analytics", eyebrow: "GROWTH", title: "사용자 행동 분석", description: "가입부터 저장 활성화, 재방문까지 사용자 흐름을 시각적으로 확인합니다.", icon: <InsightsIcon /> },
     { href: "#/parsing-pipeline", eyebrow: "PARSING", title: "파싱 파이프라인", description: "전체 처리 흐름과 실제 판정 규칙, 현재 provider 설정을 탐색합니다.", icon: <AccountTreeIcon /> },
     { href: "#/external-provider-usage", eyebrow: "COST", title: "외부 API 사용량", description: "Provider 호출량, 실패율과 예상 비용을 한눈에 확인합니다.", icon: <PaidIcon /> },
     { href: "#/posts", eyebrow: "CONTENT", title: "게시글 검수", description: "파싱 상태와 장소 매핑을 확인하고 필요한 교정을 진행합니다.", icon: <AssignmentTurnedInIcon /> },

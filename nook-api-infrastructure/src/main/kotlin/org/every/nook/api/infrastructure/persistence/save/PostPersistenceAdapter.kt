@@ -115,6 +115,7 @@ class PostPersistenceAdapter(
             postId = requireNotNull(userPost.id),
             contentParsingStatus = contentJob.status,
             placeParsingStatus = placeParsingJobJpaRepository.findByPostId(sourcePostId)?.status,
+            saveChanged = userPostCreation.saveChanged,
         )
         logSavedPostMapping(sourcePostId, createdPost.postId, userPostCreation.created, "post.save.completed")
         return createdPost
@@ -144,6 +145,7 @@ class PostPersistenceAdapter(
             postId = requireNotNull(userPost.id),
             contentParsingStatus = contentJob.status,
             placeParsingStatus = placeParsingJob?.status,
+            saveChanged = userPostCreation.saveChanged,
         )
         logSavedPostMapping(sourcePostId, createdPost.postId, userPostCreation.created, "post.reuse.completed")
         return createdPost
@@ -218,9 +220,9 @@ class PostPersistenceAdapter(
     }
 
     private fun findOrCreateUserPost(userId: Long, postId: Long, memo: String?): UserPostCreation {
-        userSavedPostJpaRepository.restoreByUserIdAndPostId(userId, postId)
+        val restored = userSavedPostJpaRepository.restoreByUserIdAndPostId(userId, postId) > 0
         return userSavedPostJpaRepository.findByUserIdAndPostId(userId, postId)
-            ?.let { UserPostCreation(it, created = false) }
+            ?.let { UserPostCreation(it, created = false, saveChanged = restored) }
             ?: UserPostCreation(
                 entity = userSavedPostJpaRepository.save(
                     UserSavedPostEntity(
@@ -230,6 +232,7 @@ class PostPersistenceAdapter(
                     ),
                 ),
                 created = true,
+                saveChanged = true,
             )
     }
 
@@ -252,7 +255,11 @@ class PostPersistenceAdapter(
         }
     }
 
-    private data class UserPostCreation(val entity: UserSavedPostEntity, val created: Boolean)
+    private data class UserPostCreation(
+        val entity: UserSavedPostEntity,
+        val created: Boolean,
+        val saveChanged: Boolean,
+    )
 
     private fun restartFailedJob(postId: Long, contentJob: PostContentParsingJobEntity) {
         if (contentJob.status == PostContentParsingStatus.FAILED) {

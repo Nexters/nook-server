@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.PlaceSearchProvider
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
@@ -94,14 +95,18 @@ class PlaceSearchConfig {
     ): SearchPlaceCandidatesUseCase = SearchPlaceCandidatesUseCase(provider)
 
     @Bean
-    fun updatePlaceBookmarkUseCase(updatePlaceBookmarkPort: UpdatePlaceBookmarkPort): UpdatePlaceBookmarkUseCase =
-        UpdatePlaceBookmarkUseCase(updatePlaceBookmarkPort)
+    fun updatePlaceBookmarkUseCase(
+        updatePlaceBookmarkPort: UpdatePlaceBookmarkPort,
+        analyticsRecorder: UserAnalyticsEventRecorder,
+    ): UpdatePlaceBookmarkUseCase = UpdatePlaceBookmarkUseCase(updatePlaceBookmarkPort, analyticsRecorder)
 
     @Bean
     fun updatePlaceMemoUseCase(updatePlaceMemoPort: UpdatePlaceMemoPort): UpdatePlaceMemoUseCase =
         UpdatePlaceMemoUseCase(updatePlaceMemoPort)
 
     @Bean
-    fun getPlaceDetailUseCase(placeDetailQueryPort: PlaceDetailQueryPort): GetPlaceDetailUseCase =
-        GetPlaceDetailUseCase(placeDetailQueryPort)
+    fun getPlaceDetailUseCase(
+        placeDetailQueryPort: PlaceDetailQueryPort,
+        analyticsRecorder: UserAnalyticsEventRecorder,
+    ): GetPlaceDetailUseCase = GetPlaceDetailUseCase(placeDetailQueryPort, analyticsRecorder)
 }
