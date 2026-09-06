@@ -32,7 +32,8 @@ EOF
   docker compose pull
   docker compose up -d --no-build
   docker compose ps
-  curl -fsS "http://127.0.0.1:${ADMIN_WEB_PORT}/health"
+  curl --retry 12 --retry-delay 1 --retry-all-errors --retry-max-time 30 \
+    -fsS "http://127.0.0.1:${ADMIN_WEB_PORT}/health"
   exit 0
 fi
 
@@ -57,4 +58,5 @@ ssh "${ADMIN_OPS_SSH_TARGET}" \
     docker compose pull && \
     docker compose up -d --no-build && \
     docker compose ps && \
-    curl -fsS 'http://127.0.0.1:${ADMIN_WEB_PORT}/health'"
+    curl --retry 12 --retry-delay 1 --retry-all-errors --retry-max-time 30 \
+      -fsS 'http://127.0.0.1:${ADMIN_WEB_PORT}/health'"
