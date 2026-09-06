@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
 import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
@@ -12,8 +13,10 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class PlaceMapQueryUseCaseConfig {
     @Bean
-    fun getMapPlacesUseCase(placeMapQueryPort: PlaceMapQueryPort): GetMapPlacesUseCase =
-        GetMapPlacesUseCase(placeMapQueryPort)
+    fun getMapPlacesUseCase(
+        placeMapQueryPort: PlaceMapQueryPort,
+        analyticsRecorder: UserAnalyticsEventRecorder,
+    ): GetMapPlacesUseCase = GetMapPlacesUseCase(placeMapQueryPort, analyticsRecorder)
 
     @Bean
     fun getRecentPlacesUseCase(placeMapQueryPort: PlaceMapQueryPort): GetRecentPlacesUseCase =

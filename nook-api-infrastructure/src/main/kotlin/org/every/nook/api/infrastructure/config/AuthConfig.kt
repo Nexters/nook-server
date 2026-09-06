@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
 import org.every.nook.api.application.auth.AuthenticateSocialUserUseCase
 import org.every.nook.api.application.auth.IssueLoginTokens
 import org.every.nook.api.application.auth.RefreshLoginTokenUseCase
@@ -132,12 +133,14 @@ class AuthConfig {
         groupPort: GroupPort,
         issueLoginTokens: IssueLoginTokens,
         transactionRunner: TransactionRunner,
+        analyticsRecorder: UserAnalyticsEventRecorder,
     ) = AuthenticateSocialUserUseCase(
         socialIdentityProvider,
         memberRepository,
         groupPort,
         issueLoginTokens,
         transactionRunner,
+        analyticsRecorder,
     )
 
     @Bean

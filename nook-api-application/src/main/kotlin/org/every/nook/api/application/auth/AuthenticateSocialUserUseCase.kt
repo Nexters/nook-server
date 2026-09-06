@@ -1,5 +1,8 @@
 package org.every.nook.api.application.auth
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventName
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
+import org.every.nook.api.application.analytics.UserAnalyticsRecord
 import org.every.nook.api.application.auth.port.SocialIdentityProvider
 import org.every.nook.api.application.group.port.GroupPort
 import org.every.nook.api.application.member.DuplicateSocialAccountException
@@ -16,14 +19,28 @@ class AuthenticateSocialUserUseCase(
     private val groupPort: GroupPort,
     private val issueLoginTokens: IssueLoginTokens,
     private val transactionRunner: TransactionRunner,
+    private val analyticsRecorder: UserAnalyticsEventRecorder = UserAnalyticsEventRecorder.NONE,
 ) {
     operator fun invoke(credential: SocialCredential): SocialAuthenticationResult {
         val identity = socialIdentityProvider.authenticate(credential)
-        return transactionRunner.required {
-            val memberId = memberRepository.findMemberId(identity.provider, identity.subject)
-                ?: createMember(identity)
-            SocialAuthenticationResult(issueLoginTokens(memberId))
+        val authentication = transactionRunner.required {
+            val existingMemberId = memberRepository.findMemberId(identity.provider, identity.subject)
+            val memberId = existingMemberId ?: createMember(identity)
+            Authentication(
+                result = SocialAuthenticationResult(issueLoginTokens(memberId)),
+                memberId = memberId,
+                signedUp = existingMemberId == null,
+            )
         }
+        if (authentication.signedUp) {
+            analyticsRecorder.record(
+                UserAnalyticsRecord(
+                    eventName = UserAnalyticsEventName.SIGN_UP,
+                    memberId = authentication.memberId,
+                ),
+            )
+        }
+        return authentication.result
     }
 
     private fun createMember(identity: SocialIdentity): Long {
@@ -52,6 +69,12 @@ class AuthenticateSocialUserUseCase(
         val suffix = UUID.randomUUID().toString().take(DEFAULT_NICKNAME_SUFFIX_LENGTH)
         return "nook" + suffix
     }
+
+    private data class Authentication(
+        val result: SocialAuthenticationResult,
+        val memberId: Long,
+        val signedUp: Boolean,
+    )
 
     private companion object {
         const val DEFAULT_NICKNAME_SUFFIX_LENGTH = 8

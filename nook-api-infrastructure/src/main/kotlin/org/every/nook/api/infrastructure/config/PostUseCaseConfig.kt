@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.config
 
+import org.every.nook.api.application.analytics.UserAnalyticsEventRecorder
 import org.every.nook.api.application.content.ExtractPostContentUseCase
 import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostSourceResolver
@@ -48,12 +49,14 @@ class PostUseCaseConfig {
         findExistingPostPort: FindExistingPostPort,
         reusePostPort: ReusePostPort,
         createPostPort: CreatePostPort,
+        analyticsRecorder: UserAnalyticsEventRecorder,
     ): CreatePostUseCase = CreatePostUseCase(
         groupOwnershipPort = groupOwnershipPort,
         postSourceResolver = postSourceResolver,
         findExistingPostPort = findExistingPostPort,
         reusePostPort = reusePostPort,
         createPostPort = createPostPort,
+        analyticsRecorder = analyticsRecorder,
     )
 
     @Bean
@@ -103,12 +106,16 @@ class PostUseCaseConfig {
         FindPostPlaceParsingUseCase(findPostPlaceParsingPort)
 
     @Bean
-    fun listSavedPostsUseCase(savedPostQueryPort: SavedPostQueryPort): ListSavedPostsUseCase =
-        ListSavedPostsUseCase(savedPostQueryPort)
+    fun listSavedPostsUseCase(
+        savedPostQueryPort: SavedPostQueryPort,
+        analyticsRecorder: UserAnalyticsEventRecorder,
+    ): ListSavedPostsUseCase = ListSavedPostsUseCase(savedPostQueryPort, analyticsRecorder)
 
     @Bean
-    fun getSavedPostDetailUseCase(savedPostQueryPort: SavedPostQueryPort): GetSavedPostDetailUseCase =
-        GetSavedPostDetailUseCase(savedPostQueryPort)
+    fun getSavedPostDetailUseCase(
+        savedPostQueryPort: SavedPostQueryPort,
+        analyticsRecorder: UserAnalyticsEventRecorder,
+    ): GetSavedPostDetailUseCase = GetSavedPostDetailUseCase(savedPostQueryPort, analyticsRecorder)
 
     @Bean
     fun updatePostMemoUseCase(updatePostMemoPort: UpdatePostMemoPort): UpdatePostMemoUseCase =

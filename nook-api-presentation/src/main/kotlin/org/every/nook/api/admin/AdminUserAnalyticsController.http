@@ -1,0 +1,7 @@
+# Cloudflare Access 로그인은 브라우저에서 admin 호스트 접근 시 수행됩니다.
+
+### 관리자 인증 상태 확인
+GET {{baseUrl}}/api/admin/v1/me
+
+### 사용자 행동 분석 조회
+GET {{baseUrl}}/api/admin/v1/user-analytics?from=2026-08-01&to=2026-08-31&activationThreshold=3
