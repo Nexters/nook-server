@@ -1,0 +1,19 @@
+# Cloudflare Access 로그인은 브라우저에서 admin 호스트 접근 시 수행됩니다.
+
+### 관리자 인증 상태 확인
+GET {{baseUrl}}/api/admin/v1/me
+
+### DAU 회원 (KST 해당 하루)
+GET {{baseUrl}}/api/admin/v1/user-analytics/activity/members?from=2026-09-08&to=2026-09-08&page=0&size=20
+
+### WAU 회원 (기준일 포함 7일)
+GET {{baseUrl}}/api/admin/v1/user-analytics/activity/members?from=2026-09-02&to=2026-09-08&page=0&size=20
+
+### MAU 회원 (기준일 포함 30일)
+GET {{baseUrl}}/api/admin/v1/user-analytics/activity/members?from=2026-08-10&to=2026-09-08&page=0&size=20
+
+### 특정 이벤트 회원
+GET {{baseUrl}}/api/admin/v1/user-analytics/activity/members?from=2026-09-01&to=2026-09-08&eventName=post_save&page=0&size=20
+
+### 회원 타임라인 (회원 목록과 동일한 기간·이벤트 필터)
+GET {{baseUrl}}/api/admin/v1/user-analytics/activity/events?from=2026-09-01&to=2026-09-08&memberId=1&eventName=post_save&page=0&size=20
