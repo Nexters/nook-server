@@ -40,6 +40,8 @@ fun interface UserAnalyticsEventStorePort {
 
 fun interface UserAnalyticsEventQueryPort {
     fun findAll(from: Instant, to: Instant): List<UserAnalyticsEvent>
+
+    fun coverage(): AnalyticsCoverage = AnalyticsCoverage(null, null)
 }
 
 data class UserAnalyticsRecord(
@@ -63,11 +65,16 @@ class ReliableUserAnalyticsEventRecorder(
 ) : UserAnalyticsEventRecorder {
     override fun record(record: UserAnalyticsRecord) {
         val occurredAt = clock.instant()
+        val eventId = UUID.randomUUID().toString()
         runCatching {
             storePort.store(
                 UserAnalyticsEvent(
-                    eventId = UUID.randomUUID().toString(),
-                    deduplicationKey = serverDeduplicationKey(record, occurredAt),
+                    eventId = eventId,
+                    deduplicationKey = if (record.eventName == UserAnalyticsEventName.SIGN_UP) {
+                        "SIGN_UP:MEMBER:${record.memberId}:NONE:0"
+                    } else {
+                        "RAW:$eventId"
+                    },
                     eventName = record.eventName,
                     memberId = record.memberId,
                     targetType = record.targetType,
@@ -82,25 +89,8 @@ class ReliableUserAnalyticsEventRecorder(
         }
     }
 
-    private fun serverDeduplicationKey(record: UserAnalyticsRecord, occurredAt: Instant): String {
-        val target = "${record.targetType?.name ?: "NONE"}:${record.targetId ?: 0L}"
-        return if (record.eventName in DAILY_EVENTS) {
-            val date = occurredAt.atZone(ADMIN_ZONE).toLocalDate()
-            "${record.eventName}:MEMBER:${record.memberId}:$target:$date"
-        } else {
-            "${record.eventName}:MEMBER:${record.memberId}:$target"
-        }
-    }
-
     private companion object {
         val logger = KotlinLogging.logger {}
-        val ADMIN_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
-        val DAILY_EVENTS = setOf(
-            UserAnalyticsEventName.ARCHIVE_VIEW,
-            UserAnalyticsEventName.POST_VIEW,
-            UserAnalyticsEventName.PLACE_VIEW,
-            UserAnalyticsEventName.MAP_VIEW,
-        )
     }
 }
 
@@ -109,6 +99,7 @@ data class UserAnalyticsPeriod(
     val endInclusive: LocalDate,
     val activationThreshold: Int,
     val activeDate: LocalDate = endInclusive,
+    val observationEnd: LocalDate = endInclusive,
 )
 
 data class UserAnalyticsOverview(
@@ -122,6 +113,7 @@ data class UserAnalyticsOverview(
     val daily: List<Daily>,
     val retention: List<Retention>,
     val behaviors: List<Behavior>,
+    val report: AnalyticsReport? = null,
 ) {
     data class Funnel(val signUps: Long, val activatedUsers: Long, val returnedUsers: Long)
 
@@ -138,10 +130,11 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
     operator fun invoke(period: UserAnalyticsPeriod): UserAnalyticsOverview {
         validate(period)
         val today = clock.instant().atZone(ADMIN_ZONE).toLocalDate()
-        val observedThrough = minOf(period.endInclusive, today)
+        val observedThrough = minOf(period.observationEnd, today)
         val activeDate = minOf(period.activeDate, today)
-        val events = loadEvents(period)
-        val signUps = signUps(events)
+        val events = loadEvents(period.copy(endInclusive = observedThrough)).filter { it.occurredAt <= clock.instant() }
+        val periodEvents = events.filter { it.occurredAt.atZone(ADMIN_ZONE).toLocalDate() <= period.endInclusive }
+        val signUps = signUps(periodEvents)
         val activationByMember = activations(events, signUps, period.activationThreshold)
         val returnEvents = returnEvents(events, activationByMember)
 
@@ -150,16 +143,23 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
             to = period.endInclusive,
             observedThrough = observedThrough,
             activationThreshold = period.activationThreshold,
-            firstEventAt = events.minOfOrNull(UserAnalyticsEvent::occurredAt),
+            firstEventAt = periodEvents.minOfOrNull(UserAnalyticsEvent::occurredAt),
             funnel = UserAnalyticsOverview.Funnel(
                 signUps = signUps.size.toLong(),
                 activatedUsers = activationByMember.size.toLong(),
                 returnedUsers = returnEvents.map(UserAnalyticsEvent::memberId).distinct().size.toLong(),
             ),
             activeUsers = activeUsers(queryPort, activeDate),
-            daily = daily(period, signUps, activationByMember, events),
+            daily = daily(period, signUps, activationByMember, periodEvents),
             retention = retention(activationByMember, events, observedThrough),
             behaviors = behaviors(returnEvents),
+            report = buildAnalyticsReport(
+                periodEvents,
+                events,
+                queryPort.coverage(),
+                observedThrough,
+                activationByMember,
+            ),
         )
     }
 
@@ -254,6 +254,10 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
 
     private fun validate(period: UserAnalyticsPeriod) {
         require(!period.endInclusive.isBefore(period.start)) { "Analytics end date must not precede start date" }
+        require(period.observationEnd >= period.endInclusive) { "Observation end must not precede period end" }
+        require(ChronoUnit.DAYS.between(period.start, period.observationEnd) < MAX_OBSERVATION_DAYS) {
+            "Observation range must be $MAX_OBSERVATION_DAYS days or fewer"
+        }
         require(ChronoUnit.DAYS.between(period.start, period.endInclusive) < MAX_PERIOD_DAYS) {
             "Analytics period must be $MAX_PERIOD_DAYS days or fewer"
         }
@@ -264,6 +268,7 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
 
     private companion object {
         const val MAX_PERIOD_DAYS = 90L
+        const val MAX_OBSERVATION_DAYS = 365L
         const val MIN_ACTIVATION_THRESHOLD = 1
         const val MAX_ACTIVATION_THRESHOLD = 20
         val ADMIN_ZONE: ZoneId = ZoneId.of("Asia/Seoul")

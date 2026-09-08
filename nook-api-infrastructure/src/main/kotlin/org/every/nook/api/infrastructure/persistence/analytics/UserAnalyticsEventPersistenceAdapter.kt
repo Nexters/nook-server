@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.analytics
 
+import org.every.nook.api.application.analytics.AnalyticsCoverage
 import org.every.nook.api.application.analytics.UserAnalyticsEvent
 import org.every.nook.api.application.analytics.UserAnalyticsEventQueryPort
 import org.every.nook.api.application.analytics.UserAnalyticsEventStorePort
@@ -12,6 +13,11 @@ import java.time.Instant
 class UserAnalyticsEventPersistenceAdapter(private val repository: UserAnalyticsEventJpaRepository) :
     UserAnalyticsEventStorePort,
     UserAnalyticsEventQueryPort {
+    @Transactional(readOnly = true)
+    override fun coverage(): AnalyticsCoverage = repository.coverage().let {
+        AnalyticsCoverage(it.firstEventAt, it.lastEventAt)
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun store(event: UserAnalyticsEvent) {
         repository.insertIgnore(

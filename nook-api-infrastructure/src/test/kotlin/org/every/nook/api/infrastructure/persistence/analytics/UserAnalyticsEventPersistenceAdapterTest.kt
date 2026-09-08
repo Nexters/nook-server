@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.analytics
 
+import org.every.nook.api.application.analytics.AnalyticsCoverage
 import org.every.nook.api.application.analytics.UserAnalyticsEvent
 import org.every.nook.api.application.analytics.UserAnalyticsEventName
 import org.mockito.Mockito.mock
@@ -12,6 +13,18 @@ import kotlin.test.assertEquals
 class UserAnalyticsEventPersistenceAdapterTest {
     private val repository = mock(UserAnalyticsEventJpaRepository::class.java)
     private val adapter = UserAnalyticsEventPersistenceAdapter(repository)
+
+    @Test
+    fun `maps global coverage including empty history`() {
+        val projection = mock(AnalyticsCoverageProjection::class.java)
+        `when`(repository.coverage()).thenReturn(projection)
+        assertEquals(AnalyticsCoverage(null, null), adapter.coverage())
+        val first = Instant.parse("2026-09-06T06:30:00Z")
+        val last = first.plusSeconds(1)
+        `when`(projection.firstEventAt).thenReturn(first)
+        `when`(projection.lastEventAt).thenReturn(last)
+        assertEquals(AnalyticsCoverage(first, last), adapter.coverage())
+    }
 
     @Test
     fun `stores event with insert ignore for idempotency`() {

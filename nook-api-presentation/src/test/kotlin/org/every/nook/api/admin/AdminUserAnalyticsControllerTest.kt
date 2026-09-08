@@ -33,5 +33,27 @@ class AdminUserAnalyticsControllerTest {
         assertEquals(0, response?.activeUsers?.daily)
         assertEquals(0, response?.activeUsers?.weekly)
         assertEquals(0, response?.activeUsers?.monthly)
+        assertEquals(7, response?.report?.events?.size)
+        assertEquals("sign_up", response?.report?.events?.first()?.eventName)
+        assertEquals(0, response?.report?.summary?.activeUsers)
+        assertEquals(0, response?.report?.members?.size)
+    }
+
+    @Test
+    fun `uses explicit followup end independent of selection and clamps future to today`() {
+        val controller = AdminUserAnalyticsController(
+            GetUserAnalyticsOverviewUseCase(
+                UserAnalyticsEventQueryPort { _, _ -> emptyList() },
+                Clock.fixed(Instant.parse("2026-09-08T00:00:00Z"), ZoneOffset.UTC),
+            ),
+        )
+        val response = controller.overview(
+            LocalDate.parse("2026-09-01"),
+            LocalDate.parse("2026-09-02"),
+            1,
+            observationEnd = LocalDate.parse("2026-09-30"),
+        ).success
+        assertEquals(LocalDate.parse("2026-09-02"), response?.to)
+        assertEquals(LocalDate.parse("2026-09-08"), response?.observedThrough)
     }
 }
