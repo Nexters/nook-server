@@ -5,26 +5,32 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class ReliableUserAnalyticsEventRecorderTest {
     @Test
-    fun `uses a daily deduplication key for view events`() {
+    fun `preserves repeated views and saves with independent raw event keys`() {
         val stored = mutableListOf<UserAnalyticsEvent>()
         val recorder = ReliableUserAnalyticsEventRecorder(
             storePort = UserAnalyticsEventStorePort(stored::add),
             clock = Clock.fixed(Instant.parse("2026-08-01T16:00:00Z"), ZoneOffset.UTC),
         )
 
-        recorder.record(
-            UserAnalyticsRecord(
-                UserAnalyticsEventName.POST_VIEW,
-                7,
-                targetType = UserAnalyticsTargetType.POST,
-                targetId = 11,
-            ),
-        )
+        listOf(UserAnalyticsEventName.POST_VIEW, UserAnalyticsEventName.POST_SAVE).forEach { name ->
+            val record = UserAnalyticsRecord(name, 7, UserAnalyticsTargetType.POST, 11)
+            recorder.record(record)
+            recorder.record(record)
+            assertNotEquals(stored[stored.lastIndex - 1].deduplicationKey, stored.last().deduplicationKey)
+        }
+        stored.forEach { assertEquals("RAW:${it.eventId}", it.deduplicationKey) }
+    }
 
-        assertEquals("POST_VIEW:MEMBER:7:POST:11:2026-08-02", stored.single().deduplicationKey)
+    @Test
+    fun `keeps signup semantic deduplication compatible with stored records`() {
+        val stored = mutableListOf<UserAnalyticsEvent>()
+        val recorder = ReliableUserAnalyticsEventRecorder(UserAnalyticsEventStorePort(stored::add), Clock.systemUTC())
+        repeat(2) { recorder.record(UserAnalyticsRecord(UserAnalyticsEventName.SIGN_UP, 7)) }
+        stored.forEach { assertEquals("SIGN_UP:MEMBER:7:NONE:0", it.deduplicationKey) }
     }
 
     @Test

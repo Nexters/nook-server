@@ -83,6 +83,13 @@ body {
   padding: 28px !important;
 }
 
+.layout:has(.user-analytics-page),
+.RaLayout-appFrame:has(.user-analytics-page),
+.RaLayout-contentWithSidebar:has(.user-analytics-page),
+.RaLayout-content:has(.user-analytics-page) {
+  min-width: 0;
+}
+
 .RaSidebar-fixed {
   border-right: 1px solid #e4e6e9;
   background: rgb(255 255 255 / 92%);

@@ -7,6 +7,9 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface UserAnalyticsEventJpaRepository : JpaRepository<UserAnalyticsEventEntity, Long> {
+    @Query("select min(e.occurredAt) as firstEventAt, max(e.occurredAt) as lastEventAt from UserAnalyticsEventEntity e")
+    fun coverage(): AnalyticsCoverageProjection
+
     @Modifying
     @Query(
         value = """
@@ -48,4 +51,9 @@ interface UserAnalyticsEventJpaRepository : JpaRepository<UserAnalyticsEventEnti
         from: Instant,
         to: Instant,
     ): List<UserAnalyticsEventEntity>
+}
+
+interface AnalyticsCoverageProjection {
+    val firstEventAt: Instant?
+    val lastEventAt: Instant?
 }

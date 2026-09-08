@@ -26,10 +26,10 @@ class AdminUserAnalyticsController(private val getOverview: GetUserAnalyticsOver
     @Operation(summary = "사용자 가입·활성화·재방문 분석 조회")
     @GetMapping
     fun overview(
-        @Parameter(description = "가입 cohort 조회 시작일")
+        @Parameter(description = "전체 활동 및 가입 cohort 조회 시작일")
         @RequestParam
         from: LocalDate,
-        @Parameter(description = "가입 cohort 조회 종료일. 해당 날짜를 포함합니다.")
+        @Parameter(description = "전체 활동 및 가입 cohort 조회 종료일. 해당 날짜를 포함합니다.")
         @RequestParam
         to: LocalDate,
         @Parameter(description = "활성 사용자로 판단할 서로 다른 저장 대상 개수")
@@ -40,9 +40,12 @@ class AdminUserAnalyticsController(private val getOverview: GetUserAnalyticsOver
         @Parameter(description = "DAU, WAU, MAU를 계산할 기준일. 생략하면 조회 종료일을 사용합니다.")
         @RequestParam(required = false)
         activeDate: LocalDate? = null,
+        @Parameter(description = "가입 후 활성화·재방문 관측 종료일. 생략하면 to. 조회 시작부터 최대 365일.")
+        @RequestParam(required = false)
+        observationEnd: LocalDate? = null,
     ): ApiResponse<UserAnalyticsOverviewResponse> = ApiResponse.success(
         UserAnalyticsOverviewResponse.from(
-            getOverview(UserAnalyticsPeriod(from, to, activationThreshold, activeDate ?: to)),
+            getOverview(UserAnalyticsPeriod(from, to, activationThreshold, activeDate ?: to, observationEnd ?: to)),
         ),
     )
 
@@ -56,7 +59,7 @@ data class UserAnalyticsOverviewResponse(
     val from: LocalDate,
     @field:Schema(description = "조회 종료일")
     val to: LocalDate,
-    @field:Schema(description = "재방문 관측이 완료된 기준일")
+    @field:Schema(description = "후속 관측 종료 기준일. 오늘 수치는 진행 중입니다.")
     val observedThrough: LocalDate,
     @field:Schema(description = "활성화에 필요한 서로 다른 저장 대상 개수")
     val activationThreshold: Int,
@@ -72,6 +75,8 @@ data class UserAnalyticsOverviewResponse(
     val retention: List<RetentionResponse>,
     @field:Schema(description = "활성화 이후 재방문 행동 구성")
     val behaviors: List<BehaviorResponse>,
+    @field:Schema(description = "전체 회원의 기간 활동 및 수집 범위")
+    val report: AnalyticsReportResponse? = null,
 ) {
     data class FunnelResponse(
         @field:Schema(description = "신규 가입 회원 수")
@@ -118,7 +123,7 @@ data class UserAnalyticsOverviewResponse(
         val eventName: String,
         @field:Schema(description = "해당 행동을 한 고유 회원 수")
         val users: Long,
-        @field:Schema(description = "중복 제거 후 저장된 행동 이벤트 수")
+        @field:Schema(description = "저장된 이벤트 수. 이전 일별·대상별 중복 제거 기록이 포함될 수 있습니다.")
         val events: Long,
     )
 
@@ -149,6 +154,7 @@ data class UserAnalyticsOverviewResponse(
             behaviors = overview.behaviors.map { behavior ->
                 BehaviorResponse(behavior.eventName.name.lowercase(), behavior.users, behavior.events)
             },
+            report = overview.report?.let(AnalyticsReportResponse::from),
         )
     }
 }
