@@ -83,6 +83,43 @@ body {
   padding: 28px !important;
 }
 
+.layout:has(.user-analytics-page),
+.RaLayout-appFrame:has(.user-analytics-page),
+.RaLayout-contentWithSidebar:has(.user-analytics-page),
+.RaLayout-content:has(.user-analytics-page) {
+  min-width: 0;
+}
+
+.analytics-kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.analytics-kpi { transition: border-color .15s ease, box-shadow .15s ease; }
+.analytics-kpi.is-selected { border-color: #558eff; box-shadow: 0 0 0 1px #558eff; }
+.analytics-kpi-value { font-size: 40px !important; font-weight: 800 !important; line-height: 1.4 !important; margin: 8px 0 !important; }
+.analytics-kpi-value span { margin-left: 6px; }
+.analytics-period-toolbar, .analytics-period-stats { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.analytics-period-stats { justify-content: flex-start; gap: 12px 24px; }
+.analytics-period-stats strong { margin-left: 7px; color: #1f1f1f; }
+.analytics-chart { min-width: 0; }
+.analytics-event-bar { font: inherit; color: inherit; cursor: pointer; border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; text-align: left; width: 100%; }
+.analytics-event-bar:hover { background: #f4f5f7; }
+.analytics-event-bar:focus-visible, .analytics-chart-hit:focus-visible { outline: 2px solid #558eff; outline-offset: 2px; }
+.analytics-chart-hit { cursor: pointer; }
+.analytics-explorer { margin-top: 12px; padding: 20px; border: 1px solid #558eff; border-radius: 12px; background: #fff; }
+.analytics-avatar { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: #edf3ff; color: #356fe5; font-weight: 700; }
+.analytics-timeline { list-style: none; padding: 0 0 0 16px; margin: 8px 0; border-left: 1px solid #e4e6e9; }
+.analytics-timeline li { position: relative; padding: 0 0 18px 6px; }
+.analytics-timeline li::before { content: ""; position: absolute; left: -21px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--event-color); outline: 3px solid white; }
+.analytics-heatmap { width: 100%; min-width: 350px; border-spacing: 5px; font-size: 13px; text-align: center; }
+.analytics-heatmap th { font-weight: 500; color: #67707d; }
+.analytics-heatmap td { padding: 8px; border-radius: 6px; }
+.analytics-heatmap small { display: block; font-size: 10px; color: #67707d; margin-top: 2px; }
+@media (max-width: 600px) {
+  .analytics-kpi-grid { gap: 8px; }
+  .analytics-kpi .MuiCardContent-root { padding: 12px 8px; }
+  .analytics-kpi-value { font-size: 28px !important; }
+  .analytics-kpi-value span { font-size: 11px; margin-left: 3px; }
+  .analytics-explorer { padding: 12px; }
+}
+
 .RaSidebar-fixed {
   border-right: 1px solid #e4e6e9;
   background: rgb(255 255 255 / 92%);
