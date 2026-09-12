@@ -8,12 +8,7 @@ if [ ! -f .env ]; then
   echo "Created .env from .env.example. Update GRAFANA_ADMIN_PASSWORD before exposing Grafana."
 fi
 
-if ! grep -q '^SLACK_ALERT_WEBHOOK_URL=https://hooks.slack.com/services/' .env; then
-  echo "SLACK_ALERT_WEBHOOK_URL must be set in .env before deploying Slack alerting." >&2
-  exit 1
-fi
-
-for key in DISCORD_DEV_ALERT_WEBHOOK_URL DISCORD_LIVE_ALERT_WEBHOOK_URL; do
+for key in DISCORD_DEV_ALERT_WEBHOOK_URL DISCORD_LIVE_ALERT_WEBHOOK_URL DISCORD_OPS_ALERT_WEBHOOK_URL; do
   if ! grep -Eq "^${key}=https://discord.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$" .env; then
     echo "${key} must be set in .env before deploying Discord alerting." >&2
     exit 1

@@ -12,14 +12,8 @@ if [ ! -f mysql-exporter.my.cnf ]; then
   exit 1
 fi
 
-if ! grep -q '^ERROR_LOG_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/' .env; then
-  echo "ERROR_LOG_SLACK_WEBHOOK_URL must be set in .env before deploying error log forwarding." >&2
-  exit 1
-fi
-
-if grep -q '^ERROR_LOG_DISCORD_WEBHOOK_URL=.' .env &&
-  ! grep -Eq '^ERROR_LOG_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$' .env; then
-  echo "ERROR_LOG_DISCORD_WEBHOOK_URL must be a Discord webhook URL when set." >&2
+if ! grep -Eq '^ERROR_LOG_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$' .env; then
+  echo "ERROR_LOG_DISCORD_WEBHOOK_URL must be set in .env before deploying error log forwarding." >&2
   exit 1
 fi
 
