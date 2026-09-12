@@ -13,6 +13,13 @@ if ! grep -q '^SLACK_ALERT_WEBHOOK_URL=https://hooks.slack.com/services/' .env; 
   exit 1
 fi
 
+for key in DISCORD_DEV_ALERT_WEBHOOK_URL DISCORD_LIVE_ALERT_WEBHOOK_URL; do
+  if ! grep -Eq "^${key}=https://discord.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$" .env; then
+    echo "${key} must be set in .env before deploying Discord alerting." >&2
+    exit 1
+  fi
+done
+
 docker compose pull
 docker compose up -d
 docker compose ps

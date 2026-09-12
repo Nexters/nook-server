@@ -13,7 +13,7 @@ policies:
       - receiver: slack-nook-alerts-v2
         object_matchers:
           - - alertname
-            - =
+            - "="
             - DatasourceError
         group_by:
           - datasource_uid
@@ -21,3 +21,12 @@ policies:
         group_wait: 2m
         group_interval: 10m
         repeat_interval: 6h
+        routes:
+          - receiver: nook-dev-alerts
+            object_matchers: [[env, "=", dev]]
+          - receiver: nook-live-alerts
+            object_matchers: [[env, "=", live]]
+      - receiver: nook-dev-alerts
+        object_matchers: [[env, "=", dev]]
+      - receiver: nook-live-alerts
+        object_matchers: [[env, "=", live]]
