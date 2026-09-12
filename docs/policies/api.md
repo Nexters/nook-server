@@ -41,4 +41,7 @@
 - presentation이 `ErrorType`을 HTTP 상태로 변환합니다.
 - 실패 응답도 오류 의미에 맞는 실제 HTTP 4xx 또는 5xx 상태를 유지합니다.
 - 예상하지 못한 오류의 메시지, 스택, SQL 및 provider 원문을 응답에 노출하지 않습니다.
+- 존재하지 않는 경로와 정적 리소스는 `404 / NOT_FOUND`, 지원하지 않는 HTTP 메서드는
+  `405 / METHOD_NOT_ALLOWED`로 응답합니다. 405 응답은 `Allow` 헤더를 유지합니다.
+- 위 라우팅 오류는 서버 장애를 의미하는 ERROR 로그로 기록하지 않습니다.
 - 오류 응답 상세 계약은 `ADR-0002-api-response-and-error-handling.md`를 따릅니다.
