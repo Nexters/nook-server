@@ -87,39 +87,6 @@ class ParseLogEntryTest(unittest.TestCase):
         self.assertEqual({}, context)
 
 
-class SlackPayloadTest(unittest.TestCase):
-    def test_builds_bold_context_fields_and_request_filtered_grafana_button(self) -> None:
-        context = {
-            "service_name": "nook-api",
-            "request_id": "abc123def456gh78",
-            "user_id": "42",
-            "url_path": "POST /api/v1/posts/{postId}",
-        }
-        with (
-            patch.object(forward_error_logs, "ENVIRONMENT", "dev"),
-            patch.object(forward_error_logs, "GRAFANA_BASE_URL", "https://grafana.example.com/"),
-        ):
-            payload = forward_error_logs.slack_payload(["error body"], context)
-
-        fields = payload["blocks"][1]["fields"]
-        self.assertEqual("*Service Name*\nnook-api", fields[0]["text"])
-        self.assertEqual("*Request ID*\nabc123def456gh78", fields[1]["text"])
-        self.assertEqual("*User ID*\n42", fields[2]["text"])
-        self.assertEqual("*URL Path*\nPOST /api/v1/posts/{postId}", fields[3]["text"])
-        button_url = payload["blocks"][3]["elements"][0]["url"]
-        self.assertIn("/d/nook-dev-logs/nook-dev-logs?", button_url)
-        self.assertIn("var-requestIdText=abc123def456gh78", button_url)
-        self.assertIn("from=now-15m", button_url)
-
-    def test_uses_fallback_values_and_omits_button_without_request_id(self) -> None:
-        with patch.object(forward_error_logs, "GRAFANA_BASE_URL", "https://grafana.example.com"):
-            payload = forward_error_logs.slack_payload(["error body"], {})
-
-        fields = payload["blocks"][1]["fields"]
-        self.assertTrue(all(field["text"].endswith("\n-") for field in fields))
-        self.assertEqual(3, len(payload["blocks"]))
-
-
 class DiscordPayloadTest(unittest.TestCase):
     def test_preserves_context_stack_trace_and_environment_link(self) -> None:
         context = {"service_name": "nook-api", "request_id": "req-347", "user_id": "42", "url_path": "GET /posts"}
@@ -163,59 +130,44 @@ class DiscordPayloadTest(unittest.TestCase):
 
 
 class DeliveryTest(unittest.TestCase):
-    def test_sends_both_and_keeps_slack_payload(self) -> None:
+    def test_sends_only_discord_with_confirmation(self) -> None:
         with (
-            patch.object(forward_error_logs, "WEBHOOK_URL", "https://slack.example/webhook"),
             patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/webhook"),
             patch.object(forward_error_logs.urllib.request, "urlopen", return_value=MagicMock()) as send,
         ):
             forward_error_logs.post_error_log(["error"], {})
-        self.assertEqual(2, send.call_count)
-        requests = [call.args[0] for call in send.call_args_list]
-        self.assertEqual(forward_error_logs.slack_payload(["error"], {}), json.loads(requests[0].data))
-        self.assertEqual("https://discord.example/webhook?wait=true", requests[1].full_url)
-        self.assertIn("embeds", json.loads(requests[1].data))
+        self.assertEqual(1, send.call_count)
+        request = send.call_args.args[0]
+        self.assertEqual("https://discord.example/webhook?wait=true", request.full_url)
+        self.assertEqual(forward_error_logs.discord_payload(["error"], {}), json.loads(request.data))
 
-    def test_failure_of_either_provider_does_not_skip_other_or_leak_url(self) -> None:
-        for failure_index in (0, 1):
-            outcomes = [MagicMock(), MagicMock()]
-            outcomes[failure_index] = urllib.error.URLError("https://secret.example/webhook-token")
+    def test_failures_do_not_stop_the_forwarder_or_leak_url(self) -> None:
+        errors = [
+            urllib.error.URLError("https://secret.example/token"),
+            urllib.error.HTTPError("https://secret.example/token", 429, "rate limited", {}, None),
+            TimeoutError("https://secret.example/token"),
+        ]
+        for error in errors:
             with (
-                self.subTest(failure_index=failure_index),
-                patch.object(forward_error_logs, "WEBHOOK_URL", "https://slack.example/webhook"),
+                self.subTest(error=type(error).__name__),
                 patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/webhook"),
-                patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=outcomes) as send,
+                patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=[error, MagicMock()]) as send,
                 patch("builtins.print") as output,
             ):
                 forward_error_logs.post_error_log(["error"], {})
+                forward_error_logs.post_error_log(["next error"], {})
                 self.assertEqual(2, send.call_count)
-                self.assertNotIn("webhook-token", str(output.call_args_list))
+                self.assertNotIn("secret.example", str(output.call_args_list))
 
-    def test_empty_discord_setting_preserves_slack_only(self) -> None:
-        with (
-            patch.object(forward_error_logs, "WEBHOOK_URL", "https://slack.example/webhook"),
-            patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", ""),
-            patch.object(forward_error_logs.urllib.request, "urlopen", return_value=MagicMock()) as send,
-        ):
-            forward_error_logs.post_error_log(["error"], {})
-            self.assertEqual(1, send.call_count)
-            forward_error_logs.post_error_log(["  "], {})
-            self.assertEqual(1, send.call_count)
-
-    def test_http_rejection_does_not_skip_discord(self) -> None:
-        with (
-            patch.object(forward_error_logs, "WEBHOOK_URL", "https://slack.example/webhook"),
-            patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/webhook"),
-            patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=[
-                urllib.error.HTTPError("https://secret.example/token", 429, "rate limited", {}, None),
-                MagicMock(),
-            ]) as send,
-            patch("builtins.print") as output,
-        ):
-            forward_error_logs.post_error_log(["error"], {})
-            self.assertEqual(2, send.call_count)
-            self.assertIn("429", str(output.call_args_list))
-            self.assertNotIn("secret.example", str(output.call_args_list))
+    def test_does_not_send_without_webhook_or_log_body(self) -> None:
+        for webhook, body in [("", "error"), ("https://discord.example/webhook", "  ")]:
+            with (
+                self.subTest(webhook=webhook, body=body),
+                patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", webhook),
+                patch.object(forward_error_logs.urllib.request, "urlopen") as send,
+            ):
+                forward_error_logs.post_error_log([body], {})
+                send.assert_not_called()
 
 
 class FollowCurrentContainerLogTest(unittest.TestCase):

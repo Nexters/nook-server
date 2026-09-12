@@ -11,7 +11,6 @@ from typing import Callable, Iterator, TextIO
 
 
 CONTAINER_NAME = os.getenv("ERROR_LOG_CONTAINER_NAME", "nook-dev-api")
-WEBHOOK_URL = os.getenv("ERROR_LOG_SLACK_WEBHOOK_URL", "")
 DISCORD_WEBHOOK_URL = os.getenv("ERROR_LOG_DISCORD_WEBHOOK_URL", "")
 ENVIRONMENT = os.getenv("ERROR_LOG_ENV", "dev")
 GRAFANA_BASE_URL = os.getenv("ERROR_LOG_GRAFANA_BASE_URL", "")
@@ -19,7 +18,6 @@ LOG_LEVEL_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}.*\s(?P<level>TRACE|DEBUG|INF
 MAX_BYTES = int(os.getenv("ERROR_LOG_MAX_BYTES", "3500"))
 FLUSH_SECONDS = float(os.getenv("ERROR_LOG_FLUSH_SECONDS", "2"))
 POLL_SECONDS = float(os.getenv("ERROR_LOG_POLL_SECONDS", "1"))
-SLACK_SECTION_MAX_CHARS = 2900
 
 
 def docker_container_log_path() -> Path:
@@ -58,55 +56,6 @@ def grafana_url(request_id: str | None) -> str | None:
     return f"{GRAFANA_BASE_URL.rstrip('/')}/d/{dashboard_uid}/{dashboard_uid}?{query}"
 
 
-def slack_text(value: str | None) -> str:
-    return (value or "-").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def truncate_body(body: str) -> str:
-    encoded = body.encode()
-    byte_limit = min(MAX_BYTES, SLACK_SECTION_MAX_CHARS)
-    if len(encoded) <= byte_limit:
-        return body
-    return encoded[:byte_limit].decode(errors="ignore").rstrip() + "\n... truncated"
-
-
-def slack_payload(lines: list[str], context: dict[str, str | None]) -> dict:
-    body = truncate_body("".join(lines).strip())
-    service_name = slack_text(context.get("service_name"))
-    request_id = slack_text(context.get("request_id"))
-    user_id = slack_text(context.get("user_id"))
-    url_path = slack_text(context.get("url_path"))
-    fields = [
-        {"type": "mrkdwn", "text": f"*Service Name*\n{service_name}"},
-        {"type": "mrkdwn", "text": f"*Request ID*\n{request_id}"},
-        {"type": "mrkdwn", "text": f"*User ID*\n{user_id}"},
-        {"type": "mrkdwn", "text": f"*URL Path*\n{url_path}"},
-    ]
-    blocks = [
-        {"type": "section", "text": {"type": "mrkdwn", "text": f":rotating_light: *{slack_text(CONTAINER_NAME)} ERROR log*"}},
-        {"type": "section", "fields": fields},
-        {"type": "section", "text": {"type": "mrkdwn", "text": f"```{body}```"}},
-    ]
-    link = grafana_url(context.get("request_id"))
-    if link:
-        blocks.append(
-            {
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {"type": "plain_text", "text": "Grafana에서 전체 요청 로그 보기"},
-                        "url": link,
-                    },
-                ],
-            },
-        )
-    return {
-        "text": f"{CONTAINER_NAME} ERROR log - request ID: {context.get('request_id') or '-'}",
-        "blocks": blocks,
-    }
-
-
 def discord_payload(lines: list[str], context: dict[str, str | None]) -> dict:
     # Byte limits also bound Discord's character limits for multibyte log text.
     body = "".join(lines).strip().replace("```", "`\u200b``")
@@ -135,7 +84,7 @@ def discord_payload(lines: list[str], context: dict[str, str | None]) -> dict:
     return {"embeds": [embed], "allowed_mentions": {"parse": []}}
 
 
-def post_payload(url: str, payload: dict, provider: str) -> None:
+def post_payload(url: str, payload: dict) -> None:
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),
@@ -148,27 +97,17 @@ def post_payload(url: str, payload: dict, provider: str) -> None:
     except (urllib.error.URLError, OSError) as error:
         # Exception messages may contain webhook credentials; log only the type/status.
         status = error.code if isinstance(error, urllib.error.HTTPError) else type(error).__name__
-        print(f"failed to send {provider} error log: {status}", flush=True)
+        print(f"failed to send discord error log: {status}", flush=True)
 
 
-def post_to_slack(lines: list[str], context: dict[str, str | None]) -> None:
-    if WEBHOOK_URL and "".join(lines).strip():
-        post_payload(WEBHOOK_URL, slack_payload(lines, context), "slack")
-
-
-def post_to_discord(lines: list[str], context: dict[str, str | None]) -> None:
+def post_error_log(lines: list[str], context: dict[str, str | None]) -> None:
     if DISCORD_WEBHOOK_URL and "".join(lines).strip():
         # wait=true makes Discord report message creation failures synchronously.
         url = urllib.parse.urlsplit(DISCORD_WEBHOOK_URL)
         query = dict(urllib.parse.parse_qsl(url.query))
         query["wait"] = "true"
         target = urllib.parse.urlunsplit(url._replace(query=urllib.parse.urlencode(query)))
-        post_payload(target, discord_payload(lines, context), "discord")
-
-
-def post_error_log(lines: list[str], context: dict[str, str | None]) -> None:
-    post_to_slack(lines, context)
-    post_to_discord(lines, context)
+        post_payload(target, discord_payload(lines, context))
 
 
 def read_json_log_line(raw_line: str) -> str:
