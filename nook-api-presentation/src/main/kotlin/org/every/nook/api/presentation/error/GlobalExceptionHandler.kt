@@ -6,9 +6,11 @@ import org.every.nook.api.application.error.NookException
 import org.every.nook.api.presentation.response.ApiError
 import org.every.nook.api.presentation.response.ApiResponse
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.servlet.NoHandlerFoundException
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -71,6 +75,23 @@ class GlobalExceptionHandler {
         reason = INVALID_REQUEST_ERROR_REASON,
     )
 
+    @ExceptionHandler(NoHandlerFoundException::class, NoResourceFoundException::class)
+    fun handleNotFound(): ResponseEntity<ApiResponse<Nothing>> = failureResponse(
+        status = HttpStatus.NOT_FOUND,
+        errorCode = "NOT_FOUND",
+        reason = "요청한 리소스를 찾을 수 없습니다.",
+    )
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
+    fun handleMethodNotAllowed(
+        exception: HttpRequestMethodNotSupportedException,
+    ): ResponseEntity<ApiResponse<Nothing>> = failureResponse(
+        status = HttpStatus.METHOD_NOT_ALLOWED,
+        errorCode = "METHOD_NOT_ALLOWED",
+        reason = "지원하지 않는 HTTP 메서드입니다.",
+        headers = exception.headers,
+    )
+
     @ExceptionHandler(Exception::class)
     fun handleUnexpectedException(exception: Exception): ResponseEntity<ApiResponse<Nothing>> {
         logger.error("Unexpected API exception", exception)
@@ -95,8 +116,10 @@ class GlobalExceptionHandler {
         errorCode: String,
         reason: String,
         data: Map<String, Any?>? = null,
+        headers: HttpHeaders = HttpHeaders.EMPTY,
     ): ResponseEntity<ApiResponse<Nothing>> = ResponseEntity
         .status(status)
+        .headers(headers)
         .body(
             ApiResponse.fail(
                 ApiError(
