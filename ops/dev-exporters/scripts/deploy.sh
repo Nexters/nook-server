@@ -17,6 +17,17 @@ if ! grep -q '^ERROR_LOG_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/' .e
   exit 1
 fi
 
+if grep -q '^ERROR_LOG_DISCORD_WEBHOOK_URL=.' .env &&
+  ! grep -Eq '^ERROR_LOG_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$' .env; then
+  echo "ERROR_LOG_DISCORD_WEBHOOK_URL must be a Discord webhook URL when set." >&2
+  exit 1
+fi
+
+if [ ! -f ../error-log-forwarder/forward_error_logs.py ]; then
+  echo "Deploy ops/error-log-forwarder beside the exporters directory first." >&2
+  exit 1
+fi
+
 docker compose pull
 docker compose up -d
 docker compose ps
