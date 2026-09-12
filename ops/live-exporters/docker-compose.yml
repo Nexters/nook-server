@@ -5,12 +5,13 @@ x-error-log-forwarder: &error-log-forwarder
     - /app/forward_error_logs.py
   environment:
     ERROR_LOG_SLACK_WEBHOOK_URL: ${ERROR_LOG_SLACK_WEBHOOK_URL:?}
-    ERROR_LOG_ENV: live
+    ERROR_LOG_DISCORD_WEBHOOK_URL: ${ERROR_LOG_DISCORD_WEBHOOK_URL:-}
+    ERROR_LOG_ENV: ${ERROR_LOG_ENV:?}
     ERROR_LOG_GRAFANA_BASE_URL: ${ERROR_LOG_GRAFANA_BASE_URL:?}
     ERROR_LOG_MAX_BYTES: ${ERROR_LOG_MAX_BYTES:-3500}
     ERROR_LOG_FLUSH_SECONDS: ${ERROR_LOG_FLUSH_SECONDS:-2}
   volumes:
-    - ./error-log-forwarder/forward_error_logs.py:/app/forward_error_logs.py:ro
+    - ../error-log-forwarder/forward_error_logs.py:/app/forward_error_logs.py:ro
     - /var/lib/docker/containers:/var/lib/docker/containers:ro
   restart: unless-stopped
 
@@ -48,7 +49,8 @@ services:
     environment:
       ERROR_LOG_CONTAINER_NAME: nook-live-api-blue
       ERROR_LOG_SLACK_WEBHOOK_URL: ${ERROR_LOG_SLACK_WEBHOOK_URL:?}
-      ERROR_LOG_ENV: live
+      ERROR_LOG_DISCORD_WEBHOOK_URL: ${ERROR_LOG_DISCORD_WEBHOOK_URL:-}
+      ERROR_LOG_ENV: ${ERROR_LOG_ENV:?}
       ERROR_LOG_GRAFANA_BASE_URL: ${ERROR_LOG_GRAFANA_BASE_URL:?}
       ERROR_LOG_MAX_BYTES: ${ERROR_LOG_MAX_BYTES:-3500}
       ERROR_LOG_FLUSH_SECONDS: ${ERROR_LOG_FLUSH_SECONDS:-2}
@@ -59,7 +61,8 @@ services:
     environment:
       ERROR_LOG_CONTAINER_NAME: nook-live-api-green
       ERROR_LOG_SLACK_WEBHOOK_URL: ${ERROR_LOG_SLACK_WEBHOOK_URL:?}
-      ERROR_LOG_ENV: live
+      ERROR_LOG_DISCORD_WEBHOOK_URL: ${ERROR_LOG_DISCORD_WEBHOOK_URL:-}
+      ERROR_LOG_ENV: ${ERROR_LOG_ENV:?}
       ERROR_LOG_GRAFANA_BASE_URL: ${ERROR_LOG_GRAFANA_BASE_URL:?}
       ERROR_LOG_MAX_BYTES: ${ERROR_LOG_MAX_BYTES:-3500}
       ERROR_LOG_FLUSH_SECONDS: ${ERROR_LOG_FLUSH_SECONDS:-2}

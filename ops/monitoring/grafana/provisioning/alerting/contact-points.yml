@@ -8,10 +8,11 @@ contactPoints:
   - orgId: 1
     name: slack-nook-alerts-v2
     receivers:
-      - uid: slack_nook_alerts_v2
+      - &slack-notifier
+        uid: slack_nook_alerts_v2
         type: slack
         disableResolveMessage: false
-        settings:
+        settings: &slack-settings
           url: $SLACK_ALERT_WEBHOOK_URL
           title: |
             {{ if eq .Status "firing" }}[FIRING]{{ else }}[RESOLVED]{{ end }} {{ .CommonLabels.alertname }}
@@ -22,3 +23,39 @@ contactPoints:
             {{ .Annotations.description }}
             {{ .GeneratorURL }}
             {{ end }}
+  - orgId: 1
+    name: nook-dev-alerts
+    receivers:
+      - <<: *slack-notifier
+        uid: slack_nook_dev_alerts
+        settings:
+          <<: *slack-settings
+          url: $SLACK_DEV_ALERT_WEBHOOK_URL
+      - &discord-notifier
+        uid: discord_nook_dev_alerts
+        type: discord
+        disableResolveMessage: false
+        settings: &discord-settings
+          url: $DISCORD_DEV_ALERT_WEBHOOK_URL
+          title: |
+            {{ if eq .Status "firing" }}[FIRING]{{ else }}[RESOLVED]{{ end }} {{ .CommonLabels.alertname }}
+          message: |
+            {{ range .Alerts }}
+            **{{ .Labels.env }} {{ .Labels.service }}** - {{ .Labels.severity }}
+            {{ .Annotations.summary }}
+            {{ .Annotations.description }}
+            {{ .GeneratorURL }}
+            {{ end }}
+  - orgId: 1
+    name: nook-live-alerts
+    receivers:
+      - <<: *slack-notifier
+        uid: slack_nook_live_alerts
+        settings:
+          <<: *slack-settings
+          url: $SLACK_LIVE_ALERT_WEBHOOK_URL
+      - <<: *discord-notifier
+        uid: discord_nook_live_alerts
+        settings:
+          <<: *discord-settings
+          url: $DISCORD_LIVE_ALERT_WEBHOOK_URL
