@@ -7,8 +7,13 @@ if [ ! -f .env ]; then
   cp .env.example .env
 fi
 
-if ! grep -q '^ERROR_LOG_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/' .env; then
-  echo "ERROR_LOG_SLACK_WEBHOOK_URL must be set in .env before deploying error log forwarding." >&2
+if ! grep -Eq '^ERROR_LOG_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$' .env; then
+  echo "ERROR_LOG_DISCORD_WEBHOOK_URL must be set in .env before deploying error log forwarding." >&2
+  exit 1
+fi
+
+if [ ! -f ../error-log-forwarder/forward_error_logs.py ]; then
+  echo "Deploy ops/error-log-forwarder beside the exporters directory first." >&2
   exit 1
 fi
 

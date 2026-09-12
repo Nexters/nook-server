@@ -2,8 +2,9 @@ import importlib.util
 import json
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 MODULE_PATH = Path(__file__).with_name("forward_error_logs.py")
@@ -86,37 +87,87 @@ class ParseLogEntryTest(unittest.TestCase):
         self.assertEqual({}, context)
 
 
-class SlackPayloadTest(unittest.TestCase):
-    def test_builds_bold_context_fields_and_request_filtered_grafana_button(self) -> None:
-        context = {
-            "service_name": "nook-api",
-            "request_id": "abc123def456gh78",
-            "user_id": "42",
-            "url_path": "POST /api/v1/posts/{postId}",
-        }
+class DiscordPayloadTest(unittest.TestCase):
+    def test_preserves_context_stack_trace_and_environment_link(self) -> None:
+        context = {"service_name": "nook-api", "request_id": "req-347", "user_id": "42", "url_path": "GET /posts"}
+        for environment in ("dev", "live"):
+            with (
+                self.subTest(environment=environment),
+                patch.object(forward_error_logs, "ENVIRONMENT", environment),
+                patch.object(forward_error_logs, "GRAFANA_BASE_URL", "https://grafana.example.com"),
+            ):
+                payload = forward_error_logs.discord_payload(["ERROR failed\n", "at Example.run()"], context)
+                embed = payload["embeds"][0]
+                self.assertIn(f"[{environment}]", embed["title"])
+                self.assertIn("at Example.run()", embed["description"])
+                self.assertEqual(list(context.values()), [field["value"] for field in embed["fields"]])
+                self.assertIn(f"/d/nook-{environment}-logs/", embed["url"])
+                self.assertIn("var-requestIdText=req-347", embed["url"])
+                self.assertEqual({"parse": []}, payload["allowed_mentions"])
+
+    def test_bounds_multibyte_payload_and_escapes_code_fences(self) -> None:
+        context = {key: "😀한" * 3000 for key in ("service_name", "request_id", "user_id", "url_path")}
         with (
-            patch.object(forward_error_logs, "ENVIRONMENT", "dev"),
-            patch.object(forward_error_logs, "GRAFANA_BASE_URL", "https://grafana.example.com/"),
+            patch.object(forward_error_logs, "MAX_BYTES", 999999),
+            patch.object(forward_error_logs, "CONTAINER_NAME", "😀" * 500),
         ):
-            payload = forward_error_logs.slack_payload(["error body"], context)
+            embed = forward_error_logs.discord_payload(["``` @everyone " + "😀한" * 5000], context)["embeds"][0]
+        count = lambda value: len(value.encode("utf-16-le")) // 2
+        self.assertLessEqual(count(embed["title"]), 256)
+        self.assertLessEqual(count(embed["description"]), 4096)
+        self.assertEqual(2, embed["description"].count("```"))
+        self.assertIn("... truncated", embed["description"])
+        total = count(embed["title"]) + count(embed["description"])
+        for field in embed["fields"]:
+            self.assertLessEqual(count(field["value"]), 1024)
+            total += count(field["name"]) + count(field["value"])
+        self.assertLessEqual(total, 6000)
 
-        fields = payload["blocks"][1]["fields"]
-        self.assertEqual("*Service Name*\nnook-api", fields[0]["text"])
-        self.assertEqual("*Request ID*\nabc123def456gh78", fields[1]["text"])
-        self.assertEqual("*User ID*\n42", fields[2]["text"])
-        self.assertEqual("*URL Path*\nPOST /api/v1/posts/{postId}", fields[3]["text"])
-        button_url = payload["blocks"][3]["elements"][0]["url"]
-        self.assertIn("/d/nook-dev-logs/nook-dev-logs?", button_url)
-        self.assertIn("var-requestIdText=abc123def456gh78", button_url)
-        self.assertIn("from=now-15m", button_url)
+    def test_missing_context_uses_fallback_without_link(self) -> None:
+        embed = forward_error_logs.discord_payload(["error"], {})["embeds"][0]
+        self.assertNotIn("url", embed)
+        self.assertTrue(all(field["value"] == "-" for field in embed["fields"]))
 
-    def test_uses_fallback_values_and_omits_button_without_request_id(self) -> None:
-        with patch.object(forward_error_logs, "GRAFANA_BASE_URL", "https://grafana.example.com"):
-            payload = forward_error_logs.slack_payload(["error body"], {})
 
-        fields = payload["blocks"][1]["fields"]
-        self.assertTrue(all(field["text"].endswith("\n-") for field in fields))
-        self.assertEqual(3, len(payload["blocks"]))
+class DeliveryTest(unittest.TestCase):
+    def test_sends_only_discord_with_confirmation(self) -> None:
+        with (
+            patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/webhook"),
+            patch.object(forward_error_logs.urllib.request, "urlopen", return_value=MagicMock()) as send,
+        ):
+            forward_error_logs.post_error_log(["error"], {})
+        self.assertEqual(1, send.call_count)
+        request = send.call_args.args[0]
+        self.assertEqual("https://discord.example/webhook?wait=true", request.full_url)
+        self.assertEqual(forward_error_logs.discord_payload(["error"], {}), json.loads(request.data))
+
+    def test_failures_do_not_stop_the_forwarder_or_leak_url(self) -> None:
+        errors = [
+            urllib.error.URLError("https://secret.example/token"),
+            urllib.error.HTTPError("https://secret.example/token", 429, "rate limited", {}, None),
+            TimeoutError("https://secret.example/token"),
+        ]
+        for error in errors:
+            with (
+                self.subTest(error=type(error).__name__),
+                patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/webhook"),
+                patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=[error, MagicMock()]) as send,
+                patch("builtins.print") as output,
+            ):
+                forward_error_logs.post_error_log(["error"], {})
+                forward_error_logs.post_error_log(["next error"], {})
+                self.assertEqual(2, send.call_count)
+                self.assertNotIn("secret.example", str(output.call_args_list))
+
+    def test_does_not_send_without_webhook_or_log_body(self) -> None:
+        for webhook, body in [("", "error"), ("https://discord.example/webhook", "  ")]:
+            with (
+                self.subTest(webhook=webhook, body=body),
+                patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", webhook),
+                patch.object(forward_error_logs.urllib.request, "urlopen") as send,
+            ):
+                forward_error_logs.post_error_log([body], {})
+                send.assert_not_called()
 
 
 class FollowCurrentContainerLogTest(unittest.TestCase):

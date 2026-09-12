@@ -3,22 +3,45 @@ apiVersion: 1
 deleteContactPoints:
   - orgId: 1
     uid: slack_nook_alerts
+  - orgId: 1
+    uid: slack_nook_alerts_v2
+  - orgId: 1
+    uid: slack_nook_dev_alerts
+  - orgId: 1
+    uid: slack_nook_live_alerts
 
 contactPoints:
   - orgId: 1
-    name: slack-nook-alerts-v2
+    name: nook-dev-alerts
     receivers:
-      - uid: slack_nook_alerts_v2
-        type: slack
+      - &discord-notifier
+        uid: discord_nook_dev_alerts
+        type: discord
         disableResolveMessage: false
-        settings:
-          url: $SLACK_ALERT_WEBHOOK_URL
+        settings: &discord-settings
+          url: $DISCORD_DEV_ALERT_WEBHOOK_URL
           title: |
             {{ if eq .Status "firing" }}[FIRING]{{ else }}[RESOLVED]{{ end }} {{ .CommonLabels.alertname }}
-          text: |
+          message: |
             {{ range .Alerts }}
-            *{{ .Labels.env }} {{ .Labels.service }}* - {{ .Labels.severity }}
+            **{{ .Labels.env }} {{ .Labels.service }}** - {{ .Labels.severity }}
             {{ .Annotations.summary }}
             {{ .Annotations.description }}
             {{ .GeneratorURL }}
             {{ end }}
+  - orgId: 1
+    name: nook-live-alerts
+    receivers:
+      - <<: *discord-notifier
+        uid: discord_nook_live_alerts
+        settings:
+          <<: *discord-settings
+          url: $DISCORD_LIVE_ALERT_WEBHOOK_URL
+  - orgId: 1
+    name: nook-ops-alerts
+    receivers:
+      - <<: *discord-notifier
+        uid: discord_nook_ops_alerts
+        settings:
+          <<: *discord-settings
+          url: $DISCORD_OPS_ALERT_WEBHOOK_URL
