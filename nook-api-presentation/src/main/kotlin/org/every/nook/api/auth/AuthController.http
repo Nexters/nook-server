@@ -37,3 +37,9 @@ Content-Type: application/json
 ### 로그아웃
 POST {{baseUrl}}/api/v1/auth/logout
 Authorization: Bearer replace-with-access-token
+
+### 로그인 API의 미지원 메서드 (405 / METHOD_NOT_ALLOWED, Allow: POST)
+GET {{baseUrl}}/api/v1/auth/social
+
+### 토큰 갱신 API의 미지원 메서드 (405 / METHOD_NOT_ALLOWED, Allow: POST)
+GET {{baseUrl}}/api/v1/auth/token/refresh
