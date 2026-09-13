@@ -58,7 +58,7 @@ DB 유지보수로 바뀌는 수정 시각을 실패 시각으로 오인하지 �
   본문 337건/장소 328건 retry 예산 일치, 과거 실패 시각 기록 0건(NULL), 신규 칼럼 확인.
 - dev/live 기존 Discord alert webhook 연결을 확인하고 worker/exporters 환경에 설정했다. 토큰은 저장소에 포함하지 않는다.
 - dev/live API 오류 전달기 코드·compose 갱신 및 전달기만 재생성 완료. 일반 ERROR 경로는 유지하고 저장 POST 오류를 alert 채널로 분기한다.
-- live 파싱 worker 신버전 및 live DDL은 아직 미적용이다.
+- live 파싱 worker 신버전은 아직 미적용이다. live DDL은 아래 선행 적용 기록을 따른다.
 - dev 최종 배포: develop `8a64e159`, API/worker `dev-434-8a64e159`, [Actions 34744043331](https://github.com/Nexters/nook-server/actions/runs/34744043331) 성공.
   관리자 화면은 선행 [Actions 34743816968](https://github.com/Nexters/nook-server/actions/runs/34743816968)에서 배포했다.
 - dev API/worker healthy 및 actuator UP, 재시작 0, Prometheus worker up=1, 파싱 전달기/관리자 running, 최근 5분 JSON ERROR 0건 확인.
@@ -66,3 +66,12 @@ DB 유지보수로 바뀌는 수정 시각을 실패 시각으로 오인하지 �
 - alert-dev / alert-live에 실제 장애가 아닌 연결 테스트 메시지를 각각 1건 전송, Discord HTTP 200 및 대상 채널 일치 확인.
 - 최종 검증: JVM 테스트 741건 실패/오류/건너뜀 0건, Python 전달기 테스트 18건 통과. 실제 인증된 dev 관리자 세션에서 통합 재시도는 미실행이다.
 - 장소 검색 실패 후 대체 제목 생성 성공이 실패 단계를 가리지 않도록 회귀 테스트로 확인했다.
+
+## live DDL 선행 적용 기록
+
+- 2026-09-13 사용자 요청으로 `ddl/up.sql` 적용. 기존 worker `prod-432-235df36e` 중지 후 PROCESSING 0건 확인.
+- 본문 593건/장소 579건 retry_attempt_count와 attempt_count 일치, 과거 last_failed_at은 모두 NULL 유지.
+- 적용 전후 모든 본문/장소 행의 updated_at을 비교해 변경 없음 확인. 신규 칼럼 타입·NULL·기본값·COMMENT 확인.
+- 기존 worker 재가동. 앱 신버전 배포/PR 병합은 아직 하지 않음.
+- 구버전 worker가 계속 실행되므로 최초 신버전 전환 직전 본문/장소 두 테이블만 실행 횟수 차이를 최종 보정한다.
+  ALTER와 후속 작업 테이블의 retry_attempt_count 보정은 반복하지 않는다.
