@@ -142,13 +142,21 @@ class ParsingExecutionMySqlTest {
         val audit = RecordingAudit()
         val recovery = db.recovery(audit)
         val command = RetryParsingJobCommand(job.id, AdminActor("operator", "ops@example.com"), "복구", null)
-        assertEquals("PENDING", recovery.retry(command).status)
+        assertEquals("RETRY_PENDING", recovery.retry(command).recoveryStatus)
         assertFailsWith<ParsingRecoveryException> { recovery.retry(command) }
         assertEquals(1, audit.entries.size)
         val next = db.jobs.claim(1, timeout).single()
         assertEquals(job.attempt + 1, next.attempt)
         assertEquals(1, next.retryAttempt)
         assertFalse(db.jobs.complete(job.id, job.attempt))
+        assertEquals("RETRY_PROCESSING", recovery.find(job.id)?.recoveryStatus)
+        db.jobs.fail(next.id, next.attempt, "failed again")
+        assertEquals("RETRY_FAILED", recovery.find(job.id)?.recoveryStatus)
+        recovery.retry(command)
+        val finalAttempt = db.jobs.claim(1, timeout).single()
+        db.jobs.complete(finalAttempt.id, finalAttempt.attempt)
+        assertEquals("RECOVERED", recovery.find(job.id)?.recoveryStatus)
+        assertEquals("RECOVERED", recovery.list(1, "COMPLETED", null, 10).jobs.single().recoveryStatus)
     }
 
     @Test
@@ -161,6 +169,18 @@ class ParsingExecutionMySqlTest {
         assertFailsWith<IllegalStateException> { recovery.retry(command) }
         assertEquals("FAILED", recovery.list(1, "FAILED", null, 10).jobs.single().status)
         assertEquals(emptyList(), db.jobs.claim(1, timeout))
+    }
+
+    @Test
+    fun `automatic retries are not reported as manual recovery`() {
+        db.insertMediaJob()
+        val first = db.jobs.claim(1, timeout).single()
+        db.jobs.retry(first.id, first.attempt, ParsingMySqlFixture.NOW, "temporary failure")
+        val second = db.jobs.claim(1, timeout).single()
+        db.jobs.complete(second.id, second.attempt)
+        val recovery = db.recovery(RecordingAudit())
+        assertEquals("NONE", recovery.find(first.id)?.recoveryStatus)
+        assertEquals(null, recovery.find(Long.MAX_VALUE))
     }
 
     private class RecordingAudit(private val fail: Boolean = false) : AdminAuditLogPort {

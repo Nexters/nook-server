@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.every.nook.api.application.admin.AdminActor
 import org.every.nook.api.application.admin.AdminFollowUpJob
+import org.every.nook.api.application.admin.GetAdminFollowUpJobUseCase
 import org.every.nook.api.application.admin.ListAdminFollowUpJobsUseCase
 import org.every.nook.api.application.admin.RetryAdminFollowUpJobUseCase
 import org.every.nook.api.application.admin.RetryParsingJobCommand
@@ -25,6 +26,7 @@ import java.time.Instant
 class AdminParsingRecoveryController(
     private val listJobs: ListAdminFollowUpJobsUseCase,
     private val retryJob: RetryAdminFollowUpJobUseCase,
+    private val getJob: GetAdminFollowUpJobUseCase,
 ) {
     @GetMapping
     @Operation(summary = "후속 파싱 작업과 실패 원인을 조회합니다")
@@ -40,6 +42,11 @@ class AdminParsingRecoveryController(
     ) = listJobs(postId, status, beforeId, limit).let { page ->
         ApiResponse.success(JobsResponse(page.jobs.map(JobResponse::from), page.hasNext))
     }
+
+    @GetMapping("/{jobId}")
+    @Operation(summary = "재시도한 후속 작업의 진행 상태를 확인합니다")
+    fun get(@Parameter(description = "확인할 작업 ID") @PathVariable jobId: Long) =
+        ApiResponse.success(JobResponse.from(getJob(jobId)))
 
     @PostMapping("/{jobId}/retry")
     @Operation(summary = "실패한 후속 작업만 다시 실행합니다")
@@ -63,6 +70,8 @@ class AdminParsingRecoveryController(
         @field:Schema(description = "최근 실패 사유") val failureReason: String?,
         @field:Schema(description = "다음 실행 가능 시각") val nextAttemptAt: Instant?,
         @field:Schema(description = "최종 변경 시각") val updatedAt: Instant,
+        @field:Schema(description = "수동 재시도 상태: NONE, RETRY_PENDING, RETRY_PROCESSING, RECOVERED, RETRY_FAILED")
+        val recoveryStatus: String,
     ) {
         companion object {
             fun from(job: AdminFollowUpJob) = JobResponse(
@@ -74,6 +83,7 @@ class AdminParsingRecoveryController(
                 job.failureReason,
                 job.nextAttemptAt,
                 job.updatedAt,
+                job.recoveryStatus,
             )
         }
     }

@@ -14,6 +14,7 @@ data class AdminFollowUpJob(
     val failureReason: String?,
     val nextAttemptAt: Instant?,
     val updatedAt: Instant,
+    val recoveryStatus: String = "NONE",
 )
 
 data class AdminFollowUpPage(val jobs: List<AdminFollowUpJob>, val hasNext: Boolean)
@@ -21,8 +22,16 @@ data class AdminFollowUpPage(val jobs: List<AdminFollowUpJob>, val hasNext: Bool
 data class RetryParsingJobCommand(val jobId: Long, val actor: AdminActor, val reason: String, val requestId: String?)
 
 interface AdminParsingRecoveryPort {
+    fun find(jobId: Long): AdminFollowUpJob?
     fun list(postId: Long?, status: String?, beforeId: Long?, limit: Int): AdminFollowUpPage
     fun retry(command: RetryParsingJobCommand): AdminFollowUpJob
+}
+
+class GetAdminFollowUpJobUseCase(private val port: AdminParsingRecoveryPort) {
+    operator fun invoke(jobId: Long): AdminFollowUpJob {
+        require(jobId > 0)
+        return port.find(jobId) ?: throw ParsingRecoveryException(ParsingRecoveryError.NOT_FOUND)
+    }
 }
 
 class ListAdminFollowUpJobsUseCase(private val port: AdminParsingRecoveryPort) {

@@ -18,3 +18,7 @@ Content-Type: application/json
 {
   "reason": "외부 서비스 복구 후 재시도"
 }
+
+### 재시도 작업 진행 상태
+GET {{baseUrl}}/api/admin/v1/parsing-jobs/62
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
