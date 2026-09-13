@@ -44,34 +44,46 @@ class ParsingFollowUpPersistenceAdapter(
             if (!job.isAvailable(now, processingTimeout)) return@mapNotNull null
             job.status = ParsingFollowUpJobStatus.PROCESSING
             job.attemptCount += 1
+            job.retryAttemptCount += 1
             job.nextAttemptAt = now
             job.toClaimed()
         }
     }
 
     @Transactional
-    override fun complete(jobId: Long) {
-        val job = requireNotNull(repository.findByIdForUpdate(jobId))
-        check(job.status == ParsingFollowUpJobStatus.PROCESSING)
+    override fun complete(jobId: Long, attempt: Int): Boolean {
+        val job = repository.findByIdForUpdate(jobId) ?: return false
+        if (!job.isCurrentAttempt(attempt)) return false
         job.status = ParsingFollowUpJobStatus.COMPLETED
         job.failureReason = null
+        return true
     }
 
     @Transactional
-    override fun retry(jobId: Long, availableAt: Instant, reason: String) {
-        val job = requireNotNull(repository.findByIdForUpdate(jobId))
-        check(job.status == ParsingFollowUpJobStatus.PROCESSING)
+    override fun retry(jobId: Long, attempt: Int, availableAt: Instant, reason: String): Boolean {
+        val job = repository.findByIdForUpdate(jobId) ?: return false
+        if (!job.isCurrentAttempt(attempt)) return false
         job.status = ParsingFollowUpJobStatus.PENDING
         job.nextAttemptAt = availableAt
         job.failureReason = reason.take(ParsingFollowUpJobEntity.FAILURE_REASON_LENGTH)
+        return true
     }
 
     @Transactional
-    override fun fail(jobId: Long, reason: String) {
-        val job = requireNotNull(repository.findByIdForUpdate(jobId))
-        check(job.status == ParsingFollowUpJobStatus.PROCESSING)
+    override fun fail(jobId: Long, attempt: Int, reason: String): Boolean {
+        val job = repository.findByIdForUpdate(jobId) ?: return false
+        if (!job.isCurrentAttempt(attempt)) return false
         job.status = ParsingFollowUpJobStatus.FAILED
         job.failureReason = reason.take(ParsingFollowUpJobEntity.FAILURE_REASON_LENGTH)
+        return true
+    }
+
+    @Transactional
+    override fun writeResult(jobId: Long, attempt: Int, change: () -> Unit): Boolean {
+        val job = repository.findByIdForUpdate(jobId) ?: return false
+        if (!job.isCurrentAttempt(attempt)) return false
+        change()
+        return true
     }
 
     private fun save(type: ParsingFollowUpJobType, postId: Long, payload: Any, availableAt: Instant?) {
@@ -90,18 +102,21 @@ class ParsingFollowUpPersistenceAdapter(
             requireNotNull(id),
             attemptCount,
             objectMapper.readValue<PostMediaStorageRequestedEvent>(payload),
+            retryAttemptCount,
         )
 
         ParsingFollowUpJobType.PLACE_THUMBNAILS -> ClaimedParsingFollowUpJob.Thumbnails(
             requireNotNull(id),
             attemptCount,
             objectMapper.readValue<PlaceThumbnailsRequestedEvent>(payload),
+            retryAttemptCount,
         )
 
         ParsingFollowUpJobType.PLACE_TAGS -> ClaimedParsingFollowUpJob.Tags(
             requireNotNull(id),
             attemptCount,
             objectMapper.readValue<PlaceTagsRequestedEvent>(payload),
+            retryAttemptCount,
         )
     }
 
@@ -115,3 +130,6 @@ class ParsingFollowUpPersistenceAdapter(
         -> false
     }
 }
+
+private fun ParsingFollowUpJobEntity.isCurrentAttempt(attempt: Int): Boolean =
+    status == ParsingFollowUpJobStatus.PROCESSING && attemptCount == attempt

@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.config
 import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.post.StorePostMediaUseCase
+import org.every.nook.api.application.processing.ParsingFailureClassifier
 import org.every.nook.api.application.processing.ParsingFollowUpJobPort
 import org.every.nook.api.application.processing.ProcessParsingFollowUpJobsUseCase
 import org.springframework.beans.factory.annotation.Value
@@ -14,6 +15,7 @@ import java.time.Duration
 class ParsingFollowUpUseCaseConfig {
     @Bean
     fun processParsingFollowUpJobsUseCase(
+        failureClassifier: ParsingFailureClassifier,
         jobPort: ParsingFollowUpJobPort,
         storePostMedia: StorePostMediaUseCase,
         storePlaceThumbnail: StorePlaceThumbnailUseCase,
@@ -23,6 +25,7 @@ class ParsingFollowUpUseCaseConfig {
         @Value("\${parsing.follow-up.retry-backoff:10s}") retryBackoff: Duration,
         @Value("\${parsing.follow-up.max-attempts:4}") maxAttempts: Int,
     ): ProcessParsingFollowUpJobsUseCase = ProcessParsingFollowUpJobsUseCase(
+        failureClassifier = failureClassifier,
         jobPort = jobPort,
         storePostMedia = storePostMedia,
         storePlaceThumbnail = storePlaceThumbnail,

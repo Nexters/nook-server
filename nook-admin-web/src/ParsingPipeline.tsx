@@ -8,6 +8,7 @@ import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "./api";
+import { ParsingRecovery } from "./ParsingRecovery";
 import "./parsing-pipeline.css";
 
 type Rule = { label: string; value: string; description?: string };
@@ -96,6 +97,7 @@ export function ParsingPipelinePage() {
     {error && <Alert severity="error">{error}</Alert>}
     {data?.execution && <ExecutionSummary execution={data.execution} />}
     {data?.execution && <ExecutionTimeline traces={data.execution.traces ?? []} />}
+    <ParsingRecovery key={requestedPostId} postId={requestedPostId || undefined} />
     {data && <ConfigurationStrip configurations={data.configurations} />}
 
     <Card variant="outlined" className="pipeline-canvas-card">

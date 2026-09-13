@@ -16,19 +16,29 @@ class ProcessParsingFollowUpJobsUseCase(
     private val retryBackoff: Duration,
     private val maxAttempts: Int = 4,
     private val clock: Clock = Clock.systemUTC(),
+    private val failureClassifier: ParsingFailureClassifier = ParsingFailureClassifier.DEFAULT,
 ) {
     init {
+        require(!processingTimeout.isNegative && !processingTimeout.isZero) { "Processing timeout must be positive" }
+        require(!retryBackoff.isNegative && !retryBackoff.isZero) { "Retry backoff must be positive" }
         require(batchSize > 0) { "Follow-up job batch size must be positive" }
         require(maxAttempts > 0) { "Follow-up job max attempts must be positive" }
     }
 
     operator fun invoke(): Int {
-        val jobs = jobPort.claim(batchSize, processingTimeout)
-        jobs.forEach(::process)
-        return jobs.size
+        var processed = 0
+        repeat(batchSize) {
+            val job = jobPort.claim(1, processingTimeout).singleOrNull() ?: return processed
+            process(job)
+            processed += 1
+        }
+        return processed
     }
 
     private fun process(job: ClaimedParsingFollowUpJob) {
+        val writer = ParsingResultWriter { change ->
+            if (!jobPort.writeResult(job.id, job.attempt, change)) throw StaleParsingExecutionException()
+        }
         runCatching {
             when (job) {
                 is ClaimedParsingFollowUpJob.Media -> storePostMedia(
@@ -39,21 +49,28 @@ class ProcessParsingFollowUpJobsUseCase(
                         job.event.sequence,
                         job.event.sourceThumbnailUrl,
                     ),
+                    writer,
                 )
 
                 is ClaimedParsingFollowUpJob.Thumbnails ->
-                    storePlaceThumbnail(job.event.postId, job.event.requests)
+                    storePlaceThumbnail(job.event.postId, job.event.requests, writer)
 
-                is ClaimedParsingFollowUpJob.Tags -> storePlaceTags(job.event)
+                is ClaimedParsingFollowUpJob.Tags -> storePlaceTags(job.event, writer)
             }
         }.onSuccess {
-            jobPort.complete(job.id)
+            jobPort.complete(job.id, job.attempt)
         }.onFailure { exception ->
-            val reason = exception.message.orEmpty().ifBlank { "Parsing follow-up job failed" }
-            if (job.attempt < maxAttempts) {
-                jobPort.retry(job.id, clock.instant().plus(retryBackoff), reason)
+            if (exception is StaleParsingExecutionException) return@onFailure
+            val failure = failureClassifier.classify(exception)
+            val reason = failure.storedReason()
+            if (failure.kind.retryable && job.retryAttempt < maxAttempts) {
+                val delay = maxOf(
+                    retryBackoff.multipliedBy(job.retryAttempt.toLong()),
+                    failure.retryAfter ?: Duration.ZERO,
+                )
+                jobPort.retry(job.id, job.attempt, clock.instant().plus(delay), reason)
             } else {
-                jobPort.fail(job.id, reason)
+                jobPort.fail(job.id, job.attempt, reason)
             }
         }
     }

@@ -3,6 +3,7 @@ package org.every.nook.api.application.post
 import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.application.post.port.UpdatePostMediaUrlPort
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ParsingResultWriter
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.measure
 import org.every.nook.api.domain.post.PostMedia
@@ -14,7 +15,7 @@ class StorePostMediaUseCase(
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    operator fun invoke(postId: Long, command: Command) {
+    operator fun invoke(postId: Long, command: Command, writer: ParsingResultWriter = ParsingResultWriter.DIRECT) {
         val media = PostMedia(
             type = PostMedia.MediaType.valueOf(command.mediaType),
             url = command.sourceUrl,
@@ -31,14 +32,16 @@ class StorePostMediaUseCase(
             }
         }
         metrics.measure(MEDIA_FLOW, COMPLETE_STAGE, postId, null, clock) {
-            updateMediaUrl.update(
-                postId,
-                media.sequence,
-                media.url,
-                stored.url,
-                command.sourceThumbnailUrl,
-                storedThumbnailUrl,
-            )
+            writer.write {
+                updateMediaUrl.update(
+                    postId,
+                    media.sequence,
+                    media.url,
+                    stored.url,
+                    command.sourceThumbnailUrl,
+                    storedThumbnailUrl,
+                )
+            }
         }
     }
 

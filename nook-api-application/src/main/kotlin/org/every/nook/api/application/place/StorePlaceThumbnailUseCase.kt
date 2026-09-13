@@ -1,8 +1,10 @@
 package org.every.nook.api.application.place
 
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ParsingResultWriter
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.ProcessingMetrics
+import org.every.nook.api.application.processing.StaleParsingExecutionException
 import org.every.nook.api.application.processing.error
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.application.processing.measure
@@ -17,37 +19,46 @@ class StorePlaceThumbnailUseCase(
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    operator fun invoke(postId: Long, requests: List<PlaceThumbnailProvider.Request>) {
+    operator fun invoke(
+        postId: Long,
+        requests: List<PlaceThumbnailProvider.Request>,
+        writer: ParsingResultWriter = ParsingResultWriter.DIRECT,
+    ) {
         require(requests.isNotEmpty()) { "thumbnail requests must not be empty" }
         val startedAt = clock.millis()
         val completed = ConcurrentHashMap.newKeySet<PlaceIdentity>()
         requests.forEach { logger.info(event(postId, it.place, "place.thumbnail.started", FETCH_STAGE, "started")) }
         runCatching {
             requests.forEach { request ->
-                updatePort.update(
-                    request.place.provider,
-                    request.place.externalPlaceId,
-                    PlaceThumbnailParsingStatus.PROCESSING,
-                )
+                writer.write {
+                    updatePort.update(
+                        request.place.provider,
+                        request.place.externalPlaceId,
+                        PlaceThumbnailParsingStatus.PROCESSING,
+                    )
+                }
             }
             val supplements = metrics.measure(THUMBNAIL_FLOW, FETCH_STAGE, postId, null, clock) {
                 thumbnailProvider.fetchAll(requests) { request, supplement ->
-                    complete(postId, request, supplement, startedAt)
+                    complete(postId, request, supplement, startedAt, writer)
                     completed += request.identity()
                 }
             }
             require(supplements.size == requests.size) { "thumbnail provider returned an invalid result count" }
             requests.zip(supplements).forEach { (request, supplement) ->
-                if (request.identity() !in completed) complete(postId, request, supplement, startedAt)
+                if (request.identity() !in completed) complete(postId, request, supplement, startedAt, writer)
             }
         }.getOrElse { exception ->
+            if (exception is StaleParsingExecutionException) throw exception
             requests.filterNot { it.identity() in completed }.forEach { request ->
                 runCatching {
-                    updatePort.update(
-                        request.place.provider,
-                        request.place.externalPlaceId,
-                        PlaceThumbnailParsingStatus.FAILED,
-                    )
+                    writer.write {
+                        updatePort.update(
+                            request.place.provider,
+                            request.place.externalPlaceId,
+                            PlaceThumbnailParsingStatus.FAILED,
+                        )
+                    }
                 }.onFailure { statusException -> exception.addSuppressed(statusException) }
                 logger.error(
                     event(postId, request.place, "place.thumbnail.failed", FETCH_STAGE, "failure", startedAt),
@@ -63,6 +74,7 @@ class StorePlaceThumbnailUseCase(
         request: PlaceThumbnailProvider.Request,
         supplement: PlaceSupplement?,
         startedAt: Long,
+        writer: ParsingResultWriter,
     ) {
         val status = if (supplement?.photoUrls.isNullOrEmpty()) {
             PlaceThumbnailParsingStatus.FAILED
@@ -70,7 +82,14 @@ class StorePlaceThumbnailUseCase(
             PlaceThumbnailParsingStatus.COMPLETED
         }
         metrics.measure(THUMBNAIL_FLOW, COMPLETE_STAGE, postId, null, clock) {
-            updatePort.update(request.place.provider, request.place.externalPlaceId, status, supplement)
+            writer.write {
+                updatePort.update(
+                    request.place.provider,
+                    request.place.externalPlaceId,
+                    status,
+                    supplement,
+                )
+            }
         }
         val action = if (status == PlaceThumbnailParsingStatus.COMPLETED) {
             "place.thumbnail.completed"
