@@ -180,6 +180,7 @@ class ProcessPlaceParsingJobUseCase(
         } else {
             NO_PLACE_RESOLVED_AFTER_IMAGE_REASON
         }
+        ensureActive(job, unresolvedPlaceStage(imageResolution != null))
         throw TerminalPlaceParsingException(reason, title)
     }
 
@@ -517,8 +518,6 @@ class ProcessPlaceParsingJobUseCase(
         }.getOrThrow()
     }
 
-    private fun failResolution(message: String): Nothing = throw PlaceResolutionException(message)
-
     // Each early return represents a distinct fenced state transition and prevents stale attempts from logging errors.
     @Suppress("ReturnCount")
     private fun handleFailure(job: ClaimedPlaceParsingJob, exception: Throwable, startedAt: Instant): Result {
@@ -684,8 +683,6 @@ class ProcessPlaceParsingJobUseCase(
         const val FAILURE_OUTCOME = "failure"
         const val DEFAULT_IMAGE_OCR_CONCURRENCY = 4
     }
-
-    private class PlaceResolutionException(message: String) : IllegalStateException(message)
 
     private class TerminalPlaceParsingException(message: String, val title: String) : IllegalStateException(message)
 
