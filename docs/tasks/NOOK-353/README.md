@@ -59,3 +59,10 @@ DB 유지보수로 바뀌는 수정 시각을 실패 시각으로 오인하지 �
 - dev/live 기존 Discord alert webhook 연결을 확인하고 worker/exporters 환경에 설정했다. 토큰은 저장소에 포함하지 않는다.
 - dev/live API 오류 전달기 코드·compose 갱신 및 전달기만 재생성 완료. 일반 ERROR 경로는 유지하고 저장 POST 오류를 alert 채널로 분기한다.
 - live 파싱 worker 신버전 및 live DDL은 아직 미적용이다.
+- dev 최종 배포: develop `8a64e159`, API/worker `dev-434-8a64e159`, [Actions 34744043331](https://github.com/Nexters/nook-server/actions/runs/34744043331) 성공.
+  관리자 화면은 선행 [Actions 34743816968](https://github.com/Nexters/nook-server/actions/runs/34743816968)에서 배포했다.
+- dev API/worker healthy 및 actuator UP, 재시작 0, Prometheus worker up=1, 파싱 전달기/관리자 running, 최근 5분 JSON ERROR 0건 확인.
+- dev 최초 신버전 전환 직전 본문/장소 실행 횟수 보정: 수정 각각 0건. 이후 보정 UPDATE는 재실행하지 않는다.
+- alert-dev / alert-live에 실제 장애가 아닌 연결 테스트 메시지를 각각 1건 전송, Discord HTTP 200 및 대상 채널 일치 확인.
+- 최종 검증: JVM 테스트 741건 실패/오류/건너뜀 0건, Python 전달기 테스트 18건 통과. 실제 인증된 dev 관리자 세션에서 통합 재시도는 미실행이다.
+- 장소 검색 실패 후 대체 제목 생성 성공이 실패 단계를 가리지 않도록 회귀 테스트로 확인했다.
