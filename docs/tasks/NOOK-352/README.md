@@ -35,3 +35,10 @@ DDL, 전체 재분석, 상세 실행 로그/진행률, 과거 실패 사유 복�
 
 스키마 변경 없음. 기존 API 필드는 유지한다. 새 API 배포 후 단건 추적과 복구 배지를 확인한다.
 본 작업은 NOOK-348의 후속 변경이며 dev 우선 검증한다. live 배포는 별도다.
+
+- 2026-09-13 develop `8c8be61807766f5709bb3ac34c7219d44ea0f56d` 배포 완료.
+- GitHub Actions [34741772820](https://github.com/Nexters/nook-server/actions/runs/34741772820) 성공.
+- API/worker `dev-431-8c8be618`: health UP, 컨테이너 healthy, 재시작 0회.
+- 관리자 웹 `/health` 정상. Prometheus dev worker `up=1` 확인.
+- 기존 화면 테스트 작업 #62는 COMPLETED, 총 실행 5회/현재 예산 실행 1회로 RECOVERED 대상임을 DB에서 확인.
+- 실제 관리자 인증 세션을 통한 배포 후 화면 검증은 수행하지 않았으며, 화면 흐름은 위 모의 API 검증 기준이다.
