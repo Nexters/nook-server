@@ -172,7 +172,7 @@ class ProcessPostContentParsingJobUseCase(
             return Result.Failed
         }
         val failure = failureClassifier.classify(exception)
-        val backoff = retryBackoffs.getOrNull(job.attempt - 1)?.takeIf { failure.kind.retryable }
+        val backoff = retryBackoffs.getOrNull(job.retryAttempt - 1)?.takeIf { failure.kind.retryable }
         if (backoff != null) {
             val nextAttemptAt = clock.instant().plus(maxOf(backoff, failure.retryAfter ?: Duration.ZERO))
             if (!jobPort.retry(job.postId, job.attempt, nextAttemptAt, reason)) return Result.Skipped

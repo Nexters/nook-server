@@ -58,7 +58,7 @@ class AdminParsingRecoveryAdapter(
     }
 }
 
-private fun ParsingFollowUpJobEntity.toAdminView() = AdminFollowUpJob(
+internal fun ParsingFollowUpJobEntity.toAdminView() = AdminFollowUpJob(
     id = requireNotNull(id),
     postId = postId,
     type = jobType.name,
@@ -67,6 +67,8 @@ private fun ParsingFollowUpJobEntity.toAdminView() = AdminFollowUpJob(
     failureReason = failureReason,
     nextAttemptAt = nextAttemptAt.takeIf { status == ParsingFollowUpJobStatus.PENDING },
     updatedAt = updatedAt,
+    lastFailedAt = lastFailedAt,
+    failureStage = jobType.name.takeIf { lastFailedAt != null },
     recoveryStatus = if (attemptCount > retryAttemptCount) {
         when (status) {
             ParsingFollowUpJobStatus.PENDING -> "RETRY_PENDING"

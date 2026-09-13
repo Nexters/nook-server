@@ -12,11 +12,13 @@ from typing import Callable, Iterator, TextIO
 
 CONTAINER_NAME = os.getenv("ERROR_LOG_CONTAINER_NAME", "nook-dev-api")
 DISCORD_WEBHOOK_URL = os.getenv("ERROR_LOG_DISCORD_WEBHOOK_URL", "")
+PARSING_DISCORD_WEBHOOK_URL = os.getenv("PARSING_ALERT_DISCORD_WEBHOOK_URL", "")
 ENVIRONMENT = os.getenv("ERROR_LOG_ENV", "dev")
 GRAFANA_BASE_URL = os.getenv("ERROR_LOG_GRAFANA_BASE_URL", "")
 LOG_LEVEL_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}.*\s(?P<level>TRACE|DEBUG|INFO|WARN|ERROR)\s+")
 MAX_BYTES = int(os.getenv("ERROR_LOG_MAX_BYTES", "3500"))
 FLUSH_SECONDS = float(os.getenv("ERROR_LOG_FLUSH_SECONDS", "2"))
+PARSING_ONLY = os.getenv("ERROR_LOG_PARSING_ONLY", "false").lower() == "true"
 POLL_SECONDS = float(os.getenv("ERROR_LOG_POLL_SECONDS", "1"))
 
 
@@ -84,6 +86,44 @@ def discord_payload(lines: list[str], context: dict[str, str | None]) -> dict:
     return {"embeds": [embed], "allowed_mentions": {"parse": []}}
 
 
+STAGE_NAMES = {
+    "POST_CONTENT": "본문 파싱", "PLACE_PARSING": "장소 파싱", "POST_MEDIA": "미디어 저장",
+    "PLACE_THUMBNAILS": "썸네일 저장", "PLACE_TAGS": "장소 태그 저장",
+    "CONTENT_FETCH": "원문 가져오기", "CONTENT_COVER_TITLE": "커버·제목 추출",
+    "CONTENT_INFERENCE": "본문 분석", "CONTENT_SAVE": "본문 저장",
+    "PLACE_TEXT_CLUES": "장소 단서 추출", "PLACE_TEXT_RESOLUTION": "장소 검색",
+    "PLACE_IMAGE_OCR": "이미지 OCR", "PLACE_IMAGE_CLUES": "이미지 장소 추출",
+    "PLACE_IMAGE_RESOLUTION": "이미지 장소 검색", "TITLE_FINALIZATION": "제목 생성",
+    "PLACE_SAVE": "장소 저장", "POST_SAVE": "게시물 저장 요청",
+}
+
+
+def parsing_payload(context: dict) -> dict:
+    post_id = context.get("post_id") or "미생성"
+    stage = context.get("failure_stage") or "UNKNOWN"
+    stage_name = STAGE_NAMES.get(stage, stage)
+    fields = [{"name": name, "value": str(value or "-")[:200], "inline": True} for name, value in (
+        ("게시물", post_id), ("실패 단계", stage_name), ("작업", context.get("job_id")),
+        ("실행 횟수", context.get("attempt")), ("실패 시각", context.get("failed_at")),
+    )]
+    embed = {
+        "title": f"[{ENVIRONMENT}] 게시물 #{post_id} · {stage_name} 실패"[:256],
+        "description": "자동 재시도가 종료되어 확인이 필요합니다. 관리자 화면에서 실패 원인을 확인하고 재시도할 수 있습니다.",
+        "color": 15158332, "fields": fields,
+    }
+    if context.get("event_type") == "post.save.failed":
+        embed["description"] = "게시물 저장 요청이 실패했습니다. Request ID로 서버 오류를 확인해 주세요."
+        embed["fields"].append({"name": "Request ID", "value": str(context.get("request_id") or "-")[:200]})
+    if str(post_id).isdigit() and ENVIRONMENT in ("dev", "live"):
+        host = "dev-admin.everynook.co.kr" if ENVIRONMENT == "dev" else "admin.everynook.co.kr"
+        embed["url"] = f"https://{host}/#/parsing-pipeline?postId={post_id}&recoveryPostId={post_id}"
+    return {"embeds": [embed], "allowed_mentions": {"parse": []}}
+
+
+def should_forward(level: str | None, context: dict) -> bool:
+    return level == "ERROR" and (not PARSING_ONLY or context.get("event_type") == "post.parsing.failed")
+
+
 def post_payload(url: str, payload: dict) -> None:
     request = urllib.request.Request(
         url,
@@ -91,23 +131,38 @@ def post_payload(url: str, payload: dict) -> None:
         headers={"Content-Type": "application/json", "User-Agent": "NookErrorLogForwarder/1.0"},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            response.read()
-    except (urllib.error.URLError, OSError) as error:
-        # Exception messages may contain webhook credentials; log only the type/status.
-        status = error.code if isinstance(error, urllib.error.HTTPError) else type(error).__name__
-        print(f"failed to send discord error log: {status}", flush=True)
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                response.read()
+            return
+        except (urllib.error.URLError, OSError) as error:
+            status = error.code if isinstance(error, urllib.error.HTTPError) else type(error).__name__
+            retryable = not isinstance(error, urllib.error.HTTPError) or status == 429 or status >= 500
+            if retryable and attempt < 2:
+                delay = 0.5 * (2 ** attempt)
+                if isinstance(error, urllib.error.HTTPError) and status == 429:
+                    try:
+                        delay = max(delay, float((error.headers or {}).get("Retry-After", delay)))
+                    except (ValueError, TypeError):
+                        pass
+                time.sleep(min(delay, 30))
+                continue
+            # Never log URLs/tokens from provider exceptions.
+            print(f"failed to send discord error log: {status}", flush=True)
+            return
 
 
 def post_error_log(lines: list[str], context: dict[str, str | None]) -> None:
-    if DISCORD_WEBHOOK_URL and "".join(lines).strip():
+    parsing = context.get("event_type") in ("post.parsing.failed", "post.save.failed")
+    webhook = (PARSING_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL) if parsing else DISCORD_WEBHOOK_URL
+    if webhook and "".join(lines).strip():
         # wait=true makes Discord report message creation failures synchronously.
-        url = urllib.parse.urlsplit(DISCORD_WEBHOOK_URL)
+        url = urllib.parse.urlsplit(webhook)
         query = dict(urllib.parse.parse_qsl(url.query))
         query["wait"] = "true"
         target = urllib.parse.urlunsplit(url._replace(query=urllib.parse.urlencode(query)))
-        post_payload(target, discord_payload(lines, context))
+        post_payload(target, parsing_payload(context) if context.get("event_type") in ("post.parsing.failed", "post.save.failed") else discord_payload(lines, context))
 
 
 def read_json_log_line(raw_line: str) -> str:
@@ -139,6 +194,16 @@ def parse_log_entry(line: str) -> tuple[str | None, str, dict[str, str | None]]:
         "user_id": context_value(entry, "user_id", "user.id"),
         "url_path": " ".join(value for value in (method, path) if value) or None,
     }
+
+    if entry.get("event_type") == "post.parsing.failed":
+        context.update({key: context_value(entry, key) for key in
+                        ("event_type", "post_id", "job_id", "job_type", "attempt", "failure_stage", "failed_at")})
+
+    if level == "ERROR" and method == "POST" and (
+        path == "/api/v1/posts" or (path and path.startswith("/api/v1/shared-posts/") and path.endswith("/save"))
+    ):
+        context.update({"event_type": "post.save.failed", "failure_stage": "POST_SAVE",
+                        "failed_at": context_value(entry, "@timestamp")})
 
     header_parts = [
         str(value)
@@ -232,7 +297,7 @@ def main() -> None:
             if buffer:
                 post_error_log(buffer, error_context)
                 buffer = []
-            if level == "ERROR":
+            if should_forward(level, context):
                 buffer = [formatted_line]
                 error_context = context
                 last_append_at = time.monotonic()

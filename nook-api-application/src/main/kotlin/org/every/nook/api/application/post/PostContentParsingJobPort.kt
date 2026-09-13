@@ -32,6 +32,11 @@ interface PostContentParsingJobPort {
     fun fail(postId: Long, attempt: Int, reason: String): Boolean
 }
 
-data class ClaimedPostContentParsingJob(val postId: Long, val attempt: Int, val canonicalUrl: String)
+data class ClaimedPostContentParsingJob(
+    val postId: Long,
+    val attempt: Int,
+    val canonicalUrl: String,
+    val retryAttempt: Int = attempt,
+)
 
 data class OutstandingPostContentParsingJob(val postId: Long, val availableAt: Instant)

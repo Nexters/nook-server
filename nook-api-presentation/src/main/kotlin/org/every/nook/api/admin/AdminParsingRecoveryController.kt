@@ -72,6 +72,8 @@ class AdminParsingRecoveryController(
         @field:Schema(description = "최종 변경 시각") val updatedAt: Instant,
         @field:Schema(description = "수동 재시도 상태: NONE, RETRY_PENDING, RETRY_PROCESSING, RECOVERED, RETRY_FAILED")
         val recoveryStatus: String,
+        @field:Schema(description = "마지막 실제 실패 시각; 과거 미기록은 null") val lastFailedAt: Instant?,
+        @field:Schema(description = "실패 단계") val failureStage: String?,
     ) {
         companion object {
             fun from(job: AdminFollowUpJob) = JobResponse(
@@ -84,6 +86,8 @@ class AdminParsingRecoveryController(
                 job.nextAttemptAt,
                 job.updatedAt,
                 job.recoveryStatus,
+                job.lastFailedAt,
+                job.failureStage,
             )
         }
     }
