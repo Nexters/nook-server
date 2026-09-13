@@ -27,7 +27,7 @@ MySQL 8.4 기준 `ddl/up.sql`은 일회용이다. 반복 실행하면 칼럼 중
 
 롤백: worker 중지 → 이전 API/worker 배포 → `rollback.sql` 적용 → worker 재개.
 칼럼 삭제는 현재 재시도 예산 정보를 잃지만 작업 payload와 총 실행 횟수는 유지한다.
-현재 모든 서버에 DDL 미적용; 적용자/시각 없음.
+dev DDL 적용: 2026-09-13 14:25 KST, 실행자 Codex (사용자 요청). dev worker 중지 후 nook-dev-mysql의 nook DB에서 up.sql 실행. 칼럼 타입/기본값/COMMENT 및 기존 53건의 backfill 일치 확인. staging/live 미적용.
 
 ## 검증
 
