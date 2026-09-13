@@ -119,7 +119,13 @@ class PlaceParsingPersistenceAdapter(
 
     @Transactional(readOnly = true)
     override fun findOutstanding(processingTimeout: Duration, limit: Int): List<OutstandingPlaceParsingJob> =
-        jobRepository.findAllByStatusInOrderByNextAttemptAtAsc(OUTSTANDING_STATUSES, PageRequest.of(0, limit))
+        jobRepository.findAvailable(
+            PlaceParsingStatus.PENDING,
+            PlaceParsingStatus.PROCESSING,
+            clock.instant(),
+            clock.instant().minus(processingTimeout),
+            PageRequest.of(0, limit),
+        )
             .map { job ->
                 OutstandingPlaceParsingJob(
                     postId = job.postId,

@@ -27,6 +27,7 @@ import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.application.post.port.UpdatePostMediaUrlPort
 import org.every.nook.api.application.post.port.UpdatePostMemoPort
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ParsingFailureClassifier
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingTracePort
 import org.springframework.beans.factory.ObjectProvider
@@ -61,6 +62,7 @@ class PostUseCaseConfig {
 
     @Bean
     fun processPostContentParsingJobUseCase(
+        failureClassifier: ParsingFailureClassifier,
         jobPort: PostContentParsingJobPort,
         extractPostContentUseCase: ExtractPostContentUseCase,
         postContentInference: PostContentInference,
@@ -69,6 +71,7 @@ class PostUseCaseConfig {
         processingTracePort: ProcessingTracePort,
         properties: PostContentParsingProperties,
     ): ProcessPostContentParsingJobUseCase = ProcessPostContentParsingJobUseCase(
+        failureClassifier = failureClassifier,
         jobPort = jobPort,
         extractPostContent = extractPostContentUseCase,
         contentInference = postContentInference,

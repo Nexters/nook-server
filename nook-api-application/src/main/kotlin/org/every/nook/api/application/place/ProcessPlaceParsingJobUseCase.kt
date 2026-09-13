@@ -5,6 +5,7 @@ import org.every.nook.api.application.post.FinalizePostTitle
 import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.NoOpProcessingTracePort
+import org.every.nook.api.application.processing.ParsingFailureClassifier
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ParsingRuleEvaluation
 import org.every.nook.api.application.processing.ProcessingMetrics
@@ -40,6 +41,7 @@ class ProcessPlaceParsingJobUseCase(
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val tracePort: ProcessingTracePort = NoOpProcessingTracePort,
     private val clock: Clock = Clock.systemUTC(),
+    private val failureClassifier: ParsingFailureClassifier = ParsingFailureClassifier.DEFAULT,
 ) {
     private val finalizePostTitle = FinalizePostTitle(titleSelector)
 
@@ -537,9 +539,10 @@ class ProcessPlaceParsingJobUseCase(
             return Result.Failed
         }
 
-        val backoff = retryBackoffs.getOrNull(job.attempt - 1)
+        val failure = failureClassifier.classify(exception)
+        val backoff = retryBackoffs.getOrNull(job.attempt - 1)?.takeIf { failure.kind.retryable }
         if (backoff != null) {
-            val nextAttemptAt = clock.instant().plus(backoff)
+            val nextAttemptAt = clock.instant().plus(maxOf(backoff, failure.retryAfter ?: Duration.ZERO))
             if (!jobPort.retry(job.postId, job.attempt, nextAttemptAt, reason)) return Result.Skipped
             eventLogger.warn(
                 job.event(

@@ -19,23 +19,38 @@ interface ParsingFollowUpJobPort {
 
     fun claim(limit: Int, processingTimeout: Duration): List<ClaimedParsingFollowUpJob>
 
-    fun complete(jobId: Long)
+    fun complete(jobId: Long, attempt: Int): Boolean
 
-    fun retry(jobId: Long, availableAt: Instant, reason: String)
+    fun retry(jobId: Long, attempt: Int, availableAt: Instant, reason: String): Boolean
 
-    fun fail(jobId: Long, reason: String)
+    fun fail(jobId: Long, attempt: Int, reason: String): Boolean
+
+    fun writeResult(jobId: Long, attempt: Int, change: () -> Unit): Boolean
 }
 
 sealed interface ClaimedParsingFollowUpJob {
     val id: Long
     val attempt: Int
+    val retryAttempt: Int
 
-    data class Media(override val id: Long, override val attempt: Int, val event: PostMediaFollowUp) :
-        ClaimedParsingFollowUpJob
+    data class Media(
+        override val id: Long,
+        override val attempt: Int,
+        val event: PostMediaFollowUp,
+        override val retryAttempt: Int = attempt,
+    ) : ClaimedParsingFollowUpJob
 
-    data class Thumbnails(override val id: Long, override val attempt: Int, val event: PlaceThumbnailsFollowUp) :
-        ClaimedParsingFollowUpJob
+    data class Thumbnails(
+        override val id: Long,
+        override val attempt: Int,
+        val event: PlaceThumbnailsFollowUp,
+        override val retryAttempt: Int = attempt,
+    ) : ClaimedParsingFollowUpJob
 
-    data class Tags(override val id: Long, override val attempt: Int, val event: PlaceTagsFollowUp) :
-        ClaimedParsingFollowUpJob
+    data class Tags(
+        override val id: Long,
+        override val attempt: Int,
+        val event: PlaceTagsFollowUp,
+        override val retryAttempt: Int = attempt,
+    ) : ClaimedParsingFollowUpJob
 }
