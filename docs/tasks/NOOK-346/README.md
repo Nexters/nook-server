@@ -40,3 +40,20 @@
 - 수정 후 라우팅 회귀 테스트 4개 및 기존 GlobalExceptionHandlerTest 5개 통과
 - `./gradlew clean check` 통과 (Detekt, 전체 테스트, 모듈 의존 방향; 일부 Gradle 캐시 재사용)
 - `git diff --check` 통과
+
+## Dev 배포 검증
+
+- 2026-09-12 develop 커밋 `f9947746`, 이미지 `dev-425-f9947746` 배포 완료
+- [배포 워크플로](https://github.com/Nexters/nook-server/actions/runs/34668326072) 성공
+- dev API와 worker 모두 healthy, 재시작 횟수 0
+- 로그인·토큰 갱신 경로 GET: 405 / METHOD_NOT_ALLOWED, Allow: POST
+- 없는 공개 경로: 404 / NOT_FOUND
+- 미인증 회원 조회: 기존 401 유지, health: UP
+- 검증 직후 최근 3분 API ERROR 로그 0건
+
+## Main 병합 후 배포
+
+main push 시 기존 Container Image 워크플로가 API·worker 이미지를 생성하고 live에 자동 배포한다.
+API는 Blue/Green 배포를 사용한다. 별도 DDL이나 환경변수 변경은 필요하지 않다.
+2026-09-12 확인 기준 live 환경에 별도 승인 보호 규칙은 없다.
+실제 live 배포 및 응답 검증은 PR 병합 이후에 수행한다.

@@ -111,6 +111,16 @@ def parsing_payload(context: dict) -> dict:
         "description": "자동 재시도가 종료되어 확인이 필요합니다. 관리자 화면에서 실패 원인을 확인하고 재시도할 수 있습니다.",
         "color": 15158332, "fields": fields,
     }
+    if context.get("event_type") == "post.parsing.summary_failed":
+        embed["title"] = f"[{ENVIRONMENT}] 게시물 #{post_id} · 처리 완료 — 일부 실패"[:256]
+        failures = json.loads(context.get("failure_summary") or "[]")
+        lines = [f"• {STAGE_NAMES.get(item['stage'], item['stage'])}: {item['reason']} ({item['count']}건)"
+                 for item in failures]
+        embed["description"] = ("모든 작업이 종료되었습니다.\n" + "\n".join(lines))[:4000]
+        embed["fields"] = [{"name": name, "value": str(context.get(key) or "0"), "inline": True}
+                           for name, key in (("전체 작업", "total_count"), ("성공", "completed_count"),
+                                             ("실패", "failed_count"))]
+        embed["fields"].append({"name": "마지막 실패 시각", "value": context.get("failed_at") or "-"})
     if context.get("event_type") == "post.save.failed":
         embed["description"] = "게시물 저장 요청이 실패했습니다. Request ID로 서버 오류를 확인해 주세요."
         embed["fields"].append({"name": "Request ID", "value": str(context.get("request_id") or "-")[:200]})
@@ -121,7 +131,7 @@ def parsing_payload(context: dict) -> dict:
 
 
 def should_forward(level: str | None, context: dict) -> bool:
-    return level == "ERROR" and (not PARSING_ONLY or context.get("event_type") == "post.parsing.failed")
+    return level == "ERROR" and (not PARSING_ONLY or context.get("event_type") == "post.parsing.summary_failed")
 
 
 def post_payload(url: str, payload: dict) -> None:
@@ -154,7 +164,7 @@ def post_payload(url: str, payload: dict) -> None:
 
 
 def post_error_log(lines: list[str], context: dict[str, str | None]) -> None:
-    parsing = context.get("event_type") in ("post.parsing.failed", "post.save.failed")
+    parsing = context.get("event_type") in ("post.parsing.summary_failed", "post.save.failed")
     webhook = (PARSING_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL) if parsing else DISCORD_WEBHOOK_URL
     if webhook and "".join(lines).strip():
         # wait=true makes Discord report message creation failures synchronously.
@@ -162,7 +172,7 @@ def post_error_log(lines: list[str], context: dict[str, str | None]) -> None:
         query = dict(urllib.parse.parse_qsl(url.query))
         query["wait"] = "true"
         target = urllib.parse.urlunsplit(url._replace(query=urllib.parse.urlencode(query)))
-        post_payload(target, parsing_payload(context) if context.get("event_type") in ("post.parsing.failed", "post.save.failed") else discord_payload(lines, context))
+        post_payload(target, parsing_payload(context) if context.get("event_type") in ("post.parsing.summary_failed", "post.save.failed") else discord_payload(lines, context))
 
 
 def read_json_log_line(raw_line: str) -> str:
@@ -195,9 +205,9 @@ def parse_log_entry(line: str) -> tuple[str | None, str, dict[str, str | None]]:
         "url_path": " ".join(value for value in (method, path) if value) or None,
     }
 
-    if entry.get("event_type") == "post.parsing.failed":
+    if entry.get("event_type") == "post.parsing.summary_failed":
         context.update({key: context_value(entry, key) for key in
-                        ("event_type", "post_id", "job_id", "job_type", "attempt", "failure_stage", "failed_at")})
+                        ("event_type", "post_id", "failure_summary", "completed_count", "failed_count", "total_count", "failed_at")})
 
     if level == "ERROR" and method == "POST" and (
         path == "/api/v1/posts" or (path and path.startswith("/api/v1/shared-posts/") and path.endswith("/save"))

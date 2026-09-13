@@ -30,7 +30,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
-import org.every.nook.api.infrastructure.persistence.processing.ParsingFailureAlerts
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.springframework.data.domain.PageRequest
@@ -63,7 +62,6 @@ class PlaceParsingPersistenceAdapter(
     private val objectMapper: ObjectMapper,
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
-    private val failureAlerts: ParsingFailureAlerts = ParsingFailureAlerts(),
 ) : PlaceParsingJobPort,
     PlaceThumbnailUpdatePort,
     PlaceTagSourcePort,
@@ -295,14 +293,6 @@ class PlaceParsingPersistenceAdapter(
         job.lastFailedAt = clock.instant()
         job.lastFailureStage = job.executionStage
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
-        failureAlerts.afterCommit(
-            job.postId,
-            "PLACE_PARSING",
-            requireNotNull(job.id),
-            attempt,
-            job.lastFailureStage ?: "PLACE_PARSING",
-            requireNotNull(job.lastFailedAt),
-        )
         return true
     }
 
