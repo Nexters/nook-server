@@ -963,7 +963,7 @@ class ProcessPlaceParsingJobUseCaseTest {
     }
 
     @Test
-    fun `fails without retry when neither text nor images provide a place clue`() {
+    fun `completes with no places when neither text nor images provide a place clue`() {
         val port = FakeJobPort(imageUrls = listOf("https://cdn.test/1.jpg"))
         val useCase = useCase(
             port,
@@ -971,14 +971,14 @@ class ProcessPlaceParsingJobUseCaseTest {
             SearchPlaceCandidatesUseCase { emptyList() },
         )
 
-        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
-        assertEquals("No place could be resolved after image analysis", port.failedReason)
-        assertEquals("방문해보기 좋은 곳", port.failedTitle)
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertNull(port.failedReason)
+        assertEquals(emptyList(), port.completed)
         assertNull(port.nextAttemptAt)
     }
 
     @Test
-    fun `selects a grounded title before failing place parsing`() {
+    fun `selects a grounded title when completing with no places`() {
         val port = FakeJobPort(body = "망원동 오니기리", sourceLocationTag = "망원동")
         val useCase = useCase(
             port = port,
@@ -995,13 +995,14 @@ class ProcessPlaceParsingJobUseCaseTest {
             },
         )
 
-        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
-        assertEquals("망원동 오니기리", port.failedTitle)
-        assertEquals("No place could be resolved from text", port.failedReason)
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertEquals("망원동 오니기리", port.completedTitle)
+        assertNull(port.failedReason)
+        assertEquals(emptyList(), port.completed)
     }
 
     @Test
-    fun `fails without retry when no image is available for fallback`() {
+    fun `completes with no places when no clues or images exist`() {
         val port = FakeJobPort()
         val useCase = useCase(
             port,
@@ -1009,8 +1010,9 @@ class ProcessPlaceParsingJobUseCaseTest {
             SearchPlaceCandidatesUseCase { emptyList() },
         )
 
-        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
-        assertEquals("No place could be resolved from text", port.failedReason)
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(1))
+        assertNull(port.failedReason)
+        assertEquals(emptyList(), port.completed)
         assertNull(port.nextAttemptAt)
     }
 

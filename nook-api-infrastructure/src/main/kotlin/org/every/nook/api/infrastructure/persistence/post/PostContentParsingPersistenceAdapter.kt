@@ -15,7 +15,6 @@ import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
-import org.every.nook.api.infrastructure.persistence.processing.ParsingFailureAlerts
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
@@ -36,7 +35,6 @@ class PostContentParsingPersistenceAdapter(
     private val followUpJobPort: ParsingFollowUpJobPort,
     private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
-    private val failureAlerts: ParsingFailureAlerts = ParsingFailureAlerts(),
 ) : PostContentParsingJobPort {
     @Transactional
     override fun claim(postId: Long, processingTimeout: Duration): ClaimedPostContentParsingJob? {
@@ -197,14 +195,6 @@ class PostContentParsingPersistenceAdapter(
         job.lastFailedAt = clock.instant()
         job.lastFailureStage = job.executionStage
         job.failureReason = reason.take(PostContentParsingJobEntity.FAILURE_REASON_MAX_LENGTH)
-        failureAlerts.afterCommit(
-            job.postId,
-            "POST_CONTENT",
-            requireNotNull(job.id),
-            attempt,
-            job.lastFailureStage ?: "POST_CONTENT",
-            requireNotNull(job.lastFailedAt),
-        )
         return true
     }
 

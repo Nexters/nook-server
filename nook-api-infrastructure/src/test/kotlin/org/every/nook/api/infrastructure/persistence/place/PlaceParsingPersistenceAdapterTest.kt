@@ -23,7 +23,6 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
-import org.every.nook.api.infrastructure.persistence.processing.ParsingFailureAlerts
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
@@ -79,7 +78,6 @@ class PlaceParsingPersistenceAdapterTest {
         followUpJobPort = followUpJobPort,
         objectMapper = jacksonObjectMapper(),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
-        failureAlerts = mock(ParsingFailureAlerts::class.java),
     )
 
     init {
