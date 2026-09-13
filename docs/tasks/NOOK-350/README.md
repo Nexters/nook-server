@@ -33,3 +33,11 @@ dev DDL 적용: 2026-09-13 14:25 KST, 실행자 Codex (사용자 요청). dev wo
 
 MySQL 테스트에서 실패 작업 재시도, 중복 거절, 소유권 번호 유지, 감사 실패 시 롤백을 확인한다.
 관리자 UI 빌드 통과. 사용자 요청으로 내장 브라우저를 사용해 로컬 모의 API의 빈 사유 차단, 실패 시 사유 유지, 성공 후 목록 갱신, 상태 필터 및 좁은 화면을 검증했다. 지연 응답 중 중복 제출 차단과 다음 페이지/처음으로 복귀도 확인했다. 실제 서버와 연결한 브라우저 통합은 미검증이다.
+
+## live DDL 선행 적용
+
+- 2026-09-13, 사용자 요청으로 live MySQL 8.4.8의 `nook.parsing_follow_up_jobs`에 적용.
+- 기존 worker 중지 후 PROCESSING 0건 확인. `ddl/up.sql` 실행 후 2,427건 모두 두 실행 횟수가 일치하고 NULL 0건임을 확인.
+- 칼럼 int / NOT NULL / 기본값 0 / COMMENT 확인. 기존 worker `prod-426-7ece8dde` 재개. 앱 배포 및 PR 병합은 수행하지 않음.
+- **새 버전 배포 직전** 기존 worker를 중지하고 PROCESSING 상태를 확인한 뒤, 구버전 실행 중 증가분을 `UPDATE parsing_follow_up_jobs SET retry_attempt_count = attempt_count WHERE retry_attempt_count <> attempt_count;`로 맞추고 새 API/worker를 배포한다. ALTER는 다시 실행하지 않는다.
+- 이 보정 UPDATE는 새 버전 최초 배포 전에만 사용한다. 새 버전에서 수동 재시도한 이후 실행하면 복구 이력을 지우므로 실행하지 않는다.
