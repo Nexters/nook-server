@@ -1,5 +1,6 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.processing.ParsingResultWriter
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.info
 import org.every.nook.api.domain.place.PlaceTag
@@ -14,17 +15,17 @@ class StorePlaceTagsUseCase(
     private val updatePort: PlaceTagUpdatePort,
     private val catalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
 ) {
-    operator fun invoke(event: PlaceTagsRequestedEvent) {
+    operator fun invoke(event: PlaceTagsRequestedEvent, writer: ParsingResultWriter = ParsingResultWriter.DIRECT) {
         val source = findSource(event) ?: return
         val catalog = catalogPort.findAll().filter(PlaceTagDefinition::enabled).sortedBy(PlaceTagDefinition::sortOrder)
         val preparedPlaces = preparePlaces(event, source, catalog)
         val (skippedPlaces, actionablePlaces) = preparedPlaces.partition { it.input.candidateTags.isEmpty() }
-        storeSkippedPlaces(event, skippedPlaces)
+        storeSkippedPlaces(event, skippedPlaces, writer)
         if (actionablePlaces.isEmpty()) return
 
         val results = extractor.extract(PlaceTagExtractor.Request(actionablePlaces.map(PreparedPlace::input)))
             .associateBy(PlaceTagExtractor.Result::placeIndex)
-        storeActionablePlaces(event, actionablePlaces, results)
+        storeActionablePlaces(event, actionablePlaces, results, writer)
     }
 
     private fun findSource(event: PlaceTagsRequestedEvent): PlaceTagSource? {
@@ -67,9 +68,13 @@ class StorePlaceTagsUseCase(
         }
     }
 
-    private fun storeSkippedPlaces(event: PlaceTagsRequestedEvent, skippedPlaces: List<PreparedPlace>) {
+    private fun storeSkippedPlaces(
+        event: PlaceTagsRequestedEvent,
+        skippedPlaces: List<PreparedPlace>,
+        writer: ParsingResultWriter,
+    ) {
         skippedPlaces.forEach { prepared ->
-            updatePort.replace(event.postId, prepared.target.placeId, emptyList())
+            writer.write { updatePort.replace(event.postId, prepared.target.placeId, emptyList()) }
             logger.info(
                 logEvent(
                     event,
@@ -87,13 +92,14 @@ class StorePlaceTagsUseCase(
         event: PlaceTagsRequestedEvent,
         actionablePlaces: List<PreparedPlace>,
         results: Map<Int, PlaceTagExtractor.Result>,
+        writer: ParsingResultWriter,
     ) {
         actionablePlaces.forEach { prepared ->
             val tags = results[prepared.input.placeIndex]
                 ?.tags
                 .orEmpty()
                 .filterAndLimit(prepared.input.candidateTags)
-            updatePort.replace(event.postId, prepared.target.placeId, tags)
+            writer.write { updatePort.replace(event.postId, prepared.target.placeId, tags) }
             logger.info(
                 logEvent(
                     event,

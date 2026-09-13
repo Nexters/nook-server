@@ -25,6 +25,22 @@ interface PlaceParsingJobJpaRepository : JpaRepository<PlaceParsingJobEntity, Lo
         pageable: Pageable,
     ): List<PlaceParsingJobEntity>
 
+    @Query(
+        """
+        SELECT job FROM PlaceParsingJobEntity job
+        WHERE (job.status = :pending AND job.nextAttemptAt <= :now)
+           OR (job.status = :processing AND job.updatedAt <= :timeoutAt)
+        ORDER BY job.nextAttemptAt ASC, job.id ASC
+        """,
+    )
+    fun findAvailable(
+        @Param("pending") pending: PlaceParsingStatus,
+        @Param("processing") processing: PlaceParsingStatus,
+        @Param("now") now: Instant,
+        @Param("timeoutAt") timeoutAt: Instant,
+        pageable: Pageable,
+    ): List<PlaceParsingJobEntity>
+
     fun countByStatusAndNextAttemptAtLessThanEqual(status: PlaceParsingStatus, now: Instant): Long
 
     fun findFirstByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc(

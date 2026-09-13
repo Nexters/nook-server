@@ -43,13 +43,60 @@ class ProcessParsingFollowUpJobsUseCaseTest {
         assertEquals(listOf(1L to NOW.plusSeconds(10)), port.retried)
     }
 
-    private fun useCase(port: FakeJobPort, failMedia: Boolean = false): ProcessParsingFollowUpJobsUseCase {
+    @Test
+    fun `stale result does not complete or schedule another retry`() {
+        val port = FakeJobPort(mediaJob(), stale = true)
+        useCase(port)()
+        assertEquals(emptyList(), port.completed)
+        assertEquals(emptyList(), port.retried)
+        assertEquals(emptyList(), port.failed)
+    }
+
+    @Test
+    fun `permanent failures terminate without retry`() {
+        val port = FakeJobPort(mediaJob())
+        useCase(port, failMedia = true, failure = ParsingFailure(ParsingFailureKind.PERMANENT, "gone"))()
+        assertEquals(listOf(1L), port.failed)
+        assertEquals(emptyList(), port.retried)
+    }
+
+    @Test
+    fun `rate limit respects provider retry delay`() {
+        val port = FakeJobPort(mediaJob())
+        val failure = ParsingFailure(ParsingFailureKind.RATE_LIMIT, "limited", Duration.ofMinutes(2))
+        useCase(port, failMedia = true, failure = failure)()
+        assertEquals(listOf(1L to NOW.plusSeconds(120)), port.retried)
+    }
+
+    @Test
+    fun `manual recovery starts a fresh retry budget without reusing ownership token`() {
+        val port = FakeJobPort(mediaJob().copy(attempt = 20, retryAttempt = 1))
+        useCase(port, failMedia = true)()
+        assertEquals(listOf(1L to NOW.plusSeconds(10)), port.retried)
+    }
+
+    @Test
+    fun `exhausted retry budget terminates job`() {
+        val port = FakeJobPort(mediaJob().copy(attempt = 5, retryAttempt = 5))
+        useCase(port, failMedia = true)()
+        assertEquals(listOf(1L), port.failed)
+        assertEquals(emptyList(), port.retried)
+    }
+
+    private fun useCase(
+        port: FakeJobPort,
+        failMedia: Boolean = false,
+        failure: ParsingFailure? = null,
+    ): ProcessParsingFollowUpJobsUseCase {
         val mediaStorage = PostMediaStoragePort { media ->
             check(!failMedia) { "storage unavailable" }
             media
         }
         return ProcessParsingFollowUpJobsUseCase(
             jobPort = port,
+            failureClassifier =
+            failure?.let { classification -> ParsingFailureClassifier { classification } }
+                ?: ParsingFailureClassifier.DEFAULT,
             storePostMedia = StorePostMediaUseCase(mediaStorage, noOpMediaUpdate()),
             storePlaceThumbnail = StorePlaceThumbnailUseCase(PlaceThumbnailProvider { null }, noOpThumbnailUpdate()),
             storePlaceTags = StorePlaceTagsUseCase(
@@ -82,22 +129,43 @@ class ProcessParsingFollowUpJobsUseCaseTest {
         event = PostMediaStorageRequestedEvent(11, PostMedia.MediaType.IMAGE.name, "https://source.test/1.jpg", 0),
     )
 
-    private class FakeJobPort(private val jobs: ClaimedParsingFollowUpJob) : ParsingFollowUpJobPort {
+    private class FakeJobPort(private val jobs: ClaimedParsingFollowUpJob, private val stale: Boolean = false) :
+        ParsingFollowUpJobPort {
+        val failed = mutableListOf<Long>()
         val completed = mutableListOf<Long>()
         val retried = mutableListOf<Pair<Long, Instant>>()
 
         override fun enqueue(event: PostMediaStorageRequestedEvent) = Unit
         override fun enqueue(event: org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent) = Unit
         override fun enqueue(event: org.every.nook.api.application.place.PlaceTagsRequestedEvent) = Unit
-        override fun claim(limit: Int, processingTimeout: Duration) = listOf(jobs)
-        override fun complete(jobId: Long) {
+        private var claimed = false
+        override fun claim(limit: Int, processingTimeout: Duration): List<ClaimedParsingFollowUpJob> {
+            assertEquals(1, limit, "Claim only the job that will execute immediately")
+            if (claimed) {
+                check(stale || completed.isNotEmpty() || retried.isNotEmpty() || failed.isNotEmpty())
+                return emptyList()
+            }
+            claimed = true
+            return listOf(jobs)
+        }
+        override fun complete(jobId: Long, attempt: Int): Boolean {
             completed += jobId
+            return true
         }
 
-        override fun retry(jobId: Long, availableAt: Instant, reason: String) {
+        override fun retry(jobId: Long, attempt: Int, availableAt: Instant, reason: String): Boolean {
             retried += jobId to availableAt
+            return true
         }
-        override fun fail(jobId: Long, reason: String) = Unit
+        override fun fail(jobId: Long, attempt: Int, reason: String): Boolean {
+            failed += jobId
+            return true
+        }
+        override fun writeResult(jobId: Long, attempt: Int, change: () -> Unit): Boolean {
+            if (stale) return false
+            change()
+            return true
+        }
     }
 
     private companion object {

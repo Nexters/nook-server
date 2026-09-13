@@ -36,6 +36,22 @@ interface ParsingFollowUpJobJpaRepository : JpaRepository<ParsingFollowUpJobEnti
         pageable: Pageable,
     ): List<Long>
 
+    @Query(
+        """
+        SELECT job FROM ParsingFollowUpJobEntity job
+        WHERE (:postId IS NULL OR job.postId = :postId)
+          AND (:status IS NULL OR job.status = :status)
+          AND (:beforeId IS NULL OR job.id < :beforeId)
+        ORDER BY job.id DESC
+        """,
+    )
+    fun findForAdmin(
+        @Param("postId") postId: Long?,
+        @Param("status") status: ParsingFollowUpJobStatus?,
+        @Param("beforeId") beforeId: Long?,
+        pageable: Pageable,
+    ): List<ParsingFollowUpJobEntity>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT job FROM ParsingFollowUpJobEntity job WHERE job.id = :id")
     fun findByIdForUpdate(@Param("id") id: Long): ParsingFollowUpJobEntity?

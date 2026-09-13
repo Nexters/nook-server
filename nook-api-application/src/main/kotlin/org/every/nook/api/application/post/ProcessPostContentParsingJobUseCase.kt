@@ -8,6 +8,7 @@ import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.place.ImageTextExtractor
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
 import org.every.nook.api.application.processing.NoOpProcessingTracePort
+import org.every.nook.api.application.processing.ParsingFailureClassifier
 import org.every.nook.api.application.processing.ParsingProgressStage
 import org.every.nook.api.application.processing.ProcessingLogEvent
 import org.every.nook.api.application.processing.ProcessingMetrics
@@ -36,6 +37,7 @@ class ProcessPostContentParsingJobUseCase(
     private val metrics: ProcessingMetrics = NoOpProcessingMetrics,
     private val tracePort: ProcessingTracePort = NoOpProcessingTracePort,
     private val clock: Clock = Clock.systemUTC(),
+    private val failureClassifier: ParsingFailureClassifier = ParsingFailureClassifier.DEFAULT,
 ) {
     operator fun invoke(postId: Long): Result {
         val job = jobPort.claim(postId, processingTimeout) ?: return Result.Skipped
@@ -169,9 +171,10 @@ class ProcessPostContentParsingJobUseCase(
             recordTrace(job, JOB_STAGE, "content.job.failed", FAILURE_OUTCOME, duration, mapOf("reason" to reason))
             return Result.Failed
         }
-        val backoff = retryBackoffs.getOrNull(job.attempt - 1)
+        val failure = failureClassifier.classify(exception)
+        val backoff = retryBackoffs.getOrNull(job.attempt - 1)?.takeIf { failure.kind.retryable }
         if (backoff != null) {
-            val nextAttemptAt = clock.instant().plus(backoff)
+            val nextAttemptAt = clock.instant().plus(maxOf(backoff, failure.retryAfter ?: Duration.ZERO))
             if (!jobPort.retry(job.postId, job.attempt, nextAttemptAt, reason)) return Result.Skipped
             eventLogger.warn(
                 job.event(

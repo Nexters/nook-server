@@ -35,6 +35,8 @@ class ParsingFollowUpJobEntity(
     var status: ParsingFollowUpJobStatus = ParsingFollowUpJobStatus.PENDING,
     @Column(name = "attempt_count", nullable = false)
     var attemptCount: Int = 0,
+    @Column(name = "retry_attempt_count", nullable = false)
+    var retryAttemptCount: Int = 0,
     @Column(name = "next_attempt_at", nullable = false, columnDefinition = "TIMESTAMP(6)")
     var nextAttemptAt: Instant,
     @Column(name = "failure_reason", nullable = true, length = FAILURE_REASON_LENGTH)

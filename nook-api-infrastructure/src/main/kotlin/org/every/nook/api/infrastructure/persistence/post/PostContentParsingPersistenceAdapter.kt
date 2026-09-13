@@ -70,7 +70,13 @@ class PostContentParsingPersistenceAdapter(
 
     @Transactional(readOnly = true)
     override fun findOutstanding(processingTimeout: Duration, limit: Int): List<OutstandingPostContentParsingJob> =
-        jobRepository.findAllByStatusInOrderByNextAttemptAtAsc(OUTSTANDING_STATUSES, PageRequest.of(0, limit))
+        jobRepository.findAvailable(
+            PostContentParsingStatus.PENDING,
+            PostContentParsingStatus.PROCESSING,
+            clock.instant(),
+            clock.instant().minus(processingTimeout),
+            PageRequest.of(0, limit),
+        )
             .map { job ->
                 OutstandingPostContentParsingJob(
                     postId = job.postId,

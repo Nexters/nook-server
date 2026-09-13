@@ -21,6 +21,7 @@ import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.post.PostTitleSelector
 import org.every.nook.api.application.processing.NoOpProcessingMetrics
+import org.every.nook.api.application.processing.ParsingFailureClassifier
 import org.every.nook.api.application.processing.ProcessingMetrics
 import org.every.nook.api.application.processing.ProcessingTracePort
 import org.springframework.beans.factory.ObjectProvider
@@ -34,6 +35,7 @@ import org.springframework.context.annotation.Configuration
 class PlaceParsingUseCaseConfig {
     @Bean
     fun processPlaceParsingJobUseCase(
+        failureClassifier: ParsingFailureClassifier,
         jobPort: PlaceParsingJobPort,
         imageUrlPort: PlaceImageUrlPort,
         imageTextExtractor: ImageTextExtractor,
@@ -46,6 +48,7 @@ class PlaceParsingUseCaseConfig {
         processingTracePort: ProcessingTracePort,
         properties: PlaceParsingProperties,
     ): ProcessPlaceParsingJobUseCase = ProcessPlaceParsingJobUseCase(
+        failureClassifier = failureClassifier,
         jobPort = jobPort,
         imageUrlPort = imageUrlPort,
         imageTextExtractor = imageTextExtractor,
