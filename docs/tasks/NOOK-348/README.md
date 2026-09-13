@@ -28,6 +28,15 @@
 
 ## 배포 및 제외 범위
 
-NOOK-350의 DDL 적용 절차를 선행한다. dev DDL 적용 완료, develop 자동 배포 진행. live 미적용.
+NOOK-350의 DDL 적용 절차를 선행한다. dev DDL 및 develop 자동 배포 완료. live 미적용.
 전체 재분석에서 기존 자동 장소 연결을 교체할지 누적할지 사용자 결정 대기 중이다.
 따라서 전체 재분석 endpoint, 회차 전환 및 이전 회차 취소, 추가적인 수동 수정 보호는 아직 제공하지 않는다.
+
+## dev 배포 결과
+
+- develop 커밋: `57df5f1a` (구현 커밋 `b100ccc6`).
+- GitHub Actions: https://github.com/Nexters/nook-server/actions/runs/34740266459 — 성공.
+- API/worker: `dev-430-57df5f1a`, 모두 healthy 및 actuator UP, 재시작 0회.
+- 관리자 화면: `dev-57df5f1ac7c8`, 실행 중 및 health 응답 ok.
+- 배포 직후 API/worker ERROR 로그 0건, 후속 작업 53건 COMPLETED, 새 칼럼 NULL 0건.
+- 무인증 관리자 API 요청 401 확인. 인증된 관리자 실제 재시도는 미실행(현재 실패 작업 없음).
