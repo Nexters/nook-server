@@ -1,0 +1,15 @@
+# TODO: 관리자 로그인 요청 추가 위치 (현재 Cloudflare Access 사용)
+### 실패가 있는 게시물 목록 (게시물 안에서는 모든 상태를 반환)
+GET {{baseUrl}}/api/admin/v1/parsing-posts?status=FAILED&limit=20
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+
+### 게시물 전체 작업 진행 확인
+GET {{baseUrl}}/api/admin/v1/parsing-posts/616
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+
+### 게시물의 실패한 단계 전체 재시도
+POST {{baseUrl}}/api/admin/v1/parsing-posts/616/retry
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+Content-Type: application/json
+
+{"reason":"실패 원인 조치 후 게시물 통합 복구"}

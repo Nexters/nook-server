@@ -19,6 +19,7 @@ class ParsingFollowUpPersistenceAdapter(
     private val repository: ParsingFollowUpJobJpaRepository,
     private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
+    private val failureAlerts: ParsingFailureAlerts = ParsingFailureAlerts(),
 ) : ParsingFollowUpJobPort {
     @Transactional
     override fun enqueue(event: PostMediaStorageRequestedEvent) {
@@ -65,6 +66,7 @@ class ParsingFollowUpPersistenceAdapter(
         if (!job.isCurrentAttempt(attempt)) return false
         job.status = ParsingFollowUpJobStatus.PENDING
         job.nextAttemptAt = availableAt
+        job.lastFailedAt = clock.instant()
         job.failureReason = reason.take(ParsingFollowUpJobEntity.FAILURE_REASON_LENGTH)
         return true
     }
@@ -74,7 +76,16 @@ class ParsingFollowUpPersistenceAdapter(
         val job = repository.findByIdForUpdate(jobId) ?: return false
         if (!job.isCurrentAttempt(attempt)) return false
         job.status = ParsingFollowUpJobStatus.FAILED
+        job.lastFailedAt = clock.instant()
         job.failureReason = reason.take(ParsingFollowUpJobEntity.FAILURE_REASON_LENGTH)
+        failureAlerts.afterCommit(
+            job.postId,
+            job.jobType.name,
+            jobId,
+            attempt,
+            job.jobType.name,
+            requireNotNull(job.lastFailedAt),
+        )
         return true
     }
 

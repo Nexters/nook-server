@@ -15,6 +15,7 @@ import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
+import org.every.nook.api.infrastructure.persistence.processing.ParsingFailureAlerts
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
@@ -35,6 +36,7 @@ class PostContentParsingPersistenceAdapter(
     private val followUpJobPort: ParsingFollowUpJobPort,
     private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
+    private val failureAlerts: ParsingFailureAlerts = ParsingFailureAlerts(),
 ) : PostContentParsingJobPort {
     @Transactional
     override fun claim(postId: Long, processingTimeout: Duration): ClaimedPostContentParsingJob? {
@@ -46,11 +48,14 @@ class PostContentParsingPersistenceAdapter(
         val post = postRepository.findById(job.postId).orElseThrow()
         job.status = PostContentParsingStatus.PROCESSING
         job.attemptCount += 1
+        job.retryAttemptCount += 1
+        job.executionStage = null
         job.nextAttemptAt = now
         job.resumeProgress(now)
         return ClaimedPostContentParsingJob(
             postId = job.postId,
             attempt = job.attemptCount,
+            retryAttempt = job.retryAttemptCount,
             canonicalUrl = post.canonicalUrl,
         )
     }
@@ -92,6 +97,7 @@ class PostContentParsingPersistenceAdapter(
     override fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean {
         val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
         if (!job.isCurrentAttempt(attempt)) return false
+        job.executionStage = stage.name
         job.advanceProgress(stage, clock.instant())
         return true
     }
@@ -175,6 +181,8 @@ class PostContentParsingPersistenceAdapter(
         if (!job.isCurrentAttempt(attempt)) return false
         job.freezeProgress(clock.instant())
         job.status = PostContentParsingStatus.PENDING
+        job.lastFailedAt = clock.instant()
+        job.lastFailureStage = job.executionStage
         job.failureReason = reason.take(PostContentParsingJobEntity.FAILURE_REASON_MAX_LENGTH)
         job.nextAttemptAt = nextAttemptAt
         return true
@@ -186,7 +194,17 @@ class PostContentParsingPersistenceAdapter(
         if (!job.isCurrentAttempt(attempt)) return false
         job.freezeProgress(clock.instant())
         job.status = PostContentParsingStatus.FAILED
+        job.lastFailedAt = clock.instant()
+        job.lastFailureStage = job.executionStage
         job.failureReason = reason.take(PostContentParsingJobEntity.FAILURE_REASON_MAX_LENGTH)
+        failureAlerts.afterCommit(
+            job.postId,
+            "POST_CONTENT",
+            requireNotNull(job.id),
+            attempt,
+            job.lastFailureStage ?: "POST_CONTENT",
+            requireNotNull(job.lastFailedAt),
+        )
         return true
     }
 

@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.processing
 
 import org.every.nook.api.application.admin.AdminAuditLogPort
 import org.every.nook.api.application.admin.AdminParsingRecoveryPort
+import org.every.nook.api.application.admin.AdminPostRecoveryPort
 import org.every.nook.api.application.processing.ParsingFollowUpJobPort
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
@@ -11,11 +12,13 @@ import org.hibernate.cfg.Configuration
 import org.springframework.aop.framework.ProxyFactory
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.orm.jpa.SharedEntityManagerCreator
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource
 import org.springframework.transaction.interceptor.TransactionInterceptor
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.MySQLContainer
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
@@ -64,6 +67,21 @@ internal class ParsingMySqlFixture : AutoCloseable {
             },
         )
     }.getProxy() as AdminParsingRecoveryPort
+
+    fun posts(audit: AdminAuditLogPort): AdminPostRecoveryPort = ProxyFactory(
+        AdminPostRecoveryAdapter(contentJobs, placeJobs, repository, NamedParameterJdbcTemplate(jdbc), audit),
+    ).apply {
+        addAdvice(
+            TransactionInterceptor().apply {
+                transactionManager = manager
+                transactionAttributeSource = AnnotationTransactionAttributeSource()
+            },
+        )
+    }.getProxy() as AdminPostRecoveryPort
+
+    fun transaction(action: () -> Unit) {
+        TransactionTemplate(manager).executeWithoutResult { action() }
+    }
 
     fun insertMediaJob() {
         jdbc.update(

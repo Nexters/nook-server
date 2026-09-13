@@ -12,4 +12,5 @@ data class ClaimedPlaceParsingJob(
     val textClues: List<PlaceClue>? = null,
     val imageTranscripts: List<ImageTranscript>? = null,
     val sourceProfileHints: List<SourceProfileHint> = emptyList(),
+    val retryAttempt: Int = attempt,
 )

@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface PostContentParsingJobJpaRepository : JpaRepository<PostContentParsingJobEntity, Long> {
+    fun findAllByPostIdInOrderByPostIdDescIdAsc(postIds: List<Long>): List<PostContentParsingJobEntity>
+
     fun findByPostId(postId: Long): PostContentParsingJobEntity?
 
     fun findAllByPostIdIn(postIds: Collection<Long>): List<PostContentParsingJobEntity>

@@ -23,6 +23,7 @@ sudo chmod 600 "${secret_files[@]}"
 
 cd "${root_dir}"
 IMAGE="${image}" docker compose pull worker
+IMAGE="${image}" docker compose up -d parsing-alerts
 IMAGE="${image}" docker compose up -d --wait --wait-timeout 120 worker
 IMAGE="${image}" docker compose exec -T worker sh -lc \
   'test -r /run/secrets/aws_credentials && test -r /run/secrets/aws_config && test -r /run/secrets/firebase-service-account.json'

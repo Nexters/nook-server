@@ -41,6 +41,12 @@ class ParsingFollowUpJobEntity(
     var nextAttemptAt: Instant,
     @Column(name = "failure_reason", nullable = true, length = FAILURE_REASON_LENGTH)
     var failureReason: String? = null,
+    @Column(
+        name = "last_failed_at",
+        nullable = true,
+        columnDefinition = "TIMESTAMP(6) COMMENT '마지막 실제 실패 시각; 과거 미기록은 NULL'",
+    )
+    var lastFailedAt: Instant? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

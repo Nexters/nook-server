@@ -3,8 +3,14 @@ import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { api } from "./api";
 
-export type RecoveryJob = { id: number; postId: number; type: string; status: string; attempts: number; failureReason?: string; nextAttemptAt?: string; updatedAt: string; recoveryStatus?: string };
-export const recoveryTypeNames: Record<string, string> = { POST_MEDIA: "미디어 저장", PLACE_THUMBNAILS: "썸네일", PLACE_TAGS: "장소 태그" };
+export type RecoveryJob = { id: number; postId: number; type: string; status: string; attempts: number; failureReason?: string; nextAttemptAt?: string; updatedAt: string; recoveryStatus?: string; lastFailedAt?: string; failureStage?: string };
+export const recoveryTypeNames: Record<string, string> = { POST_CONTENT: "본문 파싱", PLACE_PARSING: "장소 파싱", POST_MEDIA: "미디어 저장", PLACE_THUMBNAILS: "썸네일", PLACE_TAGS: "장소 태그" };
+export const recoveryStageNames: Record<string, string> = {
+  ...recoveryTypeNames, CONTENT_FETCH: "원문 가져오기", CONTENT_COVER_TITLE: "커버·제목 추출",
+  CONTENT_INFERENCE: "본문 분석", CONTENT_SAVE: "본문 저장", PLACE_TEXT_CLUES: "장소 단서 추출",
+  PLACE_TEXT_RESOLUTION: "장소 검색", PLACE_IMAGE_OCR: "이미지 OCR", PLACE_IMAGE_CLUES: "이미지 장소 추출",
+  PLACE_IMAGE_RESOLUTION: "이미지 장소 검색", TITLE_FINALIZATION: "제목 생성", PLACE_SAVE: "장소 저장",
+};
 export const recoveryStatusNames: Record<string, string> = { PENDING: "대기", PROCESSING: "처리 중", COMPLETED: "완료", FAILED: "실패" };
 const retryStatusNames: Record<string, string> = { RETRY_PENDING: "재시도 대기", RETRY_PROCESSING: "재시도 처리 중", RECOVERED: "재시도 후 복구 완료", RETRY_FAILED: "재시도 실패" };
 export const recoveryLabel = (job: RecoveryJob) => retryStatusNames[job.recoveryStatus ?? ""] ?? recoveryStatusNames[job.status] ?? job.status;

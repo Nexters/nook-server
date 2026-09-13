@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface ParsingFollowUpJobJpaRepository : JpaRepository<ParsingFollowUpJobEntity, Long> {
+    fun findAllByPostIdInOrderByPostIdDescIdAsc(postIds: List<Long>): List<ParsingFollowUpJobEntity>
+
     fun countByStatusAndNextAttemptAtLessThanEqual(status: ParsingFollowUpJobStatus, now: Instant): Long
 
     fun findFirstByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc(
@@ -55,4 +57,8 @@ interface ParsingFollowUpJobJpaRepository : JpaRepository<ParsingFollowUpJobEnti
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT job FROM ParsingFollowUpJobEntity job WHERE job.id = :id")
     fun findByIdForUpdate(@Param("id") id: Long): ParsingFollowUpJobEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT job FROM ParsingFollowUpJobEntity job WHERE job.postId = :postId ORDER BY job.id")
+    fun findByPostIdForUpdate(@Param("postId") postId: Long): List<ParsingFollowUpJobEntity>
 }
