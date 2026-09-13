@@ -4,6 +4,7 @@ import org.every.nook.api.application.admin.AdminActor
 import org.every.nook.api.application.admin.AdminAuditLogPort
 import org.every.nook.api.application.admin.ParsingRecoveryException
 import org.every.nook.api.application.admin.RetryParsingJobCommand
+import org.every.nook.api.application.admin.RetryPostParsingCommand
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.junit.jupiter.api.AfterAll
@@ -181,6 +182,62 @@ class ParsingExecutionMySqlTest {
         val recovery = db.recovery(RecordingAudit())
         assertEquals("NONE", recovery.find(first.id)?.recoveryStatus)
         assertEquals(null, recovery.find(Long.MAX_VALUE))
+    }
+
+    @Test
+    fun `post pagination keeps all stages together and retries failures atomically`() {
+        db.insertMediaJob()
+        val job = db.jobs.claim(1, timeout).single()
+        db.jobs.fail(job.id, job.attempt, "failed")
+        db.jdbc.update(
+            """
+            INSERT INTO post_content_parsing_jobs
+                (post_id, status, attempt_count, retry_attempt_count, next_attempt_at, progress_percent)
+            VALUES (1, 'COMPLETED', 1, 1, NOW(6), 45), (2, 'FAILED', 4, 4, NOW(6), 5)
+            """.trimIndent(),
+        )
+        db.jdbc.update(
+            """
+            INSERT INTO place_parsing_jobs
+                (post_id, status, attempt_count, retry_attempt_count, next_attempt_at, progress_percent)
+            VALUES (1, 'FAILED', 4, 4, NOW(6), 74)
+            """.trimIndent(),
+        )
+        val audit = RecordingAudit()
+        val posts = db.posts(audit)
+        val first = posts.list(null, "FAILED", null, 1)
+        assertEquals(listOf(2L), first.posts.map { it.postId })
+        assertEquals(true, first.hasNext)
+        val second = posts.list(null, "FAILED", 2, 1)
+        assertEquals(3, second.posts.single().jobs.size)
+        assertEquals(false, second.hasNext)
+        val command = RetryPostParsingCommand(1, AdminActor("operator", "ops@example.com"), "복구")
+        assertFailsWith<IllegalStateException> { db.posts(RecordingAudit(fail = true)).retry(command) }
+        assertEquals(2, posts.find(1)!!.jobs.count { it.status == "FAILED" })
+        val result = posts.retry(command)
+        assertEquals(1, result.jobs.count { it.status == "COMPLETED" })
+        assertEquals(2, result.jobs.count { it.recoveryStatus == "RETRY_PENDING" })
+        assertEquals(4, result.jobs.single { it.type == "PLACE_PARSING" }.attempts)
+        assertEquals(ParsingMySqlFixture.NOW, result.jobs.single { it.type == "POST_MEDIA" }.lastFailedAt)
+        assertEquals(1, audit.entries.size)
+        assertFailsWith<ParsingRecoveryException> { posts.retry(command) }
+        assertEquals(listOf(2L), posts.list(null, "FAILED", null, 20).posts.map { it.postId })
+    }
+
+    @Test
+    fun `failure time survives manual retry and unrelated metadata updates`() {
+        db.insertMediaJob()
+        val job = db.jobs.claim(1, timeout).single()
+        assertFalse(db.jobs.fail(job.id, job.attempt + 1, "stale"))
+        val recovery = db.recovery(RecordingAudit())
+        assertEquals(null, recovery.find(job.id)?.lastFailedAt)
+        db.jobs.fail(job.id, job.attempt, "failed")
+        db.jdbc.update("UPDATE parsing_follow_up_jobs SET updated_at = '2026-09-14 00:00:00'")
+        assertEquals(ParsingMySqlFixture.NOW, recovery.find(job.id)?.lastFailedAt)
+        recovery.retry(RetryParsingJobCommand(job.id, AdminActor("operator", "ops@example.com"), "복구", null))
+        val retry = db.jobs.claim(1, timeout).single()
+        db.jobs.complete(retry.id, retry.attempt)
+        assertEquals(ParsingMySqlFixture.NOW, recovery.find(job.id)?.lastFailedAt)
     }
 
     private class RecordingAudit(private val fail: Boolean = false) : AdminAuditLogPort {

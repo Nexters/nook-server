@@ -56,7 +56,7 @@ jobs:
               nook-admin-web/*|ops/admin-web/*)
                 admin_web_changed=true
                 ;;
-              Dockerfile|Dockerfile.runtime|Dockerfile.batch|Dockerfile.worker|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|config/*|nook-api-*/*|.github/scripts/deploy-dev.sh|.github/scripts/deploy-live.sh|.github/scripts/deploy-dev-worker.sh|.github/scripts/deploy-live-worker.sh|ops/live-runtime/*|ops/dev-worker/*|ops/live-worker/*)
+              Dockerfile|Dockerfile.runtime|Dockerfile.batch|Dockerfile.worker|settings.gradle.kts|build.gradle.kts|gradle.properties|gradle/*|config/*|nook-api-*/*|.github/scripts/deploy-dev.sh|.github/scripts/deploy-live.sh|.github/scripts/deploy-dev-worker.sh|.github/scripts/deploy-live-worker.sh|ops/live-runtime/*|ops/dev-worker/*|ops/live-worker/*|ops/error-log-forwarder/*)
                 api_changed=true
                 ;;
               .github/workflows/container-image.yml)

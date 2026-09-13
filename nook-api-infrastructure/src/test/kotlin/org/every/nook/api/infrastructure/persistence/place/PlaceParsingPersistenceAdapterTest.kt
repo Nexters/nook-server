@@ -23,6 +23,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostMediaEntity
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.every.nook.api.infrastructure.persistence.processing.ParsingFailureAlerts
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceEntity
@@ -78,6 +79,7 @@ class PlaceParsingPersistenceAdapterTest {
         followUpJobPort = followUpJobPort,
         objectMapper = jacksonObjectMapper(),
         clock = Clock.fixed(NOW, ZoneOffset.UTC),
+        failureAlerts = mock(ParsingFailureAlerts::class.java),
     )
 
     init {
@@ -136,6 +138,7 @@ class PlaceParsingPersistenceAdapterTest {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
 
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 1L)
         adapter.fail(11, 0, "방문해보기 좋은 곳", "No place candidate found")
 
         assertEquals("방문해보기 좋은 곳", post.title)
@@ -149,6 +152,7 @@ class PlaceParsingPersistenceAdapterTest {
         post.updateTitleFromAdmin("운영자 제목")
         `when`(jobRepository.findByPostId(11)).thenReturn(job)
 
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 1L)
         adapter.fail(11, 0, "자동 제목", "No place candidate found")
 
         assertEquals("운영자 제목", post.title)

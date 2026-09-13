@@ -74,6 +74,32 @@ class PlaceParsingJobEntity(
     var progressStageStartedAt: Instant? = null,
     @Column(name = "progress_percent", nullable = false)
     var progressPercent: Int = 50,
+    @Column(
+        name = "last_failed_at",
+        nullable = true,
+        columnDefinition = "TIMESTAMP(6) COMMENT '마지막 실제 실패 시각; 과거 미기록은 NULL'",
+    )
+    var lastFailedAt: Instant? = null,
+    @Column(
+        name = "retry_attempt_count",
+        nullable = false,
+        columnDefinition = "INT NOT NULL DEFAULT 0 COMMENT '현재 재시도 회차의 실행 횟수'",
+    )
+    var retryAttemptCount: Int = 0,
+    @Column(
+        name = "execution_stage",
+        nullable = true,
+        length = 40,
+        columnDefinition = "VARCHAR(40) COMMENT '현재 실행이 진입한 단계'",
+    )
+    var executionStage: String? = null,
+    @Column(
+        name = "last_failure_stage",
+        nullable = true,
+        length = 40,
+        columnDefinition = "VARCHAR(40) COMMENT '마지막 실제 실패 단계'",
+    )
+    var lastFailureStage: String? = null,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

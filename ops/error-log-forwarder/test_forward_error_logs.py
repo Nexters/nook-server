@@ -151,12 +151,13 @@ class DeliveryTest(unittest.TestCase):
             with (
                 self.subTest(error=type(error).__name__),
                 patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/webhook"),
-                patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=[error, MagicMock()]) as send,
+                patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=[error, error, error, MagicMock()]) as send,
                 patch("builtins.print") as output,
+                patch.object(forward_error_logs.time, "sleep"),
             ):
                 forward_error_logs.post_error_log(["error"], {})
                 forward_error_logs.post_error_log(["next error"], {})
-                self.assertEqual(2, send.call_count)
+                self.assertEqual(4, send.call_count)
                 self.assertNotIn("secret.example", str(output.call_args_list))
 
     def test_does_not_send_without_webhook_or_log_body(self) -> None:
@@ -229,3 +230,65 @@ class FollowCurrentContainerLogTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ParsingAlertTest(unittest.TestCase):
+    def test_terminal_event_contains_post_stage_and_env_specific_recovery_link(self):
+        entry = {"level": "ERROR", "event_type": "post.parsing.failed", "post_id": 616,
+                 "job_id": 378, "job_type": "POST_MEDIA", "failure_stage": "PLACE_IMAGE_OCR",
+                 "attempt": 4, "failed_at": "2026-09-13T00:00:00Z", "message": "failed"}
+        level, body, context = forward_error_logs.parse_log_entry(json.dumps(entry))
+        for env, host in [("dev", "dev-admin.everynook.co.kr"), ("live", "admin.everynook.co.kr")]:
+            with patch.object(forward_error_logs, "ENVIRONMENT", env):
+                embed = forward_error_logs.parsing_payload(context)["embeds"][0]
+                self.assertIn("616", embed["title"])
+                self.assertIn("이미지 OCR", embed["title"])
+                self.assertIn(host, embed["url"])
+                self.assertIn("recoveryPostId=616", embed["url"])
+        with patch.object(forward_error_logs, "PARSING_ONLY", True):
+            self.assertTrue(forward_error_logs.should_forward(level, context))
+            self.assertFalse(forward_error_logs.should_forward("WARN", context))
+            self.assertFalse(forward_error_logs.should_forward("ERROR", {}))
+
+    def test_post_save_api_failure_has_stage_without_fabricated_post_id(self):
+        _, _, context = forward_error_logs.parse_log_entry(json.dumps({
+            "level": "ERROR", "request_method": "POST", "http_route": "/api/v1/posts",
+            "request_id": "request-353", "@timestamp": "2026-09-13T00:00:00Z",
+        }))
+        payload = forward_error_logs.parsing_payload(context)["embeds"][0]
+        self.assertEqual("post.save.failed", context["event_type"])
+        self.assertIn("게시물 저장 요청", payload["title"])
+        self.assertNotIn("url", payload)
+        self.assertIn("request-353", str(payload))
+
+    def test_parsing_failures_use_alert_channel_and_generic_errors_keep_error_channel(self):
+        with (
+            patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/errors"),
+            patch.object(forward_error_logs, "PARSING_DISCORD_WEBHOOK_URL", "https://discord.example/alerts"),
+            patch.object(forward_error_logs, "post_payload") as send,
+        ):
+            forward_error_logs.post_error_log(["failed"], {"event_type": "post.save.failed"})
+            self.assertTrue(send.call_args.args[0].startswith("https://discord.example/alerts?"))
+            forward_error_logs.post_error_log(["failed"], {})
+            self.assertTrue(send.call_args.args[0].startswith("https://discord.example/errors?"))
+
+
+    def test_rate_limit_waits_then_delivers_and_permanent_failure_does_not_retry(self):
+        limited = urllib.error.HTTPError("https://discord.example/alerts", 429, "limited", {"Retry-After": "2.5"}, None)
+        with (
+            patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=[limited, MagicMock()]) as send,
+            patch.object(forward_error_logs.time, "sleep") as wait,
+        ):
+            forward_error_logs.post_payload("https://discord.example/alerts", {})
+            self.assertEqual(2, send.call_count)
+            wait.assert_called_once_with(2.5)
+        denied = urllib.error.HTTPError("https://secret.example/token", 403, "denied", {}, None)
+        with (
+            patch.object(forward_error_logs.urllib.request, "urlopen", side_effect=denied) as send,
+            patch.object(forward_error_logs.time, "sleep") as wait,
+            patch("builtins.print") as output,
+        ):
+            forward_error_logs.post_payload("https://discord.example/alerts", {})
+            self.assertEqual(1, send.call_count)
+            wait.assert_not_called()
+            self.assertNotIn("secret.example", str(output.call_args_list))

@@ -30,6 +30,7 @@ import org.every.nook.api.infrastructure.persistence.post.PostJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostMediaJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceEntity
 import org.every.nook.api.infrastructure.persistence.post.PostPlaceJpaRepository
+import org.every.nook.api.infrastructure.persistence.processing.ParsingFailureAlerts
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostLockJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostPlaceJpaRepository
 import org.springframework.data.domain.PageRequest
@@ -62,6 +63,7 @@ class PlaceParsingPersistenceAdapter(
     private val objectMapper: ObjectMapper,
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
+    private val failureAlerts: ParsingFailureAlerts = ParsingFailureAlerts(),
 ) : PlaceParsingJobPort,
     PlaceThumbnailUpdatePort,
     PlaceTagSourcePort,
@@ -76,12 +78,15 @@ class PlaceParsingPersistenceAdapter(
         val post = postRepository.findById(job.postId).orElseThrow()
         job.status = PlaceParsingStatus.PROCESSING
         job.attemptCount += 1
+        job.retryAttemptCount += 1
+        job.executionStage = null
         job.nextAttemptAt = now
         job.resumeProgress(now)
 
         return ClaimedPlaceParsingJob(
             postId = job.postId,
             attempt = job.attemptCount,
+            retryAttempt = job.retryAttemptCount,
             body = post.body,
             hashtags = hashtagRepository.findAllByPostIdOrderBySequenceAsc(job.postId).map { it.hashtag },
             sourceLocationTag = post.sourceLocationTag,
@@ -141,6 +146,7 @@ class PlaceParsingPersistenceAdapter(
     override fun updateProgress(postId: Long, attempt: Int, stage: ParsingProgressStage): Boolean {
         val job = requireNotNull(jobRepository.findByPostIdForUpdate(postId))
         if (!job.isCurrentAttempt(attempt)) return false
+        job.executionStage = stage.name
         job.advanceProgress(stage, clock.instant())
         return true
     }
@@ -272,6 +278,8 @@ class PlaceParsingPersistenceAdapter(
         if (!job.isCurrentAttempt(attempt)) return false
         job.freezeProgress(clock.instant())
         job.status = PlaceParsingStatus.PENDING
+        job.lastFailedAt = clock.instant()
+        job.lastFailureStage = job.executionStage
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
         job.nextAttemptAt = nextAttemptAt
         return true
@@ -284,7 +292,17 @@ class PlaceParsingPersistenceAdapter(
         postRepository.findById(postId).orElseThrow().updateTitleFromParsing(title)
         job.freezeProgress(clock.instant())
         job.status = PlaceParsingStatus.FAILED
+        job.lastFailedAt = clock.instant()
+        job.lastFailureStage = job.executionStage
         job.failureReason = reason.take(FAILURE_REASON_MAX_LENGTH)
+        failureAlerts.afterCommit(
+            job.postId,
+            "PLACE_PARSING",
+            requireNotNull(job.id),
+            attempt,
+            job.lastFailureStage ?: "PLACE_PARSING",
+            requireNotNull(job.lastFailedAt),
+        )
         return true
     }
 

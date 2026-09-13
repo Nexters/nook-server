@@ -11,6 +11,7 @@ root_dir="/opt/nook/dev-worker"
 mkdir -p "${root_dir}/scripts"
 cp ops/dev-worker/compose.yml "${root_dir}/compose.yml"
 cp ops/dev-worker/scripts/deploy.sh "${root_dir}/scripts/deploy.sh"
+cp ops/error-log-forwarder/forward_error_logs.py "${root_dir}/scripts/forward_error_logs.py"
 chmod 700 "${root_dir}/scripts/deploy.sh"
 
 printf '%s' "${GABIA_REGISTRY_PASSWORD}" |

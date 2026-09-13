@@ -903,6 +903,7 @@ class ProcessPlaceParsingJobUseCaseTest {
         assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(1))
         assertNull(port.nextAttemptAt)
         assertEquals("No place candidate found: 매칭 실패 장소", port.failedReason)
+        assertEquals(ParsingProgressStage.PLACE_TEXT_RESOLUTION, port.progressStages.last())
         assertEquals(emptyList(), port.completed)
     }
 

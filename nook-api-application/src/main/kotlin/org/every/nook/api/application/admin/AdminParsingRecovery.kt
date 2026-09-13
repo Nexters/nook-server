@@ -15,6 +15,8 @@ data class AdminFollowUpJob(
     val nextAttemptAt: Instant?,
     val updatedAt: Instant,
     val recoveryStatus: String = "NONE",
+    val lastFailedAt: Instant? = null,
+    val failureStage: String? = null,
 )
 
 data class AdminFollowUpPage(val jobs: List<AdminFollowUpJob>, val hasNext: Boolean)

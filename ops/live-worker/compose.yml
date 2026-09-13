@@ -35,3 +35,17 @@ services:
       retries: 12
       start_period: 30s
     stop_grace_period: 70s
+
+  parsing-alerts:
+    image: python:3.13-alpine
+    container_name: nook-live-parsing-alerts
+    restart: unless-stopped
+    command: ["python", "/app/forward_error_logs.py"]
+    environment:
+      ERROR_LOG_CONTAINER_NAME: nook-live-worker
+      ERROR_LOG_ENV: live
+      ERROR_LOG_PARSING_ONLY: "true"
+      ERROR_LOG_DISCORD_WEBHOOK_URL: ${PARSING_ALERT_DISCORD_WEBHOOK_URL:?}
+    volumes:
+      - ./scripts/forward_error_logs.py:/app/forward_error_logs.py:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
