@@ -93,7 +93,12 @@ class ProcessPlaceParsingJobUseCase(
         val places = (textResolution.places + imageResolution?.places.orEmpty())
             .distinctBy { it.provider to it.externalPlaceId }
             .distinctLogicalPlaces()
-        if (places.isEmpty()) {
+        if (places.isEmpty() && !isNormalEmptyPlaceResult(
+                extractedTextClues.size + (imageResolution?.clueCount ?: 0),
+                maxExpectedPlaceCount(expectedPlaceCount, imageResolution?.expectedPlaceCount),
+                textResolution.failure ?: imageResolution?.failure,
+            )
+        ) {
             failWithFinalizedTitle(job, textResolution, imageResolution, expectedPlaceCount)
         }
         val finalCoverage = SourcePlaceCoveragePolicy().evaluate(
@@ -164,7 +169,6 @@ class ProcessPlaceParsingJobUseCase(
         imageResolution: ClueResolution?,
         expectedPlaceCount: Int?,
     ): Nothing {
-        val failure = textResolution.failure ?: imageResolution?.failure
         ensureActive(job, ParsingProgressStage.TITLE_FINALIZATION)
         val title = measure(job, TITLE_STAGE) {
             finalizePostTitle(
@@ -175,11 +179,7 @@ class ProcessPlaceParsingJobUseCase(
                 onEvaluation = { recordRuleTrace(job, TITLE_STAGE, it) },
             )
         }
-        val reason = failure?.message ?: if (imageResolution == null) {
-            NO_PLACE_RESOLVED_REASON
-        } else {
-            NO_PLACE_RESOLVED_AFTER_IMAGE_REASON
-        }
+        val reason = unresolvedPlaceReason(textResolution, imageResolution)
         ensureActive(job, unresolvedPlaceStage(imageResolution != null))
         throw TerminalPlaceParsingException(reason, title)
     }
@@ -664,8 +664,6 @@ class ProcessPlaceParsingJobUseCase(
         const val CANDIDATE_LOG_LIMIT = 5
         const val CANDIDATE_TRACE_LIMIT = 10
         const val FAILURE_REASON_TRACE_LIMIT = 500
-        const val NO_PLACE_RESOLVED_REASON = "No place could be resolved from text"
-        const val NO_PLACE_RESOLVED_AFTER_IMAGE_REASON = "No place could be resolved after image analysis"
         const val PLACE_FLOW = "place"
         const val TEXT_CLUE_STAGE = "clue-text"
         const val IMAGE_TRANSCRIPT_STAGE = "image-transcript"
@@ -683,18 +681,6 @@ class ProcessPlaceParsingJobUseCase(
         const val FAILURE_OUTCOME = "failure"
         const val DEFAULT_IMAGE_OCR_CONCURRENCY = 4
     }
-
-    private class TerminalPlaceParsingException(message: String, val title: String) : IllegalStateException(message)
-
-    private data class ClueResolution(
-        val places: List<PlaceCandidate>,
-        val failure: PlaceResolutionException?,
-        val clueCount: Int,
-        val expectedPlaceCount: Int?,
-        val unresolvedClues: List<UnresolvedPlaceClue>,
-        val clues: List<PlaceClue>,
-        val imageTranscripts: List<ImageTranscript> = emptyList(),
-    )
 }
 
 internal fun PlaceClue.sourceMediaSequence(

@@ -13,6 +13,7 @@ import org.springframework.aop.framework.ProxyFactory
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.orm.jpa.SharedEntityManagerCreator
@@ -93,6 +94,12 @@ internal class ParsingMySqlFixture : AutoCloseable {
             """{"postId":1,"mediaType":"IMAGE","sourceUrl":"https://example.com/image.jpg","sequence":0}""",
         )
     }
+
+    fun summaryTransaction(action: () -> Unit) {
+        TransactionTemplate(DataSourceTransactionManager(dataSource)).executeWithoutResult { action() }
+    }
+
+    fun summaries() = ParsingSummaryAdapter(jdbc, DataSourceTransactionManager(dataSource), jacksonObjectMapper())
 
     fun writeResultValue(jobId: Long, value: String) {
         entityManager.createNativeQuery("UPDATE parsing_follow_up_jobs SET failure_reason = :value WHERE id = :id")

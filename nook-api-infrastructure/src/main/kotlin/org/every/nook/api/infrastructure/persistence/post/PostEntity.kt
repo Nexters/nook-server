@@ -62,6 +62,17 @@ class PostEntity(
     var id: Long? = null
         protected set
 
+    @Column(
+        name = "parsing_alert_fingerprint",
+        nullable = true,
+        length = 64,
+        insertable = false,
+        updatable = false,
+        columnDefinition = "VARCHAR(64) COMMENT '마지막 게시물 처리 요약 알림 상태 해시'",
+    )
+    var parsingAlertFingerprint: String? = null
+        protected set
+
     fun updateContent(post: Post) {
         if (contentManuallyOverridden) return
         authorIdentifier = post.authorIdentifier
