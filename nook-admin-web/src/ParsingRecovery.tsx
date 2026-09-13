@@ -1,21 +1,28 @@
 import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 
-type Job = { id: number; postId: number; type: string; status: string; attempts: number; failureReason?: string; nextAttemptAt?: string; updatedAt: string };
+import { ParsingRecoveryTracking, recoveryLabel, recoveryStatusNames as statusNames, recoveryTypeNames as typeNames, type RecoveryJob as Job } from "./ParsingRecoveryTracking";
+
 type Page = { jobs: Job[]; hasNext: boolean };
-const typeNames: Record<string, string> = { POST_MEDIA: "미디어 저장", PLACE_THUMBNAILS: "썸네일", PLACE_TAGS: "장소 태그" };
-const statusNames: Record<string, string> = { PENDING: "대기", PROCESSING: "처리 중", COMPLETED: "완료", FAILED: "실패" };
 const dateText = (value: string) => new Date(value).toLocaleString("ko-KR");
 
 export function ParsingRecovery({ postId }: { postId?: string }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const watchedId = Number(searchParams.get("recoveryJobId"));
+  const watch = (jobId?: number) => setSearchParams(previous => {
+    const next = new URLSearchParams(previous);
+    if (jobId) next.set("recoveryJobId", String(jobId)); else next.delete("recoveryJobId");
+    return next;
+  }, { replace: true });
   const [status, setStatus] = useState(postId ? "" : "FAILED");
   const [beforeId, setBeforeId] = useState<number>();
   const [page, setPage] = useState<Page>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const refreshList = useCallback(() => setRevision(value => value + 1), []);
   const [selected, setSelected] = useState<Job>();
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -40,6 +47,7 @@ export function ParsingRecovery({ postId }: { postId?: string }) {
     try {
       await api(`/parsing-jobs/${selected.id}/retry`, { method: "POST", body: JSON.stringify({ reason }) });
       setNotice(`게시글 #${selected.postId}의 ${typeNames[selected.type] ?? selected.type} 재시도를 예약했습니다.`);
+      watch(selected.id);
       setSelected(undefined); setReason(""); setRevision(value => value + 1);
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : "재시도 요청에 실패했습니다."); }
     finally { setSaving(false); }
@@ -55,6 +63,7 @@ export function ParsingRecovery({ postId }: { postId?: string }) {
       </Stack>
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice("")}>{notice}</Alert>}
+    {Number.isSafeInteger(watchedId) && watchedId > 0 && <ParsingRecoveryTracking key={watchedId} jobId={watchedId} onUpdate={refreshList} onClose={() => watch()} />}
     {error && <Alert severity="error">{error}</Alert>}
     {loading ? <Box sx={{ p: 2 }}><CircularProgress size={24} aria-label="후속 작업 불러오는 중" /></Box> : page?.jobs.length === 0 ? <Alert severity="info">이 조건에 해당하는 작업이 없습니다.</Alert> : page?.jobs.map(job => <Box key={job.id} sx={{ borderTop: 1, borderColor: "divider", pt: 2 }}>
       <Stack direction={{ xs: "column", lg: "row" }} spacing={1} sx={{ justifyContent: "space-between", alignItems: { lg: "center" } }}>
@@ -62,7 +71,8 @@ export function ParsingRecovery({ postId }: { postId?: string }) {
           <Typography sx={{ color: "primary.main" }}>게시글 #{job.postId} · {typeNames[job.type] ?? job.type}</Typography>
           <Typography variant="caption" color="text.secondary">작업 #{job.id} · 총 {job.attempts}회 실행 · {dateText(job.updatedAt)}</Typography>
         </Stack>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}><Chip size="small" label={statusNames[job.status] ?? job.status} color={job.status === "FAILED" ? "error" : job.status === "COMPLETED" ? "success" : "default"} />
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}><Chip size="small" label={recoveryLabel(job)} color={job.status === "FAILED" ? "error" : job.status === "COMPLETED" ? "success" : "default"} />
+          {(job.status === "PENDING" || job.status === "PROCESSING" || (job.recoveryStatus && job.recoveryStatus !== "NONE")) && <Button size="small" onClick={() => watch(job.id)}>진행·결과 보기</Button>}
           {job.status === "FAILED" && <Button variant="outlined" size="small" onClick={() => { setSelected(job); setReason(""); setSaveError(""); }}>이 단계 재시도</Button>}
         </Stack>
       </Stack>

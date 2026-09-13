@@ -4,7 +4,9 @@ import org.every.nook.api.application.admin.AdminActor
 import org.every.nook.api.application.admin.AdminFollowUpJob
 import org.every.nook.api.application.admin.AdminFollowUpPage
 import org.every.nook.api.application.admin.AdminParsingRecoveryPort
+import org.every.nook.api.application.admin.GetAdminFollowUpJobUseCase
 import org.every.nook.api.application.admin.ListAdminFollowUpJobsUseCase
+import org.every.nook.api.application.admin.ParsingRecoveryException
 import org.every.nook.api.application.admin.RetryAdminFollowUpJobUseCase
 import org.every.nook.api.application.admin.RetryParsingJobCommand
 import java.time.Instant
@@ -18,6 +20,7 @@ class AdminParsingRecoveryControllerTest {
     private val controller = AdminParsingRecoveryController(
         ListAdminFollowUpJobsUseCase(port),
         RetryAdminFollowUpJobUseCase(port),
+        GetAdminFollowUpJobUseCase(port),
     )
     private val actor = AdminActor("operator", "ops@example.com")
 
@@ -43,6 +46,13 @@ class AdminParsingRecoveryControllerTest {
         assertEquals("서비스 복구", port.command?.reason)
     }
 
+    @Test
+    fun `single job lookup returns recovery state and validates identity`() {
+        assertEquals("RECOVERED", controller.get(1).success!!.recoveryStatus)
+        assertFailsWith<IllegalArgumentException> { controller.get(0) }
+        assertFailsWith<ParsingRecoveryException> { controller.get(2) }
+    }
+
     private class FakePort : AdminParsingRecoveryPort {
         var query: List<Any?>? = null
         var command: RetryParsingJobCommand? = null
@@ -56,6 +66,8 @@ class AdminParsingRecoveryControllerTest {
             null,
             Instant.parse("2026-09-13T00:00:00Z"),
         )
+
+        override fun find(jobId: Long) = job.takeIf { jobId == it.id }?.copy(recoveryStatus = "RECOVERED")
 
         override fun list(postId: Long?, status: String?, beforeId: Long?, limit: Int): AdminFollowUpPage {
             query = listOf(postId, status, beforeId, limit)

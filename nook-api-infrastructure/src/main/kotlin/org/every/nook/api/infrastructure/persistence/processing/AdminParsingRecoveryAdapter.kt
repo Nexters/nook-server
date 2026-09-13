@@ -19,6 +19,9 @@ class AdminParsingRecoveryAdapter(
     private val clock: Clock = Clock.systemUTC(),
 ) : AdminParsingRecoveryPort {
     @Transactional(readOnly = true)
+    override fun find(jobId: Long): AdminFollowUpJob? = repository.findById(jobId).orElse(null)?.toAdminView()
+
+    @Transactional(readOnly = true)
     override fun list(postId: Long?, status: String?, beforeId: Long?, limit: Int): AdminFollowUpPage {
         val rows = repository.findForAdmin(
             postId,
@@ -64,4 +67,14 @@ private fun ParsingFollowUpJobEntity.toAdminView() = AdminFollowUpJob(
     failureReason = failureReason,
     nextAttemptAt = nextAttemptAt.takeIf { status == ParsingFollowUpJobStatus.PENDING },
     updatedAt = updatedAt,
+    recoveryStatus = if (attemptCount > retryAttemptCount) {
+        when (status) {
+            ParsingFollowUpJobStatus.PENDING -> "RETRY_PENDING"
+            ParsingFollowUpJobStatus.PROCESSING -> "RETRY_PROCESSING"
+            ParsingFollowUpJobStatus.COMPLETED -> "RECOVERED"
+            ParsingFollowUpJobStatus.FAILED -> "RETRY_FAILED"
+        }
+    } else {
+        "NONE"
+    },
 )
