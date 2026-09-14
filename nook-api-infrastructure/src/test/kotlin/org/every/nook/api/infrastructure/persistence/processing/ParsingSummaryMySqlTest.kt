@@ -18,6 +18,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ParsingSummaryMySqlTest {
@@ -28,12 +29,6 @@ class ParsingSummaryMySqlTest {
     @BeforeAll
     fun start() {
         db = ParsingMySqlFixture()
-        db.jdbc.execute(
-            """
-            CREATE TABLE posts (id BIGINT PRIMARY KEY, parsing_alert_fingerprint VARCHAR(64) NULL,
-                updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6))
-            """.trimIndent(),
-        )
         events.start()
         logger.addAppender(events)
     }
@@ -69,7 +64,7 @@ class ParsingSummaryMySqlTest {
         val fields = events.list.single().keyValuePairs.associate { it.key to it.value }
         assertEquals(1, fields["failed_count"])
         assertEquals(1, fields["completed_count"])
-        assertFalse(fields["failure_summary"].toString().contains("secret"))
+        assertFalse(fields["failure_summary"].toString().contains("secret.example"))
         assertEquals(
             "2026-01-01 00:00:00",
             db.jdbc.queryForObject(
@@ -116,6 +111,25 @@ class ParsingSummaryMySqlTest {
         db.jdbc.update("UPDATE parsing_follow_up_jobs SET status = 'COMPLETED', attempt_count = attempt_count + 1")
         publisher.publish(1)
         assertEquals(2, events.list.size)
+    }
+
+    @Test
+    fun `summary carries precise error code detail and administrator retry outcome`() {
+        insert("FAILED")
+        db.jdbc.update(
+            """
+            UPDATE parsing_follow_up_jobs SET attempt_count=8,retry_attempt_count=4,
+                failure_reason='HTTP 403: image access denied token=secret-token'
+            """.trimIndent(),
+        )
+        db.summaries().publish(1)
+        val fields = events.list.single().keyValuePairs.associate { it.key to it.value }
+        val summary = fields["failure_summary"].toString()
+        assertTrue(summary.contains("image access denied"))
+        assertTrue(summary.contains("\"code\":\"403\""))
+        assertTrue(summary.contains("\"attempts\":8"))
+        assertTrue(summary.contains("\"retried\":true"))
+        assertFalse(summary.contains("secret-token"))
     }
 
     @Test

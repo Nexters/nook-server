@@ -245,7 +245,7 @@ class ParsingAlertTest(unittest.TestCase):
                 self.assertIn("616", embed["title"])
                 self.assertIn("이미지 OCR", embed["description"])
                 self.assertIn(host, embed["url"])
-                self.assertIn("recoveryPostId=616", embed["url"])
+                self.assertIn("/posts/616/processing", embed["url"])
         with patch.object(forward_error_logs, "PARSING_ONLY", True):
             self.assertTrue(forward_error_logs.should_forward(level, context))
             self.assertFalse(forward_error_logs.should_forward("WARN", context))
@@ -268,6 +268,26 @@ class ParsingAlertTest(unittest.TestCase):
             self.assertEqual("7", next(f["value"] for f in embed["fields"] if f["name"] == "실패"))
         with patch.object(forward_error_logs, "PARSING_ONLY", True):
             self.assertFalse(forward_error_logs.should_forward("ERROR", {"event_type": "post.parsing.failed"}))
+
+    def test_summary_includes_specific_cause_code_retry_result_and_post_detail_link(self):
+        context = {
+            "event_type": "post.parsing.summary_failed", "post_id": "902",
+            "failure_summary": json.dumps([{
+                "stage": "PLACE_IMAGE_OCR", "reason": "접근 권한 확인 필요", "count": 1,
+                "detail": "HTTP 403: image access denied", "code": "403", "attempts": 8, "retried": True,
+            }]), "completed_count": 1, "failed_count": 1, "total_count": 2,
+        }
+        for environment, host in (("dev", "dev-admin.everynook.co.kr"), ("live", "admin.everynook.co.kr")):
+            with self.subTest(environment=environment), patch.object(forward_error_logs, "ENVIRONMENT", environment):
+                payload = forward_error_logs.parsing_payload(context)
+                self.assertEqual(1, len(payload["embeds"]))
+                embed = payload["embeds"][0]
+                self.assertIn("이미지 OCR: 접근 권한 확인 필요 (1건)", embed["description"])
+                self.assertIn("오류 코드: 403", embed["description"])
+                self.assertIn("HTTP 403: image access denied", embed["description"])
+                self.assertIn("관리자 재시도 후 실패 · 최대 8회 실행", embed["description"])
+                self.assertEqual(f"https://{host}/#/posts/902/processing", embed["url"])
+                self.assertEqual({"parse": []}, payload["allowed_mentions"])
 
     def test_post_save_api_failure_has_stage_without_fabricated_post_id(self):
         _, _, context = forward_error_logs.parse_log_entry(json.dumps({

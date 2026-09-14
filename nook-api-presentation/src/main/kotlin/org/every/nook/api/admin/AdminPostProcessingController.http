@@ -1,0 +1,22 @@
+### TODO 관리자 로그인 요청
+
+### 최근 실패 (실패 시각 UTC 기준, 필요 시 날짜 수정)
+GET {{baseUrl}}/api/admin/v1/post-processing?category=INITIAL_FAILED&failedSince=2026-09-07T00:00:00Z&page=1&limit=20
+
+### 관리자 재시도 실패
+GET {{baseUrl}}/api/admin/v1/post-processing?category=RETRY_FAILED&page=1&limit=20
+
+### 처리 불가
+GET {{baseUrl}}/api/admin/v1/post-processing?category=UNPROCESSABLE&page=1&limit=20
+
+### 수동 상태 변경
+PATCH {{baseUrl}}/api/admin/v1/post-processing/902/disposition
+Content-Type: application/json
+
+{"disposition":"UNPROCESSABLE","reason":"원본 확인 후 복구할 수 없다고 판단"}
+
+### 복구 대상으로 되돌리기
+PATCH {{baseUrl}}/api/admin/v1/post-processing/902/disposition
+Content-Type: application/json
+
+{"disposition":"OPEN","reason":"원인 조치 완료"}

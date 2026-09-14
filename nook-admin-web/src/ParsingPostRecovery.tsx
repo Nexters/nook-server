@@ -4,7 +4,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { api } from "./api";
 import { recoveryLabel, recoveryTypeNames, recoveryStageNames, type RecoveryJob } from "./ParsingRecoveryTracking";
 
-export type RecoveryPost = { postId: number; jobs: RecoveryJob[] };
+export type RecoveryPost = { postId: number; jobs: RecoveryJob[]; title?: string; disposition?: string; dispositionReason?: string; dispositionChangedAt?: string };
 export const failedJobs = (post: RecoveryPost) => post.jobs.filter(job => job.status === "FAILED");
 const active = (post: RecoveryPost) => post.jobs.some(job => job.status === "PENDING" || job.status === "PROCESSING");
 const dateText = (value: string) => new Date(value).toLocaleString("ko-KR");

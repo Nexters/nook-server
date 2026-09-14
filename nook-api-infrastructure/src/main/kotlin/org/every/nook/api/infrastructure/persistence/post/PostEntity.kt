@@ -73,6 +73,38 @@ class PostEntity(
     var parsingAlertFingerprint: String? = null
         protected set
 
+    @Column(
+        name = "processing_disposition",
+        nullable = false,
+        length = 20,
+        insertable = false,
+        updatable = false,
+        columnDefinition = "VARCHAR(20) DEFAULT 'OPEN' COMMENT '운영 처리 상태 OPEN 또는 UNPROCESSABLE'",
+    )
+    var processingDisposition: String = "OPEN"
+        protected set
+
+    @Column(
+        name = "processing_disposition_reason",
+        nullable = true,
+        length = 500,
+        insertable = false,
+        updatable = false,
+        columnDefinition = "VARCHAR(500) COMMENT '운영 처리 상태 변경 사유'",
+    )
+    var processingDispositionReason: String? = null
+        protected set
+
+    @Column(
+        name = "processing_disposition_changed_at",
+        nullable = true,
+        insertable = false,
+        updatable = false,
+        columnDefinition = "TIMESTAMP(6) COMMENT '운영 처리 상태 변경 시각'",
+    )
+    var processingDispositionChangedAt: Instant? = null
+        protected set
+
     fun updateContent(post: Post) {
         if (contentManuallyOverridden) return
         authorIdentifier = post.authorIdentifier

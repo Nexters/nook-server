@@ -17,6 +17,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.orm.jpa.SharedEntityManagerCreator
+import org.springframework.orm.jpa.vendor.HibernateJpaDialect
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource
 import org.springframework.transaction.interceptor.TransactionInterceptor
 import org.springframework.transaction.support.TransactionTemplate
@@ -40,7 +41,10 @@ internal class ParsingMySqlFixture : AutoCloseable {
         .setProperty("hibernate.connection.password", mysql.password)
         .setProperty("hibernate.hbm2ddl.auto", "create-drop")
         .buildSessionFactory()
-    private val manager = JpaTransactionManager(factory)
+    private val manager = JpaTransactionManager(factory).apply {
+        setDataSource(this@ParsingMySqlFixture.dataSource)
+        setJpaDialect(HibernateJpaDialect())
+    }
     private val entityManager = SharedEntityManagerCreator.createSharedEntityManager(factory)
     private val repositories = JpaRepositoryFactory(entityManager)
     val contentJobs: PostContentParsingJobJpaRepository =
@@ -59,7 +63,12 @@ internal class ParsingMySqlFixture : AutoCloseable {
     }.getProxy() as ParsingFollowUpJobPort
 
     fun recovery(audit: AdminAuditLogPort): AdminParsingRecoveryPort = ProxyFactory(
-        AdminParsingRecoveryAdapter(repository, audit, Clock.fixed(NOW, ZoneOffset.UTC)),
+        AdminParsingRecoveryAdapter(
+            repository,
+            audit,
+            PostProcessingDispositionStore(NamedParameterJdbcTemplate(jdbc)),
+            Clock.fixed(NOW, ZoneOffset.UTC),
+        ),
     ).apply {
         addAdvice(
             TransactionInterceptor().apply {
@@ -70,7 +79,14 @@ internal class ParsingMySqlFixture : AutoCloseable {
     }.getProxy() as AdminParsingRecoveryPort
 
     fun posts(audit: AdminAuditLogPort): AdminPostRecoveryPort = ProxyFactory(
-        AdminPostRecoveryAdapter(contentJobs, placeJobs, repository, NamedParameterJdbcTemplate(jdbc), audit),
+        AdminPostRecoveryAdapter(
+            contentJobs,
+            placeJobs,
+            repository,
+            NamedParameterJdbcTemplate(jdbc),
+            audit,
+            PostProcessingDispositionStore(NamedParameterJdbcTemplate(jdbc)),
+        ),
     ).apply {
         addAdvice(
             TransactionInterceptor().apply {
@@ -79,6 +95,38 @@ internal class ParsingMySqlFixture : AutoCloseable {
             },
         )
     }.getProxy() as AdminPostRecoveryPort
+
+    init {
+        jdbc.execute(
+            """
+            CREATE TABLE posts (id BIGINT PRIMARY KEY, title VARCHAR(255) NULL,
+                parsing_alert_fingerprint VARCHAR(64) NULL,
+                updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6))
+            """.trimIndent(),
+        )
+        jdbc.execute(java.nio.file.Files.readString(java.nio.file.Path.of("../docs/tasks/NOOK-356/ddl/up.sql")))
+        jdbc.update("INSERT INTO posts (id) VALUES (1),(2)")
+    }
+
+    fun processing(audit: AdminAuditLogPort): org.every.nook.api.application.admin.AdminPostProcessingPort =
+        ProxyFactory(
+            AdminPostProcessingAdapter(
+                NamedParameterJdbcTemplate(jdbc),
+                posts(audit),
+                PostProcessingDispositionStore(NamedParameterJdbcTemplate(jdbc)),
+                contentJobs,
+                placeJobs,
+                repository,
+                audit,
+            ),
+        ).apply {
+            addAdvice(
+                TransactionInterceptor().apply {
+                    transactionManager = manager
+                    transactionAttributeSource = AnnotationTransactionAttributeSource()
+                },
+            )
+        }.getProxy() as org.every.nook.api.application.admin.AdminPostProcessingPort
 
     fun transaction(action: () -> Unit) {
         TransactionTemplate(manager).executeWithoutResult { action() }
