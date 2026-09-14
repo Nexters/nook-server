@@ -20,6 +20,7 @@ data class AdminFollowUpJob(
     val lastFailedAt: Instant? = null,
     val failureStage: String? = null,
     val failure: ProcessingFailureDetail? = failureReason?.let(::processingFailureDetail),
+    val outcome: String? = null,
 )
 
 data class AdminFollowUpPage(val jobs: List<AdminFollowUpJob>, val hasNext: Boolean)
