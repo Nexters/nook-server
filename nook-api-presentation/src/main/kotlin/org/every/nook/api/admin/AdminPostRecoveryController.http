@@ -13,3 +13,5 @@ Cf-Access-Jwt-Assertion: replace-with-admin-access-token
 Content-Type: application/json
 
 {"reason":"실패 원인 조치 후 게시물 통합 복구"}
+
+# 응답의 jobs[].outcome은 장소 파싱의 COMPLETED/PARTIAL 결과이며 작업 status와 별도입니다.

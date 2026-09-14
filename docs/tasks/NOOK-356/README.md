@@ -82,3 +82,23 @@
   live DB와 main에는 이번 요청으로 적용하지 않는다.
 
 - 추가 사용자 요청: 전체 처리 규칙까지 게시글 관리 내부로 통합하고 별도 파이프라인 진입 메뉴를 제거한다.
+
+- 디벨롭 1차 merge `13cf8284`: API/worker `dev-438-13cf8284`, 관리자 웹 배포 성공.
+  [배포 34854026190](https://github.com/Nexters/nook-server/actions/runs/34854026190).
+- 메뉴 완전 통합 merge `8899b64e`: 관리자 웹 `dev-8899b64ee271` 배포 성공.
+  [배포 34854786288](https://github.com/Nexters/nook-server/actions/runs/34854786288).
+  코드가 바뀌지 않은 API/worker는 1차 배포 버전을 유지했다.
+- API/worker health UP, 컨테이너 healthy 및 재시작 0회. 신규 컨테이너 조회 구간 ERROR 로그 0건.
+  관리자 웹 health 정상, 실제 배포 번들에 RULES 탭/기존 주소 리다이렉트 및 별도 메뉴 제거 확인.
+  워커 알림 전달기 SHA-256이 저장소 파일과 동일함을 확인했다.
+- 통합 화면 로컬 브라우저에서 구주소→처리 규칙 탭→902 상세→목록→처리 규칙 이동 확인, 콘솔 오류 없음.
+  실제 dev 어드민은 Cloudflare 로그인 세션이 없어 로그인 이후의 실데이터 화면 조작은 확인하지 못했다.
+  main 및 live DB/서비스는 변경하지 않았다.
+
+## 라이브 DDL 선행 적용 — 2026-09-14
+
+- 사용자 요청으로 Codex가 `nook_admin` 계정에서 `ddl/up.sql`을 실행했다.
+- 대상: live RDS `nook`, MySQL 8.4.8. 메타데이터 잠금 대기 상한 10초, ALGORITHM=INSTANT.
+- 기존 3개 운영 분류 칼럼이 없는 것을 확인한 뒤 추가했다. 타입/null/default/COMMENT 확인 완료.
+- 적용 전후 posts 599건 유지. 전체 OPEN, 변경 사유와 변경 시각 NULL 확인.
+- main PR 병합 전에 필요한 DDL 적용을 마쳤다. main 코드 병합 및 라이브 서비스 배포는 아직 하지 않았다.

@@ -109,6 +109,24 @@ class PostProcessingMySqlTest {
     }
 
     @Test
+    fun `completed execution preserves partial place outcome in list and detail`() {
+        db.jdbc.update("UPDATE parsing_follow_up_jobs SET status='COMPLETED'")
+        db.jdbc.update(
+            """
+            INSERT INTO place_parsing_jobs
+                (post_id,status,attempt_count,retry_attempt_count,next_attempt_at,progress_percent,parsing_outcome,
+                 expected_place_count,extracted_place_count,resolved_place_count,unresolved_place_clues)
+            VALUES (1,'COMPLETED',1,1,NOW(6),100,'PARTIAL',7,6,6,'[]')
+            """.trimIndent(),
+        )
+        val post = db.processing(audit).list(PostProcessingQuery(category = "COMPLETED")).posts.single()
+        val place = post.jobs.single { it.type == "PLACE_PARSING" }
+        assertEquals("COMPLETED", place.status)
+        assertEquals("PARTIAL", place.outcome)
+        assertEquals(place, db.posts(audit).find(1)!!.jobs.single { it.type == "PLACE_PARSING" })
+    }
+
+    @Test
     fun `two operators cannot apply the same disposition twice`() {
         val barrier = CyclicBarrier(2)
         Executors.newFixedThreadPool(2).use { pool ->

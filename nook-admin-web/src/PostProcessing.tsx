@@ -6,13 +6,14 @@ import { api } from "./api";
 import { type RecoveryPost, failedJobs } from "./ParsingPostRecovery";
 import { recoveryLabel, recoveryStageNames, recoveryTypeNames, type RecoveryJob } from "./ParsingRecoveryTracking";
 import { ParsingPipelinePage, type PipelineResponse } from "./ParsingPipeline";
+import { PostPlaceResults, type PlaceResultPost } from "./PostPlaceResults";
 import { ProcessingTimeline } from "./ProcessingTimeline";
 
-const categories = { INITIAL_FAILED: "최근 실패", RETRY_FAILED: "관리자 재시도 실패", ACTIVE: "처리 중", COMPLETED: "완료", UNPROCESSABLE: "처리 불가" };
+const categories = { INITIAL_FAILED: "최근 실패", RETRY_FAILED: "관리자 재시도 실패", ACTIVE: "처리 중", COMPLETED: "실행 완료", UNPROCESSABLE: "처리 불가" };
 const date = (v?: string) => v ? new Date(v).toLocaleString("ko-KR") : "과거 이력 · 시각 미기록";
 const active = (p: RecoveryPost) => p.jobs.some(j => ["PENDING", "PROCESSING"].includes(j.status));
 const lastFailure = (p: RecoveryPost) => failedJobs(p).map(j => j.lastFailedAt).filter((v): v is string => !!v).sort().at(-1);
-const state = (p: RecoveryPost) => p.disposition === "UNPROCESSABLE" ? "처리 불가" : active(p) ? "처리 중" : failedJobs(p).some(j => j.recoveryStatus === "RETRY_FAILED") ? "관리자 재시도 실패" : failedJobs(p).length ? "실패" : p.jobs.some(j => j.recoveryStatus === "RECOVERED") ? "재시도 후 복구 완료" : "완료";
+const state = (p: RecoveryPost) => p.disposition === "UNPROCESSABLE" ? "처리 불가" : active(p) ? "처리 중" : failedJobs(p).some(j => j.recoveryStatus === "RETRY_FAILED") ? "관리자 재시도 실패" : failedJobs(p).length ? (p.jobs.some(j => j.status === "COMPLETED") ? "일부 실패" : "실패") : p.jobs.some(j => j.outcome === "PARTIAL") ? "장소 일부 미해결" : p.jobs.some(j => j.recoveryStatus === "RECOVERED") ? "재시도 후 복구 완료" : "완료";
 
 export function PostManagementList({ allPosts }: { allPosts: ReactNode }) {
   const [params, setParams] = useSearchParams();
@@ -66,7 +67,7 @@ function ProcessingList({ category }: { category: string }) {
       <Typography variant="subtitle2">{data.total.toLocaleString()}개 게시글 · {page}페이지</Typography>
       {data.posts.length === 0 && <Alert severity="info">이 조건에 해당하는 게시글이 없습니다.{days !== "all" && " 기간을 넓혀 보세요."}</Alert>}
       {data.posts.map(post => <Card variant="outlined" key={post.postId}><CardActionArea component={RouterLink} to={`/posts/${post.postId}/processing?category=${category}&days=${days}`} aria-label={`${post.title ?? `게시글 ${post.postId}`} 처리 상세`}><CardContent>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between" }}><Box><Typography variant="subtitle1">{post.title ?? "제목 없음"}</Typography><Typography variant="caption" color="text.secondary">게시글 #{post.postId}{failedJobs(post).length > 0 ? ` · 최근 실패 ${date(lastFailure(post))}` : ""}</Typography></Box><Chip size="small" label={state(post)} color={post.disposition === "UNPROCESSABLE" ? "default" : failedJobs(post).length ? "error" : "info"} /></Stack>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between" }}><Box><Typography variant="subtitle1">{post.title ?? "제목 없음"}</Typography><Typography variant="caption" color="text.secondary">게시글 #{post.postId}{failedJobs(post).length > 0 ? ` · 최근 실패 ${date(lastFailure(post))}` : ""}</Typography></Box><Chip size="small" label={state(post)} color={post.disposition === "UNPROCESSABLE" ? "default" : failedJobs(post).length ? "error" : post.jobs.some(j => j.outcome === "PARTIAL") ? "warning" : "info"} /></Stack>
         <Typography variant="body2" sx={{ mt: 1 }}>{overview(post)}</Typography>
         <Typography variant="caption" color="text.secondary">전체 {post.jobs.length}건 · 완료 {post.jobs.filter(j => j.status === "COMPLETED").length}건 · 실패 {failedJobs(post).length}건 · 상세 보기 →</Typography>
       </CardContent></CardActionArea></Card>)}
@@ -78,7 +79,7 @@ function ProcessingList({ category }: { category: string }) {
 function overview(post: RecoveryPost) {
   if (post.disposition === "UNPROCESSABLE") return post.dispositionReason ?? "운영자가 처리 불가로 분류했습니다.";
   const groups = [...new Set(failedJobs(post).map(j => `${recoveryStageNames[j.failureStage ?? j.type] ?? j.type}: ${j.failure?.summary ?? j.failureReason ?? "실패 사유 미기록"}`))];
-  return groups.length ? `${groups.slice(0, 2).join(" · ")}${groups.length > 2 ? ` 외 ${groups.length - 2}개 원인` : ""}` : active(post) ? "작업을 처리하고 있습니다." : "모든 작업이 완료되었습니다.";
+  return groups.length ? `${groups.slice(0, 2).join(" · ")}${groups.length > 2 ? ` 외 ${groups.length - 2}개 원인` : ""}` : active(post) ? "작업을 처리하고 있습니다." : post.jobs.some(j => j.outcome === "PARTIAL") ? "실행은 끝났지만 장소 결과에 미해결 항목이 있습니다. 상세에서 장소별 결과를 확인하세요." : "모든 작업이 완료되었습니다.";
 }
 
 export function PostProcessingDetail() {
@@ -90,6 +91,8 @@ function ProcessingDetail({ postId }: { postId: string }) {
   const [params] = useSearchParams();
   const location = useLocation();
   const [post, setPost] = useState<RecoveryPost>();
+  const [placeResult, setPlaceResult] = useState<PlaceResultPost>();
+  const [placeError, setPlaceError] = useState("");
   const [pipeline, setPipeline] = useState<PipelineResponse>();
   const [error, setError] = useState("");
   const [traceError, setTraceError] = useState("");
@@ -100,10 +103,11 @@ function ProcessingDetail({ postId }: { postId: string }) {
     let alive = true; let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
       let poll = true;
-      const [recovery, flow] = await Promise.allSettled([api<RecoveryPost>(`/parsing-posts/${postId}`), api<PipelineResponse>(`/parsing-pipeline?postId=${postId}`)]);
+      const [recovery, flow, detail] = await Promise.allSettled([api<RecoveryPost>(`/parsing-posts/${postId}`), api<PipelineResponse>(`/parsing-pipeline?postId=${postId}`), api<PlaceResultPost>(`/posts/${postId}`)]);
       if (!alive) return;
       if (recovery.status === "fulfilled") { setPost(recovery.value); setError(""); setChecked(new Date()); poll = active(recovery.value); } else setError(recovery.reason.message);
       if (flow.status === "fulfilled") { setPipeline(flow.value); setTraceError(""); } else setTraceError(flow.reason.message);
+      if (detail.status === "fulfilled") { setPlaceResult(detail.value); setPlaceError(""); } else setPlaceError(detail.reason.message);
       if (poll) timer = setTimeout(refresh, 5000);
     };
     void refresh(); return () => { alive = false; clearTimeout(timer); };
@@ -116,7 +120,7 @@ function ProcessingDetail({ postId }: { postId: string }) {
     {!post && !error && <CircularProgress size={28} />}
     {post && <>
       <Card variant="outlined"><CardContent><Stack spacing={1.5}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}><Chip label={state(post)} color={post.disposition === "UNPROCESSABLE" ? "default" : active(post) ? "info" : failedJobs(post).length ? "error" : "success"} /><Typography>전체 {post.jobs.length}건 · 완료 {post.jobs.filter(j => j.status === "COMPLETED").length}건 · 실패 {failedJobs(post).length}건</Typography></Stack>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}><Chip label={state(post)} color={post.disposition === "UNPROCESSABLE" ? "default" : active(post) ? "info" : failedJobs(post).length ? "error" : post.jobs.some(j => j.outcome === "PARTIAL") ? "warning" : "success"} /><Typography>처리 작업 {post.jobs.length}건 · 실행 완료 {post.jobs.filter(j => j.status === "COMPLETED").length}건 · 실패 {failedJobs(post).length}건</Typography></Stack>
         <Typography>{overview(post)}</Typography>
         {post.dispositionChangedAt && <Typography variant="caption">운영 상태 변경: {date(post.dispositionChangedAt)} · {post.dispositionReason}</Typography>}
         <Typography variant="caption" color="text.secondary">{checked && `마지막 확인 ${checked.toLocaleTimeString("ko-KR")}`} {active(post) ? "· 처리 중에는 5초마다 자동 갱신합니다." : "· 현재 실행이 종료되었습니다."}</Typography>
@@ -124,11 +128,13 @@ function ProcessingDetail({ postId }: { postId: string }) {
         <Button sx={{ alignSelf: "flex-start" }} onClick={() => setRevision(v => v + 1)}>상태 새로고침</Button>
       </Stack></CardContent></Card>
       <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-        {Object.entries(recoveryTypeNames).map(([type, label]) => { const jobs = post.jobs.filter(j => j.type === type); return <Box key={type} sx={{ flex: 1, p: 1.5, border: 1, borderColor: jobs.some(j => j.status === "FAILED") ? "error.main" : "divider", borderRadius: 1 }}><Typography variant="subtitle2">{label}</Typography><Typography variant="body2">{!jobs.length ? "생성된 작업 없음" : jobs.some(j => j.status === "PROCESSING") ? "처리 중" : jobs.some(j => j.status === "PENDING") ? "대기 중" : jobs.some(j => j.status === "FAILED") ? `실패 ${jobs.filter(j => j.status === "FAILED").length}건` : "완료"}</Typography></Box>; })}
+        {Object.entries(recoveryTypeNames).map(([type, label]) => { const jobs = post.jobs.filter(j => j.type === type); return <Box key={type} sx={{ flex: 1, p: 1.5, border: 1, borderColor: jobs.some(j => j.status === "FAILED") ? "error.main" : "divider", borderRadius: 1 }}><Typography variant="subtitle2">{label}</Typography><Typography variant="body2">{!jobs.length ? "생성된 작업 없음" : jobs.some(j => j.status === "PROCESSING") ? "처리 중" : jobs.some(j => j.status === "PENDING") ? "대기 중" : jobs.some(j => j.status === "FAILED") ? `실패 ${jobs.filter(j => j.status === "FAILED").length}건` : jobs.some(j => j.outcome === "PARTIAL") ? "일부 장소 미해결" : "완료"}</Typography></Box>; })}
       </Stack>
       {failedJobs(post).length > 0 && <Box><Typography variant="h6" sx={{ mb: 1 }}>실패 원인</Typography><Stack spacing={1}>{failedJobs(post).map(job => <FailureCard key={`${job.type}-${job.id}`} job={job} />)}</Stack></Box>}
-      <Accordion variant="outlined"><AccordionSummary expandIcon={<ExpandMoreIcon />}>전체 작업 상태 · {post.jobs.length}건</AccordionSummary><AccordionDetails><Stack spacing={1}>{post.jobs.map(j => <Box key={`${j.type}-${j.id}`}><Typography variant="subtitle2">{recoveryTypeNames[j.type]} · {recoveryLabel(j)}</Typography><Typography variant="body2">총 {j.attempts}회 실행 · 작업 #{j.id}{j.nextAttemptAt ? ` · 다음 실행 ${date(j.nextAttemptAt)}` : ""}</Typography></Box>)}</Stack></AccordionDetails></Accordion>
+      <Accordion variant="outlined"><AccordionSummary expandIcon={<ExpandMoreIcon />}>전체 작업 상태 · {post.jobs.length}건</AccordionSummary><AccordionDetails><Stack spacing={1}>{post.jobs.map(j => <Box key={`${j.type}-${j.id}`}><Typography variant="subtitle2">{recoveryTypeNames[j.type]} · {j.outcome === "PARTIAL" && j.status === "COMPLETED" ? "실행 완료 · 일부 장소 미해결" : recoveryLabel(j)}</Typography><Typography variant="body2">총 {j.attempts}회 실행 · 작업 #{j.id}{j.nextAttemptAt ? ` · 다음 실행 ${date(j.nextAttemptAt)}` : ""}</Typography></Box>)}</Stack></AccordionDetails></Accordion>
     </>}
+    {placeError && <Alert severity="warning">장소별 결과 조회 실패: {placeError}{placeResult && " · 마지막 조회 결과를 표시합니다."}</Alert>}
+    {placeResult && <PostPlaceResults post={placeResult} />}
     {traceError && <Alert severity="warning">처리 이력 조회 실패: {traceError}</Alert>}
     {pipeline?.execution && <ProcessingTimeline traces={pipeline.execution.traces} nodes={pipeline.nodes} />}
   </Stack>;
