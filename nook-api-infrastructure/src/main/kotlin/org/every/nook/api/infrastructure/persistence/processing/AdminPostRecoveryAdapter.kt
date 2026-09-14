@@ -24,6 +24,7 @@ class AdminPostRecoveryAdapter(
     private val followUps: ParsingFollowUpJobJpaRepository,
     private val jdbc: NamedParameterJdbcTemplate,
     private val audit: AdminAuditLogPort,
+    private val disposition: PostProcessingDispositionStore,
     private val clock: Clock = Clock.systemUTC(),
 ) : AdminPostRecoveryPort {
     @Transactional(readOnly = true)
@@ -54,6 +55,7 @@ class AdminPostRecoveryAdapter(
         val contentJob = content.findByPostIdForUpdate(command.postId)
         val placeJob = place.findByPostIdForUpdate(command.postId)
         val jobs = followUps.findByPostIdForUpdate(command.postId)
+        disposition.requireOpen(command.postId)
         val before = load(listOf(command.postId)).singleOrNull()
             ?: throw ParsingRecoveryException(ParsingRecoveryError.NOT_FOUND)
         if (before.jobs.none { it.status == "FAILED" }) throw ParsingRecoveryException(ParsingRecoveryError.CONFLICT)
@@ -97,6 +99,6 @@ class AdminPostRecoveryAdapter(
             place.findAllByPostIdInOrderByPostIdDescIdAsc(ids).map { it.toRecoveryView() } +
             followUps.findAllByPostIdInOrderByPostIdDescIdAsc(ids).map { it.toAdminView() }
         val grouped = jobs.groupBy(AdminFollowUpJob::postId)
-        return ids.mapNotNull { id -> grouped[id]?.let { AdminPostRecovery(id, it) } }
+        return disposition.enrich(ids.mapNotNull { id -> grouped[id]?.let { AdminPostRecovery(id, it) } })
     }
 }

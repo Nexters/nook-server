@@ -47,6 +47,7 @@ class ParsingSummaryAdapter(
                         row.getString("stage"),
                         row.getString("failure_reason"),
                         row.getTimestamp("last_failed_at")?.toInstant(),
+                        row.getInt("retry_attempt_count"),
                     )
                 },
                 postId,
@@ -77,15 +78,15 @@ class ParsingSummaryAdapter(
 
     private companion object {
         const val JOB_ROWS = """
-            SELECT post_id, 'POST_CONTENT' AS type, id, status, attempt_count,
+            SELECT post_id, 'POST_CONTENT' AS type, id, status, attempt_count, retry_attempt_count,
                 COALESCE(last_failure_stage, 'POST_CONTENT') AS stage, failure_reason, last_failed_at
             FROM post_content_parsing_jobs
             UNION ALL
-            SELECT post_id, 'PLACE_PARSING' AS type, id, status, attempt_count,
+            SELECT post_id, 'PLACE_PARSING' AS type, id, status, attempt_count, retry_attempt_count,
                 COALESCE(last_failure_stage, 'PLACE_PARSING') AS stage, failure_reason, last_failed_at
             FROM place_parsing_jobs
             UNION ALL
-            SELECT post_id, job_type AS type, id, status, attempt_count,
+            SELECT post_id, job_type AS type, id, status, attempt_count, retry_attempt_count,
                 job_type AS stage, failure_reason, last_failed_at
             FROM parsing_follow_up_jobs
         """

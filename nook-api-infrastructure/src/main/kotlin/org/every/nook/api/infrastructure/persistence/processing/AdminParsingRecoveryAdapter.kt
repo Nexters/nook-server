@@ -16,6 +16,7 @@ import java.time.Clock
 class AdminParsingRecoveryAdapter(
     private val repository: ParsingFollowUpJobJpaRepository,
     private val audit: AdminAuditLogPort,
+    private val disposition: PostProcessingDispositionStore,
     private val clock: Clock = Clock.systemUTC(),
 ) : AdminParsingRecoveryPort {
     @Transactional(readOnly = true)
@@ -39,6 +40,7 @@ class AdminParsingRecoveryAdapter(
         if (job.status != ParsingFollowUpJobStatus.FAILED) {
             throw ParsingRecoveryException(ParsingRecoveryError.CONFLICT)
         }
+        disposition.requireOpen(job.postId)
         job.status = ParsingFollowUpJobStatus.PENDING
         job.retryAttemptCount = 0
         job.nextAttemptAt = clock.instant()

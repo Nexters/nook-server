@@ -114,8 +114,16 @@ def parsing_payload(context: dict) -> dict:
     if context.get("event_type") == "post.parsing.summary_failed":
         embed["title"] = f"[{ENVIRONMENT}] 게시물 #{post_id} · 처리 완료 — 일부 실패"[:256]
         failures = json.loads(context.get("failure_summary") or "[]")
-        lines = [f"• {STAGE_NAMES.get(item['stage'], item['stage'])}: {item['reason']} ({item['count']}건)"
-                 for item in failures]
+        lines = []
+        for item in failures:
+            lines.append(f"• {STAGE_NAMES.get(item['stage'], item['stage'])}: {item['reason']} ({item['count']}건)")
+            if item.get("code"):
+                lines.append(f"  오류 코드: {item['code']}")
+            if item.get("detail") and item["detail"] != item["reason"]:
+                lines.append(f"  상세: {item['detail'][:400]}")
+            if item.get("attempts"):
+                origin = "관리자 재시도 후 실패" if item.get("retried") else "자동 재시도 종료"
+                lines.append(f"  {origin} · 최대 {item['attempts']}회 실행")
         embed["description"] = ("모든 작업이 종료되었습니다.\n" + "\n".join(lines))[:4000]
         embed["fields"] = [{"name": name, "value": str(context.get(key) or "0"), "inline": True}
                            for name, key in (("전체 작업", "total_count"), ("성공", "completed_count"),
@@ -126,7 +134,7 @@ def parsing_payload(context: dict) -> dict:
         embed["fields"].append({"name": "Request ID", "value": str(context.get("request_id") or "-")[:200]})
     if str(post_id).isdigit() and ENVIRONMENT in ("dev", "live"):
         host = "dev-admin.everynook.co.kr" if ENVIRONMENT == "dev" else "admin.everynook.co.kr"
-        embed["url"] = f"https://{host}/#/parsing-pipeline?postId={post_id}&recoveryPostId={post_id}"
+        embed["url"] = f"https://{host}/#/posts/{post_id}/processing"
     return {"embeds": [embed], "allowed_mentions": {"parse": []}}
 
 

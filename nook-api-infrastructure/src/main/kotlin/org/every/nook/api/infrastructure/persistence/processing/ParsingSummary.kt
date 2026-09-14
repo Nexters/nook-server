@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.processing
 
+import org.every.nook.api.application.processing.processingFailureDetail
 import java.security.MessageDigest
 import java.time.Instant
 
@@ -11,6 +12,7 @@ internal data class ParsingSummaryJob(
     val stage: String,
     val reason: String?,
     val lastFailedAt: Instant?,
+    val retryAttempt: Int = attempt,
 )
 
 internal data class ParsingSummary(
@@ -20,7 +22,15 @@ internal data class ParsingSummary(
     val lastFailedAt: Instant,
     val failures: List<Failure>,
 ) {
-    data class Failure(val stage: String, val reason: String, val count: Int)
+    data class Failure(
+        val stage: String,
+        val reason: String,
+        val count: Int,
+        val detail: String,
+        val code: String?,
+        val attempts: Int,
+        val retried: Boolean,
+    )
 
     companion object {
         fun from(jobs: List<ParsingSummaryJob>): ParsingSummary? {
@@ -32,24 +42,19 @@ internal data class ParsingSummary(
             }
             val fingerprint = MessageDigest.getInstance("SHA-256").digest(state.toByteArray())
                 .joinToString("") { "%02x".format(it) }
-            val failures = failed.groupingBy { it.stage to safeFailureReason(it.reason) }.eachCount()
-                .map { (key, count) -> Failure(key.first, key.second, count) }
+            val failures = failed.groupBy { it.stage to processingFailureDetail(it.reason ?: "실패 사유 미기록") }
+                .map { (key, jobs) ->
+                    Failure(
+                        key.first,
+                        key.second.summary,
+                        jobs.size,
+                        key.second.detail,
+                        key.second.code,
+                        jobs.maxOf { it.attempt },
+                        jobs.any { it.attempt > it.retryAttempt },
+                    )
+                }
             return ParsingSummary(fingerprint, jobs.size - failed.size, failed.size, failedAt, failures)
         }
-    }
-}
-
-/** Only allowlisted summaries leave the service: provider errors can contain URLs, tokens and bodies. */
-internal fun safeFailureReason(reason: String?): String {
-    val text = reason.orEmpty().lowercase()
-    return when {
-        listOf("429", "rate_limit", "rate limit").any { it in text } -> "외부 서비스 호출 제한"
-        "timeout" in text || "timed out" in text -> "외부 서비스 응답 시간 초과"
-        listOf("401", "403", "configuration").any { it in text } -> "외부 서비스 인증·접근 또는 설정 오류"
-        "404" in text || "not found" in text -> "요청한 원본 또는 리소스를 찾을 수 없음"
-        "download" in text -> "원본 이미지·미디어 다운로드 실패"
-        "no place" in text || "place clue" in text || "not grounded" in text -> "장소 단서에 맞는 장소를 찾지 못함"
-        "ocr" in text -> "이미지 문자 인식 실패"
-        else -> "처리 오류 — 상세 사유는 관리자 화면에서 확인"
     }
 }

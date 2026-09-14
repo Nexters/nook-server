@@ -6,9 +6,9 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Background, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { api } from "./api";
-import { ParsingRecovery } from "./ParsingRecovery";
+
 import "./parsing-pipeline.css";
 
 type Rule = { label: string; value: string; description?: string };
@@ -34,9 +34,9 @@ type PipelineEdge = { id: string; source: string; target: string; label?: string
 type RuntimeConfiguration = { key: string; configuredValue?: string; effectiveValue: string; source: string; description: string; warnings: string[] };
 type UnresolvedPlaceClue = { clue: { name: string; region?: string }; reason: string; type?: "NOT_EXTRACTED" | "RESOLUTION_FAILED" };
 type JobExecution = { status: string; stage?: string; progressPercent: number; attemptCount: number; failureReason?: string; nextAttemptAt?: string; outcome?: string; expectedPlaceCount?: number; extractedPlaceCount?: number; resolvedPlaceCount?: number; unresolvedPlaceClues?: UnresolvedPlaceClue[] };
-type ProcessingTrace = { id: number; flow: string; stage: string; action: string; outcome: string; attempt?: number; durationMs?: number; details: Record<string, string>; createdAt: string };
+export type ProcessingTrace = { id: number; flow: string; stage: string; action: string; outcome: string; attempt?: number; durationMs?: number; details: Record<string, string>; createdAt: string };
 type ParsingExecution = { postId: number; title?: string; content: JobExecution; place?: JobExecution; traces: ProcessingTrace[] };
-type PipelineResponse = { nodes: PipelineNode[]; edges: PipelineEdge[]; configurations: RuntimeConfiguration[]; execution?: ParsingExecution };
+export type PipelineResponse = { nodes: PipelineNode[]; edges: PipelineEdge[]; configurations: RuntimeConfiguration[]; execution?: ParsingExecution };
 type NodeState = "completed" | "active" | "failed" | "waiting" | "reference";
 type FlowNodeData = { pipeline: PipelineNode; state: NodeState; configuration?: RuntimeConfiguration; [key: string]: unknown };
 
@@ -62,7 +62,7 @@ const nodeTypes = { pipeline: PipelineNodeCard };
 
 export function ParsingPipelinePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedPostId = searchParams.get("postId") ?? "";
+  const requestedPostId = searchParams.get("postId") ?? searchParams.get("recoveryPostId") ?? "";
   const [postId, setPostId] = useState(requestedPostId);
   const [data, setData] = useState<PipelineResponse>();
   const [selected, setSelected] = useState<PipelineNode>();
@@ -84,9 +84,10 @@ export function ParsingPipelinePage() {
     setSearchParams(normalized ? { postId: normalized } : {});
   };
 
+  if (requestedPostId && /^[1-9][0-9]*$/.test(requestedPostId)) return <Navigate replace to={`/posts/${requestedPostId}/processing`} />;
   return <Stack spacing={2.5} className="pipeline-page">
     <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ justifyContent: "space-between", alignItems: { lg: "flex-end" } }}>
-      <Box><Typography variant="overline" color="primary.main" className="mono-text">PARSING EXPLORER</Typography><Typography variant="h4">파싱 파이프라인</Typography><Typography color="text.secondary" sx={{ mt: .5 }}>전체 처리 흐름을 탐색하고 각 단계의 실제 판정 규칙을 확인합니다.</Typography></Box>
+      <Box><Typography variant="overline" color="primary.main" className="mono-text">PARSING EXPLORER</Typography><Typography variant="h4">처리 규칙 안내</Typography><Typography color="text.secondary" sx={{ mt: .5 }}>전체 처리 흐름을 탐색하고 각 단계의 실제 판정 규칙을 확인합니다.</Typography></Box>
       <Stack direction="row" spacing={1} component="form" onSubmit={(event) => { event.preventDefault(); search(); }}>
         <TextField size="small" label="게시글 ID" value={postId} onChange={(event) => setPostId(event.target.value)} slotProps={{ htmlInput: { inputMode: "numeric" } }} sx={{ width: 180 }} />
         <Button type="submit" variant="contained" startIcon={<SearchIcon />}>실행 상태 보기</Button>
@@ -95,9 +96,7 @@ export function ParsingPipelinePage() {
     </Stack>
 
     {error && <Alert severity="error">{error}</Alert>}
-    {data?.execution && <ExecutionSummary execution={data.execution} />}
-    {data?.execution && <ExecutionTimeline traces={data.execution.traces ?? []} />}
-    <ParsingRecovery key={requestedPostId} postId={requestedPostId || undefined} />
+
     {data && <ConfigurationStrip configurations={data.configurations} />}
 
     <Card variant="outlined" className="pipeline-canvas-card">

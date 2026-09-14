@@ -1,6 +1,13 @@
 package org.every.nook.api.application.admin
 
-data class AdminPostRecovery(val postId: Long, val jobs: List<AdminFollowUpJob>)
+data class AdminPostRecovery(
+    val postId: Long,
+    val jobs: List<AdminFollowUpJob>,
+    val title: String? = null,
+    val disposition: String = "OPEN",
+    val dispositionReason: String? = null,
+    val dispositionChangedAt: java.time.Instant? = null,
+)
 data class AdminPostRecoveryPage(val posts: List<AdminPostRecovery>, val hasNext: Boolean)
 data class RetryPostParsingCommand(val postId: Long, val actor: AdminActor, val reason: String)
 
