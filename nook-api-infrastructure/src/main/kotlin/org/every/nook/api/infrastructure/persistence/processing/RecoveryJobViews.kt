@@ -18,6 +18,7 @@ internal fun PlaceParsingJobEntity.toRecoveryView() = AdminFollowUpJob(
     nextAttemptAt = nextAttemptAt.takeIf { status.name == "PENDING" }, updatedAt = updatedAt,
     recoveryStatus = manualRecoveryStatus(status.name, attemptCount, retryAttemptCount),
     lastFailedAt = lastFailedAt, failureStage = lastFailureStage,
+    outcome = parsingOutcome?.name,
 )
 
 private fun manualRecoveryStatus(status: String, total: Int, current: Int): String = when {

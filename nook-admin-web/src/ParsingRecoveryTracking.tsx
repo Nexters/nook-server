@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { api } from "./api";
 
-export type RecoveryJob = { id: number; postId: number; type: string; status: string; attempts: number; failureReason?: string; nextAttemptAt?: string; updatedAt: string; recoveryStatus?: string; lastFailedAt?: string; failureStage?: string; failure?: { summary: string; detail: string; code?: string } };
+export type RecoveryJob = { id: number; postId: number; type: string; status: string; attempts: number; failureReason?: string; nextAttemptAt?: string; updatedAt: string; recoveryStatus?: string; outcome?: string; lastFailedAt?: string; failureStage?: string; failure?: { summary: string; detail: string; code?: string } };
 export const recoveryTypeNames: Record<string, string> = { POST_CONTENT: "본문 파싱", PLACE_PARSING: "장소 파싱", POST_MEDIA: "미디어 저장", PLACE_THUMBNAILS: "썸네일", PLACE_TAGS: "장소 태그" };
 export const recoveryStageNames: Record<string, string> = {
   ...recoveryTypeNames, CONTENT_FETCH: "원문 가져오기", CONTENT_COVER_TITLE: "커버·제목 추출",
