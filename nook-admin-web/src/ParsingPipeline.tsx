@@ -6,7 +6,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Background, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 
 import "./parsing-pipeline.css";
@@ -60,10 +60,15 @@ function PipelineNodeCard({ data }: NodeProps<Node<FlowNodeData>>) {
 
 const nodeTypes = { pipeline: PipelineNodeCard };
 
+export function LegacyParsingPipelineRedirect() {
+  const [params] = useSearchParams();
+  const postId = params.get("postId") ?? params.get("recoveryPostId") ?? "";
+  return <Navigate replace to={/^[1-9][0-9]*$/.test(postId) ? `/posts/${postId}/processing` : "/posts?category=RULES"} />;
+}
+
 export function ParsingPipelinePage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedPostId = searchParams.get("postId") ?? searchParams.get("recoveryPostId") ?? "";
-  const [postId, setPostId] = useState(requestedPostId);
+  const navigate = useNavigate();
+  const [postId, setPostId] = useState("");
   const [data, setData] = useState<PipelineResponse>();
   const [selected, setSelected] = useState<PipelineNode>();
   const [loading, setLoading] = useState(true);
@@ -71,27 +76,24 @@ export function ParsingPipelinePage() {
 
   useEffect(() => {
     setLoading(true); setError("");
-    const query = requestedPostId ? `?postId=${encodeURIComponent(requestedPostId)}` : "";
-    api<PipelineResponse>(`/parsing-pipeline${query}`)
+    api<PipelineResponse>("/parsing-pipeline")
       .then(setData)
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "파이프라인을 불러오지 못했습니다."))
       .finally(() => setLoading(false));
-  }, [requestedPostId]);
+  }, []);
 
   const flow = useMemo(() => toFlow(data), [data]);
   const search = () => {
     const normalized = postId.trim();
-    setSearchParams(normalized ? { postId: normalized } : {});
+    if (/^[1-9][0-9]*$/.test(normalized)) navigate(`/posts/${normalized}/processing`);
   };
 
-  if (requestedPostId && /^[1-9][0-9]*$/.test(requestedPostId)) return <Navigate replace to={`/posts/${requestedPostId}/processing`} />;
   return <Stack spacing={2.5} className="pipeline-page">
     <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ justifyContent: "space-between", alignItems: { lg: "flex-end" } }}>
       <Box><Typography variant="overline" color="primary.main" className="mono-text">PARSING EXPLORER</Typography><Typography variant="h4">처리 규칙 안내</Typography><Typography color="text.secondary" sx={{ mt: .5 }}>전체 처리 흐름을 탐색하고 각 단계의 실제 판정 규칙을 확인합니다.</Typography></Box>
       <Stack direction="row" spacing={1} component="form" onSubmit={(event) => { event.preventDefault(); search(); }}>
         <TextField size="small" label="게시글 ID" value={postId} onChange={(event) => setPostId(event.target.value)} slotProps={{ htmlInput: { inputMode: "numeric" } }} sx={{ width: 180 }} />
         <Button type="submit" variant="contained" startIcon={<SearchIcon />}>실행 상태 보기</Button>
-        {requestedPostId && <Button variant="text" onClick={() => { setPostId(""); setSearchParams({}); }}>초기화</Button>}
       </Stack>
     </Stack>
 

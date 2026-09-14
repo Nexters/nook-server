@@ -5,7 +5,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { api } from "./api";
 import { type RecoveryPost, failedJobs } from "./ParsingPostRecovery";
 import { recoveryLabel, recoveryStageNames, recoveryTypeNames, type RecoveryJob } from "./ParsingRecoveryTracking";
-import { type PipelineResponse } from "./ParsingPipeline";
+import { ParsingPipelinePage, type PipelineResponse } from "./ParsingPipeline";
 import { ProcessingTimeline } from "./ProcessingTimeline";
 
 const categories = { INITIAL_FAILED: "최근 실패", RETRY_FAILED: "관리자 재시도 실패", ACTIVE: "처리 중", COMPLETED: "완료", UNPROCESSABLE: "처리 불가" };
@@ -20,9 +20,9 @@ export function PostManagementList({ allPosts }: { allPosts: ReactNode }) {
   return <Stack spacing={2}>
     <Box><Typography variant="h4">게시글 관리</Typography><Typography color="text.secondary">게시글을 선택하면 해당 게시글의 정보와 처리 상태를 확인할 수 있습니다.</Typography></Box>
     <Tabs value={category} variant="scrollable" scrollButtons="auto" onChange={(_, v: string) => setParams(v === "ALL" ? {} : { category: v, days: v.includes("FAILED") ? "7" : "all" })}>
-      <Tab value="ALL" label="전체 게시글" />{Object.entries(categories).map(([value, label]) => <Tab key={value} value={value} label={label} />)}
+      <Tab value="ALL" label="전체 게시글" />{Object.entries(categories).map(([value, label]) => <Tab key={value} value={value} label={label} />)}<Tab value="RULES" label="처리 규칙" />
     </Tabs>
-    {category === "ALL" ? allPosts : <ProcessingList key={category} category={category} />}
+    {category === "ALL" ? allPosts : category === "RULES" ? <ParsingPipelinePage /> : <ProcessingList key={category} category={category} />}
   </Stack>;
 }
 
