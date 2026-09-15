@@ -21,7 +21,7 @@ class ParsingSummaryAdapter(
     override fun candidates(afterId: Long, limit: Int): List<Long> = jdbc.queryForList(
         """
         SELECT DISTINCT p.id FROM posts p JOIN ($JOB_ROWS) j ON j.post_id = p.id
-        WHERE p.id > ? AND j.status = 'FAILED' AND j.last_failed_at IS NOT NULL
+        WHERE p.id > ? AND ((j.status = 'FAILED' AND j.last_failed_at IS NOT NULL) OR j.no_places = 1)
         ORDER BY p.id LIMIT ?
         """.trimIndent(),
         Long::class.java,
@@ -48,6 +48,7 @@ class ParsingSummaryAdapter(
                         row.getString("failure_reason"),
                         row.getTimestamp("last_failed_at")?.toInstant(),
                         row.getInt("retry_attempt_count"),
+                        row.getBoolean("no_places"),
                     )
                 },
                 postId,
@@ -62,15 +63,20 @@ class ParsingSummaryAdapter(
             val failures = objectMapper.writeValueAsString(summary.failures)
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                 override fun afterCommit() {
-                    LoggerFactory.getLogger(ParsingSummaryAdapter::class.java).atError()
-                        .addKeyValue("event_type", "post.parsing.summary_failed")
+                    val logger = LoggerFactory.getLogger(ParsingSummaryAdapter::class.java)
+                    val event = if (summary.failed > 0) logger.atError() else logger.atWarn()
+                    event.addKeyValue(
+                        "event_type",
+                        if (summary.failed > 0) "post.parsing.summary_failed" else "post.parsing.summary_warning",
+                    )
                         .addKeyValue("post_id", postId)
                         .addKeyValue("failure_summary", failures)
                         .addKeyValue("completed_count", summary.completed)
                         .addKeyValue("failed_count", summary.failed)
                         .addKeyValue("total_count", jobs.size)
-                        .addKeyValue("failed_at", summary.lastFailedAt.toString())
-                        .log("게시물 처리 종료: postId={}, failed={}", postId, summary.failed)
+                        .addKeyValue("failed_at", summary.lastFailedAt?.toString())
+                        .addKeyValue("warning_code", if (summary.noPlaces) "NO_PLACES" else null)
+                        .log("게시물 처리 종료: postId={}, failed={}, noPlaces={}", postId, summary.failed, summary.noPlaces)
                 }
             })
         }
@@ -79,15 +85,17 @@ class ParsingSummaryAdapter(
     private companion object {
         const val JOB_ROWS = """
             SELECT post_id, 'POST_CONTENT' AS type, id, status, attempt_count, retry_attempt_count,
-                COALESCE(last_failure_stage, 'POST_CONTENT') AS stage, failure_reason, last_failed_at
+                COALESCE(last_failure_stage, 'POST_CONTENT') AS stage, failure_reason, last_failed_at, 0 AS no_places
             FROM post_content_parsing_jobs
             UNION ALL
             SELECT post_id, 'PLACE_PARSING' AS type, id, status, attempt_count, retry_attempt_count,
-                COALESCE(last_failure_stage, 'PLACE_PARSING') AS stage, failure_reason, last_failed_at
-            FROM place_parsing_jobs
+                COALESCE(last_failure_stage, 'PLACE_PARSING') AS stage, failure_reason, last_failed_at,
+                (status = 'COMPLETED' AND resolved_place_count IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM post_places pp WHERE pp.post_id = pj.post_id)) AS no_places
+            FROM place_parsing_jobs pj
             UNION ALL
             SELECT post_id, job_type AS type, id, status, attempt_count, retry_attempt_count,
-                job_type AS stage, failure_reason, last_failed_at
+                job_type AS stage, failure_reason, last_failed_at, 0 AS no_places
             FROM parsing_follow_up_jobs
         """
     }

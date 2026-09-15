@@ -41,7 +41,14 @@ class ParsingSummaryMySqlTest {
 
     @BeforeTest
     fun reset() {
-        listOf("posts", "parsing_follow_up_jobs", "post_content_parsing_jobs", "place_parsing_jobs").forEach {
+        val tables = listOf(
+            "post_places",
+            "posts",
+            "parsing_follow_up_jobs",
+            "post_content_parsing_jobs",
+            "place_parsing_jobs",
+        )
+        tables.forEach {
             db.jdbc.update("DELETE FROM $it")
         }
         db.jdbc.update("INSERT INTO posts (id, updated_at) VALUES (1, '2026-01-01 00:00:00')")
@@ -189,6 +196,99 @@ class ParsingSummaryMySqlTest {
         assertEquals(0, events.list.size)
         db.summaries().publish(1)
         assertEquals(1, events.list.size)
+    }
+
+    @Test
+    fun `zero places waits for other jobs then warns once across concurrent publishers`() {
+        insertZeroPlaces()
+        insert("PROCESSING")
+        val publisher = db.summaries()
+        assertEquals(listOf(1L), publisher.candidates(0, 100))
+        publisher.publish(1)
+        assertEquals(0, events.list.size)
+        db.jdbc.update("UPDATE parsing_follow_up_jobs SET status='COMPLETED'")
+        val barrier = CyclicBarrier(2)
+        Executors.newFixedThreadPool(2).use { pool ->
+            val futures = (1..2).map {
+                pool.submit(
+                    Callable {
+                        barrier.await(10, TimeUnit.SECONDS)
+                        db.summaries().publish(1)
+                    },
+                )
+            }
+            futures.forEach { it.get(10, TimeUnit.SECONDS) }
+        }
+        publisher.publish(1)
+        val event = events.list.single()
+        val fields = event.keyValuePairs.associate { it.key to it.value }
+        assertEquals("WARN", event.level.toString())
+        assertEquals("post.parsing.summary_warning", fields["event_type"])
+        assertEquals("NO_PLACES", fields["warning_code"])
+        assertEquals(0, fields["failed_count"])
+        assertEquals(2, fields["completed_count"])
+        assertNull(fields["failed_at"])
+    }
+
+    @Test
+    fun `zero places and actual failure share one error summary`() {
+        insertZeroPlaces()
+        insert("FAILED")
+        db.summaries().publish(1)
+        db.summaries().publish(1)
+        val event = events.list.single()
+        val fields = event.keyValuePairs.associate { it.key to it.value }
+        assertEquals("ERROR", event.level.toString())
+        assertEquals("post.parsing.summary_failed", fields["event_type"])
+        assertEquals("NO_PLACES", fields["warning_code"])
+        assertEquals(1, fields["failed_count"])
+        assertEquals(1, fields["completed_count"])
+    }
+
+    @Test
+    fun `saved mapping and unknown or unfinished place result do not warn`() {
+        insertZeroPlaces()
+        db.jdbc.update("INSERT INTO post_places (post_id,place_id) VALUES (1,10)")
+        db.summaries().publish(1)
+        assertEquals(emptyList(), db.summaries().candidates(0, 100))
+        db.jdbc.update("DELETE FROM post_places")
+        db.jdbc.update("UPDATE place_parsing_jobs SET resolved_place_count=NULL")
+        db.summaries().publish(1)
+        assertEquals(emptyList(), db.summaries().candidates(0, 100))
+        db.jdbc.update("UPDATE place_parsing_jobs SET resolved_place_count=0,status='PROCESSING'")
+        db.summaries().publish(1)
+        assertEquals(0, events.list.size)
+    }
+
+    @Test
+    fun `zero place warning rolls back and retries only after a new completed attempt`() {
+        insertZeroPlaces()
+        assertFailsWith<IllegalStateException> {
+            db.summaryTransaction {
+                db.summaries().publish(1)
+                error("rollback")
+            }
+        }
+        assertNull(fingerprint())
+        assertEquals(0, events.list.size)
+        db.summaries().publish(1)
+        db.jdbc.update("UPDATE place_parsing_jobs SET status='PENDING',attempt_count=2")
+        db.summaries().publish(1)
+        assertEquals(1, events.list.size)
+        db.jdbc.update("UPDATE place_parsing_jobs SET status='COMPLETED'")
+        db.summaries().publish(1)
+        db.summaries().publish(1)
+        assertEquals(2, events.list.size)
+    }
+
+    private fun insertZeroPlaces() {
+        db.jdbc.update(
+            """
+            INSERT INTO place_parsing_jobs
+                (post_id,status,attempt_count,retry_attempt_count,next_attempt_at,progress_percent,resolved_place_count)
+            VALUES (1,'COMPLETED',1,1,NOW(6),100,0)
+            """.trimIndent(),
+        )
     }
 
     private fun insert(status: String) {

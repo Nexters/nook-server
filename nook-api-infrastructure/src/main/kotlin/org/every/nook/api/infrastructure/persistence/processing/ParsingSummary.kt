@@ -13,13 +13,15 @@ internal data class ParsingSummaryJob(
     val reason: String?,
     val lastFailedAt: Instant?,
     val retryAttempt: Int = attempt,
+    val noPlaces: Boolean = false,
 )
 
 internal data class ParsingSummary(
     val fingerprint: String,
     val completed: Int,
     val failed: Int,
-    val lastFailedAt: Instant,
+    val lastFailedAt: Instant?,
+    val noPlaces: Boolean,
     val failures: List<Failure>,
 ) {
     data class Failure(
@@ -36,10 +38,12 @@ internal data class ParsingSummary(
         fun from(jobs: List<ParsingSummaryJob>): ParsingSummary? {
             if (jobs.any { it.status !in setOf("COMPLETED", "FAILED") }) return null
             val failed = jobs.filter { it.status == "FAILED" }
-            val failedAt = failed.mapNotNull { it.lastFailedAt }.maxOrNull() ?: return null
+            val noPlaces = jobs.any { it.type == "PLACE_PARSING" && it.status == "COMPLETED" && it.noPlaces }
+            val failedAt = failed.mapNotNull { it.lastFailedAt }.maxOrNull()
+            if (failedAt == null && !noPlaces) return null
             val state = jobs.sortedWith(compareBy({ it.type }, { it.id })).joinToString("|") {
                 "${it.type}:${it.id}:${it.status}:${it.attempt}:${it.lastFailedAt}"
-            }
+            } + if (noPlaces) "|NO_PLACES" else ""
             val fingerprint = MessageDigest.getInstance("SHA-256").digest(state.toByteArray())
                 .joinToString("") { "%02x".format(it) }
             val failures = failed.groupBy { it.stage to processingFailureDetail(it.reason ?: "실패 사유 미기록") }
@@ -54,7 +58,7 @@ internal data class ParsingSummary(
                         jobs.any { it.attempt > it.retryAttempt },
                     )
                 }
-            return ParsingSummary(fingerprint, jobs.size - failed.size, failed.size, failedAt, failures)
+            return ParsingSummary(fingerprint, jobs.size - failed.size, failed.size, failedAt, noPlaces, failures)
         }
     }
 }

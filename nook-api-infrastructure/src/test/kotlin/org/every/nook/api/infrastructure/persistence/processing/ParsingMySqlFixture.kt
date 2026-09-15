@@ -105,6 +105,9 @@ internal class ParsingMySqlFixture : AutoCloseable {
             """.trimIndent(),
         )
         jdbc.execute(java.nio.file.Files.readString(java.nio.file.Path.of("../docs/tasks/NOOK-356/ddl/up.sql")))
+        jdbc.execute(
+            "CREATE TABLE post_places (post_id BIGINT NOT NULL, place_id BIGINT NOT NULL, INDEX idx_post_id (post_id))",
+        )
         jdbc.update("INSERT INTO posts (id) VALUES (1),(2)")
     }
 
