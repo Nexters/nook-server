@@ -331,3 +331,42 @@ class ParsingAlertTest(unittest.TestCase):
             self.assertEqual(1, send.call_count)
             wait.assert_not_called()
             self.assertNotIn("secret.example", str(output.call_args_list))
+
+
+class EmptyPlacesWarningTest(unittest.TestCase):
+    def test_warning_reaches_alert_channel_with_one_amber_summary_in_both_environments(self):
+        entry = {"level": "WARN", "event_type": "post.parsing.summary_warning", "post_id": 919,
+                 "warning_code": "NO_PLACES", "failure_summary": "[]", "failed_count": 0,
+                 "completed_count": 7, "total_count": 7, "message": "completed"}
+        level, body, context = forward_error_logs.parse_log_entry(json.dumps(entry))
+        for environment in ("dev", "live"):
+            with (patch.object(forward_error_logs, "ENVIRONMENT", environment),
+                  patch.object(forward_error_logs, "PARSING_ONLY", True),
+                  patch.object(forward_error_logs, "PARSING_DISCORD_WEBHOOK_URL", "https://discord.example/alerts"),
+                  patch.object(forward_error_logs, "post_payload") as send):
+                self.assertTrue(forward_error_logs.should_forward(level, context))
+                self.assertFalse(forward_error_logs.should_forward("WARN", {}))
+                forward_error_logs.post_error_log([body], context)
+                send.assert_called_once()
+                self.assertIn("/alerts?", send.call_args.args[0])
+                payload = send.call_args.args[1]
+                self.assertEqual(1, len(payload["embeds"]))
+                embed = payload["embeds"][0]
+                self.assertEqual(f"[{environment}] 게시물 #919 · 장소 없이 저장됨", embed["title"])
+                self.assertEqual(16753920, embed["color"])
+                self.assertIn("정상 저장", embed["description"])
+                self.assertNotIn("마지막 실패 시각", str(embed))
+                self.assertIn("연결된 장소가 0개", str(embed))
+                self.assertIn("/posts/919/processing", embed["url"])
+
+    def test_warning_is_included_in_failure_summary_without_another_message(self):
+        entry = {"level": "ERROR", "event_type": "post.parsing.summary_failed", "post_id": 919,
+                 "warning_code": "NO_PLACES", "failed_count": 1, "completed_count": 2, "total_count": 3,
+                 "failure_summary": json.dumps([{"stage": "POST_MEDIA", "reason": "다운로드 실패", "count": 1}])}
+        _, _, context = forward_error_logs.parse_log_entry(json.dumps(entry))
+        payload = forward_error_logs.parsing_payload(context)
+        self.assertEqual(1, len(payload["embeds"]))
+        embed = payload["embeds"][0]
+        self.assertEqual(15158332, embed["color"])
+        self.assertIn("미디어 저장: 다운로드 실패", embed["description"])
+        self.assertIn("장소 없이 저장됨", str(embed["fields"]))
