@@ -33,6 +33,7 @@ export function PostPlaceResults({ post, actions }: { post: PlaceResultPost; act
   const resolved = post.resolvedPlaceCount;
   const unaccounted = post.expectedPlaceCount != null && resolved != null ? Math.max(0, post.expectedPlaceCount - resolved - unresolved.length) : 0;
   const partial = post.placeParsingOutcome === "PARTIAL";
+  const noPlaces = post.placeParsingStatus === "COMPLETED" && resolved != null && post.places.length === 0;
   const inProgress = ["PENDING", "PROCESSING"].includes(post.placeParsingStatus ?? "");
   return <Stack spacing={2}>
     <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between" }}><Typography variant="h6">장소별 처리 결과</Typography>{actions}</Stack>
@@ -60,7 +61,7 @@ export function PostPlaceResults({ post, actions }: { post: PlaceResultPost; act
     </Stack></Box>}
     <Box><Typography variant="subtitle1" sx={{ mb: 1 }}>현재 저장된 장소 · {post.places.length}곳</Typography>
       {(post.mappingReviewed || (resolved != null && resolved !== post.places.length)) && <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>현재 연결은 수동 교정 등으로 파싱 당시 결과와 다를 수 있습니다.</Typography>}
-      {!post.places.length ? <Alert severity="info">현재 연결된 장소가 없습니다.{post.placeParsingStatus === "COMPLETED" && !partial && resolved === 0 && !post.mappingReviewed ? " 장소 0곳으로 처리가 완료됐습니다." : ""}</Alert> : <Stack spacing={1}>{post.places.map(place => <Card variant="outlined" key={place.id}><CardActionArea component={RouterLink} to={`/places/${place.id}/show`} aria-label={`${place.name} 장소 상세`}><CardContent><Stack direction="row" spacing={1} sx={{ justifyContent: "space-between" }}><Box><Typography variant="subtitle2">{place.name}</Typography><Typography variant="body2" color="text.secondary">{place.address}</Typography></Box><Chip size="small" color="success" label="저장됨" /></Stack></CardContent></CardActionArea></Card>)}</Stack>}
+      {!post.places.length ? <Alert severity={noPlaces ? "warning" : "info"}>{noPlaces ? <><Typography variant="subtitle2">장소 없이 저장됨</Typography>게시물은 저장됐지만 연결된 장소가 0개입니다. 원문을 확인해 필요한 장소를 연결해 주세요.</> : "현재 연결된 장소가 없습니다."}</Alert> : <Stack spacing={1}>{post.places.map(place => <Card variant="outlined" key={place.id}><CardActionArea component={RouterLink} to={`/places/${place.id}/show`} aria-label={`${place.name} 장소 상세`}><CardContent><Stack direction="row" spacing={1} sx={{ justifyContent: "space-between" }}><Box><Typography variant="subtitle2">{place.name}</Typography><Typography variant="body2" color="text.secondary">{place.address}</Typography></Box><Chip size="small" color="success" label="저장됨" /></Stack></CardContent></CardActionArea></Card>)}</Stack>}
     </Box>
   </Stack>;
 }

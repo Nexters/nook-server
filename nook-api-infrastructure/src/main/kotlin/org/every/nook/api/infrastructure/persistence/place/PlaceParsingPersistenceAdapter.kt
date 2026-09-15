@@ -210,11 +210,17 @@ class PlaceParsingPersistenceAdapter(
                 ),
             )
         }
-        val tagRequestPlaces = resolvedPlaces.map { it.first }.zip(postPlaces).map { (place, postPlace) ->
+        enqueueTags(postId, resolvedPlaces.map { it.first }, postPlaces)
+        return true
+    }
+
+    private fun enqueueTags(postId: Long, places: List<PlaceCandidate>, postPlaces: List<PostPlaceEntity>) {
+        val tagRequestPlaces = places.zip(postPlaces).map { (place, postPlace) ->
             PlaceTagsRequestedEvent.Place(postPlace.placeId, place)
         }
-        followUpJobPort.enqueue(PlaceTagsRequestedEvent(postId, tagRequestPlaces))
-        return true
+        if (tagRequestPlaces.isNotEmpty()) {
+            followUpJobPort.enqueue(PlaceTagsRequestedEvent(postId, tagRequestPlaces))
+        }
     }
 
     private fun thumbnailRequests(
