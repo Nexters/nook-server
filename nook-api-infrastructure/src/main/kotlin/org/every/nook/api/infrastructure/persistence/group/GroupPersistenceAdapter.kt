@@ -85,6 +85,7 @@ class GroupPersistenceAdapter(
         name = name,
         color = color.name,
         postCount = postCount,
+        lastSavedAt = lastSavedAt,
         thumbnailUrls = thumbnailUrls,
     )
 

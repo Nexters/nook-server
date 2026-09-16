@@ -40,6 +40,7 @@ class GroupPersistenceAdapterTest {
         `when`(groupSummary.name).thenReturn("카페")
         `when`(groupSummary.color).thenReturn(GroupColor.YELLOW)
         `when`(groupSummary.postCount).thenReturn(4)
+        `when`(groupSummary.lastSavedAt).thenReturn(FIXED_NOW)
         `when`(firstThumbnail.groupId).thenReturn(17)
         `when`(firstThumbnail.postMediaUrl).thenReturn("https://example.com/instagram.jpg")
         `when`(firstThumbnail.placeThumbnailUrl).thenReturn("https://example.com/place.jpg")
@@ -55,6 +56,7 @@ class GroupPersistenceAdapterTest {
             listOf("https://example.com/instagram.jpg", "https://example.com/fallback.jpg"),
             result.single().thumbnailUrls,
         )
+        assertEquals(FIXED_NOW, result.single().lastSavedAt)
         verify(groupRepository).findRecentThumbnailUrls(7)
     }
 

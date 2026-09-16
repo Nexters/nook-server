@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.group.GroupAccessType
 import org.every.nook.api.application.group.GroupOwnerView
 import org.every.nook.api.application.group.GroupView
+import java.time.Instant
 
 data class GroupResponse(
     @field:Schema(description = "그룹 식별자", example = "17")
@@ -14,6 +15,12 @@ data class GroupResponse(
     val color: String,
     @field:Schema(description = "그룹에 포함된 저장 게시물 수", example = "3")
     val postCount: Long,
+    @field:Schema(
+        description = "내 아카이브에 마지막으로 게시물을 저장한 시각. 저장 이력이 없거나 공유 아카이브면 null",
+        format = "date-time",
+        nullable = true,
+    )
+    val lastSavedAt: Instant?,
     @field:Schema(
         description = "이미지가 있는 최신 저장 게시물의 대표 이미지 URL 목록. 최신순으로 최대 3개입니다.",
         example = """["https://cdn.example.com/posts/1.jpg", "https://cdn.example.com/posts/2.jpg"]""",
@@ -32,6 +39,7 @@ data class GroupResponse(
             name = view.name,
             color = view.color,
             postCount = view.postCount,
+            lastSavedAt = view.lastSavedAt,
             thumbnailUrls = view.thumbnailUrls,
             accessType = view.accessType,
             owner = view.owner?.let(GroupOwnerResponse::from),

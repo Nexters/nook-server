@@ -83,6 +83,7 @@ class GroupControllerTest {
                         name = "카페",
                         color = "YELLOW",
                         postCount = 3,
+                        lastSavedAt = Instant.parse("2026-09-16T13:00:00Z"),
                         thumbnailUrls = listOf(
                             "https://example.com/latest.jpg",
                             "https://example.com/second.jpg",
@@ -95,6 +96,7 @@ class GroupControllerTest {
             status { isOk() }
             jsonPath("$.success[0].id") { value(17) }
             jsonPath("$.success[0].postCount") { value(3) }
+            jsonPath("$.success[0].lastSavedAt") { value("2026-09-16T13:00:00Z") }
             jsonPath("$.success[0].thumbnailUrls[0]") { value("https://example.com/latest.jpg") }
             jsonPath("$.success[0].thumbnailUrls[1]") { value("https://example.com/second.jpg") }
         }
