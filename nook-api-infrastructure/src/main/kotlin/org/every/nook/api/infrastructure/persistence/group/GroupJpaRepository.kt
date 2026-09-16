@@ -25,7 +25,11 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
             WHERE user_group.user_id = :userId
               AND user_group.deleted_at IS NULL
             GROUP BY user_group.id, user_group.name, user_group.color
-            ORDER BY user_group.id
+            ORDER BY
+                MAX(group_post.updated_at) IS NULL ASC,
+                MAX(group_post.updated_at) DESC,
+                user_group.created_at DESC,
+                user_group.id DESC
         """,
         nativeQuery = true,
     )
