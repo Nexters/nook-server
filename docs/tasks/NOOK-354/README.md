@@ -35,7 +35,7 @@ DB의 중복 발행 방지는 재시작에도 유지되지만 로그 전달기�
 - 실제 MySQL 8.4 요약 알림 테스트 6건 통과: 동시 발행, 재시작 중복 방지, 최종 성공 뒤 집계, 재시도 회차, 롤백 및 수정 시각 보존.
 - Python 전달기 테스트 19건 통과: 7개 실패를 단일 payload로 전송, 환경별 채널, 기존 개별 이벤트 제외.
 - 로컬 동기화 폴더의 생성물 읽기 지연을 피하기 위해 임시 Gradle init 스크립트로 빌드 출력만 /tmp/nook354-builds로 옮겨 검증했다. 저장소 빌드 설정은 변경하지 않았다.
-- git diff --check 통과. 실제 Discord 실패 알림 발송은 미실행. 원격 적용 상태는 아래 기록을 따른다.
+- git diff --check 통과. 실제 Discord 발송 및 원격 DDL/배포는 미실행.
 
 ## 배포와 롤백
 
@@ -49,8 +49,4 @@ DB의 중복 발행 방지는 재시작에도 유지되지만 로그 전달기�
 
 - 2026-09-13 사용자 승인으로 dev DDL 선행 적용. MySQL 8.4.11, posts 261건 유지.
   parsing_alert_fingerprint VARCHAR(64) NULL, 기본값 NULL, COMMENT 확인. 기존 값은 모두 NULL.
-- develop merge a8f7ed16 완료. 검증한 main PR 코드 a98e1f27과 merge 결과 트리 동일 확인, 커밋 hook Detekt 통과.
-- [dev 자동 배포 34752266652](https://github.com/Nexters/nook-server/actions/runs/34752266652) 진행 중. 런타임 확인 후 결과를 추가한다.
-- 2026-09-13 사용자 승인으로 live 칼럼만 선행 적용. MySQL 8.4.8, posts 593건 유지.
-  parsing_alert_fingerprint VARCHAR(64) NULL, 기본값 NULL, COMMENT 확인. 기존 값은 모두 NULL.
-- main 코드 병합 및 live 서비스 배포는 하지 않았다. main PR 병합은 사용자가 진행한다.
+- dev 코드 머지/배포와 live DDL은 진행 후 기록한다. main 병합은 사용자가 진행한다.
