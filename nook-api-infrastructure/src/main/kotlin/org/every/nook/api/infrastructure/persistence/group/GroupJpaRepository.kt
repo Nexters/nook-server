@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
     @Query(
@@ -16,7 +17,8 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 user_group.id AS id,
                 user_group.name AS name,
                 user_group.color AS color,
-                COUNT(saved_post.id) AS postCount
+                COUNT(saved_post.id) AS postCount,
+                MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) AS lastSavedAt
             FROM user_groups user_group
             LEFT JOIN group_posts group_post ON group_post.group_id = user_group.id
                 AND group_post.deleted_at IS NULL
@@ -26,8 +28,8 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
               AND user_group.deleted_at IS NULL
             GROUP BY user_group.id, user_group.name, user_group.color
             ORDER BY
-                MAX(group_post.updated_at) IS NULL ASC,
-                MAX(group_post.updated_at) DESC,
+                MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) IS NULL ASC,
+                MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) DESC,
                 user_group.created_at DESC,
                 user_group.id DESC
         """,
@@ -133,6 +135,7 @@ interface GroupSummaryProjection {
     val name: String
     val color: GroupColor
     val postCount: Long
+    val lastSavedAt: Instant?
 }
 
 interface GroupThumbnailProjection {

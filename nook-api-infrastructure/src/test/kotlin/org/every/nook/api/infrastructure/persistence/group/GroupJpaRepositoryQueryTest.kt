@@ -24,8 +24,9 @@ class GroupJpaRepositoryQueryTest {
             .getAnnotation(Query::class.java)
             .value
 
-        assertContains(query, "MAX(group_post.updated_at) IS NULL ASC")
-        assertContains(query, "MAX(group_post.updated_at) DESC")
+        assertContains(query, "MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) AS lastSavedAt")
+        assertContains(query, "MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) IS NULL ASC")
+        assertContains(query, "MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) DESC")
         assertContains(query, "user_group.created_at DESC")
     }
 }
