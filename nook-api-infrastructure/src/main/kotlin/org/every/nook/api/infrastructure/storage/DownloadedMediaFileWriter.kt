@@ -1,9 +1,11 @@
 package org.every.nook.api.infrastructure.storage
 
 import org.every.nook.api.application.post.error.PostMediaStorageException
+import org.every.nook.api.application.post.error.PostMediaStorageTimeoutException
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.http.HttpTimeoutException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -36,6 +38,7 @@ class DownloadedMediaFileWriter {
 
     private fun cleanupAndFail(path: Path, cause: Throwable): Nothing {
         runCatching { Files.deleteIfExists(path) }
+        if (cause is HttpTimeoutException) throw PostMediaStorageTimeoutException(cause)
         storageFailure(cause)
     }
 
