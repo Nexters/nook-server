@@ -7,6 +7,7 @@ import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
+import org.every.nook.api.application.group.ReplaceSavedPostsGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
 import org.every.nook.api.application.group.port.GroupPort
@@ -48,4 +49,9 @@ class GroupUseCaseConfig {
     fun replaceSavedPostGroupsUseCase(
         groupPostManagementPort: GroupPostManagementPort,
     ): ReplaceSavedPostGroupsUseCase = ReplaceSavedPostGroupsUseCase(groupPostManagementPort)
+
+    @Bean
+    fun replaceSavedPostsGroupsUseCase(
+        groupPostManagementPort: GroupPostManagementPort,
+    ): ReplaceSavedPostsGroupsUseCase = ReplaceSavedPostsGroupsUseCase(groupPostManagementPort)
 }
