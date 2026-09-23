@@ -10,6 +10,14 @@ interface PushTokenPort {
     fun disable(tokens: Collection<String>, reason: String)
 }
 
+interface PushPreferencePort {
+    fun get(userId: Long): PushPreference
+
+    fun update(userId: Long, postProcessingEnabled: Boolean): PushPreference
+
+    fun findPostProcessingDisabledUserIds(userIds: Collection<Long>): Set<Long>
+}
+
 fun interface PushNotificationSender {
     fun send(tokens: List<String>, message: PushMessage): PushSendResult
 }

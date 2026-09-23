@@ -18,12 +18,30 @@ class DeletePushTokenUseCase(private val pushTokenPort: PushTokenPort) {
     data class Command(val userId: Long, val token: String)
 }
 
+class GetPushPreferenceUseCase(private val pushPreferencePort: PushPreferencePort) {
+    operator fun invoke(query: Query): PushPreference = pushPreferencePort.get(query.userId)
+
+    data class Query(val userId: Long)
+}
+
+class UpdatePushPreferenceUseCase(private val pushPreferencePort: PushPreferencePort) {
+    operator fun invoke(command: Command): PushPreference =
+        pushPreferencePort.update(command.userId, command.postProcessingEnabled)
+
+    data class Command(val userId: Long, val postProcessingEnabled: Boolean)
+}
+
 class SendPostProcessingPushUseCase(
     private val pushTokenPort: PushTokenPort,
+    private val pushPreferencePort: PushPreferencePort,
     private val sender: PushNotificationSender,
 ) {
     operator fun invoke(command: Command): Result {
-        val tokens = pushTokenPort.findEnabledTokensByPostId(command.postId)
+        val enabledTokens = pushTokenPort.findEnabledTokensByPostId(command.postId)
+        val disabledUserIds = pushPreferencePort.findPostProcessingDisabledUserIds(
+            enabledTokens.map(PushToken::userId).distinct(),
+        )
+        val tokens = enabledTokens.filterNot { it.userId in disabledUserIds }
         if (tokens.isEmpty()) {
             return Result(0, 0, 0)
         }
