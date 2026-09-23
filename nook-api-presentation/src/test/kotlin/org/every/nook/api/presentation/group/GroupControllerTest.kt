@@ -10,6 +10,7 @@ import org.every.nook.api.application.group.GroupView
 import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
+import org.every.nook.api.application.group.ListOwnedGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.post.model.SavedPostSummary
@@ -36,6 +37,7 @@ import kotlin.test.Test
 class GroupControllerTest {
     private lateinit var mockMvc: MockMvc
     private lateinit var listGroupsUseCase: ListGroupsUseCase
+    private lateinit var listOwnedGroupsUseCase: ListOwnedGroupsUseCase
     private lateinit var createGroupUseCase: CreateGroupUseCase
     private lateinit var updateGroupUseCase: UpdateGroupUseCase
     private lateinit var deleteGroupUseCase: DeleteGroupUseCase
@@ -47,6 +49,7 @@ class GroupControllerTest {
         SecurityContextHolder.getContext().authentication =
             TestingAuthenticationToken(TEST_USER_ID.toString(), "credentials", "ROLE_USER")
         listGroupsUseCase = mock(ListGroupsUseCase::class.java)
+        listOwnedGroupsUseCase = mock(ListOwnedGroupsUseCase::class.java)
         createGroupUseCase = mock(CreateGroupUseCase::class.java)
         updateGroupUseCase = mock(UpdateGroupUseCase::class.java)
         deleteGroupUseCase = mock(DeleteGroupUseCase::class.java)
@@ -56,6 +59,7 @@ class GroupControllerTest {
             .standaloneSetup(
                 GroupController(
                     listGroupsUseCase,
+                    listOwnedGroupsUseCase,
                     createGroupUseCase,
                     updateGroupUseCase,
                     deleteGroupUseCase,
@@ -100,6 +104,29 @@ class GroupControllerTest {
             jsonPath("$.success[0].thumbnailUrls[0]") { value("https://example.com/latest.jpg") }
             jsonPath("$.success[0].thumbnailUrls[1]") { value("https://example.com/second.jpg") }
         }
+    }
+
+    @Test
+    fun `lists only current users save eligible owned groups`() {
+        `when`(listOwnedGroupsUseCase(TEST_USER_ID))
+            .thenReturn(
+                listOf(
+                    GroupView(
+                        id = 17,
+                        name = "내 카페",
+                        color = "YELLOW",
+                        postCount = 3,
+                    ),
+                ),
+            )
+
+        mockMvc.get("/api/v1/groups/owned").andExpect {
+            status { isOk() }
+            jsonPath("$.success.length()") { value(1) }
+            jsonPath("$.success[0].id") { value(17) }
+            jsonPath("$.success[0].accessType") { value("OWNED") }
+        }
+        verify(listOwnedGroupsUseCase)(TEST_USER_ID)
     }
 
     @Test

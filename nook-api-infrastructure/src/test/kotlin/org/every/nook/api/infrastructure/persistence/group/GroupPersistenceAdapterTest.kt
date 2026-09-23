@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.port.GroupPort
+import org.every.nook.api.application.group.port.GroupSharePort
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostEntity
 import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaRepository
@@ -66,6 +67,23 @@ class GroupPersistenceAdapterTest {
 
         assertTrue(adapter.findAll(7).isEmpty())
         verify(groupRepository, never()).findRecentThumbnailUrls(7)
+    }
+
+    @Test
+    fun `owned group listing excludes subscribed shared groups`() {
+        val groupSharePort = mock(GroupSharePort::class.java)
+        val ownedOnlyAdapter = GroupPersistenceAdapter(
+            groupRepository,
+            groupPostRepository,
+            savedPostRepository,
+            FIXED_CLOCK,
+            groupSharePort,
+        )
+        `when`(groupRepository.findAllSummaries(7)).thenReturn(emptyList())
+
+        assertTrue(ownedOnlyAdapter.findOwned(7).isEmpty())
+
+        verifyNoInteractions(groupSharePort)
     }
 
     @Test
