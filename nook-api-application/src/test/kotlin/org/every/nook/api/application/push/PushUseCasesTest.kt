@@ -2,6 +2,7 @@ package org.every.nook.api.application.push
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class PushUseCasesTest {
     @Test
@@ -27,16 +28,31 @@ class PushUseCasesTest {
     }
 
     @Test
+    fun `gets and updates a push preference`() {
+        val port = RecordingPushPreferencePort()
+
+        val initial = GetPushPreferenceUseCase(port)(GetPushPreferenceUseCase.Query(userId = 7))
+        val updated = UpdatePushPreferenceUseCase(port)(
+            UpdatePushPreferenceUseCase.Command(userId = 7, postProcessingEnabled = false),
+        )
+
+        assertTrue(initial.postProcessingEnabled)
+        assertEquals(PushPreference(false), updated)
+        assertEquals(false, port.preferences[7])
+    }
+
+    @Test
     fun `sends completed push and disables invalid tokens`() {
         val port = RecordingPushTokenPort(
             tokens = listOf(
-                PushToken("token-1", PushPlatform.IOS),
-                PushToken("token-2", PushPlatform.IOS),
+                PushToken(7, "token-1", PushPlatform.IOS),
+                PushToken(7, "token-2", PushPlatform.IOS),
             ),
         )
+        val preferencePort = RecordingPushPreferencePort()
         val sender = RecordingPushNotificationSender(invalidTokens = listOf("token-2"))
 
-        val result = SendPostProcessingPushUseCase(port, sender)(
+        val result = SendPostProcessingPushUseCase(port, preferencePort, sender)(
             SendPostProcessingPushUseCase.Command(
                 postId = 11,
                 outcome = SendPostProcessingPushUseCase.Outcome.COMPLETED,
@@ -54,10 +70,10 @@ class PushUseCasesTest {
 
     @Test
     fun `sends failed push`() {
-        val port = RecordingPushTokenPort(tokens = listOf(PushToken("token-1", PushPlatform.IOS)))
+        val port = RecordingPushTokenPort(tokens = listOf(PushToken(7, "token-1", PushPlatform.IOS)))
         val sender = RecordingPushNotificationSender()
 
-        SendPostProcessingPushUseCase(port, sender)(
+        SendPostProcessingPushUseCase(port, RecordingPushPreferencePort(), sender)(
             SendPostProcessingPushUseCase.Command(
                 postId = 11,
                 outcome = SendPostProcessingPushUseCase.Outcome.FAILED,
@@ -67,6 +83,25 @@ class PushUseCasesTest {
         assertEquals("앗, 저장에 실패했어요", sender.message?.title)
         assertEquals("다시 시도하러 가볼까요?", sender.message?.body)
         assertEquals("FAILED", sender.message?.data?.get("outcome"))
+    }
+
+    @Test
+    fun `does not send to users who disabled post processing push`() {
+        val port = RecordingPushTokenPort(
+            tokens = listOf(
+                PushToken(7, "token-disabled", PushPlatform.IOS),
+                PushToken(8, "token-enabled", PushPlatform.ANDROID),
+            ),
+        )
+        val preferencePort = RecordingPushPreferencePort(mutableMapOf(7L to false))
+        val sender = RecordingPushNotificationSender()
+
+        val result = SendPostProcessingPushUseCase(port, preferencePort, sender)(
+            SendPostProcessingPushUseCase.Command(11, SendPostProcessingPushUseCase.Outcome.COMPLETED),
+        )
+
+        assertEquals(listOf("token-enabled"), sender.tokens)
+        assertEquals(SendPostProcessingPushUseCase.Result(1, 1, 0), result)
     }
 
     private data class RegisterCall(val userId: Long, val token: String, val platform: PushPlatform)
@@ -107,5 +142,18 @@ class PushUseCasesTest {
                 invalidTokens = invalidTokens,
             )
         }
+    }
+
+    private class RecordingPushPreferencePort(val preferences: MutableMap<Long, Boolean> = mutableMapOf()) :
+        PushPreferencePort {
+        override fun get(userId: Long): PushPreference = PushPreference(preferences[userId] ?: true)
+
+        override fun update(userId: Long, postProcessingEnabled: Boolean): PushPreference {
+            preferences[userId] = postProcessingEnabled
+            return PushPreference(postProcessingEnabled)
+        }
+
+        override fun findPostProcessingDisabledUserIds(userIds: Collection<Long>): Set<Long> =
+            userIds.filterTo(mutableSetOf()) { preferences[it] == false }
     }
 }
