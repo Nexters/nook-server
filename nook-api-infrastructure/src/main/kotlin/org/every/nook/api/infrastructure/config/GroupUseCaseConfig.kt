@@ -6,6 +6,7 @@ import org.every.nook.api.application.group.DeleteGroupUseCase
 import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
+import org.every.nook.api.application.group.ListOwnedGroupsUseCase
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
@@ -20,6 +21,9 @@ import org.springframework.context.annotation.Configuration
 class GroupUseCaseConfig {
     @Bean
     fun listGroupsUseCase(groupPort: GroupPort): ListGroupsUseCase = ListGroupsUseCase(groupPort)
+
+    @Bean
+    fun listOwnedGroupsUseCase(groupPort: GroupPort): ListOwnedGroupsUseCase = ListOwnedGroupsUseCase(groupPort)
 
     @Bean
     fun createGroupUseCase(groupPort: GroupPort): CreateGroupUseCase = CreateGroupUseCase(groupPort)

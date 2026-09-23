@@ -117,6 +117,8 @@ private class AuthFakeGroupPort : GroupPort {
 
     override fun findAll(userId: Long): List<GroupView> = error("Not used")
 
+    override fun findOwned(userId: Long): List<GroupView> = error("Not used")
+
     override fun create(userId: Long, name: String, color: GroupColor): GroupView {
         groups += AuthFakeGroup(userId, name, color)
         return GroupView(id = groups.size.toLong(), name = name, color = color.name, postCount = 0)
