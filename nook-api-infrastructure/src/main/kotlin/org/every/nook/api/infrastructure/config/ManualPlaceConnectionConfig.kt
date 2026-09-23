@@ -7,6 +7,7 @@ import org.every.nook.api.application.place.PlaceSelectionTokenPort
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
 import org.every.nook.api.application.place.port.DisconnectPostPlacePort
+import org.every.nook.api.application.place.port.PlaceIdentityQueryPort
 import org.every.nook.api.infrastructure.auth.JwtProperties
 import org.every.nook.api.infrastructure.place.JwtPlaceSelectionTokenAdapter
 import org.springframework.beans.factory.annotation.Qualifier
@@ -26,7 +27,8 @@ class ManualPlaceConnectionConfig {
     fun searchPlacesUseCase(
         @Qualifier("kakaoPlaceSearchProvider") provider: PagedPlaceSearchProvider,
         selectionTokenPort: PlaceSelectionTokenPort,
-    ): SearchPlacesUseCase = SearchPlacesUseCase(provider, selectionTokenPort)
+        placeIdentityQueryPort: PlaceIdentityQueryPort,
+    ): SearchPlacesUseCase = SearchPlacesUseCase(provider, selectionTokenPort, placeIdentityQueryPort)
 
     @Bean
     fun connectPostPlaceUseCase(

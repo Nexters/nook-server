@@ -1,10 +1,13 @@
 package org.every.nook.api.application.place
 
+import org.every.nook.api.application.place.port.PlaceIdentityQueryPort
+import org.every.nook.api.domain.place.PlaceProviderReference
 import java.math.BigDecimal
 
 class SearchPlacesUseCase(
     private val provider: PagedPlaceSearchProvider,
     private val selectionTokenPort: PlaceSelectionTokenPort,
+    private val placeIdentityQueryPort: PlaceIdentityQueryPort,
 ) {
     operator fun invoke(query: Query): PlaceSearchSliceView {
         query.validate()
@@ -17,11 +20,15 @@ class SearchPlacesUseCase(
                 size = query.size,
             ),
         )
+        val existingPlaceIds = placeIdentityQueryPort.findIds(
+            page.items.mapTo(mutableSetOf()) { candidate -> candidate.reference() },
+        )
         return PlaceSearchSliceView(
             items = page.items.map { candidate ->
                 PlaceSearchResultView(
                     selectionToken = selectionTokenPort.issue(query.userId, candidate),
                     candidate = candidate,
+                    existingPlaceId = existingPlaceIds[candidate.reference()],
                 )
             },
             page = query.page,
@@ -65,7 +72,14 @@ class SearchPlacesUseCase(
     }
 }
 
-data class PlaceSearchResultView(val selectionToken: String, val candidate: PlaceCandidate)
+data class PlaceSearchResultView(
+    val selectionToken: String,
+    val candidate: PlaceCandidate,
+    val existingPlaceId: Long? = null,
+)
+
+private fun PlaceCandidate.reference(): PlaceProviderReference =
+    PlaceProviderReference(provider = provider, externalPlaceId = externalPlaceId)
 
 data class PlaceSearchSliceView(
     val items: List<PlaceSearchResultView>,
