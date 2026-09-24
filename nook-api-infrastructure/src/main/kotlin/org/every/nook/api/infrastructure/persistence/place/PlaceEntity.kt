@@ -60,6 +60,8 @@ class PlaceEntity(
     val longitude: BigDecimal,
     @Column(name = "category", nullable = true, length = Place.MAX_CATEGORY_LENGTH)
     var category: String? = null,
+    @Column(name = "provider_category", nullable = true, length = Place.MAX_PROVIDER_CATEGORY_LENGTH)
+    var providerCategory: String? = null,
     @Column(name = "phone_number", nullable = true, length = Place.MAX_PHONE_NUMBER_LENGTH)
     var phoneNumber: String? = null,
     @Column(name = "google_place_id", nullable = true, length = GOOGLE_PLACE_ID_MAX_LENGTH)

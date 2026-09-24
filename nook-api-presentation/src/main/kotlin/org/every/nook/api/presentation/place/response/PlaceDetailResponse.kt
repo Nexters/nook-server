@@ -1,6 +1,7 @@
 package org.every.nook.api.presentation.place.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceDetailView
 import org.every.nook.api.application.place.PlaceOpeningHours
 import org.every.nook.api.application.place.PlaceOpeningPeriod
@@ -31,6 +32,8 @@ data class PlaceDetailResponse(
     val longitude: BigDecimal,
     @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 카테고리 그룹")
+    val categoryGroup: PlaceCategoryGroup,
     @field:Schema(description = "장소 전화번호", nullable = true)
     val phoneNumber: String?,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
@@ -62,6 +65,7 @@ data class PlaceDetailResponse(
             latitude = view.latitude,
             longitude = view.longitude,
             category = view.category,
+            categoryGroup = view.categoryGroup,
             phoneNumber = view.phoneNumber,
             thumbnailUrl = view.thumbnailUrl,
             thumbnailParsingStatus = view.thumbnailParsingStatus,

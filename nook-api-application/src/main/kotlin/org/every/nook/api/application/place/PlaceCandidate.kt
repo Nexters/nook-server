@@ -18,4 +18,5 @@ data class PlaceCandidate(
     val googlePlaceId: String? = null,
     val sourceMediaSequence: Int? = null,
     val postMediaFallbackAllowed: Boolean = false,
+    val providerCategory: String? = category,
 )

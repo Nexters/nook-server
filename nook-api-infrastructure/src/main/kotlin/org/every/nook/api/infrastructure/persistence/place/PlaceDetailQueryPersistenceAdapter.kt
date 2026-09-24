@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceDetailView
 import org.every.nook.api.application.place.PlacePostGroupView
 import org.every.nook.api.application.place.PlacePostMediaTypeView
@@ -76,6 +77,7 @@ class PlaceDetailQueryPersistenceAdapter(
             latitude = place.latitude,
             longitude = place.longitude,
             category = place.category,
+            categoryGroup = PlaceCategoryGroup.from(place.providerCategory),
             phoneNumber = place.phoneNumber,
             thumbnailUrl = place.thumbnailUrl,
             thumbnailParsingStatus = PlaceThumbnailParsingStatusView.from(place.effectiveThumbnailParsingStatus()),
