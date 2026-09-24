@@ -28,6 +28,11 @@ data class PlaceSearchSliceResponse(
 data class PlaceSearchResponse(
     @field:Schema(description = "게시물 연결 시 사용할 만료형 장소 선택 토큰")
     val selectionToken: String,
+    @field:Schema(
+        description = "동일 provider 장소가 서버에 이미 있으면 내부 장소 식별자, 없으면 null",
+        nullable = true,
+    )
+    val existingPlaceId: Long?,
     @field:Schema(description = "장소명")
     val name: String,
     @field:Schema(description = "장소 주소")
@@ -44,6 +49,7 @@ data class PlaceSearchResponse(
     companion object {
         fun from(view: PlaceSearchResultView): PlaceSearchResponse = PlaceSearchResponse(
             selectionToken = view.selectionToken,
+            existingPlaceId = view.existingPlaceId,
             name = view.candidate.name,
             address = view.candidate.address,
             category = view.candidate.category,

@@ -23,6 +23,7 @@ import org.every.nook.api.presentation.place.request.UpdatePlaceBookmarkRequest
 import org.every.nook.api.presentation.place.request.UpdatePlaceMemoRequest
 import org.every.nook.api.presentation.place.response.MapPlaceResponse
 import org.every.nook.api.presentation.place.response.PlaceDetailResponse
+import org.every.nook.api.presentation.place.response.PlacePostPageResponse
 import org.every.nook.api.presentation.place.response.PlaceSearchSliceResponse
 import org.every.nook.api.presentation.place.response.RecentPlaceSliceResponse
 import org.every.nook.api.presentation.place.response.SavedPlaceSearchPageResponse
@@ -219,6 +220,35 @@ class PlaceController(
             ),
         )
         return ApiResponse.success(PlaceDetailResponse.from(detail))
+    }
+
+    @Operation(summary = "내 장소의 연관 게시물 목록 조회")
+    @GetMapping("/{placeId}/posts")
+    fun getPosts(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Parameter(description = "조회할 장소 식별자")
+        @PathVariable
+        @Positive
+        placeId: Long,
+        @Parameter(description = "조회할 페이지 번호. 0부터 시작합니다.")
+        @RequestParam(defaultValue = "0")
+        @Min(0)
+        page: Int,
+        @Parameter(description = "페이지당 게시물 수")
+        @RequestParam(defaultValue = "6")
+        @Min(1)
+        @Max(MAX_PLACE_POST_PAGE_SIZE)
+        size: Int,
+    ): ApiResponse<PlacePostPageResponse> {
+        val detail = getPlaceDetailUseCase(
+            GetPlaceDetailUseCase.Query(
+                userId = userContext.userId,
+                placeId = placeId,
+                page = page,
+                size = size,
+            ),
+        )
+        return ApiResponse.success(PlacePostPageResponse.from(detail.posts))
     }
 
     @Operation(summary = "장소 북마크 변경")

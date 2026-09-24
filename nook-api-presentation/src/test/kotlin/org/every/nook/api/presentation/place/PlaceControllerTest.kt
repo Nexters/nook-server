@@ -299,6 +299,7 @@ class PlaceControllerTest {
                 items = listOf(
                     PlaceSearchResultView(
                         selectionToken = "signed-token",
+                        existingPlaceId = 17,
                         candidate = PlaceCandidate(
                             provider = "KAKAO",
                             externalPlaceId = "1234",
@@ -325,12 +326,67 @@ class PlaceControllerTest {
         ).andExpect {
             status { isOk() }
             jsonPath("$.success.items[0].selectionToken") { value("signed-token") }
+            jsonPath("$.success.items[0].existingPlaceId") { value(17) }
             jsonPath("$.success.items[0].name") { value("퍼머넌트해비탯") }
             jsonPath("$.success.items[0].distanceMeters") { value(1200) }
             jsonPath("$.success.hasNext") { value(true) }
         }
 
         verify(searchPlacesUseCase)(query)
+    }
+
+    @Test
+    fun `returns the first six current user posts connected to an existing place`() {
+        val query = GetPlaceDetailUseCase.Query(
+            userId = TEST_USER_ID,
+            placeId = 17,
+            page = 0,
+            size = 6,
+        )
+        `when`(getPlaceDetailUseCase(query)).thenReturn(
+            PlaceDetailView(
+                id = 17,
+                provider = "KAKAO",
+                externalPlaceId = "1234",
+                name = "퍼머넌트해비탯",
+                address = "경기 용인시",
+                latitude = BigDecimal("37.5"),
+                longitude = BigDecimal("127.0"),
+                category = "카페",
+                phoneNumber = null,
+                thumbnailUrl = null,
+                thumbnailParsingStatus = PlaceThumbnailParsingStatusView.PENDING,
+                bookmarked = true,
+                memo = null,
+                posts = PlacePostPageView(
+                    items = listOf(
+                        PlacePostView(
+                            postId = 21,
+                            title = "연결 게시물",
+                            authorIdentifier = "author",
+                            representativeMedia = null,
+                            savedAt = Instant.parse("2026-09-20T00:00:00Z"),
+                            groups = emptyList(),
+                        ),
+                    ),
+                    page = 0,
+                    size = 6,
+                    totalElements = 7,
+                    totalPages = 2,
+                    hasNext = true,
+                ),
+            ),
+        )
+
+        mockMvc.get("/api/v1/places/17/posts").andExpect {
+            status { isOk() }
+            jsonPath("$.success.items[0].postId") { value(21) }
+            jsonPath("$.success.size") { value(6) }
+            jsonPath("$.success.totalElements") { value(7) }
+            jsonPath("$.success.hasNext") { value(true) }
+        }
+
+        verify(getPlaceDetailUseCase)(query)
     }
 
     @Test
