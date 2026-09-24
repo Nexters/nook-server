@@ -1,6 +1,7 @@
 package org.every.nook.api.presentation.place.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.SavedPlaceSearchGroupView
 import org.every.nook.api.application.place.SavedPlaceSearchItemView
 import org.every.nook.api.application.place.SavedPlaceSearchPageView
@@ -61,6 +62,8 @@ data class SavedPlaceSearchItemResponse(
     val address: String,
     @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 카테고리 그룹")
+    val categoryGroup: PlaceCategoryGroup,
     @field:Schema(description = "장소 대표 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
     @field:Schema(description = "장소 식별자")
@@ -71,6 +74,7 @@ data class SavedPlaceSearchItemResponse(
             name = view.name,
             address = view.address,
             category = view.category,
+            categoryGroup = view.categoryGroup,
             thumbnailUrl = view.thumbnailUrl,
             id = view.id,
         )

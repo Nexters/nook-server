@@ -13,6 +13,7 @@ class KakaoPlaceMapper {
             latitude = document.y.toCoordinate(),
             longitude = document.x.toCoordinate(),
             category = document.categoryName.toTopLevelCategory(),
+            providerCategory = document.categoryName.toNullableValue(),
             phoneNumber = document.phone.toNullableValue(),
             providerUrl = document.placeUrl.toNullableValue(),
             distanceMeters = document.distance.toNullableValue()?.toIntOrNull(),

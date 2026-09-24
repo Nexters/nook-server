@@ -39,6 +39,7 @@ interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
                 latitude,
                 longitude,
                 category,
+                provider_category,
                 phone_number,
                 created_at,
                 updated_at
@@ -51,6 +52,7 @@ interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
                 :latitude,
                 :longitude,
                 :category,
+                :providerCategory,
                 :phoneNumber,
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
@@ -67,6 +69,7 @@ interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
         @Param("latitude") latitude: BigDecimal,
         @Param("longitude") longitude: BigDecimal,
         @Param("category") category: String?,
+        @Param("providerCategory") providerCategory: String?,
         @Param("phoneNumber") phoneNumber: String?,
     ): Int
 
