@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.SavedPlaceSearchGroupView
 import org.every.nook.api.application.place.SavedPlaceSearchItemView
 import org.every.nook.api.application.place.SavedPlaceSearchPageView
@@ -27,6 +28,7 @@ class SavedPlaceSearchPersistenceAdapter(private val bookmarkRepository: UserPla
                     name = row.name,
                     address = row.address,
                     category = row.category,
+                    categoryGroup = PlaceCategoryGroup.from(row.providerCategory),
                     thumbnailUrl = row.thumbnailUrl,
                 )
             },

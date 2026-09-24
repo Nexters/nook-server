@@ -24,6 +24,7 @@ class KakaoPlaceMapperTest {
         assertEquals("37.5120741", result.latitude.toPlainString())
         assertEquals("127.0590297", result.longitude.toPlainString())
         assertEquals("음식점", result.category)
+        assertEquals("음식점 > 카페", result.providerCategory)
     }
 
     @Test
@@ -41,6 +42,7 @@ class KakaoPlaceMapperTest {
         ).single()
 
         assertEquals("음식점", result.category)
+        assertEquals("음식점 > 간식 > 제과,베이커리", result.providerCategory)
     }
 
     @Test
@@ -60,6 +62,7 @@ class KakaoPlaceMapperTest {
 
         assertEquals("서울 성동구 성수동 1", result.address)
         assertNull(result.category)
+        assertNull(result.providerCategory)
         assertNull(result.phoneNumber)
     }
 

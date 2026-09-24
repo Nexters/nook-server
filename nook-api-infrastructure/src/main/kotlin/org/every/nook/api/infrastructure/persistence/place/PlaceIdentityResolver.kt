@@ -68,6 +68,7 @@ class PlaceIdentityResolver(
             latitude = candidate.latitude,
             longitude = candidate.longitude,
             category = candidate.category,
+            providerCategory = candidate.providerCategory,
             phoneNumber = candidate.phoneNumber,
         )
         return requireNotNull(

@@ -26,6 +26,7 @@ class NaverPlaceMapper {
                 latitude = latitude,
                 longitude = longitude,
                 category = item.category.toTopLevelCategory(),
+                providerCategory = item.category.toNullableValue(),
                 phoneNumber = item.telephone.toNullableValue(),
                 providerUrl = item.link.toNullableValue(),
             )

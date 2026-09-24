@@ -42,6 +42,7 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
                 p.city AS city,
                 p.address AS address,
                 p.category AS category,
+                p.provider_category AS providerCategory,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 p.thumbnail_url AS thumbnailUrl,
@@ -137,6 +138,7 @@ interface GroupPlaceProjection {
     val city: String?
     val address: String
     val category: String?
+    val providerCategory: String?
     val latitude: java.math.BigDecimal
     val longitude: java.math.BigDecimal
     val thumbnailUrl: String?

@@ -68,6 +68,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.name AS name,
                 p.city AS city,
                 p.category AS category,
+                p.provider_category AS providerCategory,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 p.thumbnail_url AS thumbnailUrl,
@@ -163,6 +164,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.city AS city,
                 p.address AS address,
                 p.category AS category,
+                p.provider_category AS providerCategory,
                 p.latitude AS latitude,
                 p.longitude AS longitude,
                 CAST(p.representative_tags AS CHAR) AS representativeTags,
@@ -257,6 +259,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                 p.name AS name,
                 p.address AS address,
                 p.category AS category,
+                p.provider_category AS providerCategory,
                 COALESCE(
                     p.thumbnail_url,
                     (
@@ -466,6 +469,7 @@ interface MapPlaceProjection {
     val name: String
     val city: String?
     val category: String?
+    val providerCategory: String?
     val latitude: BigDecimal
     val longitude: BigDecimal
     val color: String
@@ -482,6 +486,7 @@ interface RecentPlaceProjection {
     val city: String?
     val address: String
     val category: String?
+    val providerCategory: String?
     val latitude: BigDecimal
     val longitude: BigDecimal
     val thumbnailUrl: String?
@@ -497,6 +502,7 @@ interface SavedPlaceSearchProjection {
     val name: String
     val address: String
     val category: String?
+    val providerCategory: String?
     val thumbnailUrl: String?
 }
 

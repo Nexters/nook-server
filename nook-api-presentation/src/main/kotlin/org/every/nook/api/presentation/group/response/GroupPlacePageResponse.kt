@@ -3,6 +3,7 @@ package org.every.nook.api.presentation.group.response
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.group.GroupPlacePage
 import org.every.nook.api.application.group.GroupPlaceSummary
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import java.math.BigDecimal
 
@@ -46,6 +47,8 @@ data class GroupPlaceSummaryResponse(
     val address: String,
     @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 카테고리 그룹")
+    val categoryGroup: PlaceCategoryGroup,
     @field:Schema(description = "장소 위도")
     val latitude: BigDecimal,
     @field:Schema(description = "장소 경도")
@@ -64,6 +67,7 @@ data class GroupPlaceSummaryResponse(
             city = result.city,
             address = result.address,
             category = result.category,
+            categoryGroup = result.categoryGroup,
             latitude = result.latitude,
             longitude = result.longitude,
             thumbnailUrl = result.thumbnailUrl,
