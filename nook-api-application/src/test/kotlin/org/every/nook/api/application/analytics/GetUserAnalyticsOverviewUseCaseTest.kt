@@ -1,6 +1,9 @@
 package org.every.nook.api.application.analytics
 
+import org.junit.jupiter.api.Assertions.assertTimeout
+import org.junit.jupiter.api.function.ThrowingSupplier
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -77,6 +80,58 @@ class GetUserAnalyticsOverviewUseCaseTest {
         assertEquals(1, overview.activeUsers.weekly)
         assertEquals(2, overview.activeUsers.monthly)
         assertEquals(1, overview.daily.single { it.date == LocalDate.parse("2026-09-06") }.activeUsers)
+    }
+
+    @Test
+    fun `calculates a large analytics cohort without repeatedly scanning all events`() {
+        val memberCount = 5_000
+        val events = (1L..memberCount).flatMap { memberId ->
+            listOf(
+                event(UserAnalyticsEventName.SIGN_UP, memberId, null, null, "2026-08-01T01:00:00Z"),
+                event(
+                    UserAnalyticsEventName.POST_SAVE,
+                    memberId,
+                    UserAnalyticsTargetType.POST,
+                    1,
+                    "2026-08-01T02:00:00Z",
+                ),
+                event(
+                    UserAnalyticsEventName.PLACE_SAVE,
+                    memberId,
+                    UserAnalyticsTargetType.PLACE,
+                    2,
+                    "2026-08-01T03:00:00Z",
+                ),
+                event(
+                    UserAnalyticsEventName.POST_SAVE,
+                    memberId,
+                    UserAnalyticsTargetType.POST,
+                    3,
+                    "2026-08-01T04:00:00Z",
+                ),
+                event(
+                    UserAnalyticsEventName.POST_VIEW,
+                    memberId,
+                    UserAnalyticsTargetType.POST,
+                    1,
+                    "2026-08-02T01:00:00Z",
+                ),
+            )
+        }
+        val useCase = GetUserAnalyticsOverviewUseCase(
+            UserAnalyticsEventQueryPort { _, _ -> events },
+            Clock.fixed(Instant.parse("2026-08-03T00:00:00Z"), ZoneOffset.UTC),
+        )
+
+        val overview = assertTimeout(
+            Duration.ofSeconds(5),
+            ThrowingSupplier {
+                useCase(UserAnalyticsPeriod(LocalDate.parse("2026-08-01"), LocalDate.parse("2026-08-02"), 3))
+            },
+        )
+
+        assertEquals(memberCount.toLong(), overview.funnel.activatedUsers)
+        assertEquals(memberCount.toLong(), overview.funnel.returnedUsers)
     }
 
     private fun event(
