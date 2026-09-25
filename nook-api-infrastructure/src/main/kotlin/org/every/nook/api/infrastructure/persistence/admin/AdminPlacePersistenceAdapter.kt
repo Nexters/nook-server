@@ -34,24 +34,33 @@ class AdminPlacePersistenceAdapter(
     AdminPlaceCorrectionPort,
     AdminPlaceCreationPort {
     @Transactional(readOnly = true)
-    override fun search(query: String, limit: Int): List<AdminPlaceSummary> = placeRepository.findAll().asSequence()
-        .filter { it.name.contains(query, true) || it.address.contains(query, true) }
-        .take(limit)
-        .map { it.toSummary(includeImpact = false) }
-        .toList()
+    override fun search(query: String, limit: Int): List<AdminPlaceSummary> =
+        placeRepository.searchForAdmin(query, limit)
+            .asSequence()
+            .map { it.toSummary(includeImpact = false) }
+            .toList()
 
     @Transactional(readOnly = true)
     override fun listPlaces(query: String?, offset: Int, limit: Int): AdminPage<AdminPlaceSummary> {
-        val filtered = placeRepository.findAll().asSequence()
-            .filter { place ->
-                query == null || place.name.contains(query, true) || place.address.contains(query, true) ||
-                    place.externalPlaceId.contains(query, true)
-            }
-            .sortedByDescending { it.createdAt }
-            .toList()
+        val places = placeRepository.findAdminPage(query, offset, limit)
+        val placeIds = places.mapNotNull(PlaceEntity::id)
+        val linkedPostCounts = placeIds.takeIf { it.isNotEmpty() }
+            ?.let(postPlaceRepository::countDistinctPostsByPlaceIdIn)
+            ?.associate { it.placeId to it.itemCount }
+            .orEmpty()
+        val affectedUserCounts = placeIds.takeIf { it.isNotEmpty() }
+            ?.let(savedPostPlaceRepository::countDistinctActiveUsersByPlaceIdIn)
+            ?.associate { it.placeId to it.itemCount }
+            .orEmpty()
         return AdminPage(
-            items = filtered.drop(offset).take(limit).map { it.toSummary(includeImpact = true) },
-            total = filtered.size.toLong(),
+            items = places.map { place ->
+                val placeId = requireNotNull(place.id)
+                place.toSummary(
+                    linkedPostCount = linkedPostCounts.getOrDefault(placeId, 0),
+                    affectedUserCount = affectedUserCounts.getOrDefault(placeId, 0),
+                )
+            },
+            total = placeRepository.countAdminPlaces(query),
         )
     }
 
@@ -173,14 +182,7 @@ class AdminPlacePersistenceAdapter(
 
     private fun PlaceEntity.toSummary(includeImpact: Boolean): AdminPlaceSummary {
         val placeId = requireNotNull(id)
-        return AdminPlaceSummary(
-            id = placeId,
-            name = name,
-            address = address,
-            provider = provider,
-            externalPlaceId = externalPlaceId,
-            thumbnailUrl = thumbnailUrl,
-            representativeTags = representativeTags,
+        return toSummary(
             linkedPostCount = if (includeImpact) linkedPostCount(placeId) else 0,
             affectedUserCount = if (includeImpact) {
                 savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId)
@@ -189,6 +191,18 @@ class AdminPlacePersistenceAdapter(
             },
         )
     }
+
+    private fun PlaceEntity.toSummary(linkedPostCount: Long, affectedUserCount: Long) = AdminPlaceSummary(
+        id = requireNotNull(id),
+        name = name,
+        address = address,
+        provider = provider,
+        externalPlaceId = externalPlaceId,
+        thumbnailUrl = thumbnailUrl,
+        representativeTags = representativeTags,
+        linkedPostCount = linkedPostCount,
+        affectedUserCount = affectedUserCount,
+    )
 
     private fun linkedPostCount(placeId: Long): Long =
         postPlaceRepository.findAllByPlaceId(placeId).map { it.postId }.distinct().size.toLong()
