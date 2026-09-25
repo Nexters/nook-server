@@ -135,8 +135,10 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
         val events = loadEvents(period.copy(endInclusive = observedThrough)).filter { it.occurredAt <= clock.instant() }
         val periodEvents = events.filter { it.occurredAt.atZone(ADMIN_ZONE).toLocalDate() <= period.endInclusive }
         val signUps = signUps(periodEvents)
-        val activationByMember = activations(events, signUps, period.activationThreshold)
+        val eventsByMember = events.groupBy(UserAnalyticsEvent::memberId)
+        val activationByMember = activations(eventsByMember, signUps, period.activationThreshold)
         val returnEvents = returnEvents(events, activationByMember)
+        val returnDatesByMember = returnDatesByMember(events)
 
         return UserAnalyticsOverview(
             from = period.start,
@@ -151,7 +153,7 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
             ),
             activeUsers = activeUsers(queryPort, activeDate),
             daily = daily(period, signUps, activationByMember, periodEvents),
-            retention = retention(activationByMember, events, observedThrough),
+            retention = retention(activationByMember, returnDatesByMember, observedThrough),
             behaviors = behaviors(returnEvents),
             report = buildAnalyticsReport(
                 periodEvents,
@@ -174,15 +176,13 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
             .mapValues { (_, memberEvents) -> memberEvents.minBy(UserAnalyticsEvent::occurredAt) }
 
     private fun activations(
-        events: List<UserAnalyticsEvent>,
+        eventsByMember: Map<Long, List<UserAnalyticsEvent>>,
         signUps: Map<Long, UserAnalyticsEvent>,
         threshold: Int,
     ): Map<Long, LocalDate> = signUps.mapNotNull { (memberId, signUp) ->
-        events.asSequence()
+        eventsByMember.getOrDefault(memberId, emptyList()).asSequence()
             .filter { event ->
-                event.memberId == memberId &&
-                    event.eventName in SAVE_EVENTS &&
-                    event.occurredAt >= signUp.occurredAt
+                event.eventName in SAVE_EVENTS && event.occurredAt >= signUp.occurredAt
             }
             .distinctBy { it.targetType to it.targetId }
             .sortedBy(UserAnalyticsEvent::occurredAt)
@@ -204,20 +204,20 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
         signUps: Map<Long, UserAnalyticsEvent>,
         activationByMember: Map<Long, LocalDate>,
         events: List<UserAnalyticsEvent>,
-    ): List<UserAnalyticsOverview.Daily> = dates(period).map { date ->
-        UserAnalyticsOverview.Daily(
-            date = date,
-            signUps = signUps.values.count {
-                it.occurredAt.atZone(ADMIN_ZONE).toLocalDate() == date
-            }.toLong(),
-            activatedUsers = activationByMember.values.count { it == date }.toLong(),
-            activeUsers = events.asSequence()
-                .filter { event -> event.occurredAt.atZone(ADMIN_ZONE).toLocalDate() == date }
-                .map(UserAnalyticsEvent::memberId)
-                .distinct()
-                .count()
-                .toLong(),
-        )
+    ): List<UserAnalyticsOverview.Daily> {
+        val signUpsByDate = signUps.values.groupingBy { it.analyticsDate() }.eachCount()
+        val activationsByDate = activationByMember.values.groupingBy { it }.eachCount()
+        val activeUsersByDate = events.groupBy { it.analyticsDate() }.mapValues { (_, dateEvents) ->
+            dateEvents.mapTo(mutableSetOf(), UserAnalyticsEvent::memberId).size
+        }
+        return dates(period).map { date ->
+            UserAnalyticsOverview.Daily(
+                date = date,
+                signUps = signUpsByDate.getOrDefault(date, 0).toLong(),
+                activatedUsers = activationsByDate.getOrDefault(date, 0).toLong(),
+                activeUsers = activeUsersByDate.getOrDefault(date, 0).toLong(),
+            )
+        }
     }
 
     private fun dates(period: UserAnalyticsPeriod): List<LocalDate> = generateSequence(period.start) { date ->
@@ -226,21 +226,17 @@ class GetUserAnalyticsOverviewUseCase(private val queryPort: UserAnalyticsEventQ
 
     private fun retention(
         activationByMember: Map<Long, LocalDate>,
-        events: List<UserAnalyticsEvent>,
+        returnDatesByMember: Map<Long, Set<LocalDate>>,
         observedThrough: LocalDate,
     ): List<UserAnalyticsOverview.Retention> = RETENTION_DAYS.map { day ->
         val eligible = activationByMember.filterValues { activatedAt ->
             !activatedAt.plusDays(day.toLong()).isAfter(observedThrough)
         }
         val returned = eligible.count { (memberId, activatedAt) ->
-            events.any { event -> event.isReturnOn(memberId, activatedAt.plusDays(day.toLong())) }
+            activatedAt.plusDays(day.toLong()) in returnDatesByMember.getOrDefault(memberId, emptySet())
         }
         UserAnalyticsOverview.Retention(day, eligible.size.toLong(), returned.toLong())
     }
-
-    private fun UserAnalyticsEvent.isReturnOn(memberId: Long, date: LocalDate): Boolean = this.memberId == memberId &&
-        eventName in RETURN_EVENTS &&
-        occurredAt.atZone(ADMIN_ZONE).toLocalDate() == date
 
     private fun behaviors(returnEvents: List<UserAnalyticsEvent>): List<UserAnalyticsOverview.Behavior> =
         returnEvents.groupBy(UserAnalyticsEvent::eventName)
@@ -284,13 +280,15 @@ private fun activeUsers(queryPort: UserAnalyticsEventQueryPort, asOf: LocalDate)
         from.atStartOfDay(ANALYTICS_ZONE).toInstant(),
         asOf.plusDays(1).atStartOfDay(ANALYTICS_ZONE).toInstant(),
     )
+    val membersByDate = events.groupBy { event -> event.occurredAt.atZone(ANALYTICS_ZONE).toLocalDate() }
+        .mapValues { (_, dateEvents) -> dateEvents.mapTo(mutableSetOf(), UserAnalyticsEvent::memberId) }
     fun count(windowDays: Long): Long {
         val windowStart = asOf.minusDays(windowDays - 1L)
-        return events.asSequence()
-            .filter { event -> event.occurredAt.atZone(ANALYTICS_ZONE).toLocalDate() in windowStart..asOf }
-            .map(UserAnalyticsEvent::memberId)
-            .distinct()
-            .count()
+        return membersByDate.asSequence()
+            .filter { (date, _) -> date in windowStart..asOf }
+            .flatMap { (_, members) -> members.asSequence() }
+            .toSet()
+            .size
             .toLong()
     }
     return UserAnalyticsOverview.ActiveUsers(
@@ -300,6 +298,13 @@ private fun activeUsers(queryPort: UserAnalyticsEventQueryPort, asOf: LocalDate)
         monthly = count(MONTHLY_WINDOW_DAYS),
     )
 }
+
+private fun returnDatesByMember(events: List<UserAnalyticsEvent>): Map<Long, Set<LocalDate>> = events.asSequence()
+    .filter { it.eventName != UserAnalyticsEventName.SIGN_UP }
+    .groupBy(UserAnalyticsEvent::memberId)
+    .mapValues { (_, memberEvents) -> memberEvents.mapTo(mutableSetOf()) { it.analyticsDate() } }
+
+private fun UserAnalyticsEvent.analyticsDate(): LocalDate = occurredAt.atZone(ANALYTICS_ZONE).toLocalDate()
 
 private const val WEEKLY_WINDOW_DAYS = 7L
 private const val MONTHLY_WINDOW_DAYS = 30L
