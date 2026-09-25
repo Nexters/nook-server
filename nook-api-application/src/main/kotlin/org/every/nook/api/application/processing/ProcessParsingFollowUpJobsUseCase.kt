@@ -5,6 +5,8 @@ import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.post.StorePostMediaUseCase
 import java.time.Clock
 import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 
 class ProcessParsingFollowUpJobsUseCase(
     private val jobPort: ParsingFollowUpJobPort,
@@ -15,6 +17,8 @@ class ProcessParsingFollowUpJobsUseCase(
     private val processingTimeout: Duration,
     private val retryBackoff: Duration,
     private val maxAttempts: Int = 4,
+    private val concurrency: Int = 1,
+    private val executor: Executor = Executor(Runnable::run),
     private val clock: Clock = Clock.systemUTC(),
     private val failureClassifier: ParsingFailureClassifier = ParsingFailureClassifier.DEFAULT,
 ) {
@@ -23,14 +27,20 @@ class ProcessParsingFollowUpJobsUseCase(
         require(!retryBackoff.isNegative && !retryBackoff.isZero) { "Retry backoff must be positive" }
         require(batchSize > 0) { "Follow-up job batch size must be positive" }
         require(maxAttempts > 0) { "Follow-up job max attempts must be positive" }
+        require(concurrency > 0) { "Follow-up job concurrency must be positive" }
     }
 
     operator fun invoke(): Int {
         var processed = 0
-        repeat(batchSize) {
-            val job = jobPort.claim(1, processingTimeout).singleOrNull() ?: return processed
-            process(job)
-            processed += 1
+        while (processed < batchSize) {
+            val waveSize = minOf(concurrency, batchSize - processed)
+            val jobs = (0 until waveSize).mapNotNull {
+                jobPort.claim(1, processingTimeout).singleOrNull()
+            }
+            if (jobs.isEmpty()) return processed
+            jobs.map { job -> CompletableFuture.runAsync({ process(job) }, executor) }
+                .forEach(CompletableFuture<Void>::join)
+            processed += jobs.size
         }
         return processed
     }
