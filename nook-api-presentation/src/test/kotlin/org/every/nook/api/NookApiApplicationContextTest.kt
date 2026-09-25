@@ -4,6 +4,7 @@ import org.every.nook.api.application.place.FindOutstandingPlaceParsingJobsUseCa
 import org.every.nook.api.application.post.FindOutstandingPostContentParsingJobsUseCase
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.web.server.LocalManagementPort
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.ApplicationContext
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -49,6 +50,9 @@ class NookApiApplicationContextTest {
     @LocalServerPort
     private var port: Int = 0
 
+    @LocalManagementPort
+    private var managementPort: Int = 0
+
     @Test
     fun `application context starts with the Jackson 3 object mapper`() {
         assertNotNull(applicationContext.getBean(ObjectMapper::class.java))
@@ -77,5 +81,23 @@ class NookApiApplicationContextTest {
         assertTrue(savedPostDetailRequired.containsAll(setOf("postId", "canonicalUrl", "media", "groups", "places")))
         assertFalse(savedPostDetailRequired.contains("title"))
         assertFalse(savedPostDetailRequired.contains("publishedAt"))
+    }
+
+    @Test
+    fun `Prometheus exposes HTTP request histogram buckets`() {
+        val client = HttpClient.newHttpClient()
+        val apiResponse = client.send(
+            HttpRequest.newBuilder(URI("http://localhost:$port/v3/api-docs")).GET().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+        assertEquals(200, apiResponse.statusCode())
+
+        val metricsResponse = client.send(
+            HttpRequest.newBuilder(URI("http://localhost:$managementPort/actuator/prometheus")).GET().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(200, metricsResponse.statusCode())
+        assertTrue(metricsResponse.body().contains("http_server_requests_seconds_bucket"))
     }
 }
