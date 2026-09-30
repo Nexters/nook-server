@@ -103,6 +103,51 @@ class ParsingSummaryMySqlTest {
     }
 
     @Test
+    fun `completed follow up jobs added after a failure do not republish the same alert`() {
+        insert("FAILED")
+        val publisher = db.summaries()
+        publisher.publish(1)
+
+        db.insertMediaJob()
+        db.jdbc.update(
+            "UPDATE parsing_follow_up_jobs SET status = 'COMPLETED', attempt_count = 1 WHERE status = 'PENDING'",
+        )
+        publisher.publish(1)
+
+        assertEquals(1, events.list.size)
+    }
+
+    @Test
+    fun `legacy fingerprint migrates without republishing an existing failure`() {
+        insert("FAILED")
+        val jobId = requireNotNull(
+            db.jdbc.queryForObject("SELECT id FROM parsing_follow_up_jobs WHERE post_id = 1", Long::class.java),
+        )
+        val summary = requireNotNull(
+            ParsingSummary.from(
+                listOf(
+                    ParsingSummaryJob(
+                        "POST_MEDIA",
+                        jobId,
+                        "FAILED",
+                        4,
+                        "POST_MEDIA",
+                        "download https://secret.example/token",
+                        java.time.Instant.parse("2026-09-13T00:00:00Z"),
+                        0,
+                    ),
+                ),
+            ),
+        )
+        db.jdbc.update("UPDATE posts SET parsing_alert_fingerprint = ? WHERE id = 1", summary.legacyFingerprint)
+
+        db.summaries().publish(1)
+
+        assertEquals(0, events.list.size)
+        assertEquals(summary.fingerprint, fingerprint())
+    }
+
+    @Test
     fun `manual retry waits then emits a new summary only if failure remains`() {
         insert("FAILED")
         val publisher = db.summaries()

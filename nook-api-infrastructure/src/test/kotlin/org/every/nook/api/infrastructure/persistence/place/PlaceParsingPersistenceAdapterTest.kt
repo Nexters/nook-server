@@ -346,6 +346,35 @@ class PlaceParsingPersistenceAdapterTest {
     }
 
     @Test
+    fun `stores one post place when different provider candidates resolve to the same place`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        val place = mock(PlaceEntity::class.java)
+        val first = candidate("kakao-123")
+        val second = candidate("naver-456").copy(provider = "NAVER", sourceMediaSequence = 3)
+        val storedPostPlaces = mutableListOf<PostPlaceEntity>()
+        `when`(place.id).thenReturn(17)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+        `when`(placeIdentityResolver.resolve(first)).thenReturn(place)
+        `when`(placeIdentityResolver.resolve(second)).thenReturn(place)
+        `when`(postPlaceRepository.saveAll(anyList<PostPlaceEntity>())).thenAnswer { invocation ->
+            invocation.getArgument<List<PostPlaceEntity>>(0).also(storedPostPlaces::addAll)
+        }
+        `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(emptyList())
+
+        adapter.complete(11, 0, "서울 누크 카페", listOf(first, second), diagnostics())
+
+        assertEquals(listOf(17L), storedPostPlaces.map { it.placeId })
+        assertEquals(0, storedPostPlaces.single().sequence)
+        val followUps = mockingDetails(followUpJobPort).invocations
+            .map { invocation -> invocation.arguments.single() }
+        assertEquals(
+            listOf(17L),
+            followUps.filterIsInstance<PlaceTagsRequestedEvent>().single().places.map { it.placeId },
+        )
+        assertEquals(PlaceParsingStatus.COMPLETED, job.status)
+    }
+
+    @Test
     fun `passes an extracted city to the place identity resolver`() {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         val savedPlace = mock(PlaceEntity::class.java)
