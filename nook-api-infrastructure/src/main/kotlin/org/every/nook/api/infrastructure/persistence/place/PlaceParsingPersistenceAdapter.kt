@@ -171,7 +171,7 @@ class PlaceParsingPersistenceAdapter(
         val resolvedPlaces = distinctPlaces.map { candidate ->
             val place = placeIdentityResolver.resolve(candidate)
             candidate.copy(googlePlaceId = place.googlePlaceId) to place
-        }
+        }.distinctBy { (_, place) -> requireNotNull(place.id) }
         val postPlaces = resolvedPlaces.mapIndexed { sequence, (candidate, place) ->
             PostPlaceEntity(
                 postId = postId,
