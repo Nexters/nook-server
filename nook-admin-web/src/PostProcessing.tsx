@@ -3,6 +3,7 @@ import { Link as RouterLink, useLocation, useParams, useSearchParams } from "rea
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Pagination, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { api } from "./api";
+import { SavedUsersInline, SavedUsersSection } from "./SavedUsers";
 import { type RecoveryPost, failedJobs } from "./ParsingPostRecovery";
 import { recoveryLabel, recoveryStageNames, recoveryTypeNames, type RecoveryJob } from "./ParsingRecoveryTracking";
 import { ParsingPipelinePage, type PipelineResponse } from "./ParsingPipeline";
@@ -68,6 +69,7 @@ function ProcessingList({ category }: { category: string }) {
       {data.posts.length === 0 && <Alert severity="info">이 조건에 해당하는 게시글이 없습니다.{days !== "all" && " 기간을 넓혀 보세요."}</Alert>}
       {data.posts.map(post => <Card variant="outlined" key={post.postId}><CardActionArea component={RouterLink} to={`/posts/${post.postId}/processing?category=${category}&days=${days}`} aria-label={`${post.title ?? `게시글 ${post.postId}`} 처리 상세`}><CardContent>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between" }}><Box><Typography variant="subtitle1">{post.title ?? "제목 없음"}</Typography><Typography variant="caption" color="text.secondary">게시글 #{post.postId}{failedJobs(post).length > 0 ? ` · 최근 실패 ${date(lastFailure(post))}` : ""}</Typography></Box><Chip size="small" label={state(post)} color={post.disposition === "UNPROCESSABLE" ? "default" : failedJobs(post).length ? "error" : post.jobs.some(j => j.outcome === "PARTIAL") ? "warning" : "info"} /></Stack>
+        <Box sx={{ mt: 1 }}><Typography variant="caption" color="text.secondary">저장한 회원</Typography><SavedUsersInline users={post.savedUsers} /></Box>
         <Typography variant="body2" sx={{ mt: 1 }}>{overview(post)}</Typography>
         <Typography variant="caption" color="text.secondary">전체 {post.jobs.length}건 · 완료 {post.jobs.filter(j => j.status === "COMPLETED").length}건 · 실패 {failedJobs(post).length}건 · 상세 보기 →</Typography>
       </CardContent></CardActionArea></Card>)}
@@ -133,6 +135,7 @@ function ProcessingDetail({ postId }: { postId: string }) {
       {failedJobs(post).length > 0 && <Box><Typography variant="h6" sx={{ mb: 1 }}>실패 원인</Typography><Stack spacing={1}>{failedJobs(post).map(job => <FailureCard key={`${job.type}-${job.id}`} job={job} />)}</Stack></Box>}
       <Accordion variant="outlined"><AccordionSummary expandIcon={<ExpandMoreIcon />}>전체 작업 상태 · {post.jobs.length}건</AccordionSummary><AccordionDetails><Stack spacing={1}>{post.jobs.map(j => <Box key={`${j.type}-${j.id}`}><Typography variant="subtitle2">{recoveryTypeNames[j.type]} · {j.outcome === "PARTIAL" && j.status === "COMPLETED" ? "실행 완료 · 일부 장소 미해결" : recoveryLabel(j)}</Typography><Typography variant="body2">총 {j.attempts}회 실행 · 작업 #{j.id}{j.nextAttemptAt ? ` · 다음 실행 ${date(j.nextAttemptAt)}` : ""}</Typography></Box>)}</Stack></AccordionDetails></Accordion>
     </>}
+    {post && <SavedUsersSection users={post.savedUsers} />}
     {placeError && <Alert severity="warning">장소별 결과 조회 실패: {placeError}{placeResult && " · 마지막 조회 결과를 표시합니다."}</Alert>}
     {placeResult && <PostPlaceResults post={placeResult} />}
     {traceError && <Alert severity="warning">처리 이력 조회 실패: {traceError}</Alert>}

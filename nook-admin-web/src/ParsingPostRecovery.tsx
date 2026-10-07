@@ -2,15 +2,17 @@ import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from "@
 import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { api } from "./api";
+import { SavedUsersInline, type SavedUser } from "./SavedUsers";
 import { recoveryLabel, recoveryTypeNames, recoveryStageNames, type RecoveryJob } from "./ParsingRecoveryTracking";
 
-export type RecoveryPost = { postId: number; jobs: RecoveryJob[]; title?: string; disposition?: string; dispositionReason?: string; dispositionChangedAt?: string };
+export type RecoveryPost = { postId: number; jobs: RecoveryJob[]; title?: string; disposition?: string; dispositionReason?: string; dispositionChangedAt?: string; savedUsers: SavedUser[] };
 export const failedJobs = (post: RecoveryPost) => post.jobs.filter(job => job.status === "FAILED");
 const active = (post: RecoveryPost) => post.jobs.some(job => job.status === "PENDING" || job.status === "PROCESSING");
 const dateText = (value: string) => new Date(value).toLocaleString("ko-KR");
 export function PostRecoveryDetails({ post, onRetryJob }: { post: RecoveryPost; onRetryJob?: (job: RecoveryJob) => void }) {
   return <Stack spacing={1}>
     <Typography component={RouterLink} to={`/posts/${post.postId}/show`} sx={{ color: "primary.main", p: .5, "&:hover": { bgcolor: "action.hover" } }}>게시글 #{post.postId}</Typography>
+    <Box><Typography variant="caption" color="text.secondary">저장한 회원</Typography><SavedUsersInline users={post.savedUsers} /></Box>
     <Typography variant="body2">전체 {post.jobs.length}건 · 실패 {failedJobs(post).length}건 · 완료 {post.jobs.filter(job => job.status === "COMPLETED").length}건 · 대기/처리 중 {post.jobs.filter(job => ["PENDING", "PROCESSING"].includes(job.status)).length}건</Typography>
     {post.jobs.map(job => <Box key={`${job.type}-${job.id}`} sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}>

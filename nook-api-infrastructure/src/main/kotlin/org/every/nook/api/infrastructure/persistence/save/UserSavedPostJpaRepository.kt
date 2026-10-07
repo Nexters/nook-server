@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.save
 
+import org.every.nook.api.infrastructure.persistence.admin.AdminSavedUsersQuery
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
@@ -127,14 +128,7 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
     fun countDistinctActiveUsersByPostId(@Param("postId") postId: Long): Long
 
     @Query(
-        value = """
-            SELECT DISTINCT saved_post.post_id AS postId, member.id AS id, member.nickname AS nickname
-            FROM user_saved_posts saved_post
-            INNER JOIN members member ON member.id = saved_post.user_id
-            WHERE saved_post.post_id IN (:postIds)
-              AND saved_post.deleted_at IS NULL
-            ORDER BY saved_post.post_id, member.id
-        """,
+        value = AdminSavedUsersQuery.SQL,
         nativeQuery = true,
     )
     fun findActiveSavedUsersByPostIdIn(@Param("postIds") postIds: Collection<Long>): List<SavedPostUserProjection>
