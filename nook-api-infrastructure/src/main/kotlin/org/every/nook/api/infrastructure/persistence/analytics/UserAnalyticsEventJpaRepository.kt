@@ -47,6 +47,20 @@ interface UserAnalyticsEventJpaRepository : JpaRepository<UserAnalyticsEventEnti
         @Param("occurredAt") occurredAt: Instant,
     ): Int
 
+    @Query(
+        """
+            select e from UserAnalyticsEventEntity e where e.memberId in :memberIds
+            and e.eventName = org.every.nook.api.application.analytics.UserAnalyticsEventName.POST_SAVE
+            and e.targetType = org.every.nook.api.application.analytics.UserAnalyticsTargetType.POST
+            and e.occurredAt >= :from and e.occurredAt <= :to
+        """,
+    )
+    fun onboardingSaves(
+        @Param("memberIds") memberIds: List<Long>,
+        @Param("from") from: Instant,
+        @Param("to") to: Instant,
+    ): List<UserAnalyticsEventEntity>
+
     fun findAllByOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtAsc(
         from: Instant,
         to: Instant,
