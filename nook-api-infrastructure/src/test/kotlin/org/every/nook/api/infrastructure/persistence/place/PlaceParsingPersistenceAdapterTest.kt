@@ -340,8 +340,8 @@ class PlaceParsingPersistenceAdapterTest {
         assertEquals(4, storedPostPlaces.single().sourceMediaSequence)
         verify(userSavedPostPlaceRepository).insertAllFromPost(21, 11)
         verify(userSavedPostPlaceRepository).insertAllFromPost(22, 11)
-        verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "내 메모")
-        verify(bookmarkRepository).insertIgnoreWithMemo(8, 17, null)
+        verify(bookmarkRepository).insertOrTouchWithMemo(7, 17, "내 메모")
+        verify(bookmarkRepository).insertOrTouchWithMemo(8, 17, null)
         assertEquals(PlaceParsingStatus.COMPLETED, job.status)
     }
 
