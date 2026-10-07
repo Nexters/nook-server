@@ -15,6 +15,7 @@ GET {{baseUrl}}/api/admin/v1/posts/1
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 
 ### 게시글 공용 정보 수정
+# 어드민 수정창은 상세 응답의 기존 authorIdentifier 값을 그대로 전달합니다.
 PUT {{baseUrl}}/api/admin/v1/posts/1
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 Content-Type: application/json
@@ -50,7 +51,7 @@ Cf-Access-Jwt-Assertion: {{accessJwt}}
 GET {{baseUrl}}/api/admin/v1/places/manage?withoutPhotos=true&offset=0&limit=20
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 
-### 장소 관리 상세
+### 장소 관리 상세 (posts[].savedUsers: 연결 게시글별 저장 회원 ID·닉네임)
 GET {{baseUrl}}/api/admin/v1/places/1
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 

@@ -10,6 +10,7 @@ import org.every.nook.api.application.admin.ParsingRecoveryException
 import org.every.nook.api.application.admin.RetryPostParsingCommand
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.post.PostContentParsingStatus
+import org.every.nook.api.infrastructure.persistence.admin.AdminSavedUsersQuery
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobJpaRepository
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -25,6 +26,7 @@ class AdminPostRecoveryAdapter(
     private val jdbc: NamedParameterJdbcTemplate,
     private val audit: AdminAuditLogPort,
     private val disposition: PostProcessingDispositionStore,
+    private val savedUsersQuery: AdminSavedUsersQuery,
     private val clock: Clock = Clock.systemUTC(),
 ) : AdminPostRecoveryPort {
     @Transactional(readOnly = true)
@@ -48,6 +50,9 @@ class AdminPostRecoveryAdapter(
 
     @Transactional(readOnly = true)
     override fun find(postId: Long): AdminPostRecovery? = load(listOf(postId)).singleOrNull()
+
+    @Transactional(readOnly = true)
+    override fun findAll(postIds: List<Long>): List<AdminPostRecovery> = load(postIds)
 
     @Transactional
     override fun retry(command: RetryPostParsingCommand): AdminPostRecovery {
@@ -99,6 +104,11 @@ class AdminPostRecoveryAdapter(
             place.findAllByPostIdInOrderByPostIdDescIdAsc(ids).map { it.toRecoveryView() } +
             followUps.findAllByPostIdInOrderByPostIdDescIdAsc(ids).map { it.toAdminView() }
         val grouped = jobs.groupBy(AdminFollowUpJob::postId)
-        return disposition.enrich(ids.mapNotNull { id -> grouped[id]?.let { AdminPostRecovery(id, it) } })
+        val savedUsersByPostId = savedUsersQuery.findByPostIds(ids)
+        return disposition.enrich(
+            ids.mapNotNull { id ->
+                grouped[id]?.let { AdminPostRecovery(id, it, savedUsers = savedUsersByPostId[id].orEmpty()) }
+            },
+        )
     }
 }
