@@ -65,9 +65,11 @@ class RuntimePlaceThumbnailProvider(
         onPhotosResolved: (PlaceThumbnailProvider.Request, PlaceSupplement) -> Unit,
     ): PlaceSupplement? {
         var accumulated: PlaceSupplement? = null
+        var lastFailure: Throwable? = null
         for ((type, provider) in activeProviders) {
             val supplement = runCatching { provider.fetch(request) }
                 .onFailure { exception ->
+                    lastFailure = exception
                     logFallback(request, type, "failure", exception)
                 }
                 .getOrNull()
@@ -78,6 +80,7 @@ class RuntimePlaceThumbnailProvider(
             }
             logFallback(request, type, "empty", null)
         }
+        if (request.failOnProviderError && accumulated == null) lastFailure?.let { throw it }
         return accumulated
     }
 

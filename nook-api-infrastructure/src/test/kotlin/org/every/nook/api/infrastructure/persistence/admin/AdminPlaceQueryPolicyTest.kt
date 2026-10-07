@@ -11,7 +11,13 @@ class AdminPlaceQueryPolicyTest {
     @Test
     fun `admin place page applies filtering sorting and pagination in database`() {
         val query = PlaceJpaRepository::class.java
-            .getMethod("findAdminPage", String::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            .getMethod(
+                "findAdminPage",
+                String::class.java,
+                Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+                Boolean::class.javaPrimitiveType,
+            )
             .getAnnotation(Query::class.java)
             .value
 

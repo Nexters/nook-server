@@ -18,6 +18,25 @@ interface PostPlaceTagJpaRepository : JpaRepository<PostPlaceTagEntity, Long> {
     )
     fun findRepresentativeTags(@Param("placeId") placeId: Long): List<String>
 
+    @Query(
+        value = """
+            WITH relations AS (
+                SELECT post_id, place_id FROM post_places
+                UNION
+                SELECT saved.post_id, mapping.place_id
+                FROM user_saved_post_places mapping
+                INNER JOIN user_saved_posts saved ON saved.id = mapping.user_saved_post_id
+                WHERE saved.deleted_at IS NULL
+            )
+            SELECT relation.post_id AS postId, relation.place_id AS placeId
+            FROM relations relation
+            WHERE relation.post_id IN (SELECT post_id FROM relations WHERE place_id = :placeId)
+            ORDER BY relation.post_id, relation.place_id
+        """,
+        nativeQuery = true,
+    )
+    fun findReprocessingContexts(@Param("placeId") placeId: Long): List<PlaceTagBackfillProjection>
+
     fun findAllByTag(tag: String): List<PostPlaceTagEntity>
 
     @Query(

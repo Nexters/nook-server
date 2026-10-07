@@ -26,10 +26,14 @@ interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
         value = """
             SELECT *
             FROM places place
-            WHERE :query IS NULL
+            WHERE (:query IS NULL
                OR LOWER(place.name) LIKE CONCAT('%', LOWER(:query), '%')
                OR LOWER(place.address) LIKE CONCAT('%', LOWER(:query), '%')
-               OR LOWER(place.external_place_id) LIKE CONCAT('%', LOWER(:query), '%')
+               OR LOWER(place.external_place_id) LIKE CONCAT('%', LOWER(:query), '%'))
+              AND (:withoutPhotos = false OR (
+                  (place.thumbnail_url IS NULL OR TRIM(place.thumbnail_url) = '')
+                  AND JSON_LENGTH(place.photo_urls) = 0
+              ))
             ORDER BY place.created_at DESC, place.id DESC
             LIMIT :limit OFFSET :offset
         """,
@@ -39,20 +43,25 @@ interface PlaceJpaRepository : JpaRepository<PlaceEntity, Long> {
         @Param("query") query: String?,
         @Param("offset") offset: Int,
         @Param("limit") limit: Int,
+        @Param("withoutPhotos") withoutPhotos: Boolean = false,
     ): List<PlaceEntity>
 
     @Query(
         value = """
             SELECT COUNT(*)
             FROM places place
-            WHERE :query IS NULL
+            WHERE (:query IS NULL
                OR LOWER(place.name) LIKE CONCAT('%', LOWER(:query), '%')
                OR LOWER(place.address) LIKE CONCAT('%', LOWER(:query), '%')
-               OR LOWER(place.external_place_id) LIKE CONCAT('%', LOWER(:query), '%')
+               OR LOWER(place.external_place_id) LIKE CONCAT('%', LOWER(:query), '%'))
+              AND (:withoutPhotos = false OR (
+                  (place.thumbnail_url IS NULL OR TRIM(place.thumbnail_url) = '')
+                  AND JSON_LENGTH(place.photo_urls) = 0
+              ))
         """,
         nativeQuery = true,
     )
-    fun countAdminPlaces(@Param("query") query: String?): Long
+    fun countAdminPlaces(@Param("query") query: String?, @Param("withoutPhotos") withoutPhotos: Boolean = false): Long
 
     fun findByProviderAndExternalPlaceId(provider: String, externalPlaceId: String): PlaceEntity?
 

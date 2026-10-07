@@ -19,6 +19,7 @@ fun interface PlaceThumbnailProvider {
         val sourcePostId: Long? = null,
         val sourceMediaSequence: Int? = null,
         val postMediaFallbackAllowed: Boolean = false,
+        val failOnProviderError: Boolean = false,
     )
 }
 
