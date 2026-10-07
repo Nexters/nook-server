@@ -90,9 +90,17 @@ class AdminPersistenceAdapter(
         val placeCounts = postPlaceRepository.findAllByPostIdInOrderByPostIdAscSequenceAsc(postIds)
             .groupingBy { it.postId }.eachCount()
         val reviewedIds = reviewRepository.findAllByPostIdIn(postIds).mapTo(mutableSetOf()) { it.postId }
+        val savedUsersByPostId = if (postIds.isEmpty()) {
+            emptyMap()
+        } else {
+            savedPostRepository.findActiveSavedUsersByPostIdIn(postIds).groupBy { it.postId }
+        }
         return AdminPage(
             items = pagePosts.map { post ->
                 val postId = requireNotNull(post.id)
+                val savedUsers = savedUsersByPostId[postId].orEmpty().map {
+                    AdminSavedUser(id = it.id, nickname = it.nickname)
+                }
                 AdminPostSummary(
                     id = postId,
                     canonicalUrl = post.canonicalUrl,
@@ -101,7 +109,8 @@ class AdminPersistenceAdapter(
                     contentParsingStatus = contentJobs[postId]?.status?.name ?: "PENDING",
                     placeParsingStatus = placeJobs[postId]?.status?.name,
                     placeCount = placeCounts[postId] ?: 0,
-                    savedUserCount = savedPostRepository.countDistinctActiveUsersByPostId(postId),
+                    savedUserCount = savedUsers.size.toLong(),
+                    savedUsers = savedUsers,
                     mappingReviewed = postId in reviewedIds,
                     createdAt = post.createdAt,
                     placeParsingOutcome = placeJobs[postId]?.parsingOutcome?.name,
@@ -129,7 +138,7 @@ class AdminPersistenceAdapter(
             placeParsingStatus = placeJob?.status?.name,
             placeParsingFailureReason = placeJob?.failureReason,
             savedUserCount = savedPostRepository.countDistinctActiveUsersByPostId(postId),
-            savedUsers = savedPostRepository.findActiveSavedUsersByPostId(postId).map {
+            savedUsers = savedPostRepository.findActiveSavedUsersByPostIdIn(listOf(postId)).map {
                 AdminSavedUser(id = it.id, nickname = it.nickname)
             },
             mappingReviewed = reviewRepository.existsByPostId(postId),

@@ -18,6 +18,7 @@ data class AdminPostSummary(
     val mappingReviewed: Boolean,
     val createdAt: Instant,
     val placeParsingOutcome: String? = null,
+    val savedUsers: List<AdminSavedUser> = emptyList(),
 )
 
 data class AdminPostDetail(
