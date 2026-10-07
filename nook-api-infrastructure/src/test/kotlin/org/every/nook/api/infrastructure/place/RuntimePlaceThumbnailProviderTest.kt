@@ -12,9 +12,27 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class RuntimePlaceThumbnailProviderTest {
+    @Test
+    fun `manual refresh exposes exhausted provider failures while ordinary parsing retains fallback`() {
+        val provider = provider(
+            value = "APIFY_GOOGLE",
+            delegates = mapOf(
+                PlaceThumbnailProviderType.APIFY_GOOGLE to PlaceThumbnailProvider {
+                    error("upstream unavailable")
+                },
+            ),
+        )
+
+        assertNull(provider.fetch(REQUEST))
+        assertFailsWith<java.util.concurrent.ExecutionException> {
+            provider.fetch(REQUEST.copy(failOnProviderError = true))
+        }
+    }
+
     @Test
     fun `uses configured providers in order and stops after photos`() {
         val calls = mutableListOf<String>()

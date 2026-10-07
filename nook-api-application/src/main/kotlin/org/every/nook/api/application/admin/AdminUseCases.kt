@@ -139,13 +139,12 @@ class SearchAdminPlacesUseCase(private val port: AdminPlaceQueryPort) {
 }
 
 class ListAdminPlacesUseCase(private val port: AdminPlaceQueryPort) {
-    operator fun invoke(query: Query): AdminPage<AdminPlaceSummary> = port.listPlaces(
-        query.query?.trim()?.takeIf(String::isNotEmpty),
-        query.offset.validOffset(),
-        query.limit.validLimit(),
-    )
+    operator fun invoke(query: Query): AdminPage<AdminPlaceSummary> {
+        val search = query.query?.trim()?.takeIf(String::isNotEmpty)
+        return port.listPlaces(search, query.offset.validOffset(), query.limit.validLimit(), query.withoutPhotos)
+    }
 
-    data class Query(val query: String?, val offset: Int, val limit: Int)
+    data class Query(val query: String?, val offset: Int, val limit: Int, val withoutPhotos: Boolean = false)
 }
 
 class GetAdminPlaceUseCase(private val port: AdminPlaceQueryPort) {
@@ -482,6 +481,11 @@ enum class AdminErrorCode(
         "주소 변환 서비스 응답이 지연되고 있습니다.",
         ErrorType.GATEWAY_TIMEOUT,
     ),
+    PLACE_REPROCESSING_ACTIVE(
+        "ADMIN_PLACE_REPROCESSING_ACTIVE",
+        "이 장소는 이미 재처리 대기 중이거나 처리 중입니다.",
+        ErrorType.CONFLICT,
+    ),
     DUPLICATE_PLACE("ADMIN_DUPLICATE_PLACE", "동일한 이름, 주소, 좌표의 장소가 이미 존재합니다.", ErrorType.CONFLICT),
 }
 
@@ -517,3 +521,5 @@ private const val MAX_ADMIN_PLACE_TAG_KEYWORD_COUNT = 20
 private const val MAX_ADMIN_PLACE_TAG_KEYWORD_LENGTH = 100
 private const val MAX_ADMIN_PLACE_TAG_CATALOG_SIZE = 500
 private const val CUSTOM_TAG_ID_SUFFIX_LENGTH = 28
+
+class PlaceReprocessingActiveException : NookException(AdminErrorCode.PLACE_REPROCESSING_ACTIVE)

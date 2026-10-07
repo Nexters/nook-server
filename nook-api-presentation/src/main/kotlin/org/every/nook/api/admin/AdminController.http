@@ -46,6 +46,10 @@ Content-Type: application/json
 GET {{baseUrl}}/api/admin/v1/places/manage?query=성수&offset=0&limit=20
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 
+### 사진 없는 장소 조회
+GET {{baseUrl}}/api/admin/v1/places/manage?withoutPhotos=true&offset=0&limit=20
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+
 ### 장소 관리 상세
 GET {{baseUrl}}/api/admin/v1/places/1
 Cf-Access-Jwt-Assertion: {{accessJwt}}

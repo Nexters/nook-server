@@ -15,10 +15,15 @@ class StorePlaceTagsUseCase(
     private val updatePort: PlaceTagUpdatePort,
     private val catalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
 ) {
-    operator fun invoke(event: PlaceTagsRequestedEvent, writer: ParsingResultWriter = ParsingResultWriter.DIRECT) {
+    operator fun invoke(
+        event: PlaceTagsRequestedEvent,
+        writer: ParsingResultWriter = ParsingResultWriter.DIRECT,
+        targetPlaceIds: Set<Long> = emptySet(),
+    ) {
         val source = findSource(event) ?: return
         val catalog = catalogPort.findAll().filter(PlaceTagDefinition::enabled).sortedBy(PlaceTagDefinition::sortOrder)
         val preparedPlaces = preparePlaces(event, source, catalog)
+            .filter { targetPlaceIds.isEmpty() || it.target.placeId in targetPlaceIds }
         val (skippedPlaces, actionablePlaces) = preparedPlaces.partition { it.input.candidateTags.isEmpty() }
         storeSkippedPlaces(event, skippedPlaces, writer)
         if (actionablePlaces.isEmpty()) return

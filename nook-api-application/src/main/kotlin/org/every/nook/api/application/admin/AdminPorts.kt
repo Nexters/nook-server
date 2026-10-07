@@ -55,7 +55,12 @@ interface AdminPostTitleRegenerationPort {
 interface AdminPlaceQueryPort {
     fun search(query: String, limit: Int): List<AdminPlaceSummary>
 
-    fun listPlaces(query: String?, offset: Int, limit: Int): AdminPage<AdminPlaceSummary>
+    fun listPlaces(
+        query: String?,
+        offset: Int,
+        limit: Int,
+        withoutPhotos: Boolean = false,
+    ): AdminPage<AdminPlaceSummary>
 
     fun findPlace(placeId: Long): AdminPlaceDetail?
 }

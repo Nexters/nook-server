@@ -42,8 +42,13 @@ class AdminPlacePersistenceAdapter(
             .toList()
 
     @Transactional(readOnly = true)
-    override fun listPlaces(query: String?, offset: Int, limit: Int): AdminPage<AdminPlaceSummary> {
-        val places = placeRepository.findAdminPage(query, offset, limit)
+    override fun listPlaces(
+        query: String?,
+        offset: Int,
+        limit: Int,
+        withoutPhotos: Boolean,
+    ): AdminPage<AdminPlaceSummary> {
+        val places = placeRepository.findAdminPage(query, offset, limit, withoutPhotos)
         val placeIds = places.mapNotNull(PlaceEntity::id)
         val linkedPostCounts = placeIds.takeIf { it.isNotEmpty() }
             ?.let(postPlaceRepository::countDistinctPostsByPlaceIdIn)
@@ -61,7 +66,7 @@ class AdminPlacePersistenceAdapter(
                     affectedUserCount = affectedUserCounts.getOrDefault(placeId, 0),
                 )
             },
-            total = placeRepository.countAdminPlaces(query),
+            total = placeRepository.countAdminPlaces(query, withoutPhotos),
         )
     }
 
