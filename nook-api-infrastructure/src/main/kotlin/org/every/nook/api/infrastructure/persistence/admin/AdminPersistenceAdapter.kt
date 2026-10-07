@@ -11,6 +11,7 @@ import org.every.nook.api.application.admin.AdminPostPlaceCorrectionPort
 import org.every.nook.api.application.admin.AdminPostQueryPort
 import org.every.nook.api.application.admin.AdminPostSummary
 import org.every.nook.api.application.admin.AdminPostTitleRegenerationPort
+import org.every.nook.api.application.admin.AdminSavedUser
 import org.every.nook.api.application.place.UnresolvedPlaceClue
 import org.every.nook.api.domain.post.PostMedia
 import org.every.nook.api.infrastructure.persistence.place.PlaceJpaRepository
@@ -100,7 +101,7 @@ class AdminPersistenceAdapter(
                     contentParsingStatus = contentJobs[postId]?.status?.name ?: "PENDING",
                     placeParsingStatus = placeJobs[postId]?.status?.name,
                     placeCount = placeCounts[postId] ?: 0,
-                    savedUserCount = savedPostRepository.findDistinctUserIdsByPostId(postId).size.toLong(),
+                    savedUserCount = savedPostRepository.countDistinctActiveUsersByPostId(postId),
                     mappingReviewed = postId in reviewedIds,
                     createdAt = post.createdAt,
                     placeParsingOutcome = placeJobs[postId]?.parsingOutcome?.name,
@@ -127,7 +128,10 @@ class AdminPersistenceAdapter(
             contentParsingFailureReason = contentJob?.failureReason,
             placeParsingStatus = placeJob?.status?.name,
             placeParsingFailureReason = placeJob?.failureReason,
-            savedUserCount = savedPostRepository.findDistinctUserIdsByPostId(postId).size.toLong(),
+            savedUserCount = savedPostRepository.countDistinctActiveUsersByPostId(postId),
+            savedUsers = savedPostRepository.findActiveSavedUsersByPostId(postId).map {
+                AdminSavedUser(id = it.id, nickname = it.nickname)
+            },
             mappingReviewed = reviewRepository.existsByPostId(postId),
             hashtags = hashtagRepository.findAllByPostIdOrderBySequenceAsc(postId).map { it.hashtag },
             media = mediaRepository.findAllByPostIdOrderBySequenceAsc(postId).map {

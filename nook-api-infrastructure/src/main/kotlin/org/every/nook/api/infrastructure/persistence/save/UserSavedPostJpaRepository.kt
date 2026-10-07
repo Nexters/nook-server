@@ -113,8 +113,30 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
         pageable: Pageable,
     ): Page<UserSavedPostEntity>
 
-    @Query("SELECT DISTINCT savedPost.userId FROM UserSavedPostEntity savedPost WHERE savedPost.postId = :postId")
-    fun findDistinctUserIdsByPostId(@Param("postId") postId: Long): List<Long>
+    @Query(
+        value = """
+            SELECT COUNT(DISTINCT saved_post.user_id)
+            FROM user_saved_posts saved_post
+            INNER JOIN members member ON member.id = saved_post.user_id
+            WHERE saved_post.post_id = :postId
+              AND saved_post.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun countDistinctActiveUsersByPostId(@Param("postId") postId: Long): Long
+
+    @Query(
+        value = """
+            SELECT DISTINCT member.id AS id, member.nickname AS nickname
+            FROM user_saved_posts saved_post
+            INNER JOIN members member ON member.id = saved_post.user_id
+            WHERE saved_post.post_id = :postId
+              AND saved_post.deleted_at IS NULL
+            ORDER BY member.id
+        """,
+        nativeQuery = true,
+    )
+    fun findActiveSavedUsersByPostId(@Param("postId") postId: Long): List<SavedUserProjection>
 
     fun findAllByPostId(postId: Long): List<UserSavedPostEntity>
 
@@ -129,6 +151,11 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
         nativeQuery = true,
     )
     fun restoreByUserIdAndPostId(userId: Long, postId: Long): Int
+}
+
+interface SavedUserProjection {
+    val id: Long
+    val nickname: String
 }
 
 interface GroupPlaceProjection {

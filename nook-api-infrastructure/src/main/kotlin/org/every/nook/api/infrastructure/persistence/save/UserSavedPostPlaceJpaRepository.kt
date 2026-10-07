@@ -8,6 +8,20 @@ import org.springframework.data.repository.query.Param
 interface UserSavedPostPlaceJpaRepository : JpaRepository<UserSavedPostPlaceEntity, Long> {
     @Query(
         value = """
+            SELECT DISTINCT member.id AS id, member.nickname AS nickname
+            FROM user_saved_post_places saved_post_place
+            INNER JOIN user_saved_posts saved_post ON saved_post.id = saved_post_place.user_saved_post_id
+            INNER JOIN members member ON member.id = saved_post.user_id
+            WHERE saved_post_place.place_id = :placeId
+              AND saved_post.deleted_at IS NULL
+            ORDER BY member.id
+        """,
+        nativeQuery = true,
+    )
+    fun findActiveSavedUsersByPlaceId(@Param("placeId") placeId: Long): List<SavedUserProjection>
+
+    @Query(
+        value = """
             SELECT COUNT(DISTINCT saved_post.user_id)
             FROM user_saved_post_places saved_post_place
             INNER JOIN user_saved_posts saved_post ON saved_post.id = saved_post_place.user_saved_post_id

@@ -32,6 +32,7 @@ data class AdminPostDetail(
     val placeParsingStatus: String?,
     val placeParsingFailureReason: String?,
     val savedUserCount: Long,
+    val savedUsers: List<AdminSavedUser> = emptyList(),
     val mappingReviewed: Boolean,
     val hashtags: List<String> = emptyList(),
     val media: List<AdminPostMedia> = emptyList(),
@@ -182,8 +183,11 @@ data class AdminPlaceDetail(
     val openingHours: PlaceOpeningHours? = null,
     val linkedPostCount: Long = 0,
     val affectedUserCount: Long = 0,
+    val savedUsers: List<AdminSavedUser> = emptyList(),
     val posts: List<AdminLinkedPost> = emptyList(),
 )
+
+data class AdminSavedUser(val id: Long, val nickname: String)
 
 data class AdminLinkedPost(
     val id: Long,

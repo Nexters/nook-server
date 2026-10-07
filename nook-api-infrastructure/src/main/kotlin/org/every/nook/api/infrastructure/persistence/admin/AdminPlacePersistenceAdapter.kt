@@ -8,6 +8,7 @@ import org.every.nook.api.application.admin.AdminPlaceCreationPort
 import org.every.nook.api.application.admin.AdminPlaceDetail
 import org.every.nook.api.application.admin.AdminPlaceQueryPort
 import org.every.nook.api.application.admin.AdminPlaceSummary
+import org.every.nook.api.application.admin.AdminSavedUser
 import org.every.nook.api.application.admin.DuplicateAdminPlaceException
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.domain.place.PlaceTag
@@ -78,6 +79,9 @@ class AdminPlacePersistenceAdapter(
             openingHours = place.openingHours,
             linkedPostCount = mappings.map { it.postId }.distinct().size.toLong(),
             affectedUserCount = savedPostPlaceRepository.countDistinctActiveUsersByPlaceId(placeId),
+            savedUsers = savedPostPlaceRepository.findActiveSavedUsersByPlaceId(placeId).map {
+                AdminSavedUser(id = it.id, nickname = it.nickname)
+            },
             posts = mappings.distinctBy { it.postId }.mapNotNull { mapping ->
                 postsById[mapping.postId]?.let { post ->
                     AdminLinkedPost(
