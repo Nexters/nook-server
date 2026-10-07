@@ -6,7 +6,7 @@
 GET {{baseUrl}}/api/admin/v1/me
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 
-### 게시글 목록
+### 게시글 목록 (savedUsers: 현재 저장 회원 ID·닉네임)
 GET {{baseUrl}}/api/admin/v1/posts?offset=0&limit=20
 Cf-Access-Jwt-Assertion: {{accessJwt}}
 

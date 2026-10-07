@@ -128,16 +128,16 @@ interface UserSavedPostJpaRepository : JpaRepository<UserSavedPostEntity, Long> 
 
     @Query(
         value = """
-            SELECT DISTINCT member.id AS id, member.nickname AS nickname
+            SELECT DISTINCT saved_post.post_id AS postId, member.id AS id, member.nickname AS nickname
             FROM user_saved_posts saved_post
             INNER JOIN members member ON member.id = saved_post.user_id
-            WHERE saved_post.post_id = :postId
+            WHERE saved_post.post_id IN (:postIds)
               AND saved_post.deleted_at IS NULL
-            ORDER BY member.id
+            ORDER BY saved_post.post_id, member.id
         """,
         nativeQuery = true,
     )
-    fun findActiveSavedUsersByPostId(@Param("postId") postId: Long): List<SavedUserProjection>
+    fun findActiveSavedUsersByPostIdIn(@Param("postIds") postIds: Collection<Long>): List<SavedPostUserProjection>
 
     fun findAllByPostId(postId: Long): List<UserSavedPostEntity>
 
@@ -171,4 +171,8 @@ interface GroupPlaceProjection {
     val thumbnailUrl: String?
     val thumbnailParsingStatus: String?
     val representativeTags: String?
+}
+
+interface SavedPostUserProjection : SavedUserProjection {
+    val postId: Long
 }
