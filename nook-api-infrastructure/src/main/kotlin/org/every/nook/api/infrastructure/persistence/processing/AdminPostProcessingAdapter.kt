@@ -41,7 +41,7 @@ class AdminPostProcessingAdapter(
             Long::class.java,
         ).filterNotNull()
         val total = jdbc.queryForObject("SELECT COUNT(*) $FILTER", params, Long::class.java) ?: 0L
-        return PostProcessingPage(ids.mapNotNull(recovery::find), total)
+        return PostProcessingPage(recovery.findAll(ids), total)
     }
 
     @Transactional

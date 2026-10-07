@@ -20,3 +20,5 @@ PATCH {{baseUrl}}/api/admin/v1/post-processing/902/disposition
 Content-Type: application/json
 
 {"disposition":"OPEN","reason":"원인 조치 완료"}
+
+# 목록 posts[].savedUsers는 각 게시글의 현재 저장 회원 ID·닉네임입니다.

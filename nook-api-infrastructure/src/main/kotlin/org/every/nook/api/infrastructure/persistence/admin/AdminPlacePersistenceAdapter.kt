@@ -30,6 +30,7 @@ class AdminPlacePersistenceAdapter(
     private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val auditLogPort: AdminAuditLogPort,
     private val objectMapper: ObjectMapper,
+    private val savedUsersQuery: AdminSavedUsersQuery,
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
 ) : AdminPlaceQueryPort,
     AdminPlaceCorrectionPort,
@@ -76,6 +77,7 @@ class AdminPlacePersistenceAdapter(
         val mappings = postPlaceRepository.findAllByPlaceId(placeId)
         val postsById = postRepository.findAllById(mappings.map { it.postId })
             .associateBy { requireNotNull(it.id) }
+        val savedUsersByPostId = savedUsersQuery.findByPostIds(postsById.keys)
         return AdminPlaceDetail(
             id = placeId,
             name = place.name,
@@ -104,6 +106,7 @@ class AdminPlacePersistenceAdapter(
                         authorIdentifier = post.authorIdentifier,
                         canonicalUrl = post.canonicalUrl,
                         createdAt = post.createdAt,
+                        savedUsers = savedUsersByPostId[mapping.postId].orEmpty(),
                     )
                 }
             }.sortedByDescending { it.createdAt },
