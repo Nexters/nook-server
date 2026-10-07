@@ -1,0 +1,14 @@
+# TODO 로그인 요청 추가 위치 (NOOK-402: 관리자 Cloudflare Access 인증 사용)
+
+### 장소 사진·태그 재처리
+POST {{baseUrl}}/api/admin/v1/places/1/reprocessing
+Cf-Access-Jwt-Assertion: {{accessJwt}}
+Content-Type: application/json
+
+{
+  "reason": "사진 및 부가 정보 재수집"
+}
+
+### 장소 재처리 상태와 항목별 결과
+GET {{baseUrl}}/api/admin/v1/places/1/reprocessing
+Cf-Access-Jwt-Assertion: {{accessJwt}}
