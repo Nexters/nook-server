@@ -3,6 +3,7 @@ package org.every.nook.api.presentation.post
 import org.every.nook.api.application.content.PrivatePostException
 import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
+import org.every.nook.api.application.group.ReplaceSavedPostsGroupsUseCase
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.place.DisconnectPostPlaceUseCase
@@ -53,6 +54,7 @@ class PostControllerTest {
     private lateinit var detailUseCase: GetSavedPostDetailUseCase
     private lateinit var updateMemoUseCase: UpdatePostMemoUseCase
     private lateinit var replaceGroupsUseCase: ReplaceSavedPostGroupsUseCase
+    private lateinit var replaceGroupsBulkUseCase: ReplaceSavedPostsGroupsUseCase
     private lateinit var connectPostPlaceUseCase: ConnectPostPlaceUseCase
     private lateinit var disconnectPostPlaceUseCase: DisconnectPostPlaceUseCase
     private lateinit var deleteSavedPostUseCase: DeleteSavedPostUseCase
@@ -67,6 +69,7 @@ class PostControllerTest {
         detailUseCase = mock(GetSavedPostDetailUseCase::class.java)
         updateMemoUseCase = mock(UpdatePostMemoUseCase::class.java)
         replaceGroupsUseCase = mock(ReplaceSavedPostGroupsUseCase::class.java)
+        replaceGroupsBulkUseCase = mock(ReplaceSavedPostsGroupsUseCase::class.java)
         connectPostPlaceUseCase = mock(ConnectPostPlaceUseCase::class.java)
         disconnectPostPlaceUseCase = mock(DisconnectPostPlaceUseCase::class.java)
         deleteSavedPostUseCase = mock(DeleteSavedPostUseCase::class.java)
@@ -83,6 +86,7 @@ class PostControllerTest {
                     detailUseCase,
                     updateMemoUseCase,
                     replaceGroupsUseCase,
+                    replaceGroupsBulkUseCase,
                     connectPostPlaceUseCase,
                     disconnectPostPlaceUseCase,
                     deleteSavedPostUseCase,
@@ -209,6 +213,28 @@ class PostControllerTest {
                 groupIds = listOf(17, 18, 17),
             ),
         )
+    }
+
+    @Test
+    fun `replaces several saved post groups`() {
+        mockMvc.put("/api/v1/posts/groups") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"postIds":[11,12],"groupIds":[17,18]}"""
+        }.andExpect { status { isOk() } }
+
+        verify(replaceGroupsBulkUseCase)(
+            ReplaceSavedPostsGroupsUseCase.Command(TEST_USER_ID, listOf(11, 12), listOf(17, 18)),
+        )
+    }
+
+    @Test
+    fun `rejects bulk group replacement without a destination group`() {
+        mockMvc.put("/api/v1/posts/groups") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"postIds":[11,12],"groupIds":[]}"""
+        }.andExpect { status { isBadRequest() } }
+
+        verifyNoInteractions(replaceGroupsBulkUseCase)
     }
 
     private fun stubCreate() {

@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Positive
 import org.every.nook.api.application.group.ReplaceSavedPostGroupsUseCase
+import org.every.nook.api.application.group.ReplaceSavedPostsGroupsUseCase
 import org.every.nook.api.application.place.ConnectPostPlaceUseCase
 import org.every.nook.api.application.place.DisconnectPostPlaceUseCase
 import org.every.nook.api.application.post.CreatePostUseCase
@@ -20,6 +21,7 @@ import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.post.request.ConnectPostPlaceRequest
 import org.every.nook.api.presentation.post.request.CreatePostRequest
 import org.every.nook.api.presentation.post.request.ReplaceSavedPostGroupsRequest
+import org.every.nook.api.presentation.post.request.ReplaceSavedPostsGroupsRequest
 import org.every.nook.api.presentation.post.request.UpdatePostMemoRequest
 import org.every.nook.api.presentation.post.response.ConnectedPlaceResponse
 import org.every.nook.api.presentation.post.response.PostPlaceParsingResponse
@@ -54,6 +56,7 @@ class PostController(
     private val getSavedPostDetailUseCase: GetSavedPostDetailUseCase,
     private val updatePostMemoUseCase: UpdatePostMemoUseCase,
     private val replaceSavedPostGroupsUseCase: ReplaceSavedPostGroupsUseCase,
+    private val replaceSavedPostsGroupsUseCase: ReplaceSavedPostsGroupsUseCase,
     private val connectPostPlaceUseCase: ConnectPostPlaceUseCase,
     private val disconnectPostPlaceUseCase: DisconnectPostPlaceUseCase,
     private val deleteSavedPostUseCase: DeleteSavedPostUseCase,
@@ -167,6 +170,22 @@ class PostController(
             ReplaceSavedPostGroupsUseCase.Command(
                 userId = userContext.userId,
                 savedPostId = postId,
+                groupIds = request.groupIds,
+            ),
+        )
+        return ApiResponse.success(Unit)
+    }
+
+    @Operation(summary = "여러 저장 게시물의 그룹 일괄 재지정")
+    @PutMapping("/groups")
+    fun replaceGroupsBulk(
+        @Parameter(hidden = true) userContext: UserContext,
+        @Valid @RequestBody request: ReplaceSavedPostsGroupsRequest,
+    ): ApiResponse<Unit> {
+        replaceSavedPostsGroupsUseCase(
+            ReplaceSavedPostsGroupsUseCase.Command(
+                userId = userContext.userId,
+                savedPostIds = request.postIds,
                 groupIds = request.groupIds,
             ),
         )

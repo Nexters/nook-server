@@ -55,6 +55,14 @@ class ParsingSummaryAdapter(
             )
             val summary = ParsingSummary.from(jobs) ?: return@executeWithoutResult
             if (previous["parsing_alert_fingerprint"] == summary.fingerprint) return@executeWithoutResult
+            if (previous["parsing_alert_fingerprint"] == summary.legacyFingerprint) {
+                jdbc.update(
+                    "UPDATE posts SET parsing_alert_fingerprint = ?, updated_at = updated_at WHERE id = ?",
+                    summary.fingerprint,
+                    postId,
+                )
+                return@executeWithoutResult
+            }
             jdbc.update(
                 "UPDATE posts SET parsing_alert_fingerprint = ?, updated_at = updated_at WHERE id = ?",
                 summary.fingerprint,

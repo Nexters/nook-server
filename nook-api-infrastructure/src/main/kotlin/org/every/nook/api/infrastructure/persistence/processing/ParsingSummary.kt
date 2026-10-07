@@ -18,6 +18,7 @@ internal data class ParsingSummaryJob(
 
 internal data class ParsingSummary(
     val fingerprint: String,
+    val legacyFingerprint: String,
     val completed: Int,
     val failed: Int,
     val lastFailedAt: Instant?,
@@ -41,11 +42,16 @@ internal data class ParsingSummary(
             val noPlaces = jobs.any { it.type == "PLACE_PARSING" && it.status == "COMPLETED" && it.noPlaces }
             val failedAt = failed.mapNotNull { it.lastFailedAt }.maxOrNull()
             if (failedAt == null && !noPlaces) return null
-            val state = jobs.sortedWith(compareBy({ it.type }, { it.id })).joinToString("|") {
+            val alertJobs = failed + jobs.filter { it.type == "PLACE_PARSING" && it.noPlaces }
+            val state = alertJobs.distinctBy { it.type to it.id }
+                .sortedWith(compareBy({ it.type }, { it.id }))
+                .joinToString("|") {
+                    "${it.type}:${it.id}:${it.status}:${it.attempt}:${it.stage}:${it.reason}:${it.lastFailedAt}"
+                } + if (noPlaces) "|NO_PLACES" else ""
+            val fingerprint = state.fingerprint()
+            val legacyFingerprint = jobs.sortedWith(compareBy({ it.type }, { it.id })).joinToString("|") {
                 "${it.type}:${it.id}:${it.status}:${it.attempt}:${it.lastFailedAt}"
-            } + if (noPlaces) "|NO_PLACES" else ""
-            val fingerprint = MessageDigest.getInstance("SHA-256").digest(state.toByteArray())
-                .joinToString("") { "%02x".format(it) }
+            }.plus(if (noPlaces) "|NO_PLACES" else "").fingerprint()
             val failures = failed.groupBy { it.stage to processingFailureDetail(it.reason ?: "실패 사유 미기록") }
                 .map { (key, jobs) ->
                     Failure(
@@ -58,7 +64,18 @@ internal data class ParsingSummary(
                         jobs.any { it.attempt > it.retryAttempt },
                     )
                 }
-            return ParsingSummary(fingerprint, jobs.size - failed.size, failed.size, failedAt, noPlaces, failures)
+            return ParsingSummary(
+                fingerprint,
+                legacyFingerprint,
+                jobs.size - failed.size,
+                failed.size,
+                failedAt,
+                noPlaces,
+                failures,
+            )
         }
+
+        private fun String.fingerprint(): String = MessageDigest.getInstance("SHA-256").digest(toByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 }

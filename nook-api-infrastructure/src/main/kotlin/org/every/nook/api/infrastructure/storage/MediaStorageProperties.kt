@@ -18,6 +18,7 @@ data class MediaStorageProperties(
     val profileImageUploadExpires: Duration = Duration.ofMinutes(DEFAULT_PROFILE_IMAGE_UPLOAD_EXPIRES_MINUTES),
 ) {
     init {
+        require(!readTimeout.isNegative && !readTimeout.isZero) { "Media download timeout must be positive" }
         require(maxImageBytes > 0) { "Media storage max image bytes must be positive" }
         require(maxVideoBytes > 0) { "Media storage max video bytes must be positive" }
         require(maxRedirects >= 0) { "Media storage max redirects must not be negative" }

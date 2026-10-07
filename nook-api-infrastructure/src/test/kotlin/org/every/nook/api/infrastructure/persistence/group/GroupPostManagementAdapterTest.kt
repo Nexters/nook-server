@@ -84,6 +84,37 @@ class GroupPostManagementAdapterTest {
         verifyNoInteractions(secondGroupPostRepository)
     }
 
+    @Test
+    fun `validates every post and group before bulk replacement`() {
+        val first = mock(UserSavedPostEntity::class.java)
+        val second = mock(UserSavedPostEntity::class.java)
+        `when`(first.id).thenReturn(11)
+        `when`(second.id).thenReturn(12)
+        `when`(savedPostRepository.findAllByUserIdAndIdIn(7, setOf(11, 12))).thenReturn(listOf(first, second))
+        val destinationGroup = group(17)
+        `when`(groupRepository.findAllByUserIdAndIdIn(7, setOf(17))).thenReturn(listOf(destinationGroup))
+
+        val result = adapter.replaceAll(7, setOf(11, 12), setOf(17))
+
+        assertEquals(GroupPostManagementPort.ReplaceResult.Updated, result)
+        verify(groupPostRepository).softDeleteAllByUserSavedPostId(11, FIXED_NOW)
+        verify(groupPostRepository).softDeleteAllByUserSavedPostId(12, FIXED_NOW)
+        verify(bookmarkRepository).insertAllForActiveSubscribers(11, setOf(17))
+        verify(bookmarkRepository).insertAllForActiveSubscribers(12, setOf(17))
+    }
+
+    @Test
+    fun `does not partially replace when a bulk post is inaccessible`() {
+        val first = mock(UserSavedPostEntity::class.java)
+        `when`(first.id).thenReturn(11)
+        `when`(savedPostRepository.findAllByUserIdAndIdIn(7, setOf(11, 12))).thenReturn(listOf(first))
+
+        val result = adapter.replaceAll(7, setOf(11, 12), setOf(17))
+
+        assertEquals(GroupPostManagementPort.ReplaceResult.PostNotFound, result)
+        verifyNoInteractions(groupPostRepository)
+    }
+
     private fun group(id: Long): GroupEntity {
         val group = mock(GroupEntity::class.java)
         `when`(group.id).thenReturn(id)

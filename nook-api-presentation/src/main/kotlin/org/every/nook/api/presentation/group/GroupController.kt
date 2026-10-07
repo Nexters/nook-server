@@ -12,6 +12,7 @@ import org.every.nook.api.application.group.DeleteGroupUseCase
 import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
 import org.every.nook.api.application.group.ListGroupsUseCase
+import org.every.nook.api.application.group.ListOwnedGroupsUseCase
 import org.every.nook.api.application.group.UpdateGroupUseCase
 import org.every.nook.api.presentation.auth.UserContext
 import org.every.nook.api.presentation.group.request.CreateGroupRequest
@@ -42,6 +43,7 @@ private const val MAX_GROUP_PLACE_PAGE_SIZE = 100L
 @RequestMapping("/api/v1/groups")
 class GroupController(
     private val listGroupsUseCase: ListGroupsUseCase,
+    private val listOwnedGroupsUseCase: ListOwnedGroupsUseCase,
     private val createGroupUseCase: CreateGroupUseCase,
     private val updateGroupUseCase: UpdateGroupUseCase,
     private val deleteGroupUseCase: DeleteGroupUseCase,
@@ -52,6 +54,11 @@ class GroupController(
     @GetMapping
     fun list(@Parameter(hidden = true) userContext: UserContext): ApiResponse<List<GroupResponse>> =
         ApiResponse.success(listGroupsUseCase(userContext.userId).map(GroupResponse::from))
+
+    @Operation(summary = "저장 가능한 내 그룹 목록 조회")
+    @GetMapping("/owned")
+    fun listOwned(@Parameter(hidden = true) userContext: UserContext): ApiResponse<List<GroupResponse>> =
+        ApiResponse.success(listOwnedGroupsUseCase(userContext.userId).map(GroupResponse::from))
 
     @Operation(summary = "그룹 저장 게시물 목록 조회")
     @GetMapping("/{groupId}/posts")

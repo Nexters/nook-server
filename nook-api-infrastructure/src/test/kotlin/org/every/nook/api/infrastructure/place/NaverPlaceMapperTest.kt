@@ -26,6 +26,7 @@ class NaverPlaceMapperTest {
         assertEquals("126.972332".toBigDecimal(), candidate.longitude)
         assertEquals("37.543123".toBigDecimal(), candidate.latitude)
         assertEquals("음식점", candidate.category)
+        assertEquals("음식점>한식", candidate.providerCategory)
     }
 
     @Test

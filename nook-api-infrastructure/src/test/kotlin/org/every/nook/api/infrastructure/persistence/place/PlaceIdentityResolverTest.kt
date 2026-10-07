@@ -63,6 +63,7 @@ class PlaceIdentityResolverTest {
             candidate.latitude,
             candidate.longitude,
             candidate.category,
+            candidate.providerCategory,
             candidate.phoneNumber,
         )
     }
@@ -115,6 +116,7 @@ class PlaceIdentityResolverTest {
             candidate.latitude,
             candidate.longitude,
             candidate.category,
+            candidate.providerCategory,
             candidate.phoneNumber,
         )
     }
@@ -153,6 +155,7 @@ class PlaceIdentityResolverTest {
             candidate.latitude,
             candidate.longitude,
             candidate.category,
+            candidate.providerCategory,
             candidate.phoneNumber,
         )
         verify(referenceRepository).insertIgnore(930, "NAVER", "another-store")

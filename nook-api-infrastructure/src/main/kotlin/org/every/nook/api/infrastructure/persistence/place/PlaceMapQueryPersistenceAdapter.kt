@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.MapPlaceView
 import org.every.nook.api.application.place.PlaceAccessType
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagCatalogSnapshot
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
@@ -38,6 +39,7 @@ class PlaceMapQueryPersistenceAdapter(
                 name = row.name,
                 city = row.city,
                 category = row.category,
+                categoryGroup = PlaceCategoryGroup.from(row.providerCategory),
                 latitude = row.latitude,
                 longitude = row.longitude,
                 color = row.color,
@@ -70,6 +72,7 @@ class PlaceMapQueryPersistenceAdapter(
                 city = row.city,
                 address = row.address,
                 category = row.category,
+                categoryGroup = PlaceCategoryGroup.from(row.providerCategory),
                 latitude = row.latitude,
                 longitude = row.longitude,
                 thumbnailUrl = row.thumbnailUrl,

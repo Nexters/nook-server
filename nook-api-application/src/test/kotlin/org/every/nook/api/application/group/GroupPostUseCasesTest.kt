@@ -87,15 +87,38 @@ class GroupPostUseCasesTest {
         }
     }
 
+    @Test
+    fun `replaces several saved posts as deduplicated sets`() {
+        val port = FakeGroupPostManagementPort(GroupPostManagementPort.ReplaceResult.Updated)
+
+        ReplaceSavedPostsGroupsUseCase(port)(
+            ReplaceSavedPostsGroupsUseCase.Command(7, listOf(11, 12, 11), listOf(17, 18, 17)),
+        )
+
+        assertEquals(setOf(11L, 12L), port.savedPostIds)
+        assertEquals(setOf(17L, 18L), port.groupIds)
+    }
+
     private class FakeGroupPostManagementPort(private val result: GroupPostManagementPort.ReplaceResult) :
         GroupPostManagementPort {
         var groupIds: Set<Long>? = null
+        var savedPostIds: Set<Long>? = null
 
         override fun replace(
             userId: Long,
             savedPostId: Long,
             groupIds: Set<Long>,
         ): GroupPostManagementPort.ReplaceResult {
+            this.groupIds = groupIds
+            return result
+        }
+
+        override fun replaceAll(
+            userId: Long,
+            savedPostIds: Set<Long>,
+            groupIds: Set<Long>,
+        ): GroupPostManagementPort.ReplaceResult {
+            this.savedPostIds = savedPostIds
             this.groupIds = groupIds
             return result
         }

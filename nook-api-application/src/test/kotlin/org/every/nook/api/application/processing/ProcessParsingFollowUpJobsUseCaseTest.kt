@@ -10,6 +10,7 @@ import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.post.PostMediaStorageRequestedEvent
 import org.every.nook.api.application.post.StorePostMediaUseCase
+import org.every.nook.api.application.post.error.PostMediaStorageTimeoutException
 import org.every.nook.api.application.post.port.PostMediaStoragePort
 import org.every.nook.api.application.post.port.UpdatePostMediaUrlPort
 import org.every.nook.api.domain.place.PlaceTag
@@ -18,8 +19,14 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ProcessParsingFollowUpJobsUseCaseTest {
     @Test
@@ -83,10 +90,50 @@ class ProcessParsingFollowUpJobsUseCaseTest {
         assertEquals(emptyList(), port.retried)
     }
 
+    @Test
+    fun `media timeout retries failed job and continues to next job`() {
+        val first = mediaJob()
+        val second = first.copy(id = 2, event = first.event.copy(sequence = 1))
+        val port = FakeJobPort(first, remainingJobs = listOf(second))
+        val storage = PostMediaStoragePort { media ->
+            if (media.sequence == 0) throw PostMediaStorageTimeoutException()
+            media
+        }
+
+        assertEquals(2, useCase(port, storage = storage)())
+        assertEquals(listOf(1L to NOW.plusSeconds(10)), port.retried)
+        assertEquals(listOf(2L), port.completed)
+        assertEquals(emptyList(), port.failed)
+    }
+
+    @Test
+    fun `processes jobs concurrently within configured limit`() {
+        val first = mediaJob()
+        val second = first.copy(id = 2, event = first.event.copy(sequence = 1))
+        val port = FakeJobPort(first, remainingJobs = listOf(second))
+        val started = CountDownLatch(2)
+        val executor = Executors.newFixedThreadPool(2)
+        val storage = PostMediaStoragePort { media ->
+            started.countDown()
+            assertTrue(started.await(1, TimeUnit.SECONDS))
+            media
+        }
+
+        try {
+            assertEquals(2, useCase(port, storage = storage, concurrency = 2, executor = executor)())
+            assertEquals(setOf(1L, 2L), port.completed.toSet())
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     private fun useCase(
         port: FakeJobPort,
         failMedia: Boolean = false,
         failure: ParsingFailure? = null,
+        storage: PostMediaStoragePort? = null,
+        concurrency: Int = 1,
+        executor: Executor = Executor(Runnable::run),
     ): ProcessParsingFollowUpJobsUseCase {
         val mediaStorage = PostMediaStoragePort { media ->
             check(!failMedia) { "storage unavailable" }
@@ -97,7 +144,7 @@ class ProcessParsingFollowUpJobsUseCaseTest {
             failureClassifier =
             failure?.let { classification -> ParsingFailureClassifier { classification } }
                 ?: ParsingFailureClassifier.DEFAULT,
-            storePostMedia = StorePostMediaUseCase(mediaStorage, noOpMediaUpdate()),
+            storePostMedia = StorePostMediaUseCase(storage ?: mediaStorage, noOpMediaUpdate()),
             storePlaceThumbnail = StorePlaceThumbnailUseCase(PlaceThumbnailProvider { null }, noOpThumbnailUpdate()),
             storePlaceTags = StorePlaceTagsUseCase(
                 PlaceTagSourcePort { null },
@@ -108,6 +155,8 @@ class ProcessParsingFollowUpJobsUseCaseTest {
             batchSize = 10,
             processingTimeout = Duration.ofMinutes(5),
             retryBackoff = Duration.ofSeconds(10),
+            concurrency = concurrency,
+            executor = executor,
             clock = Clock.fixed(NOW, ZoneOffset.UTC),
         )
     }
@@ -129,21 +178,24 @@ class ProcessParsingFollowUpJobsUseCaseTest {
         event = PostMediaStorageRequestedEvent(11, PostMedia.MediaType.IMAGE.name, "https://source.test/1.jpg", 0),
     )
 
-    private class FakeJobPort(private val jobs: ClaimedParsingFollowUpJob, private val stale: Boolean = false) :
-        ParsingFollowUpJobPort {
-        val failed = mutableListOf<Long>()
-        val completed = mutableListOf<Long>()
-        val retried = mutableListOf<Pair<Long, Instant>>()
+    private class FakeJobPort(
+        private val jobs: ClaimedParsingFollowUpJob,
+        private val stale: Boolean = false,
+        remainingJobs: List<ClaimedParsingFollowUpJob> = emptyList(),
+    ) : ParsingFollowUpJobPort {
+        val failed: MutableList<Long> = Collections.synchronizedList(mutableListOf())
+        val completed: MutableList<Long> = Collections.synchronizedList(mutableListOf())
+        val retried: MutableList<Pair<Long, Instant>> = Collections.synchronizedList(mutableListOf())
 
         override fun enqueue(event: PostMediaStorageRequestedEvent) = Unit
         override fun enqueue(event: org.every.nook.api.application.place.PlaceThumbnailsRequestedEvent) = Unit
         override fun enqueue(event: org.every.nook.api.application.place.PlaceTagsRequestedEvent) = Unit
+        private val remaining = ArrayDeque(remainingJobs)
         private var claimed = false
         override fun claim(limit: Int, processingTimeout: Duration): List<ClaimedParsingFollowUpJob> {
             assertEquals(1, limit, "Claim only the job that will execute immediately")
             if (claimed) {
-                check(stale || completed.isNotEmpty() || retried.isNotEmpty() || failed.isNotEmpty())
-                return emptyList()
+                return listOfNotNull(remaining.removeFirstOrNull())
             }
             claimed = true
             return listOf(jobs)

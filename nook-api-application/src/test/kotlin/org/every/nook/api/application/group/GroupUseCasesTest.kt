@@ -74,6 +74,8 @@ class GroupUseCasesTest {
 
         override fun findAll(userId: Long): List<GroupView> = emptyList()
 
+        override fun findOwned(userId: Long): List<GroupView> = emptyList()
+
         override fun create(userId: Long, name: String, color: GroupColor): GroupView =
             createResult.copy(id = nextGroupId++, name = name, color = color.name)
 

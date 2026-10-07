@@ -39,7 +39,7 @@ class PushTokenPersistenceAdapter(
     @Transactional(readOnly = true)
     override fun findEnabledTokensByPostId(postId: Long): List<PushToken> = repository
         .findAllEnabledByPostId(postId)
-        .map { PushToken(it.token, it.platform) }
+        .map { PushToken(it.userId, it.token, it.platform) }
 
     @Transactional
     override fun disable(tokens: Collection<String>, reason: String) {

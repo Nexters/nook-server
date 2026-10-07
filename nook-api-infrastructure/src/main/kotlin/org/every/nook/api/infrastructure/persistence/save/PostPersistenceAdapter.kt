@@ -315,6 +315,7 @@ class PostPersistenceAdapter(
         category = category,
         phoneNumber = phoneNumber,
         id = id,
+        providerCategory = providerCategory,
     )
 }
 

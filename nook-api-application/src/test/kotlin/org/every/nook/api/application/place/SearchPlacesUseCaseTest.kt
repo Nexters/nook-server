@@ -1,7 +1,9 @@
 package org.every.nook.api.application.place
 
 import org.every.nook.api.application.place.port.ConnectPostPlacePort
+import org.every.nook.api.application.place.port.PlaceIdentityQueryPort
 import org.every.nook.api.application.post.error.PostNotFoundException
+import org.every.nook.api.domain.place.PlaceProviderReference
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,6 +20,9 @@ class SearchPlacesUseCaseTest {
                 PlaceCandidatePage(listOf(candidate), page = 2, size = 10, hasNext = true)
             },
             selectionTokenPort = tokenPort(candidate),
+            placeIdentityQueryPort = PlaceIdentityQueryPort { references ->
+                mapOf(references.single() to 17L)
+            },
         )
 
         val result = useCase(
@@ -35,6 +40,7 @@ class SearchPlacesUseCaseTest {
         assertEquals(2, providerRequest?.page)
         assertEquals(10, providerRequest?.size)
         assertEquals("token-7", result.items.single().selectionToken)
+        assertEquals(17, result.items.single().existingPlaceId)
         assertEquals(true, result.hasNext)
     }
 
@@ -43,6 +49,7 @@ class SearchPlacesUseCaseTest {
         val useCase = SearchPlacesUseCase(
             provider = PagedPlaceSearchProvider { error("should not search") },
             selectionTokenPort = tokenPort(candidate()),
+            placeIdentityQueryPort = PlaceIdentityQueryPort { emptyMap() },
         )
 
         assertFailsWith<InvalidPlaceSearchRequestException> {
@@ -57,6 +64,27 @@ class SearchPlacesUseCaseTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `returns null internal id when the provider place is not stored`() {
+        val candidate = candidate()
+        val useCase = SearchPlacesUseCase(
+            provider = PagedPlaceSearchProvider {
+                PlaceCandidatePage(listOf(candidate), page = 1, size = 15, hasNext = false)
+            },
+            selectionTokenPort = tokenPort(candidate),
+            placeIdentityQueryPort = PlaceIdentityQueryPort { references ->
+                assertEquals(setOf(PlaceProviderReference("KAKAO", "1234")), references)
+                emptyMap()
+            },
+        )
+
+        val result = useCase(
+            SearchPlacesUseCase.Query(7, "장소", 0, 15, longitude = null, latitude = null),
+        )
+
+        assertEquals(null, result.items.single().existingPlaceId)
     }
 
     @Test

@@ -91,6 +91,7 @@ parsing:
   follow-up:
     dispatcher-interval: ${PARSING_FOLLOW_UP_DISPATCHER_INTERVAL:5s}
     batch-size: ${PARSING_FOLLOW_UP_BATCH_SIZE:10}
+    concurrency: ${PARSING_FOLLOW_UP_CONCURRENCY:2}
     processing-timeout: ${PARSING_FOLLOW_UP_PROCESSING_TIMEOUT:5m}
     retry-backoff: ${PARSING_FOLLOW_UP_RETRY_BACKOFF:10s}
     max-attempts: ${PARSING_FOLLOW_UP_MAX_ATTEMPTS:4}

@@ -32,6 +32,12 @@ server:
 management:
   server:
     port: ${MANAGEMENT_PORT:${server.port:8080}}
+  metrics:
+    distribution:
+      percentiles-histogram:
+        "http.server.requests": true
+      slo:
+        "http.server.requests": 50ms,100ms,250ms,500ms,1s,2s,5s
   endpoints:
     web:
       exposure:

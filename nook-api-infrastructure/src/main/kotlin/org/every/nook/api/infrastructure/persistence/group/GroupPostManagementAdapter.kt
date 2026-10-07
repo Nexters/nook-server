@@ -24,20 +24,35 @@ class GroupPostManagementAdapter(
             return GroupPostManagementPort.ReplaceResult.GroupNotFound
         }
 
+        replaceLinks(savedPostId, groupIds)
+        return GroupPostManagementPort.ReplaceResult.Updated
+    }
+
+    @Transactional
+    override fun replaceAll(
+        userId: Long,
+        savedPostIds: Set<Long>,
+        groupIds: Set<Long>,
+    ): GroupPostManagementPort.ReplaceResult {
+        val ownedPostIds = savedPostRepository.findAllByUserIdAndIdIn(userId, savedPostIds)
+            .mapTo(mutableSetOf()) { requireNotNull(it.id) }
+        if (ownedPostIds != savedPostIds) {
+            return GroupPostManagementPort.ReplaceResult.PostNotFound
+        }
+        if (!ownsAllGroups(userId, groupIds)) {
+            return GroupPostManagementPort.ReplaceResult.GroupNotFound
+        }
+        savedPostIds.forEach { savedPostId -> replaceLinks(savedPostId, groupIds) }
+        return GroupPostManagementPort.ReplaceResult.Updated
+    }
+
+    private fun replaceLinks(savedPostId: Long, groupIds: Set<Long>) {
         groupPostRepository.softDeleteAllByUserSavedPostId(savedPostId, clock.instant())
         val newGroupIds = groupIds.filter { groupId -> groupPostRepository.restore(groupId, savedPostId) == 0 }
         groupPostRepository.saveAll(
-            newGroupIds.map { groupId ->
-                GroupPostEntity(
-                    groupId = groupId,
-                    userSavedPostId = savedPostId,
-                )
-            },
+            newGroupIds.map { groupId -> GroupPostEntity(groupId = groupId, userSavedPostId = savedPostId) },
         )
-        if (groupIds.isNotEmpty()) {
-            bookmarkRepository.insertAllForActiveSubscribers(savedPostId, groupIds)
-        }
-        return GroupPostManagementPort.ReplaceResult.Updated
+        if (groupIds.isNotEmpty()) bookmarkRepository.insertAllForActiveSubscribers(savedPostId, groupIds)
     }
 
     private fun ownsAllGroups(userId: Long, groupIds: Set<Long>): Boolean {

@@ -9,6 +9,7 @@ data class Place(
     val category: String? = null,
     val phoneNumber: String? = null,
     val id: Long? = null,
+    val providerCategory: String? = null,
 ) {
     init {
         require(id == null || id > 0) { "Place id must be positive" }
@@ -24,6 +25,9 @@ data class Place(
         require(category == null || category.length <= MAX_CATEGORY_LENGTH) {
             "Place category must not exceed $MAX_CATEGORY_LENGTH characters"
         }
+        require(providerCategory == null || providerCategory.length <= MAX_PROVIDER_CATEGORY_LENGTH) {
+            "Place provider category must not exceed $MAX_PROVIDER_CATEGORY_LENGTH characters"
+        }
         require(phoneNumber == null || phoneNumber.length <= MAX_PHONE_NUMBER_LENGTH) {
             "Place phone number must not exceed $MAX_PHONE_NUMBER_LENGTH characters"
         }
@@ -34,6 +38,7 @@ data class Place(
         const val MAX_ADDRESS_LENGTH = 500
         const val MAX_CITY_LENGTH = 50
         const val MAX_CATEGORY_LENGTH = 100
+        const val MAX_PROVIDER_CATEGORY_LENGTH = 255
         const val MAX_PHONE_NUMBER_LENGTH = 30
     }
 }

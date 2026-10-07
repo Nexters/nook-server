@@ -12,6 +12,7 @@ data class PlaceDetailView(
     val latitude: BigDecimal,
     val longitude: BigDecimal,
     val category: String?,
+    val categoryGroup: PlaceCategoryGroup = PlaceCategoryGroup.ETC,
     val phoneNumber: String?,
     val thumbnailUrl: String?,
     val thumbnailParsingStatus: PlaceThumbnailParsingStatusView,

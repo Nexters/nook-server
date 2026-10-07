@@ -9,6 +9,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.net.http.HttpTimeoutException
+import java.time.Duration
 
 fun interface RemoteMediaHttpClient {
     fun get(uri: URI): MediaHttpResponse
@@ -30,8 +31,14 @@ class JdkRemoteMediaHttpClient(private val httpClient: HttpClient, private val p
             .header(ACCEPT_HEADER, ACCEPT)
             .GET()
             .build()
+        val startedAt = System.nanoTime()
         val response = send(request)
-        return MediaHttpResponse(response.statusCode(), response.headers().map(), response.body())
+        val remaining = properties.readTimeout.minus(Duration.ofNanos(System.nanoTime() - startedAt))
+        return MediaHttpResponse(
+            response.statusCode(),
+            response.headers().map(),
+            DeadlineInputStream(response.body(), remaining),
+        )
     }
 
     private fun send(request: HttpRequest): HttpResponse<InputStream> = try {

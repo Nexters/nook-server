@@ -3,6 +3,7 @@ package org.every.nook.api.presentation.place.response
 import io.swagger.v3.oas.annotations.media.Schema
 import org.every.nook.api.application.place.MapPlaceView
 import org.every.nook.api.application.place.PlaceAccessType
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceSliceView
 import org.every.nook.api.application.place.RecentPlaceView
@@ -18,6 +19,8 @@ data class MapPlaceResponse(
     val city: String?,
     @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 카테고리 그룹")
+    val categoryGroup: PlaceCategoryGroup,
     @field:Schema(description = "장소 위도")
     val latitude: BigDecimal,
     @field:Schema(description = "장소 경도")
@@ -37,6 +40,7 @@ data class MapPlaceResponse(
             name = view.name,
             city = view.city,
             category = view.category,
+            categoryGroup = view.categoryGroup,
             latitude = view.latitude,
             longitude = view.longitude,
             color = view.color,
@@ -75,6 +79,8 @@ data class RecentPlaceResponse(
     val address: String,
     @field:Schema(description = "장소 카테고리", nullable = true)
     val category: String?,
+    @field:Schema(description = "장소 카테고리 그룹")
+    val categoryGroup: PlaceCategoryGroup,
     @field:Schema(description = "장소 위도")
     val latitude: BigDecimal,
     @field:Schema(description = "장소 경도")
@@ -100,6 +106,7 @@ data class RecentPlaceResponse(
             city = view.city,
             address = view.address,
             category = view.category,
+            categoryGroup = view.categoryGroup,
             latitude = view.latitude,
             longitude = view.longitude,
             thumbnailUrl = view.thumbnailUrl,

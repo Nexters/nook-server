@@ -41,6 +41,7 @@ import org.every.nook.api.presentation.post.PostController
 import org.every.nook.api.presentation.post.request.ConnectPostPlaceRequest
 import org.every.nook.api.presentation.post.request.CreatePostRequest
 import org.every.nook.api.presentation.post.request.ReplaceSavedPostGroupsRequest
+import org.every.nook.api.presentation.post.request.ReplaceSavedPostsGroupsRequest
 import org.every.nook.api.presentation.post.request.UpdatePostMemoRequest
 import org.every.nook.api.presentation.post.response.ConnectedPlaceResponse
 import org.every.nook.api.presentation.post.response.PlaceResponse
@@ -106,6 +107,7 @@ class OpenApiDocumentationPolicyTest {
         val requestTypes = listOf(
             CreatePostRequest::class.java,
             ReplaceSavedPostGroupsRequest::class.java,
+            ReplaceSavedPostsGroupsRequest::class.java,
         )
 
         requestTypes.forEach { requestType ->
@@ -239,6 +241,7 @@ class OpenApiDocumentationPolicyTest {
             ConnectedPlaceResponse::class.java,
             CreatePostRequest::class.java,
             ReplaceSavedPostGroupsRequest::class.java,
+            ReplaceSavedPostsGroupsRequest::class.java,
             UpdatePostMemoRequest::class.java,
             PostResponse::class.java,
             PostPlaceParsingResponse::class.java,

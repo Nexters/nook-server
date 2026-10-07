@@ -1,5 +1,6 @@
 package org.every.nook.api.application.group
 
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import java.math.BigDecimal
 
@@ -19,6 +20,7 @@ data class GroupPlaceSummary(
     val city: String?,
     val address: String,
     val category: String?,
+    val categoryGroup: PlaceCategoryGroup = PlaceCategoryGroup.ETC,
     val latitude: BigDecimal,
     val longitude: BigDecimal,
     val thumbnailUrl: String?,

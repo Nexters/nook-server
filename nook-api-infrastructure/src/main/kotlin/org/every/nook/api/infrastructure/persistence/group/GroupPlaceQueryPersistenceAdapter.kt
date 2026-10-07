@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.persistence.group
 import org.every.nook.api.application.group.GroupPlacePage
 import org.every.nook.api.application.group.GroupPlaceSummary
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
+import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagCatalogSnapshot
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
@@ -43,6 +44,7 @@ class GroupPlaceQueryPersistenceAdapter(
                     city = projection.city,
                     address = projection.address,
                     category = projection.category,
+                    categoryGroup = PlaceCategoryGroup.from(projection.providerCategory),
                     latitude = projection.latitude,
                     longitude = projection.longitude,
                     thumbnailUrl = projection.thumbnailUrl,

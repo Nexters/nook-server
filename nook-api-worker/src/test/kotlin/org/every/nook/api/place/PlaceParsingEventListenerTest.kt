@@ -16,6 +16,8 @@ import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
 import org.every.nook.api.application.push.PushMessage
 import org.every.nook.api.application.push.PushNotificationSender
 import org.every.nook.api.application.push.PushPlatform
+import org.every.nook.api.application.push.PushPreference
+import org.every.nook.api.application.push.PushPreferencePort
 import org.every.nook.api.application.push.PushSendResult
 import org.every.nook.api.application.push.PushToken
 import org.every.nook.api.application.push.PushTokenPort
@@ -39,7 +41,11 @@ class PlaceParsingEventListenerTest {
     private val storePlaceThumbnail = mock(StorePlaceThumbnailUseCase::class.java)
     private val storePlaceTags = mock(StorePlaceTagsUseCase::class.java)
     private val pushSender = RecordingPushNotificationSender()
-    private val sendPostProcessingPush = SendPostProcessingPushUseCase(FakePushTokenPort(), pushSender)
+    private val sendPostProcessingPush = SendPostProcessingPushUseCase(
+        FakePushTokenPort(),
+        AlwaysEnabledPushPreferencePort(),
+        pushSender,
+    )
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
     private val retryTaskScheduler = mock(TaskScheduler::class.java)
 
@@ -141,9 +147,17 @@ class PlaceParsingEventListenerTest {
         override fun delete(userId: Long, token: String) = Unit
 
         override fun findEnabledTokensByPostId(postId: Long): List<PushToken> =
-            listOf(PushToken("token-1", PushPlatform.IOS))
+            listOf(PushToken(1, "token-1", PushPlatform.IOS))
 
         override fun disable(tokens: Collection<String>, reason: String) = Unit
+    }
+
+    private class AlwaysEnabledPushPreferencePort : PushPreferencePort {
+        override fun get(userId: Long) = PushPreference(true)
+
+        override fun update(userId: Long, postProcessingEnabled: Boolean) = PushPreference(postProcessingEnabled)
+
+        override fun findPostProcessingDisabledUserIds(userIds: Collection<Long>): Set<Long> = emptySet()
     }
 
     private class RecordingPushNotificationSender : PushNotificationSender {
