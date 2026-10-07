@@ -268,8 +268,8 @@ class PostPersistenceAdapterTest {
         assertEquals(11, result.postId)
         assertEquals(PlaceParsingStatus.COMPLETED, result.placeParsingStatus)
         verify(userSavedPostPlaceRepository).insertAllFromPost(11, 101)
-        verify(bookmarkRepository).insertIgnoreWithMemo(7, 201, "주말에 방문")
-        verify(bookmarkRepository).insertIgnoreWithMemo(7, 202, "주말에 방문")
+        verify(bookmarkRepository).insertOrTouchWithMemo(7, 201, "주말에 방문")
+        verify(bookmarkRepository).insertOrTouchWithMemo(7, 202, "주말에 방문")
     }
 
     @Test

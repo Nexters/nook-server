@@ -185,7 +185,7 @@ class PlaceParsingPersistenceAdapter(
             val savedPostId = requireNotNull(savedPost.id)
             userSavedPostPlaceRepository.insertAllFromPost(savedPostId, postId)
             userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId).forEach { place ->
-                userPlaceBookmarkRepository.insertIgnoreWithMemo(
+                userPlaceBookmarkRepository.insertOrTouchWithMemo(
                     userId = savedPost.userId,
                     placeId = place.placeId,
                     memo = savedPost.memo,

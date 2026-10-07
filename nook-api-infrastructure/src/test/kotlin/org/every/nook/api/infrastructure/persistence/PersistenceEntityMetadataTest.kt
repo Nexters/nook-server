@@ -87,7 +87,7 @@ class PersistenceEntityMetadataTest {
 
         assertEquals("user_place_bookmarks", table.name)
         assertEquals(
-            setOf("idx_place_id", "idx_user_id_created_at_id"),
+            setOf("idx_place_id", "idx_user_id_last_saved_at_id"),
             table.indexes.map { it.name }.toSet(),
         )
         val uniqueConstraint = table.uniqueConstraints.single()

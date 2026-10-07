@@ -43,17 +43,20 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
 
     /**
      * 북마크를 만들면서 게시물 메모를 장소 메모의 초기값으로 심는다.
-     * 이미 북마크가 있으면 IGNORE 되므로 사용자가 직접 쓴 메모를 덮어쓰지 않는다.
+     * 이미 북마크가 있으면 메모는 보존하고 최근 저장 시각만 갱신한다.
      */
     @Modifying
     @Query(
         value = """
-            INSERT IGNORE INTO user_place_bookmarks (user_id, place_id, memo, created_at, updated_at)
+            INSERT INTO user_place_bookmarks (user_id, place_id, memo, created_at, updated_at)
             VALUES (:userId, :placeId, :memo, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+            ON DUPLICATE KEY UPDATE
+                last_saved_at = CURRENT_TIMESTAMP(6),
+                updated_at = CURRENT_TIMESTAMP(6)
         """,
         nativeQuery = true,
     )
-    fun insertIgnoreWithMemo(
+    fun insertOrTouchWithMemo(
         @Param("userId") userId: Long,
         @Param("placeId") placeId: Long,
         @Param("memo") memo: String?,
@@ -158,7 +161,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
         value = """
             SELECT
                 upb.id AS bookmarkId,
-                upb.created_at AS bookmarkedAt,
+                upb.last_saved_at AS bookmarkedAt,
                 p.id AS placeId,
                 p.name AS name,
                 p.city AS city,
@@ -237,10 +240,10 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
               )
               AND (
                   :cursorBookmarkedAt IS NULL
-                  OR upb.created_at < :cursorBookmarkedAt
-                  OR (upb.created_at = :cursorBookmarkedAt AND upb.id < :cursorBookmarkId)
+                  OR upb.last_saved_at < :cursorBookmarkedAt
+                  OR (upb.last_saved_at = :cursorBookmarkedAt AND upb.id < :cursorBookmarkId)
               )
-            ORDER BY upb.created_at DESC, upb.id DESC
+            ORDER BY upb.last_saved_at DESC, upb.id DESC
             LIMIT :limit
         """,
         nativeQuery = true,
