@@ -12,6 +12,11 @@ class UserPlaceBookmarkJpaRepositoryRecentQueryTest {
         .findAnnotation<Query>()
         ?.value
         ?: error("findRecentPlaces must declare @Query")
+    private val touchQuery = UserPlaceBookmarkJpaRepository::class.memberFunctions
+        .single { it.name == "insertOrTouchWithMemo" }
+        .findAnnotation<Query>()
+        ?.value
+        ?: error("insertOrTouchWithMemo must declare @Query")
 
     @Test
     fun `resolves a share token only for places outside my own saved posts`() {
@@ -40,6 +45,25 @@ class UserPlaceBookmarkJpaRepositoryRecentQueryTest {
         ACTIVE_SHARE_CONDITIONS.forEach { condition ->
             assertTrue(shareTokenSubquery.contains(condition), "share token subquery must keep: $condition")
         }
+    }
+
+    @Test
+    fun `orders recent places by last saved time and uses it for cursor pagination`() {
+        val normalizedQuery = recentQuery.replace(Regex("\\s+"), " ")
+
+        assertTrue(normalizedQuery.contains("upb.last_saved_at AS bookmarkedAt"))
+        assertTrue(normalizedQuery.contains("upb.last_saved_at < :cursorBookmarkedAt"))
+        assertTrue(normalizedQuery.contains("upb.last_saved_at = :cursorBookmarkedAt AND upb.id < :cursorBookmarkId"))
+        assertTrue(normalizedQuery.contains("ORDER BY upb.last_saved_at DESC, upb.id DESC"))
+    }
+
+    @Test
+    fun `touching an existing bookmark refreshes recency without replacing its memo`() {
+        val normalizedQuery = touchQuery.replace(Regex("\\s+"), " ")
+
+        assertTrue(normalizedQuery.contains("ON DUPLICATE KEY UPDATE last_saved_at = CURRENT_TIMESTAMP(6)"))
+        assertTrue(normalizedQuery.contains("updated_at = CURRENT_TIMESTAMP(6)"))
+        assertTrue(!normalizedQuery.contains("memo ="))
     }
 
     private companion object {

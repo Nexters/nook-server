@@ -348,7 +348,7 @@ private fun initializeSavedPostPlaces(
     val savedPostId = requireNotNull(savedPost.id)
     savedPostPlaceRepository.insertAllFromPost(savedPostId, sourcePostId)
     savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId).forEach { place ->
-        bookmarkRepository.insertIgnoreWithMemo(
+        bookmarkRepository.insertOrTouchWithMemo(
             userId = savedPost.userId,
             placeId = place.placeId,
             memo = savedPost.memo,
