@@ -89,7 +89,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         assertEquals(11, captor.value.userSavedPostId)
         assertEquals(17, captor.value.placeId)
         assertEquals(1, captor.value.sequence)
-        verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "게시물 메모")
+        verify(bookmarkRepository).insertOrTouchWithMemo(7, 17, "게시물 메모")
         val followUps = followUps()
         val thumbnailEvent = followUps.filterIsInstance<PlaceThumbnailsRequestedEvent>().single()
         assertEquals(101, thumbnailEvent.postId)
@@ -137,7 +137,7 @@ class ConnectPostPlacePersistenceAdapterTest {
         )
 
         verify(savedPostPlaceRepository, never()).save(org.mockito.ArgumentMatchers.any())
-        verify(bookmarkRepository).insertIgnoreWithMemo(7, 17, "게시물 메모")
+        verify(bookmarkRepository, never()).insertOrTouchWithMemo(7, 17, "게시물 메모")
     }
 
     private fun savedPost(): UserSavedPostEntity {

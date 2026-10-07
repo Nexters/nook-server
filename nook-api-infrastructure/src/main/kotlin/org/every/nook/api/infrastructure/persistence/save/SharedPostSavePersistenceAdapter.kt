@@ -33,7 +33,7 @@ class SharedPostSavePersistenceAdapter(
     private fun initializePlaces(userId: Long, savedPostId: Long, sourcePostId: Long) {
         savedPostPlaceRepository.insertAllFromPost(savedPostId, sourcePostId)
         savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId).forEach { place ->
-            bookmarkRepository.insertIgnoreWithMemo(userId, place.placeId, memo = null)
+            bookmarkRepository.insertOrTouchWithMemo(userId, place.placeId, memo = null)
         }
     }
 

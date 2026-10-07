@@ -40,14 +40,17 @@ class ConnectPostPlacePersistenceAdapter(
         }
         val placeId = requireNotNull(place.id)
         val existingSavedPostPlace = savedPostPlaceRepository.findByUserSavedPostIdAndPlaceId(savedPostId, placeId)
-        if (existingSavedPostPlace == null) {
+        val isNewAssociation = existingSavedPostPlace == null
+        if (isNewAssociation) {
             val nextSequence = savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId)
                 .maxOfOrNull(UserSavedPostPlaceEntity::sequence)
                 ?.plus(1)
                 ?: 0
             savedPostPlaceRepository.save(UserSavedPostPlaceEntity(savedPostId, placeId, nextSequence))
         }
-        bookmarkRepository.insertIgnoreWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
+        if (isNewAssociation) {
+            bookmarkRepository.insertOrTouchWithMemo(userId = userId, placeId = placeId, memo = savedPost.memo)
+        }
         sharedBookmarkSyncRepository.insertForActiveSubscribers(savedPostId = savedPostId, placeId = placeId)
         if (shouldRequestThumbnail) {
             followUpJobPort.enqueue(
