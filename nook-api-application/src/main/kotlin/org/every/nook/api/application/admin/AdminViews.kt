@@ -196,6 +196,7 @@ data class AdminLinkedPost(
     val authorIdentifier: String?,
     val canonicalUrl: String,
     val createdAt: Instant,
+    val savedUsers: List<AdminSavedUser> = emptyList(),
 )
 
 data class AdminAuditLog(

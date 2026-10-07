@@ -4,6 +4,7 @@ import org.every.nook.api.application.admin.AdminAuditLogPort
 import org.every.nook.api.application.admin.AdminParsingRecoveryPort
 import org.every.nook.api.application.admin.AdminPostRecoveryPort
 import org.every.nook.api.application.processing.ParsingFollowUpJobPort
+import org.every.nook.api.infrastructure.persistence.admin.AdminSavedUsersQuery
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobEntity
 import org.every.nook.api.infrastructure.persistence.place.PlaceParsingJobJpaRepository
 import org.every.nook.api.infrastructure.persistence.post.PostContentParsingJobEntity
@@ -86,6 +87,7 @@ internal class ParsingMySqlFixture : AutoCloseable {
             NamedParameterJdbcTemplate(jdbc),
             audit,
             PostProcessingDispositionStore(NamedParameterJdbcTemplate(jdbc)),
+            AdminSavedUsersQuery(NamedParameterJdbcTemplate(jdbc)),
         ),
     ).apply {
         addAdvice(
@@ -107,6 +109,11 @@ internal class ParsingMySqlFixture : AutoCloseable {
         jdbc.execute(java.nio.file.Files.readString(java.nio.file.Path.of("../docs/tasks/NOOK-356/ddl/up.sql")))
         jdbc.execute(
             "CREATE TABLE post_places (post_id BIGINT NOT NULL, place_id BIGINT NOT NULL, INDEX idx_post_id (post_id))",
+        )
+        jdbc.execute("CREATE TABLE members (id BIGINT PRIMARY KEY, nickname VARCHAR(100) NOT NULL)")
+        jdbc.execute(
+            "CREATE TABLE user_saved_posts " +
+                "(post_id BIGINT NOT NULL, user_id BIGINT NOT NULL, deleted_at TIMESTAMP NULL)",
         )
         jdbc.update("INSERT INTO posts (id) VALUES (1),(2)")
     }

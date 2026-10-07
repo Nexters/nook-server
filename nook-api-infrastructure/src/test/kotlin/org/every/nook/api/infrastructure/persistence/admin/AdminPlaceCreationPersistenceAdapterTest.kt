@@ -41,6 +41,7 @@ class AdminPlaceCreationPersistenceAdapterTest {
             savedPostPlaceRepository = mock(UserSavedPostPlaceJpaRepository::class.java),
             auditLogPort = mock(AdminAuditLogPort::class.java),
             objectMapper = jacksonObjectMapper(),
+            savedUsersQuery = mock(AdminSavedUsersQuery::class.java),
         )
 
         assertFailsWith<DuplicateAdminPlaceException> {

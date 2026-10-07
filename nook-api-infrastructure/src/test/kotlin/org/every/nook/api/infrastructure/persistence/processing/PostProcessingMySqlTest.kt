@@ -2,6 +2,7 @@ package org.every.nook.api.infrastructure.persistence.processing
 
 import org.every.nook.api.application.admin.AdminActor
 import org.every.nook.api.application.admin.AdminAuditLogPort
+import org.every.nook.api.application.admin.AdminSavedUser
 import org.every.nook.api.application.admin.ChangePostDisposition
 import org.every.nook.api.application.admin.ParsingRecoveryException
 import org.every.nook.api.application.admin.PostProcessingQuery
@@ -42,6 +43,8 @@ class PostProcessingMySqlTest {
 
     @BeforeTest
     fun reset() {
+        db.jdbc.update("DELETE FROM user_saved_posts")
+        db.jdbc.update("DELETE FROM members")
         db.jdbc.update("DELETE FROM parsing_follow_up_jobs")
         db.jdbc.update("DELETE FROM post_content_parsing_jobs")
         db.jdbc.update("DELETE FROM place_parsing_jobs")
@@ -53,6 +56,24 @@ class PostProcessingMySqlTest {
             last_failed_at='2026-09-10 00:00:00',failure_reason='download HTTP 403: access denied'
             """.trimIndent(),
         )
+    }
+
+    @Test
+    fun `processing list and recovery detail expose active saved members`() {
+        db.jdbc.update("INSERT INTO members VALUES (49, 'first'), (50, 'second')")
+        db.jdbc.update(
+            "INSERT INTO user_saved_posts VALUES " +
+                "(1, 50, NULL), (1, 49, NULL), (1, 49, NULL), " +
+                "(1, 99, NULL), (1, 50, NOW()), (2, 50, NULL)",
+        )
+        val expected = listOf(AdminSavedUser(49, "first"), AdminSavedUser(50, "second"))
+
+        assertEquals(expected, db.processing(audit).list(PostProcessingQuery()).posts.single().savedUsers)
+        assertEquals(expected, db.posts(audit).find(1)!!.savedUsers)
+        assertEquals(expected, db.posts(audit).findAll(listOf(1L, 2L)).single().savedUsers)
+
+        db.jdbc.update("UPDATE user_saved_posts SET deleted_at=NOW() WHERE post_id=1")
+        assertTrue(db.posts(audit).find(1)!!.savedUsers.isEmpty())
     }
 
     @Test

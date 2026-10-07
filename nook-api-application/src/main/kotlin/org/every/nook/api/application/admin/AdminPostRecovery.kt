@@ -7,6 +7,7 @@ data class AdminPostRecovery(
     val disposition: String = "OPEN",
     val dispositionReason: String? = null,
     val dispositionChangedAt: java.time.Instant? = null,
+    val savedUsers: List<AdminSavedUser> = emptyList(),
 )
 data class AdminPostRecoveryPage(val posts: List<AdminPostRecovery>, val hasNext: Boolean)
 data class RetryPostParsingCommand(val postId: Long, val actor: AdminActor, val reason: String)
@@ -14,6 +15,7 @@ data class RetryPostParsingCommand(val postId: Long, val actor: AdminActor, val 
 interface AdminPostRecoveryPort {
     fun list(postId: Long?, status: String?, beforePostId: Long?, limit: Int): AdminPostRecoveryPage
     fun find(postId: Long): AdminPostRecovery?
+    fun findAll(postIds: List<Long>): List<AdminPostRecovery> = postIds.mapNotNull(::find)
     fun retry(command: RetryPostParsingCommand): AdminPostRecovery
 }
 

@@ -99,6 +99,15 @@ class AdminPostSavedUsersTest {
             ) { result, _ -> Triple(result.getLong("postId"), result.getLong("id"), result.getString("nickname")) }
 
             assertEquals(listOf(Triple(2L, 49L, "first"), Triple(3L, 49L, "first"), Triple(3L, 50L, "second")), rows)
+            val savedUsers = AdminSavedUsersQuery(NamedParameterJdbcTemplate(JdbcTemplate(dataSource)))
+            assertEquals(
+                mapOf(
+                    2L to listOf(AdminSavedUser(49, "first")),
+                    3L to listOf(AdminSavedUser(49, "first"), AdminSavedUser(50, "second")),
+                ),
+                savedUsers.findByPostIds(listOf(2L, 3L)),
+            )
+            assertTrue(savedUsers.findByPostIds(emptyList()).isEmpty())
         }
     }
 
