@@ -1,0 +1,11 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+### 온보딩 CTA 전환 (어드민 인증 환경에서 실행)
+GET {{baseUrl}}/api/admin/v1/onboarding-conversion?from=2026-10-01&to=2026-10-07

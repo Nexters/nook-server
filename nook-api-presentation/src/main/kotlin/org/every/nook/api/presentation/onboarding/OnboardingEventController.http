@@ -1,0 +1,33 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+@accessToken = replace-with-nook-access-token
+
+### 온보딩 Instagram CTA 클릭 (occurredAt을 실제 발생 시각으로 교체)
+# 재시도 시 eventId와 occurredAt을 그대로 유지. 성공 및 중복 성공은 204.
+POST {{baseUrl}}/api/v1/onboarding/events
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "eventId": "60d86756-c4cd-4e67-bcca-c6b08cecd4a4",
+  "eventName": "INSTAGRAM_CTA_CLICK",
+  "occurredAt": "2026-10-07T14:00:00Z"
+}
+
+### Share Extension 실제 실행 (클라이언트 지원 확인 후 사용)
+POST {{baseUrl}}/api/v1/onboarding/events
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "eventId": "7ea8f0d0-bb79-4a15-bd0f-bb87dcc51ccc",
+  "eventName": "SHARE_EXTENSION_OPEN",
+  "occurredAt": "2026-10-07T14:01:00Z"
+}
