@@ -228,90 +228,99 @@ class FollowCurrentContainerLogTest(unittest.TestCase):
         return json.dumps({"log": message}) + "\n"
 
 
-if __name__ == "__main__":
-    unittest.main()
+class RemovedParsingAlertTest(unittest.TestCase):
+    def test_removed_events_never_reach_discord(self):
+        for environment in ("dev", "live"):
+            for parsing_only in (False, True):
+                for event_type, level in (
+                    ("post.parsing.summary_warning", "WARN"),
+                    ("post.parsing.summary_warning", "ERROR"),
+                    ("post.parsing.summary_failed", "ERROR"),
+                    ("post.save.failed", "ERROR"),
+                ):
+                    with (
+                        self.subTest(environment=environment, parsing_only=parsing_only, event_type=event_type, level=level),
+                        patch.object(forward_error_logs, "ENVIRONMENT", environment),
+                        patch.object(forward_error_logs, "PARSING_ONLY", parsing_only),
+                        patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/errors"),
+                        patch.object(forward_error_logs.urllib.request, "urlopen") as send,
+                    ):
+                        parsed_level, body, context = forward_error_logs.parse_log_entry(json.dumps({
+                            "level": level, "event_type": event_type, "message": "removed alert",
+                            "post_id": 919, "warning_code": "NO_PLACES", "failure_summary": "[]",
+                        }))
+                        self.assertFalse(forward_error_logs.should_forward(parsed_level, context))
+                        forward_error_logs.post_error_log([body], context)
+                        send.assert_not_called()
 
+    def test_save_request_errors_are_suppressed_for_both_routes_and_context_formats(self):
+        for route in ("/api/v1/posts", "/api/v1/shared-posts/123/save", "/api/v1/shared-posts/{sharedPostId}/save"):
+            for method_key, route_key in (
+                ("request_method", "http_route"), ("http_method", "request_path"),
+                ("request.method", "http.route"), ("http.method", "request.path"),
+            ):
+                with (
+                    self.subTest(route=route, method_key=method_key),
+                    patch.object(forward_error_logs, "PARSING_ONLY", False),
+                    patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/errors"),
+                    patch.object(forward_error_logs.urllib.request, "urlopen") as send,
+                ):
+                    level, body, context = forward_error_logs.parse_log_entry(json.dumps({
+                        "level": "ERROR", method_key: "POST", route_key: route,
+                        "request_id": "req-403", "message": "save failed", "stack_trace": "at Save.run()",
+                    }))
+                    self.assertEqual("post.save.failed", context["event_type"])
+                    self.assertIn("at Save.run()", body)
+                    self.assertFalse(forward_error_logs.should_forward(level, context))
+                    forward_error_logs.post_error_log([body], context)
+                    send.assert_not_called()
 
-class ParsingAlertTest(unittest.TestCase):
-    def test_terminal_event_contains_post_stage_and_env_specific_recovery_link(self):
-        entry = {"level": "ERROR", "event_type": "post.parsing.summary_failed", "post_id": 616,
-                 "job_id": 378, "job_type": "POST_MEDIA", "failure_stage": "PLACE_IMAGE_OCR",
-                 "failure_summary": json.dumps([{"stage": "PLACE_IMAGE_OCR", "reason": "이미지 문자 인식 실패", "count": 1}]),
-                 "total_count": 8, "completed_count": 1, "failed_count": 7, "failed_at": "2026-09-13T00:00:00Z", "message": "failed"}
-        level, body, context = forward_error_logs.parse_log_entry(json.dumps(entry))
-        for env, host in [("dev", "dev-admin.everynook.co.kr"), ("live", "admin.everynook.co.kr")]:
-            with patch.object(forward_error_logs, "ENVIRONMENT", env):
-                embed = forward_error_logs.parsing_payload(context)["embeds"][0]
-                self.assertIn("616", embed["title"])
-                self.assertIn("이미지 OCR", embed["description"])
-                self.assertIn(host, embed["url"])
-                self.assertIn("/posts/616/processing", embed["url"])
-        with patch.object(forward_error_logs, "PARSING_ONLY", True):
-            self.assertTrue(forward_error_logs.should_forward(level, context))
-            self.assertFalse(forward_error_logs.should_forward("WARN", context))
-            self.assertFalse(forward_error_logs.should_forward("ERROR", {}))
+    def test_generic_errors_still_reach_error_channel_only_in_general_mode(self):
+        for method, route in (("GET", "/api/v1/posts"), ("POST", "/api/v1/posts/123"), ("POST", "/api/v1/shared-posts/123")):
+            for parsing_only in (False, True):
+                with (
+                    self.subTest(method=method, route=route, parsing_only=parsing_only),
+                    patch.object(forward_error_logs, "PARSING_ONLY", parsing_only),
+                    patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/errors"),
+                    patch.object(forward_error_logs.urllib.request, "urlopen", return_value=MagicMock()) as send,
+                ):
+                    level, body, context = forward_error_logs.parse_log_entry(json.dumps({
+                        "level": "ERROR", "request_method": method, "http_route": route, "message": "server failed",
+                    }))
+                    self.assertEqual(not parsing_only, forward_error_logs.should_forward(level, context))
+                    forward_error_logs.post_error_log([body], context)
+                    if parsing_only:
+                        send.assert_not_called()
+                    else:
+                        self.assertEqual(1, send.call_count)
+                        self.assertEqual("https://discord.example/errors?wait=true", send.call_args.args[0].full_url)
 
-    def test_seven_failures_are_one_summary_payload_and_old_job_events_are_ignored(self):
-        entry = {"level": "ERROR", "event_type": "post.parsing.summary_failed", "post_id": 616,
-                 "total_count": 8, "completed_count": 1, "failed_count": 7,
-                 "failure_summary": json.dumps([
-                     {"stage": "PLACE_TEXT_RESOLUTION", "reason": "장소 후보 없음", "count": 1},
-                     {"stage": "POST_MEDIA", "reason": "다운로드 실패", "count": 6}])}
-        _, _, context = forward_error_logs.parse_log_entry(json.dumps(entry))
-        with patch.object(forward_error_logs, "post_payload") as send:
-            with patch.object(forward_error_logs, "PARSING_DISCORD_WEBHOOK_URL", "https://discord.example/alerts"):
-                forward_error_logs.post_error_log(["summary"], context)
-            send.assert_called_once()
-            embed = send.call_args.args[1]["embeds"][0]
-            self.assertIn("장소 검색: 장소 후보 없음 (1건)", embed["description"])
-            self.assertIn("미디어 저장: 다운로드 실패 (6건)", embed["description"])
-            self.assertEqual("7", next(f["value"] for f in embed["fields"] if f["name"] == "실패"))
-        with patch.object(forward_error_logs, "PARSING_ONLY", True):
-            self.assertFalse(forward_error_logs.should_forward("ERROR", {"event_type": "post.parsing.failed"}))
-
-    def test_summary_includes_specific_cause_code_retry_result_and_post_detail_link(self):
-        context = {
-            "event_type": "post.parsing.summary_failed", "post_id": "902",
-            "failure_summary": json.dumps([{
-                "stage": "PLACE_IMAGE_OCR", "reason": "접근 권한 확인 필요", "count": 1,
-                "detail": "HTTP 403: image access denied", "code": "403", "attempts": 8, "retried": True,
-            }]), "completed_count": 1, "failed_count": 1, "total_count": 2,
-        }
-        for environment, host in (("dev", "dev-admin.everynook.co.kr"), ("live", "admin.everynook.co.kr")):
-            with self.subTest(environment=environment), patch.object(forward_error_logs, "ENVIRONMENT", environment):
-                payload = forward_error_logs.parsing_payload(context)
-                self.assertEqual(1, len(payload["embeds"]))
-                embed = payload["embeds"][0]
-                self.assertIn("이미지 OCR: 접근 권한 확인 필요 (1건)", embed["description"])
-                self.assertIn("오류 코드: 403", embed["description"])
-                self.assertIn("HTTP 403: image access denied", embed["description"])
-                self.assertIn("관리자 재시도 후 실패 · 최대 8회 실행", embed["description"])
-                self.assertEqual(f"https://{host}/#/posts/902/processing", embed["url"])
-                self.assertEqual({"parse": []}, payload["allowed_mentions"])
-
-    def test_post_save_api_failure_has_stage_without_fabricated_post_id(self):
-        _, _, context = forward_error_logs.parse_log_entry(json.dumps({
-            "level": "ERROR", "request_method": "POST", "http_route": "/api/v1/posts",
-            "request_id": "request-353", "@timestamp": "2026-09-13T00:00:00Z",
-        }))
-        payload = forward_error_logs.parsing_payload(context)["embeds"][0]
-        self.assertEqual("post.save.failed", context["event_type"])
-        self.assertIn("게시물 저장 요청", payload["title"])
-        self.assertNotIn("url", payload)
-        self.assertIn("request-353", str(payload))
-
-    def test_parsing_failures_use_alert_channel_and_generic_errors_keep_error_channel(self):
+    def test_main_flushes_generic_errors_without_forwarding_removed_alerts(self):
+        entries = [
+            {"level": "ERROR", "message": "before"},
+            {"level": "WARN", "event_type": "post.parsing.summary_warning", "message": "no places"},
+            {"level": "ERROR", "event_type": "post.parsing.summary_failed", "message": "summary failed"},
+            {"level": "ERROR", "request_method": "POST", "http_route": "/api/v1/posts", "message": "save failed"},
+            {"level": "ERROR", "message": "after"},
+            {"level": "INFO", "message": "done"},
+        ]
         with (
+            patch.object(forward_error_logs, "PARSING_ONLY", False),
             patch.object(forward_error_logs, "DISCORD_WEBHOOK_URL", "https://discord.example/errors"),
-            patch.object(forward_error_logs, "PARSING_DISCORD_WEBHOOK_URL", "https://discord.example/alerts"),
-            patch.object(forward_error_logs, "post_payload") as send,
+            patch.object(forward_error_logs, "follow_current_container_log", return_value=iter(json.dumps(entry) for entry in entries)),
+            patch.object(forward_error_logs.urllib.request, "urlopen", return_value=MagicMock()) as send,
         ):
-            forward_error_logs.post_error_log(["failed"], {"event_type": "post.save.failed"})
-            self.assertTrue(send.call_args.args[0].startswith("https://discord.example/alerts?"))
-            forward_error_logs.post_error_log(["failed"], {})
-            self.assertTrue(send.call_args.args[0].startswith("https://discord.example/errors?"))
+            forward_error_logs.main()
+            self.assertEqual(2, send.call_count)
+            descriptions = [json.loads(call.args[0].data)["embeds"][0]["description"] for call in send.call_args_list]
+            self.assertIn("before", descriptions[0])
+            self.assertIn("after", descriptions[1])
+            self.assertNotIn("save failed", str(descriptions))
+            self.assertNotIn("summary failed", str(descriptions))
+            self.assertNotIn("no places", str(descriptions))
 
 
+class PostPayloadRetryTest(unittest.TestCase):
     def test_rate_limit_waits_then_delivers_and_permanent_failure_does_not_retry(self):
         limited = urllib.error.HTTPError("https://discord.example/alerts", 429, "limited", {"Retry-After": "2.5"}, None)
         with (
@@ -333,40 +342,5 @@ class ParsingAlertTest(unittest.TestCase):
             self.assertNotIn("secret.example", str(output.call_args_list))
 
 
-class EmptyPlacesWarningTest(unittest.TestCase):
-    def test_warning_reaches_alert_channel_with_one_amber_summary_in_both_environments(self):
-        entry = {"level": "WARN", "event_type": "post.parsing.summary_warning", "post_id": 919,
-                 "warning_code": "NO_PLACES", "failure_summary": "[]", "failed_count": 0,
-                 "completed_count": 7, "total_count": 7, "message": "completed"}
-        level, body, context = forward_error_logs.parse_log_entry(json.dumps(entry))
-        for environment in ("dev", "live"):
-            with (patch.object(forward_error_logs, "ENVIRONMENT", environment),
-                  patch.object(forward_error_logs, "PARSING_ONLY", True),
-                  patch.object(forward_error_logs, "PARSING_DISCORD_WEBHOOK_URL", "https://discord.example/alerts"),
-                  patch.object(forward_error_logs, "post_payload") as send):
-                self.assertTrue(forward_error_logs.should_forward(level, context))
-                self.assertFalse(forward_error_logs.should_forward("WARN", {}))
-                forward_error_logs.post_error_log([body], context)
-                send.assert_called_once()
-                self.assertIn("/alerts?", send.call_args.args[0])
-                payload = send.call_args.args[1]
-                self.assertEqual(1, len(payload["embeds"]))
-                embed = payload["embeds"][0]
-                self.assertEqual(f"[{environment}] 게시물 #919 · 장소 없이 저장됨", embed["title"])
-                self.assertEqual(16753920, embed["color"])
-                self.assertIn("정상 저장", embed["description"])
-                self.assertNotIn("마지막 실패 시각", str(embed))
-                self.assertIn("연결된 장소가 0개", str(embed))
-                self.assertIn("/posts/919/processing", embed["url"])
-
-    def test_warning_is_included_in_failure_summary_without_another_message(self):
-        entry = {"level": "ERROR", "event_type": "post.parsing.summary_failed", "post_id": 919,
-                 "warning_code": "NO_PLACES", "failed_count": 1, "completed_count": 2, "total_count": 3,
-                 "failure_summary": json.dumps([{"stage": "POST_MEDIA", "reason": "다운로드 실패", "count": 1}])}
-        _, _, context = forward_error_logs.parse_log_entry(json.dumps(entry))
-        payload = forward_error_logs.parsing_payload(context)
-        self.assertEqual(1, len(payload["embeds"]))
-        embed = payload["embeds"][0]
-        self.assertEqual(15158332, embed["color"])
-        self.assertIn("미디어 저장: 다운로드 실패", embed["description"])
-        self.assertIn("장소 없이 저장됨", str(embed["fields"]))
+if __name__ == "__main__":
+    unittest.main()
