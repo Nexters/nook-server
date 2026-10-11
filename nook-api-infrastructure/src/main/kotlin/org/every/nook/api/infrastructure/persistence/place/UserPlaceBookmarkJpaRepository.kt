@@ -351,6 +351,14 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   p.name LIKE :pattern ESCAPE '!'
                   OR p.address LIKE :pattern ESCAPE '!'
                   OR p.category LIKE :pattern ESCAPE '!'
+                  OR upb.memo LIKE :pattern ESCAPE '!'
+                  OR EXISTS (
+                      SELECT 1
+                      FROM place_tag_catalogs tag_catalog
+                      WHERE tag_catalog.enabled = TRUE
+                        AND tag_catalog.display_name LIKE :pattern ESCAPE '!'
+                        AND JSON_CONTAINS(p.representative_tags, JSON_QUOTE(tag_catalog.tag_code))
+                  )
               )
             ORDER BY
                 CASE
@@ -417,6 +425,14 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   p.name LIKE :pattern ESCAPE '!'
                   OR p.address LIKE :pattern ESCAPE '!'
                   OR p.category LIKE :pattern ESCAPE '!'
+                  OR upb.memo LIKE :pattern ESCAPE '!'
+                  OR EXISTS (
+                      SELECT 1
+                      FROM place_tag_catalogs tag_catalog
+                      WHERE tag_catalog.enabled = TRUE
+                        AND tag_catalog.display_name LIKE :pattern ESCAPE '!'
+                        AND JSON_CONTAINS(p.representative_tags, JSON_QUOTE(tag_catalog.tag_code))
+                  )
               )
         """,
         nativeQuery = true,
@@ -455,6 +471,14 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   p.name LIKE :pattern ESCAPE '!'
                   OR p.address LIKE :pattern ESCAPE '!'
                   OR p.category LIKE :pattern ESCAPE '!'
+                  OR bookmark.memo LIKE :pattern ESCAPE '!'
+                  OR EXISTS (
+                      SELECT 1
+                      FROM place_tag_catalogs tag_catalog
+                      WHERE tag_catalog.enabled = TRUE
+                        AND tag_catalog.display_name LIKE :pattern ESCAPE '!'
+                        AND JSON_CONTAINS(p.representative_tags, JSON_QUOTE(tag_catalog.tag_code))
+                  )
               )
             GROUP BY user_group.id, user_group.name, user_group.color
             ORDER BY user_group.id ASC

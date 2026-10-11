@@ -121,7 +121,7 @@ class PlaceController(
     @GetMapping("/saved/search")
     fun searchSavedPlaces(
         @Parameter(hidden = true) userContext: UserContext,
-        @Parameter(description = "장소명, 주소 또는 카테고리 검색 문자열")
+        @Parameter(description = "장소명, 주소, 카테고리, 내 장소 메모 또는 장소 태그명 검색 문자열")
         @RequestParam
         @NotBlank
         @Size(max = SearchSavedPlacesUseCase.MAX_QUERY_LENGTH)
