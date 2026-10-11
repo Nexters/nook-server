@@ -18,12 +18,14 @@ internal fun List<PlaceClue>.reconcileWithSourceProfileHints(hints: List<SourceP
 internal fun List<PlaceClue>.mergePlaceClues(): PlaceClue {
     require(isNotEmpty())
     val primary = first()
+    val addressClue = firstOrNull { it.addressHint != null }
     return primary.copy(
         region = firstNotNullOfOrNull(PlaceClue::region),
         queries = flatMap(PlaceClue::queries).distinct(),
         evidence = flatMap(PlaceClue::evidence)
             .distinctBy { evidence -> evidence.imageIndex to evidence.evidenceText },
-        addressHint = firstNotNullOfOrNull(PlaceClue::addressHint),
+        addressHint = addressClue?.addressHint,
+        normalizedAddressHint = addressClue?.normalizedAddressHint,
     )
 }
 

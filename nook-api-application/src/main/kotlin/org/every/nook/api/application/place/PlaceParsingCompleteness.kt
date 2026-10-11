@@ -104,6 +104,7 @@ private fun PlaceClue.restoreAddressFromCard(transcripts: List<ImageTranscript>)
     return copy(
         name = cardName,
         addressHint = restoredAddress,
+        normalizedAddressHint = normalizedAddressHint.takeIf { restoredAddress == addressHint },
         queries = listOf(cardName, restoredAddress) + queries,
         evidence = restoredEvidence,
     )

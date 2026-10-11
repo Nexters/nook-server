@@ -19,6 +19,145 @@ import kotlin.test.assertTrue
 @Suppress("LargeClass") // The scenarios share one cohesive orchestration fixture for the place parsing pipeline.
 class ProcessPlaceParsingJobUseCaseTest {
     @Test
+    fun `resolves English addresses using normalized search while preserving original clues`() {
+        val originalAddress = "5 Gyedong-gil, Jongno-gu, Seoul"
+        val normalizedAddress = "서울 종로구 계동길 5"
+        val place = candidate("853028118", "어니언 안국", normalizedAddress)
+        listOf("Cafe Onion Anguk", "어니언 안국").forEach { name ->
+            val port = FakeJobPort(body = "$name $originalAddress")
+            val searched = mutableListOf<String>()
+            var modelSelections = 0
+            val useCase = useCase(
+                port = port,
+                extractor = PlaceClueExtractor {
+                    listOf(
+                        PlaceClue(
+                            name = name,
+                            region = null,
+                            queries = listOf(name, "어니언 안국"),
+                            addressHint = originalAddress,
+                            normalizedAddressHint = normalizedAddress,
+                        ),
+                    )
+                },
+                search = SearchPlaceCandidatesUseCase { request ->
+                    searched += request.query
+                    if (request.query == normalizedAddress) listOf(place) else emptyList()
+                },
+                selector = PlaceCandidateSelector { request ->
+                    modelSelections += 1
+                    assertEquals(originalAddress, request.clue.addressHint)
+                    assertEquals(normalizedAddress, request.clue.normalizedAddressHint)
+                    place
+                },
+            )
+
+            assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(388))
+            assertEquals(if (name == "Cafe Onion Anguk") originalAddress else normalizedAddress, searched.first())
+            assertEquals(listOf(place.copy(sourceMediaSequence = 0)), port.completed)
+            assertEquals(0, modelSelections)
+        }
+    }
+
+    @Test
+    fun `rejects another business at the normalized address even if the model selects it`() {
+        val address = "서울 종로구 계동길 5"
+        val port = FakeJobPort(body = "Cafe Onion Anguk 5 Gyedong-gil, Jongno-gu, Seoul")
+        var modelSelections = 0
+        val unrelated = candidate("other", "다른 가게", address)
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor {
+                listOf(
+                    PlaceClue(
+                        name = "Cafe Onion Anguk",
+                        region = null,
+                        queries = listOf("Cafe Onion Anguk"),
+                        addressHint = "5 Gyedong-gil, Jongno-gu, Seoul",
+                        normalizedAddressHint = address,
+                    ),
+                )
+            },
+            search = SearchPlaceCandidatesUseCase {
+                listOf(unrelated)
+            },
+            selector = PlaceCandidateSelector {
+                modelSelections += 1
+                unrelated
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Failed>(useCase(388))
+        assertEquals(2, modelSelections)
+        assertEquals(emptyList(), port.completed)
+    }
+
+    @Test
+    fun `Korean name searches four Korean queries before an English address and stops on a valid match`() {
+        val address = "5 Gyedong-gil, Jongno-gu, Seoul"
+        val clue = PlaceClue(
+            name = "어니언 안국",
+            region = null,
+            queries = listOf("어니언 안국 서울", "어니언 안국 종로", "어니언 안국 계동", "Onion Anguk", "Onion Seoul"),
+            addressHint = address,
+        )
+        val port = FakeJobPort(body = "어니언 안국 $address")
+        val place = candidate("853028118", "어니언 안국", "서울 종로구 계동길 5")
+        val searched = mutableListOf<String>()
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(clue) },
+            search = SearchPlaceCandidatesUseCase { request ->
+                searched += request.query
+                if (request.query == address) listOf(place) else emptyList()
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(388))
+        assertEquals(clue.searchPlan().primary + address, searched)
+        assertEquals(listOf(place.externalPlaceId), port.completed.map(PlaceCandidate::externalPlaceId))
+    }
+
+    @Test
+    fun `English search switches to three Korean queries after a model selected candidate fails validation`() {
+        val normalized = "서울 종로구 계동길 5"
+        val clue = PlaceClue(
+            name = "Cafe Onion Anguk",
+            region = null,
+            queries = listOf("Onion Anguk Seoul", "Onion Gyedong-gil", "어니언 안국", "어니언 안국 서울"),
+            addressHint = "5 Gyedong-gil, Jongno-gu, Seoul",
+            normalizedAddressHint = normalized,
+        )
+        val port = FakeJobPort(body = "${clue.name} ${clue.addressHint}")
+        val place = candidate("853028118", "어니언 안국", normalized)
+        val unrelated = candidate("other", "다른 가게", normalized)
+        val searched = mutableListOf<String>()
+        var modelSelections = 0
+        val useCase = useCase(
+            port = port,
+            extractor = PlaceClueExtractor { listOf(clue) },
+            search = SearchPlaceCandidatesUseCase { request ->
+                searched += request.query
+                when {
+                    request.query == normalized -> listOf(place)
+                    request.query.none { it in '가'..'힣' } -> listOf(unrelated)
+                    else -> emptyList()
+                }
+            },
+            selector = PlaceCandidateSelector {
+                modelSelections += 1
+                unrelated
+            },
+        )
+
+        assertIs<ProcessPlaceParsingJobUseCase.Result.Completed>(useCase(388))
+        assertEquals(listOf(4, 3), listOf(clue.searchPlan().primary.size, clue.searchPlan().fallback.size))
+        assertEquals(clue.searchQueries(), searched)
+        assertEquals(1, modelSelections)
+        assertEquals(listOf(place.externalPlaceId), port.completed.map(PlaceCandidate::externalPlaceId))
+    }
+
+    @Test
     fun `uses a manual place only after external candidates have no compatible match`() {
         val port = FakeJobPort(body = "매미지옥 숙소")
         val manual = candidate("MANUAL", "manual-1", "매미지옥", "강원 양양군 강현면 뒷나루2길 20-1")
