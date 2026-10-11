@@ -1,0 +1,124 @@
+{
+  "checkedAt": "2026-10-11 KST",
+  "method": "Read-only Naver/Kakao search of actual normalized address and Korean queries from updated inference",
+  "results": [
+    {
+      "provider": "naver",
+      "query": "서울특별시 종로구 계동길 5",
+      "httpStatus": 200,
+      "returnedCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "서울특별시 종로구 계동길 5",
+      "httpStatus": 200,
+      "returnedCount": 15,
+      "candidates": [
+        {
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "드림디포 안국점",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "가가",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "앙시엔",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "취 북촌플래그십스토어",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "와플샵 북촌점",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "선채 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "브뤼셀프라이 안국점",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "아꼬떼",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "계동길츄러스",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "꽃공작소 미쓰김라일락",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "구슬샵",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "요가문화원",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "신원광고기획",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "name": "길츄",
+          "address": "서울 종로구 계동길 5"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "카페 어니언 안국 종로구 계동길 5",
+      "httpStatus": 200,
+      "returnedCount": 1,
+      "candidates": [
+        {
+          "name": "어니언 안국",
+          "address": "서울특별시 종로구 계동길 5"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "카페 어니언 안국 종로구 계동길 5",
+      "httpStatus": 200,
+      "returnedCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "naver",
+      "query": "카페어니언 안국 서울 종로구",
+      "httpStatus": 200,
+      "returnedCount": 1,
+      "candidates": [
+        {
+          "name": "어니언 안국",
+          "address": "서울특별시 종로구 계동길 5"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "카페어니언 안국 서울 종로구",
+      "httpStatus": 200,
+      "returnedCount": 1,
+      "candidates": [
+        {
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        }
+      ]
+    }
+  ]
+}

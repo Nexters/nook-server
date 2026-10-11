@@ -154,7 +154,7 @@ class PostContentParsingPersistenceAdapterTest {
         assertEquals(PlaceParsingStatus.PENDING, placeJobCaptor.value.status)
         assertEquals(
             """[{"name":"성수 식당","region":"성수","queries":["성수 식당"],"evidence":[],""" +
-                """"addressHint":"서울 성동구 성수이로 11 4층"}]""",
+                """"addressHint":"서울 성동구 성수이로 11 4층","normalizedAddressHint":null}]""",
             placeJobCaptor.value.textPlaceClues,
         )
         assertEquals("""[{"imageIndex":1,"texts":["성수 맛집"]}]""", placeJobCaptor.value.imageTranscripts)

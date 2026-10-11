@@ -1,0 +1,141 @@
+{
+  "checkedAt": "2026-10-11 KST",
+  "method": "Replay of requests captured from unmodified OpenAiContentInferenceAdapter.infer; synthetic input; no application DB writes",
+  "results": [
+    {
+      "case": "case-0",
+      "input": {
+        "body": "Visited Cafe Onion Anguk in Seoul today.",
+        "hashtags": [],
+        "sourceLocationTag": null
+      },
+      "requestedModel": "gpt-5-mini",
+      "status": "completed",
+      "model": "gpt-5-mini-2025-08-07",
+      "usage": {
+        "input_tokens": 1369,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 1280
+        },
+        "output_tokens": 88,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1457
+      },
+      "extracted": {
+        "places": [
+          {
+            "name": "Cafe Onion Anguk",
+            "region": "Seoul",
+            "addressHint": null,
+            "queries": [
+              "Cafe Onion Anguk Seoul",
+              "Cafe Onion Anguk Anguk Seoul",
+              "Cafe Onion Anguk 안국 서울",
+              "Cafe Onion Anguk 카페 어니언 안국 서울"
+            ],
+            "evidence": []
+          }
+        ]
+      },
+      "applicationSearchQueries": [
+        "Cafe Onion Anguk",
+        "Seoul Cafe",
+        "Seoul Onion",
+        "Seoul Anguk"
+      ]
+    },
+    {
+      "case": "case-1",
+      "input": {
+        "body": "어니언 안국 방문. Address: 5 Gyedong-gil, Jongno-gu, Seoul.",
+        "hashtags": [],
+        "sourceLocationTag": null
+      },
+      "requestedModel": "gpt-5-mini",
+      "status": "completed",
+      "model": "gpt-5-mini-2025-08-07",
+      "usage": {
+        "input_tokens": 1383,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 1280
+        },
+        "output_tokens": 112,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1495
+      },
+      "extracted": {
+        "places": [
+          {
+            "name": "어니언 안국",
+            "region": null,
+            "addressHint": "5 Gyedong-gil, Jongno-gu, Seoul.",
+            "queries": [
+              "어니언 안국 Jongno-gu",
+              "어니언 안국 안국",
+              "어니언 안국 5 Gyedong-gil Jongno-gu",
+              "Onion Anguk 5 Gyedong-gil Jongno-gu"
+            ],
+            "evidence": []
+          }
+        ]
+      },
+      "applicationSearchQueries": [
+        "5 Gyedong-gil, Jongno-gu, Seoul.",
+        "어니언 안국",
+        "어니언 안국 Jongno-gu",
+        "어니언 안국 안국"
+      ]
+    },
+    {
+      "case": "case-2",
+      "input": {
+        "body": "Cafe Onion Anguk\n5 Gyedong-gil, Jongno-gu, Seoul",
+        "hashtags": [],
+        "sourceLocationTag": null
+      },
+      "requestedModel": "gpt-5-mini",
+      "status": "completed",
+      "model": "gpt-5-mini-2025-08-07",
+      "usage": {
+        "input_tokens": 1378,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 115,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1493
+      },
+      "extracted": {
+        "places": [
+          {
+            "name": "Cafe Onion Anguk",
+            "region": "Jongno-gu, Seoul",
+            "addressHint": "5 Gyedong-gil, Jongno-gu, Seoul",
+            "queries": [
+              "Cafe Onion Anguk Jongno-gu Seoul",
+              "Cafe Onion Anguk Gyedong-gil",
+              "Cafe Onion Anguk Anguk Jongno-gu",
+              "Cafe Onion Anguk 5 Gyedong-gil, Jongno-gu, Seoul"
+            ],
+            "evidence": []
+          }
+        ]
+      },
+      "applicationSearchQueries": [
+        "5 Gyedong-gil, Jongno-gu, Seoul",
+        "Cafe Onion Anguk",
+        "Jongno-gu, Seoul Cafe",
+        "Jongno-gu, Seoul Onion"
+      ]
+    }
+  ]
+}

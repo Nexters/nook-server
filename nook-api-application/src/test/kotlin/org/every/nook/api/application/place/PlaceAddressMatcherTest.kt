@@ -155,8 +155,9 @@ class PlaceAddressMatcherTest {
                 "용산구 이태원로20가길 11",
                 "파티오피즈",
             ),
-            clue.searchQueries(),
+            clue.searchPlan().primary,
         )
+        assertEquals(listOf("patio fizz"), clue.searchPlan().fallback)
     }
 
     @Test
@@ -219,8 +220,9 @@ class PlaceAddressMatcherTest {
                 "광진구 능동로50길 24",
                 "라벤다 lavender",
             ),
-            clue.searchQueries(),
+            clue.searchPlan().primary,
         )
+        assertEquals(listOf("lavender lavender_seoul"), clue.searchPlan().fallback)
     }
 
     @Test

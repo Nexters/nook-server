@@ -29,8 +29,55 @@ import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class OpenAiContentInferenceAdapterTest {
+    @Test
+    fun `extracts a separate Korean address while keeping the English source unchanged`() {
+        val fixture = adapterFixture()
+        fixture.server.expect(requestTo("https://api.openai.test/v1/responses"))
+            .andExpect(content().string(containsString("normalizedAddressHint")))
+            .andExpect(content().string(containsString("변환이 불확실하면")))
+            .andRespond(
+                withSuccess(
+                    response(
+                        """
+                        {"places":[{
+                          "name":"Cafe Onion Anguk","region":"Seoul",
+                          "addressHint":"5 Gyedong-gil, Jongno-gu, Seoul",
+                          "normalizedAddressHint":"서울 종로구 계동길 5",
+                          "queries":["어니언 안국","Cafe Onion Anguk"],"evidence":[]
+                        }]}
+                        """.trimIndent(),
+                    ),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val clues = fixture.adapter.extract(
+            PlaceClueExtractor.Request(
+                body = "Cafe Onion Anguk 5 Gyedong-gil, Jongno-gu, Seoul",
+                hashtags = emptyList(),
+                sourceLocationTag = null,
+            ),
+        )
+
+        assertEquals("5 Gyedong-gil, Jongno-gu, Seoul", clues.single().addressHint)
+        assertEquals("서울 종로구 계동길 5", clues.single().normalizedAddressHint)
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `previously stored clues remain readable without a normalized address`() {
+        val clue = jacksonObjectMapper().readValue(
+            """{"name":"어니언 안국","region":null,"queries":["어니언 안국"],"evidence":[],"addressHint":null}""",
+            PlaceClue::class.java,
+        )
+
+        assertEquals("어니언 안국", clue.name)
+        assertNull(clue.normalizedAddressHint)
+    }
+
     @Test
     fun `extracts grounded place tags from the controlled vocabulary`() {
         val fixture = adapterFixture()
@@ -438,7 +485,7 @@ class OpenAiContentInferenceAdapterTest {
             .andExpect(content().string(containsString("지역 문맥과 검색어를 보조하는 힌트")))
             .andExpect(content().string(containsString("장소 존재의 근거로 사용하지 않는다")))
             .andExpect(content().string(containsString("\\\"sourceLocationTag\\\":\\\"Lodge190\\\"")))
-            .andExpect(content().string(containsString("\"maxItems\":4")))
+            .andExpect(content().string(containsString("\"maxItems\":7")))
             .andRespond(
                 withSuccess(
                     response(
