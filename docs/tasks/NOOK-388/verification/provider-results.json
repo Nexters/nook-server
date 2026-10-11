@@ -1,0 +1,915 @@
+{
+  "checkedAt": "2026-10-11 KST",
+  "method": "Application provider endpoints and parameters; synthetic public place queries; no DB writes",
+  "results": [
+    {
+      "provider": "naver",
+      "query": "어니언 안국",
+      "httpStatus": 200,
+      "resultCount": 1,
+      "candidates": [
+        {
+          "id": "https://onionkr.com",
+          "name": "어니언 안국",
+          "address": "서울특별시 종로구 계동길 5"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "어니언 안국",
+      "httpStatus": 200,
+      "resultCount": 2,
+      "candidates": [
+        {
+          "id": "853028118",
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "13143628",
+          "name": "블루어니언소프트",
+          "address": "서울 종로구 율곡로 53"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Cafe Onion Anguk",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "Cafe Onion Anguk",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "naver",
+      "query": "Onion Anguk",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "Onion Anguk",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "naver",
+      "query": "5 Gyedong-gil, Jongno-gu, Seoul",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "5 Gyedong-gil, Jongno-gu, Seoul",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "naver",
+      "query": "서울 종로구 계동길 5",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "서울 종로구 계동길 5",
+      "httpStatus": 200,
+      "resultCount": 15,
+      "candidates": [
+        {
+          "id": "853028118",
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "16678260",
+          "name": "드림디포 안국점",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "21298128",
+          "name": "가가",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "2123679216",
+          "name": "앙시엔",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "1630133820",
+          "name": "취 북촌플래그십스토어",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "1513044537",
+          "name": "와플샵 북촌점",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "450702905",
+          "name": "선채 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "28874535",
+          "name": "브뤼셀프라이 안국점",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "16036539",
+          "name": "아꼬떼",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "1661355192",
+          "name": "계동길츄러스",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "17201467",
+          "name": "꽃공작소 미쓰김라일락",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "1874560018",
+          "name": "구슬샵",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "12082721",
+          "name": "요가문화원",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "15464050",
+          "name": "신원광고기획",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "2031714098",
+          "name": "길츄",
+          "address": "서울 종로구 계동길 5"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Cafe Onion Anguk 5 Gyedong-gil, Jongno-gu, Seoul",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "Cafe Onion Anguk 5 Gyedong-gil, Jongno-gu, Seoul",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "naver",
+      "query": "NEAT COFFEE",
+      "httpStatus": 200,
+      "resultCount": 5,
+      "candidates": [
+        {
+          "id": "https://knitcoffee.co.kr",
+          "name": "니트커피",
+          "address": "서울특별시 중구 소월로2길 30 1층 107호"
+        },
+        {
+          "id": "",
+          "name": "니트커피 아뜰리에",
+          "address": "서울특별시 용산구 후암로48길 1 3층"
+        },
+        {
+          "id": "https://www.instagram.com/cafe_neat",
+          "name": "카페니트",
+          "address": "서울특별시 영등포구 도신로25길 15-2 1층"
+        },
+        {
+          "id": "https://100원커피이벤트-선착순주문하기.com",
+          "name": "매니트커피",
+          "address": "서울특별시 영등포구 은행로 60-1 1층 115호"
+        },
+        {
+          "id": "https://www.instagram.com/knitncoffee75?igsh=Ymx5ZGY4dmpva2x0",
+          "name": "니트앤커피",
+          "address": "서울특별시 노원구 중계로 202 2층 201호"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "NEAT COFFEE",
+      "httpStatus": 200,
+      "resultCount": 4,
+      "candidates": [
+        {
+          "id": "4984425",
+          "name": "니트",
+          "address": "서울 마포구 도화길 18"
+        },
+        {
+          "id": "1128904105",
+          "name": "카페니트",
+          "address": "서울 영등포구 도신로25길 15-2"
+        },
+        {
+          "id": "2024087411",
+          "name": "니트",
+          "address": "서울 성북구 장월로6길 5"
+        },
+        {
+          "id": "1354788959",
+          "name": "닛커피",
+          "address": "경남 창원시 진해구 덕산로45번길 10"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "BEAKER 한남",
+      "httpStatus": 200,
+      "resultCount": 1,
+      "candidates": [
+        {
+          "id": "http://www.ssfshop.com/beaker",
+          "name": "비이커 한남점",
+          "address": "서울특별시 용산구 이태원로 241 (한남동) 비이커 한남 플래그쉽스토어"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "BEAKER 한남",
+      "httpStatus": 200,
+      "resultCount": 1,
+      "candidates": [
+        {
+          "id": "18349399",
+          "name": "비이커 한남점",
+          "address": "서울 용산구 이태원로 241"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "TUNE 성수",
+      "httpStatus": 200,
+      "resultCount": 3,
+      "candidates": [
+        {
+          "id": "https://www.instagram.com/tune.kr",
+          "name": "튠",
+          "address": "서울특별시 성동구 성수이로7가길 3 1층"
+        },
+        {
+          "id": "http://www.with-merrytune.com/",
+          "name": "메리튠",
+          "address": "서울특별시 성동구 왕십리로 63 L-Lab"
+        },
+        {
+          "id": "http://tune-clinic.co.kr/",
+          "name": "압구정튠의원",
+          "address": "서울특별시 강남구 논현로176길 14 4층 압구정튠의원"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "TUNE 성수",
+      "httpStatus": 200,
+      "resultCount": 3,
+      "candidates": [
+        {
+          "id": "764282393",
+          "name": "튠",
+          "address": "서울 성동구 성수이로7가길 3"
+        },
+        {
+          "id": "1734267096",
+          "name": "티제이튠",
+          "address": "서울 성동구 아차산로 103"
+        },
+        {
+          "id": "1183912264",
+          "name": "압구정튠의원",
+          "address": "서울 강남구 논현로176길 14"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "NUDAKE 도산",
+      "httpStatus": 200,
+      "resultCount": 2,
+      "candidates": [
+        {
+          "id": "https://www.nudake.com/",
+          "name": "누데이크 하우스 노웨어 도산",
+          "address": "서울특별시 강남구 압구정로46길 50 하우스 노웨어 도산 B1층"
+        },
+        {
+          "id": "https://www.instagram.com/nu_dake/",
+          "name": "누데이크 티 하우스",
+          "address": "서울특별시 성동구 뚝섬로 433"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "NUDAKE 도산",
+      "httpStatus": 200,
+      "resultCount": 1,
+      "candidates": [
+        {
+          "id": "507311553",
+          "name": "누데이크 하우스 노웨어 도산",
+          "address": "서울 강남구 압구정로46길 50"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Blue Bottle 삼청",
+      "httpStatus": 200,
+      "resultCount": 2,
+      "candidates": [
+        {
+          "id": "https://kr.bluebottlecoffee.com/",
+          "name": "블루보틀 삼청 카페",
+          "address": "서울특별시 종로구 북촌로5길 76"
+        },
+        {
+          "id": "https://app.catchtable.co.kr/ct/shop/bluebottlestudioseoul",
+          "name": "블루보틀 삼청 한옥",
+          "address": "서울특별시 종로구 삼청로2길 40-3"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "Blue Bottle 삼청",
+      "httpStatus": 200,
+      "resultCount": 5,
+      "candidates": [
+        {
+          "id": "353512935",
+          "name": "블루보틀 삼청 카페",
+          "address": "서울 종로구 북촌로5길 76"
+        },
+        {
+          "id": "409019077",
+          "name": "블루보틀 삼청 한옥",
+          "address": "서울 종로구 삼청로2길 40-3"
+        },
+        {
+          "id": "1713604919",
+          "name": "블루바틀",
+          "address": "서울 종로구 돈화문로11길 41"
+        },
+        {
+          "id": "146946502",
+          "name": "블루보틀 광화문 카페",
+          "address": "서울 종로구 청계천로 11"
+        },
+        {
+          "id": "621505231",
+          "name": "블루보틀 명동 카페",
+          "address": "서울 중구 명동길 14"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Seoul Cafe",
+      "httpStatus": 200,
+      "resultCount": 5,
+      "candidates": [
+        {
+          "id": "https://www.instagram.com/seoulcoffee1945",
+          "name": "서울커피 익선본점",
+          "address": "서울특별시 종로구 수표로28길 33-3 1층 서울커피"
+        },
+        {
+          "id": "https://1994seoul.co.kr",
+          "name": "1994SEOUL 롯데백화점 본점",
+          "address": "서울특별시 중구 남대문로 81 롯데백화점 본점 B1층"
+        },
+        {
+          "id": "",
+          "name": "서울커피",
+          "address": "서울특별시 중구 을지로 30"
+        },
+        {
+          "id": "",
+          "name": "서울서둘째로잘하는집",
+          "address": "서울특별시 종로구 삼청로 122-1"
+        },
+        {
+          "id": "https://www.instagram.com/george_seoul/",
+          "name": "죠지",
+          "address": "서울특별시 중구 을지로12길 6 한일빌딩 302호"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "Seoul Cafe",
+      "httpStatus": 200,
+      "resultCount": 15,
+      "candidates": [
+        {
+          "id": "711864705",
+          "name": "맥심플랜트",
+          "address": "서울 용산구 이태원로 250"
+        },
+        {
+          "id": "1302549042",
+          "name": "로우키",
+          "address": "서울 성동구 연무장3길 6"
+        },
+        {
+          "id": "24855092",
+          "name": "빈브라더스 합정",
+          "address": "서울 마포구 토정로 35-1"
+        },
+        {
+          "id": "22549791",
+          "name": "마일스톤커피",
+          "address": "서울 강남구 논현로159길 49"
+        },
+        {
+          "id": "253560122",
+          "name": "커피루소 정동점",
+          "address": "서울 중구 정동길 17"
+        },
+        {
+          "id": "53292857",
+          "name": "943킹스크로스",
+          "address": "서울 마포구 양화로16길 24"
+        },
+        {
+          "id": "1198183678",
+          "name": "커피앤시가렛",
+          "address": "서울 중구 서소문로 116"
+        },
+        {
+          "id": "27194461",
+          "name": "제비다방",
+          "address": "서울 마포구 와우산로 24"
+        },
+        {
+          "id": "7941905",
+          "name": "서울서둘째로잘하는집",
+          "address": "서울 종로구 삼청로 122-1"
+        },
+        {
+          "id": "1040119941",
+          "name": "디벙크",
+          "address": "서울 마포구 성지1길 30"
+        },
+        {
+          "id": "8143287",
+          "name": "학림다방",
+          "address": "서울 종로구 대학로 119"
+        },
+        {
+          "id": "1693563906",
+          "name": "더숲초소책방",
+          "address": "서울 종로구 인왕산로 172"
+        },
+        {
+          "id": "630064388",
+          "name": "스윗솔트",
+          "address": "서울 강동구 상암로 286"
+        },
+        {
+          "id": "670102239",
+          "name": "1인1잔",
+          "address": "서울 은평구 연서로 534"
+        },
+        {
+          "id": "517442171",
+          "name": "결",
+          "address": "서울 종로구 우정국로 26"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Seoul Onion",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "Seoul Onion",
+      "httpStatus": 200,
+      "resultCount": 15,
+      "candidates": [
+        {
+          "id": "853028118",
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "145791269",
+          "name": "어니언 성수",
+          "address": "서울 성동구 아차산로9길 8"
+        },
+        {
+          "id": "2021943104",
+          "name": "어니언 미아",
+          "address": "서울 강북구 솔매로50길 55"
+        },
+        {
+          "id": "1021356734",
+          "name": "어니언 광장시장",
+          "address": "서울 종로구 청계천로 215"
+        },
+        {
+          "id": "1673863434",
+          "name": "Onion",
+          "address": "서울 성북구 동소문로 71"
+        },
+        {
+          "id": "1884148778",
+          "name": "퍽앤어니언",
+          "address": "서울 성북구 고려대로28길 17-3"
+        },
+        {
+          "id": "2102758985",
+          "name": "어니언 명동",
+          "address": "서울 중구 명동10길 35-18"
+        },
+        {
+          "id": "13143628",
+          "name": "블루어니언소프트",
+          "address": "서울 종로구 율곡로 53"
+        },
+        {
+          "id": "984684839",
+          "name": "어니언앤코코넛",
+          "address": "서울 중구 명동10길 19-3"
+        },
+        {
+          "id": "88581395",
+          "name": "마포 대파 솥뚜껑삼겹",
+          "address": "서울 마포구 삼개로3길 6"
+        },
+        {
+          "id": "11289139",
+          "name": "어니언소프트웨어",
+          "address": "서울 마포구 월드컵북로 396"
+        },
+        {
+          "id": "804074070",
+          "name": "대파국밥",
+          "address": "서울 서초구 방배로 178"
+        },
+        {
+          "id": "1652252092",
+          "name": "어니언랩",
+          "address": "서울 강남구 강남대로156길 39"
+        },
+        {
+          "id": "1630758396",
+          "name": "어니언왁싱 압구정점",
+          "address": "서울 강남구 압구정로34길 11"
+        },
+        {
+          "id": "17399052",
+          "name": "어니언디자인",
+          "address": "서울 강남구 테헤란로 128"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Seoul Anguk",
+      "httpStatus": 200,
+      "resultCount": 2,
+      "candidates": [
+        {
+          "id": "https://anookhotel.com/home",
+          "name": "아늑 호텔 앤 스파 서울 종로 안국 1호점",
+          "address": "서울특별시 종로구 돈화문로11가길 89 아늑호텔앤스파 종로운니점"
+        },
+        {
+          "id": "https://www.instagram.com/bouquet_seoul_anguk",
+          "name": "무화서울 안국점",
+          "address": "서울특별시 종로구 북촌로 24 1층 무화서울 안국점"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "Seoul Anguk",
+      "httpStatus": 200,
+      "resultCount": 15,
+      "candidates": [
+        {
+          "id": "21160552",
+          "name": "안국역 3호선",
+          "address": "서울 종로구 율곡로 지하 62"
+        },
+        {
+          "id": "7862874",
+          "name": "안국에너지 망원동주유소",
+          "address": "서울 마포구 월드컵로 119"
+        },
+        {
+          "id": "1697703245",
+          "name": "비움안국",
+          "address": "서울 종로구 북촌로4길 8"
+        },
+        {
+          "id": "215641709",
+          "name": "안국고다",
+          "address": "서울 종로구 인사동14길 10"
+        },
+        {
+          "id": "27281766",
+          "name": "안국153",
+          "address": "서울 종로구 율곡로 51"
+        },
+        {
+          "id": "34237220",
+          "name": "다운타우너 안국",
+          "address": "서울 종로구 북촌로 6-4"
+        },
+        {
+          "id": "981528846",
+          "name": "신라제면 안국점",
+          "address": "서울 종로구 계동길 19-6"
+        },
+        {
+          "id": "7814281",
+          "name": "안국에너지 삼보셀프주유소",
+          "address": "서울 서대문구 연희로 78"
+        },
+        {
+          "id": "1861385143",
+          "name": "온미관 안국",
+          "address": "서울 종로구 북촌로2길 5-4"
+        },
+        {
+          "id": "1263230815",
+          "name": "일월카츠 안국점",
+          "address": "서울 종로구 북촌로1길 11"
+        },
+        {
+          "id": "7987031",
+          "name": "안국빌딩",
+          "address": "서울 종로구 율곡로 33"
+        },
+        {
+          "id": "9103857",
+          "name": "안국에너지 삼원셀프주유소",
+          "address": "서울 동대문구 망우로 90"
+        },
+        {
+          "id": "1174661288",
+          "name": "안국역4번출구 주차장",
+          "address": "서울 종로구 율곡로 78"
+        },
+        {
+          "id": "1752553785",
+          "name": "콤포타블 안국",
+          "address": "서울 종로구 윤보선길 16-1"
+        },
+        {
+          "id": "289141335",
+          "name": "로우파이브 안국",
+          "address": "서울 종로구 북촌로 20-3"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "5 Gyedong-gil, Jongno-gu, Seoul.",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "5 Gyedong-gil, Jongno-gu, Seoul.",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "naver",
+      "query": "어니언 안국 Jongno-gu",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "어니언 안국 Jongno-gu",
+      "httpStatus": 200,
+      "resultCount": 2,
+      "candidates": [
+        {
+          "id": "853028118",
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "13143628",
+          "name": "블루어니언소프트",
+          "address": "서울 종로구 율곡로 53"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "어니언 안국 안국",
+      "httpStatus": 200,
+      "resultCount": 1,
+      "candidates": [
+        {
+          "id": "https://onionkr.com",
+          "name": "어니언 안국",
+          "address": "서울특별시 종로구 계동길 5"
+        }
+      ]
+    },
+    {
+      "provider": "kakao",
+      "query": "어니언 안국 안국",
+      "httpStatus": 200,
+      "resultCount": 2,
+      "candidates": [
+        {
+          "id": "853028118",
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "13143628",
+          "name": "블루어니언소프트",
+          "address": "서울 종로구 율곡로 53"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Jongno-gu, Seoul Cafe",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "Jongno-gu, Seoul Cafe",
+      "httpStatus": 200,
+      "resultCount": 15,
+      "candidates": [
+        {
+          "id": "642698966",
+          "name": "서울형키즈카페 종로구 혜화동점",
+          "address": "서울 종로구 성균관로 91"
+        },
+        {
+          "id": "1357366649",
+          "name": "서울형키즈카페 종로구 숭인1동점 소담누리놀이터",
+          "address": "서울 종로구 동망산길 62"
+        },
+        {
+          "id": "100671345",
+          "name": "서울형키즈카페 시립공예마을점",
+          "address": "서울 종로구 율곡로3길 4"
+        },
+        {
+          "id": "747830348",
+          "name": "서울한복카페",
+          "address": "서울 종로구 삼청로 4"
+        },
+        {
+          "id": "73637325",
+          "name": "서울창업카페 대학로점",
+          "address": "서울 종로구 동숭길 122-6"
+        },
+        {
+          "id": "375569115",
+          "name": "르서울카페",
+          "address": "서울 중구 남대문로1길 56"
+        },
+        {
+          "id": "656795514",
+          "name": "사조푸디스트 서울시중구청카페점",
+          "address": "서울 중구 창경궁로 17"
+        },
+        {
+          "id": "21551987",
+          "name": "고려대학교 서울캠퍼스 신의학관 웰스토리카페",
+          "address": "서울 성북구 고려대로 73"
+        },
+        {
+          "id": "1281638074",
+          "name": "서울형키즈카페 서대문구홍제3동점",
+          "address": "서울 서대문구 세검정로 104"
+        },
+        {
+          "id": "1361408922",
+          "name": "서울형키즈카페 성북구성북동점",
+          "address": "서울 성북구 성북로4길 21"
+        },
+        {
+          "id": "579126017",
+          "name": "서울형키즈카페 정릉2동점",
+          "address": "서울 성북구 북악산로1길 64"
+        },
+        {
+          "id": "173780107",
+          "name": "서울형키즈카페 서대문구홍제1동점",
+          "address": "서울 서대문구 통일로39길 22-31"
+        },
+        {
+          "id": "1668072561",
+          "name": "서울형키즈카페 천연동점",
+          "address": "서울 서대문구 독립문로8길 107"
+        },
+        {
+          "id": "1300039156",
+          "name": "서울형키즈카페 노리몽땅 을지로점",
+          "address": "서울 중구 을지로27가길 24"
+        },
+        {
+          "id": "877371921",
+          "name": "서울형키즈카페 성북구 정릉3동점",
+          "address": "서울 성북구 솔샘로17길 8"
+        }
+      ]
+    },
+    {
+      "provider": "naver",
+      "query": "Jongno-gu, Seoul Onion",
+      "httpStatus": 200,
+      "resultCount": 0,
+      "candidates": []
+    },
+    {
+      "provider": "kakao",
+      "query": "Jongno-gu, Seoul Onion",
+      "httpStatus": 200,
+      "resultCount": 7,
+      "candidates": [
+        {
+          "id": "853028118",
+          "name": "어니언 안국",
+          "address": "서울 종로구 계동길 5"
+        },
+        {
+          "id": "1021356734",
+          "name": "어니언 광장시장",
+          "address": "서울 종로구 청계천로 215"
+        },
+        {
+          "id": "13143628",
+          "name": "블루어니언소프트",
+          "address": "서울 종로구 율곡로 53"
+        },
+        {
+          "id": "2102758985",
+          "name": "어니언 명동",
+          "address": "서울 중구 명동10길 35-18"
+        },
+        {
+          "id": "984684839",
+          "name": "어니언앤코코넛",
+          "address": "서울 중구 명동10길 19-3"
+        },
+        {
+          "id": "1673863434",
+          "name": "Onion",
+          "address": "서울 성북구 동소문로 71"
+        },
+        {
+          "id": "1884148778",
+          "name": "퍽앤어니언",
+          "address": "서울 성북구 고려대로28길 17-3"
+        }
+      ]
+    }
+  ]
+}

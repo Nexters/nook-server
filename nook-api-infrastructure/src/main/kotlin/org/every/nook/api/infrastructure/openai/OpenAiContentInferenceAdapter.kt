@@ -90,6 +90,11 @@ class OpenAiContentInferenceAdapter(
                 ?.asText()
                 ?.trim()
                 ?.ifBlank { null },
+            normalizedAddressHint = place.path("normalizedAddressHint")
+                .takeUnless { it.isNull || it.isMissingNode }
+                ?.asText()
+                ?.trim()
+                ?.ifBlank { null },
         )
     }
 
@@ -218,6 +223,7 @@ class OpenAiContentInferenceAdapter(
                 "name" to clue.name,
                 "region" to clue.region,
                 "addressHint" to clue.addressHint,
+                "normalizedAddressHint" to clue.normalizedAddressHint,
                 "queries" to clue.queries,
                 "evidence" to clue.evidence.map { evidence ->
                     mapOf(
@@ -260,7 +266,7 @@ class OpenAiContentInferenceAdapter(
         const val MAX_TITLE_LENGTH = 25
         const val MAX_PLACE_NAME_LENGTH = 50
         const val MAX_PLACE_COUNT = 60
-        const val MAX_QUERY_COUNT = 4
+        const val MAX_QUERY_COUNT = 7
         const val CONTENT_INFERENCE_MAX_OUTPUT_TOKENS = 8000
         const val TITLE_INFERENCE_MAX_OUTPUT_TOKENS = 300
         const val PLACE_MAX_OUTPUT_TOKENS = 2500
@@ -278,6 +284,7 @@ class OpenAiContentInferenceAdapter(
                     "name" to mapOf("type" to "string", "minLength" to 1, "maxLength" to MAX_PLACE_NAME_LENGTH),
                     "region" to mapOf("type" to listOf("string", "null")),
                     "addressHint" to mapOf("type" to listOf("string", "null")),
+                    "normalizedAddressHint" to mapOf("type" to listOf("string", "null")),
                     "queries" to mapOf(
                         "type" to "array",
                         "minItems" to 1,
@@ -302,7 +309,7 @@ class OpenAiContentInferenceAdapter(
                         ),
                     ),
                 ),
-                "required" to listOf("name", "region", "addressHint", "queries", "evidence"),
+                "required" to listOf("name", "region", "addressHint", "normalizedAddressHint", "queries", "evidence"),
                 "additionalProperties" to false,
             ),
         )
@@ -338,6 +345,10 @@ class OpenAiContentInferenceAdapter(
                 "상호명이 확인되지 않으면 추측하거나 일반 업종명으로 만들지 않는다. 좌표는 만들지 않는다. " +
                 "본문이나 imageTranscripts에 주소가 명시된 경우에만 addressHint에 주소 원문 전체를 그대로 담고, " +
                 "주소가 없으면 null을 반환한다. 주소를 축약하거나 보정하거나 추측하지 않는다. " +
+                "한국 주소가 영문 도로명 또는 지번으로 명시되면 addressHint는 원문을 유지하고, " +
+                "확실하게 대응하는 한글 전체 주소만 normalizedAddressHint에 별도로 반환한다. " +
+                "도시·구·도로명·건물 번호를 모두 유지하고 층·호는 한글로 변환하되 번호를 바꾸거나 생략하지 않는다. " +
+                "주소가 없거나 이미 한글이거나 한국 주소가 아니거나 변환이 불확실하면 normalizedAddressHint는 null이다. " +
                 "특히 1층, 4층, B1, 지하 1층, 201호, 건물명, 출입구 같은 상세 위치를 절대 생략하지 않는다. " +
                 "sourceLocationTag는 지역 문맥과 검색어를 보조하는 힌트로만 사용한다. " +
                 "sourceLocationTag를 name, addressHint 또는 장소 존재의 근거로 사용하지 않는다. " +
@@ -363,7 +374,11 @@ class OpenAiContentInferenceAdapter(
                 "evidenceText로 evidence에 담는다. 이미지가 없거나 이미지 근거가 아니면 evidence는 빈 배열이다. " +
                 "읽을 수 없는 글씨나 로고를 추측하지 않는다. " +
                 "장소별 상호명 name, 확인 가능한 region, 명시된 전체 주소 addressHint, 장소 검색용 queries를 반환한다. " +
-                "queries는 본문에서 확인되는 한글·영문 표기와 지역 조합을 우선해 서로 다른 검색어 3~4개를 만든다. " +
+                "queries는 원문 상호명 언어의 검색어를 최대 4개, 반대 언어의 검색어를 최대 3개 만든다. " +
+                "영문 상호명은 name 원문을 유지하고 확실히 대응하는 한글 상호명·지점 표기가 있으면 " +
+                "지역과 결합한 한글 검색어도 포함한다. 한글 상호에도 확실한 영문 표기가 있으면 영문 검색어를 포함한다. " +
+                "한글 검색어는 한글 상호·지역·주소로, 영문 검색어는 영문 상호·지역·주소로 구성한다. " +
+                "불확실한 상호명 번역은 만들지 않고 검색어 수를 채우려고 정보를 추측하지 않는다. " +
                 "상호명과 지역의 순서만 뒤집은 중복 검색어를 만들지 않는다. 동·역·랜드마크만 확인된 경우에는 " +
                 "확실히 알 수 있는 상위 행정구나 대표 인근역을 결합한 검색어도 하나 포함한다. " +
                 "짧은 이미지 상호명이 OCR 오독일 가능성이 있으면 name은 전사 원문대로 유지하되, " +
@@ -374,10 +389,12 @@ class OpenAiContentInferenceAdapter(
                 "displayName을 상호명 후보로 사용할 수 있다. 본문에 등장하지 않은 계정, 협찬·매거진·플랫폼 계정은 장소로 만들지 않는다. " +
                 "'앱에서 X를 검색'처럼 플랫폼과 실제 체험 장소가 함께 나오면 플랫폼이 아니라 X를 장소로 우선 검토한다. " +
                 "addressHint가 있으면 상호명과 전체 주소를 조합한 검색어를 포함하고 층·호 정보를 그대로 유지한다. " +
-                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 60개 가게와 가게당 최대 4개 검색어만 반환한다."
+                "가게 근거가 없으면 places를 빈 배열로 반환한다. 최대 60개 가게와 가게당 최대 7개 검색어만 반환한다."
         const val CANDIDATE_SELECTION_INSTRUCTIONS =
             "placeClue는 Instagram 게시물에서 추출한 장소 단서이고 candidates는 실제 장소 검색 결과다. " +
-                "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, addressHint, 후보 주소, region, " +
+                "상호명의 한글·영문 표기, 숫자와 띄어쓰기 변형, 업종, addressHint, normalizedAddressHint, 후보 주소, region, " +
+                "normalizedAddressHint는 영문 원문의 변환 제안이며 독립적인 장소 근거가 아니다. " +
+                "원문 상호명과 영문 주소가 실제 후보의 상호명·지역·도로명·건물 번호와 동일한지 확인한다. " +
                 "이미지 evidence, matchedQueries를 함께 비교해 " +
                 "게시물이 가리키는 장소와 가장 일치하는 candidateIndex 하나를 선택한다. " +
                 "도로명과 건물 번호가 다르거나 양쪽에 명시된 층·호가 충돌하면 선택하지 않는다. " +

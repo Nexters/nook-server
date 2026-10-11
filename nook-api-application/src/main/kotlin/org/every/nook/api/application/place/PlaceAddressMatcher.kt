@@ -40,6 +40,10 @@ internal object PlaceAddressMatcher {
 
     fun hasLocationDetail(value: String?): Boolean = value != null && locationDetails(value).isNotEmpty()
 
+    fun preservesNormalizedDetails(original: String, normalized: String, buildingNumbers: Set<String>): Boolean =
+        buildingNumbers == BASE_ADDRESS_PATTERN.findAll(normalized).map { it.groupValues[2] }.toSet() &&
+            locationDetails(original) == locationDetails(normalized)
+
     fun searchVariants(value: String): List<String> {
         val fullAddress = value.trim()
         val baseAddress = BASE_ADDRESS_PATTERN.find(fullAddress)
@@ -106,15 +110,20 @@ internal object PlaceAddressMatcher {
         val roomDetails = ROOM_PATTERN.findAll(value).map { match ->
             LocationDetail(LocationDetailType.ROOM, match.groupValues[1])
         }
-        return basementDetails + floorDetails + compactFloorDetails + roomDetails
+        val englishFloorDetails = ENGLISH_FLOOR_PATTERN.findAll(value).map { match ->
+            LocationDetail(LocationDetailType.FLOOR, match.firstCapturedValue())
+        }
+        val englishRoomDetails = ENGLISH_ROOM_PATTERN.findAll(value).map { match ->
+            LocationDetail(LocationDetailType.ROOM, match.groupValues[1])
+        }
+        return basementDetails + floorDetails + compactFloorDetails + roomDetails +
+            englishFloorDetails + englishRoomDetails
     }
 
     private fun MatchResult.isFollowedByFloorSuffix(source: String): Boolean =
         source.substring(range.last + 1).trimStart().startsWith(FLOOR_SUFFIX)
 
     private fun MatchResult.firstCapturedValue(): String = groupValues.drop(1).first(String::isNotEmpty)
-
-    private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
     private enum class LocationDetailType {
         FLOOR,
@@ -141,6 +150,10 @@ internal object PlaceAddressMatcher {
     private val ROOM_PATTERN = Regex(
         "(?<![-\\d])([1-9]\\d{0,3})\\s*호(?=$|[^가-힣A-Za-z0-9])",
     )
+    private val ENGLISH_FLOOR_PATTERN = Regex(
+        "(?i)\\b(?:([1-9]\\d?)(?:st|nd|rd|th)?\\s+floor|floor\\s+([1-9]\\d?))\\b",
+    )
+    private val ENGLISH_ROOM_PATTERN = Regex("(?i)\\b(?:room|suite|unit)\\s*#?\\s*([1-9]\\d{0,3})\\b")
     private val DISTRICT_PATTERN = Regex("[가-힣]+(?:구|군|시)")
     private val PROVINCE_PREFIX_PATTERN = Regex(
         "^[가-힣]+(?:특별시|광역시|특별자치시|특별자치도|도)?\\s+(?=[가-힣]+(?:구|군|시)\\s)",
@@ -150,3 +163,5 @@ internal object PlaceAddressMatcher {
     private const val FLOOR_SUFFIX = "층"
     private const val MIN_COMPACT_BUILDING_FLOOR_LENGTH = 3
 }
+
+private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
