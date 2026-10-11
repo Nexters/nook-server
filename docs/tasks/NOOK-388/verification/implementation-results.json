@@ -1,0 +1,216 @@
+{
+  "checkedAt": "2026-10-11 KST",
+  "method": "Replay of requests captured from modified OpenAiContentInferenceAdapter; synthetic inputs; no application DB writes",
+  "results": [
+    {
+      "case": "infer-0",
+      "input": {
+        "body": "Visited Cafe Onion Anguk in Seoul today.",
+        "hashtags": [],
+        "sourceLocationTag": null
+      },
+      "requestedModel": "gpt-5-mini",
+      "model": "gpt-5-mini-2025-08-07",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 1545,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 85,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1630
+      },
+      "result": {
+        "places": [
+          {
+            "name": "Cafe Onion Anguk",
+            "region": "Seoul",
+            "addressHint": null,
+            "normalizedAddressHint": null,
+            "queries": [
+              "Cafe Onion Anguk Seoul",
+              "Cafe Onion Anguk 안국",
+              "Cafe Onion 안국 Seoul",
+              "Cafe Onion 안국 카페"
+            ],
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "infer-1",
+      "input": {
+        "body": "어니언 안국 방문. Address: 5 Gyedong-gil, Jongno-gu, Seoul.",
+        "hashtags": [],
+        "sourceLocationTag": null
+      },
+      "requestedModel": "gpt-5-mini",
+      "model": "gpt-5-mini-2025-08-07",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 1559,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 1408
+        },
+        "output_tokens": 126,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1685
+      },
+      "result": {
+        "places": [
+          {
+            "name": "어니언 안국",
+            "region": "Seoul",
+            "addressHint": "5 Gyedong-gil, Jongno-gu, Seoul.",
+            "normalizedAddressHint": "서울특별시 종로구 계동길 5",
+            "queries": [
+              "어니언 안국 Jongno-gu",
+              "어니언 안국 계동길 5 Seoul",
+              "어니언 안국 서울 종로구",
+              "어니언 안국 5 Gyedong-gil"
+            ],
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "infer-2",
+      "input": {
+        "body": "Cafe Onion Anguk\n5 Gyedong-gil, Jongno-gu, Seoul",
+        "hashtags": [],
+        "sourceLocationTag": null
+      },
+      "requestedModel": "gpt-5-mini",
+      "model": "gpt-5-mini-2025-08-07",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 1554,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 1408
+        },
+        "output_tokens": 137,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1691
+      },
+      "result": {
+        "places": [
+          {
+            "name": "Cafe Onion Anguk",
+            "region": "Jongno-gu, Seoul",
+            "addressHint": "5 Gyedong-gil, Jongno-gu, Seoul",
+            "normalizedAddressHint": "서울특별시 종로구 계동길 5",
+            "queries": [
+              "Cafe Onion Anguk Jongno-gu Seoul",
+              "Cafe Onion Anguk Gyedong-gil 5 Jongno-gu",
+              "카페 어니언 안국 종로구 계동길 5",
+              "카페어니언 안국 서울 종로구"
+            ],
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "select-0",
+      "input": {
+        "placeClue": {
+          "name": "Cafe Onion Anguk",
+          "region": "Seoul",
+          "addressHint": "5 Gyedong-gil, Jongno-gu, Seoul",
+          "normalizedAddressHint": "서울 종로구 계동길 5",
+          "queries": [
+            "Cafe Onion Anguk"
+          ],
+          "evidence": []
+        },
+        "candidates": [
+          {
+            "candidateIndex": 0,
+            "provider": "KAKAO",
+            "name": "어니언 안국",
+            "address": "서울 종로구 계동길 5",
+            "category": "카페",
+            "matchedQueries": [
+              "서울 종로구 계동길 5"
+            ]
+          }
+        ]
+      },
+      "requestedModel": "gpt-5-nano",
+      "model": "gpt-5-nano-2025-08-07",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 386,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 29,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 415
+      },
+      "result": {
+        "candidateIndex": 0
+      }
+    },
+    {
+      "case": "select-1",
+      "input": {
+        "placeClue": {
+          "name": "Cafe Onion Anguk",
+          "region": "Seoul",
+          "addressHint": "5 Gyedong-gil, Jongno-gu, Seoul",
+          "normalizedAddressHint": "서울 종로구 계동길 5",
+          "queries": [
+            "Cafe Onion Anguk"
+          ],
+          "evidence": []
+        },
+        "candidates": [
+          {
+            "candidateIndex": 0,
+            "provider": "KAKAO",
+            "name": "다른 가게",
+            "address": "서울 종로구 계동길 5",
+            "category": "카페",
+            "matchedQueries": [
+              "서울 종로구 계동길 5"
+            ]
+          }
+        ]
+      },
+      "requestedModel": "gpt-5-nano",
+      "model": "gpt-5-nano-2025-08-07",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 385,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 29,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 414
+      },
+      "result": {
+        "candidateIndex": 0
+      }
+    }
+  ]
+}

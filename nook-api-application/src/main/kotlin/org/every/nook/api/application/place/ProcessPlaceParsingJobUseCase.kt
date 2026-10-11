@@ -317,7 +317,7 @@ class ProcessPlaceParsingJobUseCase(
         val unresolvedClues = mutableListOf<UnresolvedPlaceClue>()
         val places = clues.mapIndexedNotNull { clueSequence, clue ->
             try {
-                resolve(job, clue).copy(
+                clue.resolveWithLanguageFallback { queries -> resolve(job, clue, queries) }.copy(
                     sourceMediaSequence = clue.sourceMediaSequence(
                         clueSequence = clueSequence,
                         imageCount = job.imageUrls.size,
@@ -347,14 +347,14 @@ class ProcessPlaceParsingJobUseCase(
         return ClueResolution(places, lastFailure, clues.size, expectedPlaceCount, unresolvedClues, clues)
     }
 
-    private fun resolve(job: ClaimedPlaceParsingJob, clue: PlaceClue): PlaceCandidate {
-        if (clue.name.isBlank() || clue.searchQueries().isEmpty()) {
+    private fun resolve(job: ClaimedPlaceParsingJob, clue: PlaceClue, queries: List<String>): PlaceCandidate {
+        if (clue.name.isBlank() || queries.isEmpty()) {
             failResolution("Invalid place clue")
         }
-        var candidates = searchCandidates(job, clue)
+        var candidates = searchCandidates(job, clue, queries)
         logger.info {
             "Place candidates searched: placeName=${clue.name}, region=${clue.region}, " +
-                "addressHint=${clue.addressHint}, queries=${clue.searchQueries()}, candidateCount=${candidates.size}"
+                "addressHint=${clue.addressHint}, queries=$queries, candidateCount=${candidates.size}"
         }
         val candidatePolicy = CandidateResolutionPolicy()
         val fallbackResult = ManualPlaceCandidateFallback(manualPlaceCandidateSearchPort)
@@ -461,9 +461,10 @@ class ProcessPlaceParsingJobUseCase(
     private fun searchCandidates(
         job: ClaimedPlaceParsingJob,
         clue: PlaceClue,
+        queries: List<String>,
     ): List<PlaceCandidateSelector.Candidate> {
         val candidatesById = linkedMapOf<Pair<String, String>, PlaceCandidateSelector.Candidate>()
-        clue.searchQueries().asSequence()
+        queries.asSequence()
             .map(String::trim)
             .filter(String::isNotEmpty)
             .distinct()
@@ -493,7 +494,7 @@ class ProcessPlaceParsingJobUseCase(
                         supportingProviders = existing?.supportingProviders.orEmpty() + candidate.provider,
                     )
                 }
-                if (strictMatches(clue, candidatesById.values).size == 1) {
+                if (candidatesById.values.hasValidatedStrictMatch(clue)) {
                     return candidatesById.values.toList()
                 }
             }
@@ -595,13 +596,6 @@ class ProcessPlaceParsingJobUseCase(
     private class StalePlaceParsingAttemptException : RuntimeException()
 
     private fun elapsedMillis(startedAt: Instant): Long = Duration.between(startedAt, clock.instant()).toMillis()
-
-    private fun PlaceClue.traceDetails(): Map<String, String> = mapOf(
-        "placeName" to name,
-        "region" to region.orEmpty(),
-        "addressHint" to addressHint.orEmpty(),
-        "queries" to searchQueries().joinToString("\n"),
-    ).filterValues(String::isNotEmpty)
 
     private fun recordTrace(
         job: ClaimedPlaceParsingJob,
@@ -752,3 +746,10 @@ private fun maxExpectedPlaceCount(vararg counts: Int?): Int? = counts.filterNotN
 private fun String.groundingKey(): String = lowercase().filter(Char::isLetterOrDigit)
 
 private val EXPECTED_PLACE_COUNT_PATTERN = Regex("(?<!\\d)(\\d{1,2})\\s*(?:곳|선|군데)")
+
+private fun PlaceClue.traceDetails(): Map<String, String> = mapOf(
+    "placeName" to name,
+    "region" to region.orEmpty(),
+    "addressHint" to addressHint.orEmpty(),
+    "queries" to searchQueries().joinToString("\n"),
+).filterValues(String::isNotEmpty)

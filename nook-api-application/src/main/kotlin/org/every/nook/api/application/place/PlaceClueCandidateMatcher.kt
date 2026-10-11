@@ -5,19 +5,20 @@ internal fun Collection<PlaceCandidateSelector.Candidate>.compatibleWith(
 ): List<PlaceCandidateSelector.Candidate> {
     val addressHint = clue.addressHint?.trim()?.takeIf(String::isNotEmpty) ?: return toList()
     val addressCompatible = filter { candidate ->
-        PlaceAddressMatcher.isCompatible(addressHint, candidate.place.address)
+        PlaceAddressMatcher.isCompatible(addressHint, candidate.place.address) &&
+            clue.isCompatibleWithNormalizedAddress(candidate.place)
     }
     if (addressCompatible.isNotEmpty()) return addressCompatible
 
     val exactNameCandidates = filter { candidate ->
         clue.isSafeAddressMismatchRecovery(candidate.place, candidate.matchedQueries)
-    }.toList().distinctLogicalCandidates()
+    }.filter { clue.isCompatibleWithNormalizedAddress(it.place) }.toList().distinctLogicalCandidates()
     return exactNameCandidates.takeIf { it.size == 1 }.orEmpty()
 }
 
-internal fun PlaceClue.isSupportedBy(
+internal fun PlaceClue.isSupportedByOriginalAddress(
     candidate: PlaceCandidate,
-    matchedQueries: Collection<String> = emptyList(),
+    matchedQueries: Collection<String>,
 ): Boolean {
     val explicitAddressHint = addressHint?.trim()?.takeIf(String::isNotEmpty)
     if (explicitAddressHint != null &&

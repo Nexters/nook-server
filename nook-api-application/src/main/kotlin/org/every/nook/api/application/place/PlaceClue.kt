@@ -6,6 +6,7 @@ data class PlaceClue(
     val queries: List<String>,
     val evidence: List<PlaceClueEvidence> = emptyList(),
     val addressHint: String? = null,
+    val normalizedAddressHint: String? = null,
 )
 
 data class PlaceClueEvidence(val imageIndex: Int, val evidenceText: String)
