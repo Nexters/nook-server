@@ -25,12 +25,17 @@ class ProcessPlaceReprocessingUseCase(
     private fun process(job: ClaimedPlaceReprocessing) {
         val source = sources.find(job.placeId) ?: throw AdminPlaceNotFoundException()
         val supplement = runCatching {
+            if (!job.refreshPhotos) return@runCatching null
             thumbnails.fetch(
                 PlaceThumbnailProvider.Request(source.candidate, failOnProviderError = true),
             )
         }.onFailure { logger.warn("Place supplement refresh failed: placeId={}", job.placeId, it) }
         val changes = mutableListOf<() -> Unit>()
-        val tagOutcome = refreshTags(job, source, changes)
+        val tagOutcome = if (job.refreshTags) {
+            refreshTags(job, source, changes)
+        } else {
+            PlaceReprocessingOutcome.PRESERVED
+        }
         jobs.finish(
             job,
             PlaceReprocessingResult(source, supplement.getOrNull(), supplement.isFailure, tagOutcome, changes),

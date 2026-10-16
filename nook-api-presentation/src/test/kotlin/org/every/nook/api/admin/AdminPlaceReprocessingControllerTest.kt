@@ -10,6 +10,7 @@ import org.every.nook.api.application.admin.PlaceReprocessingOutcome
 import org.every.nook.api.application.admin.PlaceReprocessingPort
 import org.every.nook.api.application.admin.PlaceReprocessingResult
 import org.every.nook.api.application.admin.PlaceReprocessingStatus
+import org.every.nook.api.application.admin.PlaceReprocessingTarget
 import org.every.nook.api.application.admin.RequestPlaceReprocessingCommand
 import org.every.nook.api.application.admin.RequestPlaceReprocessingUseCase
 import org.every.nook.api.presentation.error.GlobalExceptionHandler
@@ -87,6 +88,21 @@ class AdminPlaceReprocessingControllerTest {
         assertEquals(actor, captured?.actor)
         assertEquals("부가 정보 재수집", captured?.reason)
         assertEquals("request-17", captured?.requestId)
+    }
+
+    @Test
+    fun `optional target supports photos or tags and rejects unknown selection`() {
+        for (target in listOf("PHOTOS", "TAGS")) {
+            mvc.post("/api/admin/v1/places/17/reprocessing") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"reason":"선택 재시도","target":"$target"}"""
+            }.andExpect { status { isOk() } }
+            assertEquals(PlaceReprocessingTarget.valueOf(target), captured?.target)
+        }
+        mvc.post("/api/admin/v1/places/17/reprocessing") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"잘못된 요청","target":"UNKNOWN"}"""
+        }.andExpect { status { isBadRequest() } }
     }
 
     @Test

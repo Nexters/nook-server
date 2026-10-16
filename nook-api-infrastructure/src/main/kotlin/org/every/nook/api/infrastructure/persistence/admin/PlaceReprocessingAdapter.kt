@@ -9,6 +9,7 @@ import org.every.nook.api.application.admin.PlaceReprocessingOutcome
 import org.every.nook.api.application.admin.PlaceReprocessingPort
 import org.every.nook.api.application.admin.PlaceReprocessingResult
 import org.every.nook.api.application.admin.PlaceReprocessingStatus
+import org.every.nook.api.application.admin.PlaceReprocessingTarget
 import org.every.nook.api.application.admin.RequestPlaceReprocessingCommand
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import org.every.nook.api.infrastructure.persistence.place.PlaceEntity
@@ -34,8 +35,17 @@ class PlaceReprocessingAdapter(
         if (existing != null && existing.status.active()) throw PlaceReprocessingActiveException()
         val job = existing ?: PlaceReprocessingJobEntity(command.placeId)
         job.status = PlaceReprocessingStatus.PENDING
-        job.photos = PlaceReprocessingOutcome.PENDING
-        job.tags = PlaceReprocessingOutcome.PENDING
+        // PENDING selects work; PRESERVED durably keeps an unselected field unchanged across worker restarts.
+        job.photos = if (command.target == PlaceReprocessingTarget.TAGS) {
+            PlaceReprocessingOutcome.PRESERVED
+        } else {
+            PlaceReprocessingOutcome.PENDING
+        }
+        job.tags = if (command.target == PlaceReprocessingTarget.PHOTOS) {
+            PlaceReprocessingOutcome.PRESERVED
+        } else {
+            PlaceReprocessingOutcome.PENDING
+        }
         val saved = jobs.saveAndFlush(job)
         audit.append(
             AdminAuditLogPort.Entry(
@@ -45,7 +55,7 @@ class PlaceReprocessingAdapter(
                 targetId = command.placeId.toString(),
                 reason = command.reason,
                 beforeValue = null,
-                afterValue = """{"status":"PENDING","attempt":${job.attempt}}""",
+                afterValue = """{"status":"PENDING","attempt":${job.attempt},"target":"${command.target}"}""",
                 requestId = command.requestId,
             ),
         )
@@ -67,7 +77,12 @@ class PlaceReprocessingAdapter(
             job.status == PlaceReprocessingStatus.PENDING -> {
                 job.status = PlaceReprocessingStatus.PROCESSING
                 job.attempt += 1
-                ClaimedPlaceReprocessing(placeId, job.attempt)
+                ClaimedPlaceReprocessing(
+                    placeId,
+                    job.attempt,
+                    refreshPhotos = job.photos == PlaceReprocessingOutcome.PENDING,
+                    refreshTags = job.tags == PlaceReprocessingOutcome.PENDING,
+                )
             }
 
             job.status == PlaceReprocessingStatus.PROCESSING && job.updatedAt <= cutoff -> {
@@ -101,8 +116,12 @@ class PlaceReprocessingAdapter(
 
     private fun applyResult(place: PlaceEntity, job: PlaceReprocessingJobEntity, result: PlaceReprocessingResult) {
         val protected = protectedFields(place, result.source, protection.fields(job.placeId))
-        job.photos = applyPhotos(place, result, protected.photos)
-        job.tags = if (protected.tags) {
+        job.photos = if (job.photos == PlaceReprocessingOutcome.PRESERVED) {
+            PlaceReprocessingOutcome.PRESERVED
+        } else {
+            applyPhotos(place, result, protected.photos)
+        }
+        job.tags = if (job.tags == PlaceReprocessingOutcome.PRESERVED || protected.tags) {
             PlaceReprocessingOutcome.PRESERVED
         } else {
             result.tagChanges.forEach { it() }
@@ -113,10 +132,12 @@ class PlaceReprocessingAdapter(
             }
         }
         result.supplement?.googlePlaceId?.let { place.googlePlaceId = it }
-        place.thumbnailParsingStatus = if (place.thumbnailUrl != null || place.photoUrls.isNotEmpty()) {
-            PlaceThumbnailParsingStatus.COMPLETED
-        } else {
-            PlaceThumbnailParsingStatus.FAILED
+        if (job.photos != PlaceReprocessingOutcome.PRESERVED) {
+            place.thumbnailParsingStatus = if (place.thumbnailUrl != null || place.photoUrls.isNotEmpty()) {
+                PlaceThumbnailParsingStatus.COMPLETED
+            } else {
+                PlaceThumbnailParsingStatus.FAILED
+            }
         }
         job.status = overallStatus(listOf(job.photos, job.tags))
     }
@@ -141,8 +162,8 @@ class PlaceReprocessingAdapter(
 
     private fun markFailed(job: PlaceReprocessingJobEntity) {
         job.status = PlaceReprocessingStatus.FAILED
-        job.photos = PlaceReprocessingOutcome.FAILED
-        job.tags = PlaceReprocessingOutcome.FAILED
+        if (job.photos != PlaceReprocessingOutcome.PRESERVED) job.photos = PlaceReprocessingOutcome.FAILED
+        if (job.tags != PlaceReprocessingOutcome.PRESERVED) job.tags = PlaceReprocessingOutcome.FAILED
     }
 
     private companion object {

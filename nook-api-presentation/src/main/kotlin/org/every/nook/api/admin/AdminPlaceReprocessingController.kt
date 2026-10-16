@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Size
 import org.every.nook.api.application.admin.AdminActor
 import org.every.nook.api.application.admin.GetPlaceReprocessingUseCase
 import org.every.nook.api.application.admin.PlaceReprocessingJob
+import org.every.nook.api.application.admin.PlaceReprocessingTarget
 import org.every.nook.api.application.admin.RequestPlaceReprocessingCommand
 import org.every.nook.api.application.admin.RequestPlaceReprocessingUseCase
 import org.every.nook.api.logging.RequestLoggingFields
@@ -47,6 +48,7 @@ class AdminPlaceReprocessingController(
                     request.reason,
                     MDC.get(RequestLoggingFields.REQUEST_ID)
                         ?: servletRequest.getHeader(RequestLoggingFields.REQUEST_ID_HEADER),
+                    request.target,
                 ),
             ),
         ),
@@ -62,6 +64,8 @@ class AdminPlaceReprocessingController(
         @field:NotBlank
         @field:Size(max = 500)
         val reason: String,
+        @field:Schema(description = "재처리 항목: ALL(기본), PHOTOS(사진만), TAGS(태그만)")
+        val target: PlaceReprocessingTarget = PlaceReprocessingTarget.ALL,
     )
 
     data class ReprocessingResponse(

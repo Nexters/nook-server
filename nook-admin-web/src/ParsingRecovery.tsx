@@ -47,8 +47,10 @@ export function ParsingRecovery({ postId }: { postId?: string }) {
     if (!selected || saving) return;
     setSaving(true); setSaveError("");
     try {
-      await api(selected.job ? `/parsing-jobs/${selected.job.id}/retry` : `/parsing-posts/${selected.post.postId}/retry`, { method: "POST", body: JSON.stringify({ reason }) });
-      setNotice(`게시글 #${selected.post.postId}의 실패 작업 재시도를 예약했습니다.`);
+      const primaryJob = selected.job && ["POST_CONTENT", "PLACE_PARSING"].includes(selected.job.type);
+      const path = selected.job && !primaryJob ? `/parsing-jobs/${selected.job.id}/retry` : `/parsing-posts/${selected.post.postId}/retry`;
+      await api(path, { method: "POST", body: JSON.stringify({ reason, jobType: primaryJob ? selected.job?.type : undefined }) });
+      setNotice(`게시글 #${selected.post.postId}의 선택한 작업 재시도를 예약했습니다.`);
       watch(selected.post.postId);
       setSelected(undefined); setReason(""); setRevision(value => value + 1);
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : "재시도 요청에 실패했습니다."); }
@@ -80,8 +82,8 @@ export function ParsingRecovery({ postId }: { postId?: string }) {
     <Stack direction="row" spacing={1}>{beforeId && <Button onClick={() => setBeforeId(undefined)}>처음으로</Button>}{page?.hasNext && <Button disabled={loading} onClick={() => setBeforeId(page.posts.at(-1)?.postId)}>다음 게시물</Button>}</Stack>
   </Stack></CardContent>
     <Dialog open={!!selected} onClose={() => { if (!saving) setSelected(undefined); }} fullWidth maxWidth="sm">
-      <DialogTitle>실패한 단계 재시도</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
-        <Typography>게시글 #{selected?.post.postId}의 {selected?.job ? `${typeNames[selected.job.type]} 작업 1건` : `실패 작업 ${selected ? failedJobs(selected.post).length : 0}건`}을 재시도합니다. 완료된 작업은 유지하며 외부 서비스 호출 비용이 발생할 수 있습니다.</Typography>
+      <DialogTitle>선택한 단계 재시도</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
+        <Typography>게시글 #{selected?.post.postId}의 {selected?.job ? `${typeNames[selected.job.type]} 작업 1건` : `실패 작업 ${selected ? failedJobs(selected.post).length : 0}건`}을 재시도합니다. 선택하지 않은 작업은 유지합니다. 외부 서비스 호출 비용이 발생할 수 있습니다.</Typography>
         {selected && !selected.job && <Typography variant="body2">대상: {[...new Set(failedJobs(selected.post).map(job => typeNames[job.type] ?? job.type))].join(", ")}</Typography>}
         <TextField label="재처리 사유" multiline minRows={2} value={reason} onChange={event => setReason(event.target.value)} slotProps={{ htmlInput: { maxLength: 500 } }} disabled={saving} />
         {saveError && <Alert severity="error">{saveError}</Alert>}

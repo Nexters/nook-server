@@ -5,6 +5,8 @@ import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceTagsRequestedEvent
 import java.time.Instant
 
+enum class PlaceReprocessingTarget { ALL, PHOTOS, TAGS }
+
 enum class PlaceReprocessingStatus { PENDING, PROCESSING, COMPLETED, PARTIAL, FAILED }
 
 enum class PlaceReprocessingOutcome { PENDING, UPDATED, PRESERVED, NO_DATA, NO_SOURCE, FAILED }
@@ -23,9 +25,15 @@ data class RequestPlaceReprocessingCommand(
     val actor: AdminActor,
     val reason: String,
     val requestId: String?,
+    val target: PlaceReprocessingTarget = PlaceReprocessingTarget.ALL,
 )
 
-data class ClaimedPlaceReprocessing(val placeId: Long, val attempt: Int)
+data class ClaimedPlaceReprocessing(
+    val placeId: Long,
+    val attempt: Int,
+    val refreshPhotos: Boolean = true,
+    val refreshTags: Boolean = true,
+)
 
 data class PlaceReprocessingSource(
     val candidate: PlaceCandidate,
