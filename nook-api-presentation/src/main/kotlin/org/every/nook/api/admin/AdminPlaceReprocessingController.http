@@ -12,3 +12,17 @@ Content-Type: application/json
 ### 장소 재처리 상태와 항목별 결과
 GET {{baseUrl}}/api/admin/v1/places/1/reprocessing
 Cf-Access-Jwt-Assertion: {{accessJwt}}
+
+### 장소 사진만 다시 수집 (태그 유지)
+POST {{baseUrl}}/api/admin/v1/places/17/reprocessing
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+Content-Type: application/json
+
+{"reason":"장소 사진 누락 확인 후 재수집", "target":"PHOTOS"}
+
+### 장소 태그만 다시 추출 (사진 유지)
+POST {{baseUrl}}/api/admin/v1/places/17/reprocessing
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+Content-Type: application/json
+
+{"reason":"장소 태그 재추출", "target":"TAGS"}

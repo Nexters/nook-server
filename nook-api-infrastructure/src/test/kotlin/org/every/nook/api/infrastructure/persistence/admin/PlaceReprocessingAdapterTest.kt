@@ -8,6 +8,7 @@ import org.every.nook.api.application.admin.PlaceReprocessingOutcome
 import org.every.nook.api.application.admin.PlaceReprocessingResult
 import org.every.nook.api.application.admin.PlaceReprocessingSource
 import org.every.nook.api.application.admin.PlaceReprocessingStatus
+import org.every.nook.api.application.admin.PlaceReprocessingTarget
 import org.every.nook.api.application.admin.RequestPlaceReprocessingCommand
 import org.every.nook.api.application.place.PlaceOpeningHours
 import org.every.nook.api.application.place.PlaceSupplement
@@ -29,7 +30,13 @@ class PlaceReprocessingAdapterTest {
     private val audit = mock(AdminAuditLogPort::class.java)
     private val logs = mock(AdminAuditLogJpaRepository::class.java)
     private val protection = PlaceReprocessingProtection(logs, jacksonObjectMapper())
-    private val adapter = PlaceReprocessingAdapter(jobs, places, audit, protection)
+    private val adapter = PlaceReprocessingAdapter(
+        jobs,
+        places,
+        audit,
+        protection,
+        java.time.Clock.fixed(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC),
+    )
     private val place = PlaceEntity(
         "KAKAO",
         "123",
@@ -156,7 +163,53 @@ class PlaceReprocessingAdapterTest {
         assertEquals(PlaceReprocessingStatus.FAILED, stored.status)
     }
 
+    @Test
+    fun `photo selection persists across enqueue and claim while skipping tag work`() {
+        prepare()
+        stored.status = PlaceReprocessingStatus.COMPLETED
+        `when`(jobs.saveAndFlush(stored)).thenReturn(stored)
+        adapter.enqueue(
+            RequestPlaceReprocessingCommand(
+                17,
+                AdminActor("admin", "admin@example.com"),
+                "사진만",
+                null,
+                PlaceReprocessingTarget.PHOTOS,
+            ),
+        )
+        assertEquals(PlaceReprocessingOutcome.PENDING, stored.photos)
+        assertEquals(PlaceReprocessingOutcome.PRESERVED, stored.tags)
+        `when`(
+            jobs.findClaimableIds(
+                java.time.Instant.EPOCH.minusSeconds(900),
+                org.springframework.data.domain.PageRequest.of(0, 1),
+            ),
+        ).thenReturn(listOf(17))
+        val claimed = requireNotNull(adapter.claim())
+        assertTrue(claimed.refreshPhotos)
+        assertFalse(claimed.refreshTags)
+        var tagsWritten = false
+        adapter.finish(claimed, result { tagsWritten = true })
+        assertFalse(tagsWritten)
+        assertEquals(PlaceReprocessingOutcome.UPDATED, stored.photos)
+        assertEquals(PlaceReprocessingOutcome.PRESERVED, stored.tags)
+    }
+
+    @Test
+    fun `tag selection preserves photo fields even when a supplement is supplied`() {
+        prepare()
+        stored.photos = PlaceReprocessingOutcome.PRESERVED
+        place.thumbnailUrl = "https://example.com/existing.jpg"
+        val status = place.thumbnailParsingStatus
+        adapter.finish(ClaimedPlaceReprocessing(17, 2, refreshPhotos = false), result())
+        assertEquals("https://example.com/existing.jpg", place.thumbnailUrl)
+        assertEquals(status, place.thumbnailParsingStatus)
+        assertEquals(PlaceReprocessingOutcome.PRESERVED, stored.photos)
+    }
+
     private fun prepare() {
+        org.every.nook.api.infrastructure.persistence.BaseEntity::class.java.getDeclaredField("updatedAt")
+            .apply { isAccessible = true }.set(stored, java.time.Instant.EPOCH)
         `when`(places.findByIdForUpdate(17)).thenReturn(place)
         `when`(jobs.findForUpdate(17)).thenReturn(stored)
         `when`(

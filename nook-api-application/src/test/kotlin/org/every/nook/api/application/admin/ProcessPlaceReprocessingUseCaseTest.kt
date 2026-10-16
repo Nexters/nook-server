@@ -103,6 +103,30 @@ class ProcessPlaceReprocessingUseCaseTest {
         assertEquals(null, jobs.result)
     }
 
+    @Test
+    fun `photos only request never extracts tags`() {
+        val jobs = Jobs().apply { claimed = ClaimedPlaceReprocessing(17, 1, refreshTags = false) }
+        val useCase = ProcessPlaceReprocessingUseCase(
+            jobs,
+            PlaceReprocessingSourcePort { source(candidate()) },
+            PlaceThumbnailProvider { PlaceSupplement(null, listOf("https://example.com/new.jpg")) },
+            tags(),
+            PlaceTagSourcePort { error("Tags must not be queried") },
+        )
+        assertTrue(useCase())
+        assertEquals(PlaceReprocessingOutcome.PRESERVED, requireNotNull(jobs.result).tagOutcome)
+        assertFalse(jobs.failed)
+    }
+
+    @Test
+    fun `tags only request never fetches photos`() {
+        val jobs = Jobs().apply { claimed = ClaimedPlaceReprocessing(17, 1, refreshPhotos = false) }
+        assertTrue(processor(jobs, PlaceThumbnailProvider { error("Photos must not be fetched") })())
+        val result = requireNotNull(jobs.result)
+        assertEquals(null, result.supplement)
+        assertFalse(result.supplementFailed)
+    }
+
     private fun processor(jobs: Jobs, thumbnail: PlaceThumbnailProvider) = ProcessPlaceReprocessingUseCase(
         jobs,
         PlaceReprocessingSourcePort { source(candidate()) },
@@ -125,9 +149,10 @@ class ProcessPlaceReprocessingUseCaseTest {
     )
 
     private class Jobs : PlaceReprocessingPort {
+        var claimed = ClaimedPlaceReprocessing(17, 1)
         var result: PlaceReprocessingResult? = null
         var failed = false
-        override fun claim() = ClaimedPlaceReprocessing(17, 1)
+        override fun claim() = claimed
         override fun finish(job: ClaimedPlaceReprocessing, result: PlaceReprocessingResult): Boolean {
             this.result = result
             return true
