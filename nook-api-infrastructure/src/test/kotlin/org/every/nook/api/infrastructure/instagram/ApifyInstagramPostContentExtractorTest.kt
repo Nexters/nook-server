@@ -1,8 +1,13 @@
 package org.every.nook.api.infrastructure.instagram
 
+import org.every.nook.api.application.config.RuntimeConfigurationReader
+import org.every.nook.api.application.content.ExtractedPostContent
+import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
+import org.every.nook.api.domain.post.Post
+import org.every.nook.api.domain.post.PostSource
 import org.every.nook.api.infrastructure.persistence.cache.ScrapingProviderResponseCache
 import org.hamcrest.Matchers.containsString
 import org.mockito.Mockito.mock
@@ -79,6 +84,44 @@ class ApifyInstagramPostContentExtractorTest {
 
         assertFailsWith<PostContentNotFoundException> {
             fixture.extractor.extract("https://www.instagram.com/p/Post123/")
+        }
+    }
+
+    @Test
+    fun `unavailable Apify HTTP results recover through Bright Data`() {
+        val url = "https://www.instagram.com/p/Post123/"
+        val fallbackResult = ExtractedPostContent(
+            post = Post(
+                source = PostSource("INSTAGRAM", "Post123"),
+                canonicalUrl = url,
+                authorIdentifier = null,
+                body = "Recovered content",
+                publishedAt = null,
+                media = emptyList(),
+            ),
+            hashtags = emptyList(),
+            sourceLocationNames = emptyList(),
+        )
+        val unavailableResponses = listOf(
+            "[]",
+            """[{"error":"no_items","errorDescription":"Post does not exist"}]""",
+            """[{"error":"restricted_page","errorDescription":"This content is age-restricted"}]""",
+        )
+        unavailableResponses.forEach { response ->
+            val fixture = providerFixture()
+            fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON))
+            val brightData = mock(PostContentExtractor::class.java)
+            `when`(brightData.extract(url)).thenReturn(fallbackResult)
+            val router = InstagramPostContentExtractor(
+                brightDataExtractor = brightData,
+                apifyExtractor = fixture.extractor,
+                configurationReader = RuntimeConfigurationReader { "APIFY_BRIGHT_WITH_DATA_FALLBACK" },
+            )
+
+            assertEquals(fallbackResult, router.extract(url))
+            verify(brightData).extract(url)
+            fixture.server.verify()
         }
     }
 
