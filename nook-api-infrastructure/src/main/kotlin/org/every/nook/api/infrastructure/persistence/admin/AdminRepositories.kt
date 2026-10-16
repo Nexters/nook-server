@@ -5,6 +5,12 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 
 interface AdminAuditLogJpaRepository : JpaRepository<AdminAuditLogEntity, Long> {
+    fun findAllByTargetTypeAndTargetIdAndActionIn(
+        targetType: String,
+        targetId: String,
+        actions: Collection<String>,
+    ): List<AdminAuditLogEntity>
+
     fun findAllByOrderByCreatedAtDesc(pageable: Pageable): Page<AdminAuditLogEntity>
 
     fun findAllByTargetTypeAndTargetIdOrderByCreatedAtDesc(

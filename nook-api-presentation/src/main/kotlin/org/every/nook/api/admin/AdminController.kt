@@ -131,9 +131,10 @@ class AdminController(
     @GetMapping("/places/manage")
     fun managedPlaces(
         @RequestParam(required = false) query: String?,
+        @RequestParam(defaultValue = "false") withoutPhotos: Boolean,
         @RequestParam(defaultValue = "0") offset: Int,
         @RequestParam(defaultValue = "20") limit: Int,
-    ) = ApiResponse.success(listPlaces(ListAdminPlacesUseCase.Query(query, offset, limit)))
+    ) = ApiResponse.success(listPlaces(ListAdminPlacesUseCase.Query(query, offset, limit, withoutPhotos)))
 
     @GetMapping("/places/{placeId}")
     fun place(@PathVariable placeId: Long) = ApiResponse.success(getPlace(placeId))
