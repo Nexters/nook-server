@@ -6,11 +6,13 @@ import org.every.nook.api.application.content.PostContentExtractor
 import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
+import org.every.nook.api.application.content.UnsupportedPostUrlException
 import org.every.nook.api.domain.post.Post
 import org.every.nook.api.domain.post.PostSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 
 class InstagramPostContentExtractorTest {
     @Test
@@ -102,12 +104,58 @@ class InstagramPostContentExtractorTest {
     }
 
     @Test
-    fun `Apify content not found does not fall back`() {
+    fun `Apify content not found falls back to Bright Data once`() {
         val brightData = extractor(result = CONTENT)
         val apify = extractor(failure = PostContentNotFoundException())
         val router = router("APIFY_BRIGHT_WITH_DATA_FALLBACK", brightData, apify)
 
+        assertEquals(CONTENT, router.extract(URL))
+        assertEquals(1, brightData.calls)
+        assertEquals(1, apify.calls)
+    }
+
+    @Test
+    fun `content not found from both providers preserves the final failure without another attempt`() {
+        val failure = PostContentNotFoundException()
+        val brightData = extractor(failure = failure)
+        val apify = extractor(failure = PostContentNotFoundException())
+        val router = router("APIFY_BRIGHT_WITH_DATA_FALLBACK", brightData, apify)
+
+        assertSame(failure, assertFailsWith<PostContentNotFoundException> { router.extract(URL) })
+        assertEquals(1, brightData.calls)
+        assertEquals(1, apify.calls)
+    }
+
+    @Test
+    fun `Bright Data provider failure after Apify content not found is propagated without another attempt`() {
+        val failure = PostContentProviderException()
+        val brightData = extractor(failure = failure)
+        val apify = extractor(failure = PostContentNotFoundException())
+        val router = router("APIFY_BRIGHT_WITH_DATA_FALLBACK", brightData, apify)
+
+        assertSame(failure, assertFailsWith<PostContentProviderException> { router.extract(URL) })
+        assertEquals(1, brightData.calls)
+        assertEquals(1, apify.calls)
+    }
+
+    @Test
+    fun `Apify only preserves content not found without fallback`() {
+        val brightData = extractor(result = CONTENT)
+        val apify = extractor(failure = PostContentNotFoundException())
+        val router = router("APIFY_ONLY", brightData, apify)
+
         assertFailsWith<PostContentNotFoundException> { router.extract(URL) }
+        assertEquals(0, brightData.calls)
+        assertEquals(1, apify.calls)
+    }
+
+    @Test
+    fun `unsupported URL does not fall back to Bright Data`() {
+        val brightData = extractor(result = CONTENT)
+        val apify = extractor(failure = UnsupportedPostUrlException())
+        val router = router("APIFY_BRIGHT_WITH_DATA_FALLBACK", brightData, apify)
+
+        assertFailsWith<UnsupportedPostUrlException> { router.extract(URL) }
         assertEquals(0, brightData.calls)
         assertEquals(1, apify.calls)
     }
