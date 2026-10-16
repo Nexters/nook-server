@@ -3,6 +3,7 @@ package org.every.nook.api.infrastructure.instagram
 import org.every.nook.api.application.config.RuntimeConfigurationReader
 import org.every.nook.api.application.content.ExtractedPostContent
 import org.every.nook.api.application.content.PostContentExtractor
+import org.every.nook.api.application.content.PostContentNotFoundException
 import org.every.nook.api.application.content.PostContentProviderException
 import org.every.nook.api.application.content.PostContentProviderTimeoutException
 import org.every.nook.api.application.processing.ProcessingLogEvent
@@ -58,6 +59,10 @@ class InstagramPostContentExtractor(
 
     private fun extractApifyWithFallback(url: String): ExtractedPostContent = try {
         apifyExtractor.extract(url)
+    } catch (exception: PostContentNotFoundException) {
+        logFallback("apify", "bright_data", "content_not_found", exception)
+        logger.warn("Apify returned no accessible content; falling back to Bright Data", exception)
+        brightDataExtractor.extract(url)
     } catch (exception: PostContentProviderTimeoutException) {
         logFallback("apify", "bright_data", "timeout", exception)
         logger.warn("Apify timed out; falling back to Bright Data", exception)
