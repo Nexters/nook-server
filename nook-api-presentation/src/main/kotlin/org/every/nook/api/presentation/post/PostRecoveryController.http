@@ -1,0 +1,17 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+@postId = 1
+
+### 복구 요청: postId는 원본 게시물 ID가 아닌 내 저장 게시물 ID
+# URL/아카이브 입력 없음. 신규 접수 또는 이미 처리 중이면 202, 완료 상태면 200.
+POST {{baseUrl}}/api/v1/posts/{{postId}}/recovery
+
+### 복구 상태 조회
+GET {{baseUrl}}/api/v1/posts/{{postId}}/recovery

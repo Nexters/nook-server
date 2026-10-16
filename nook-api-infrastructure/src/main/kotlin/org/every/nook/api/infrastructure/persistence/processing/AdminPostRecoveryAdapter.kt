@@ -63,18 +63,27 @@ class AdminPostRecoveryAdapter(
         disposition.requireOpen(command.postId)
         val before = load(listOf(command.postId)).singleOrNull()
             ?: throw ParsingRecoveryException(ParsingRecoveryError.NOT_FOUND)
-        if (before.jobs.none { it.status == "FAILED" }) throw ParsingRecoveryException(ParsingRecoveryError.CONFLICT)
-        contentJob?.takeIf { it.status == PostContentParsingStatus.FAILED }?.apply {
+        val selected = before.jobs.filter { command.jobType == null || it.type == command.jobType }
+        val upstreamIncomplete = command.jobType == "PLACE_PARSING" &&
+            contentJob?.status != PostContentParsingStatus.COMPLETED
+        if (selected.none { it.status == "FAILED" } || upstreamIncomplete) {
+            throw ParsingRecoveryException(ParsingRecoveryError.CONFLICT)
+        }
+        contentJob?.takeIf {
+            it.status == PostContentParsingStatus.FAILED && command.jobType in listOf(null, "POST_CONTENT")
+        }?.apply {
             status = PostContentParsingStatus.PENDING
             retryAttemptCount = 0
             nextAttemptAt = clock.instant()
         }
-        placeJob?.takeIf { it.status == PlaceParsingStatus.FAILED }?.apply {
+        placeJob?.takeIf {
+            it.status == PlaceParsingStatus.FAILED && command.jobType in listOf(null, "PLACE_PARSING")
+        }?.apply {
             status = PlaceParsingStatus.PENDING
             retryAttemptCount = 0
             nextAttemptAt = clock.instant()
         }
-        jobs.filter { it.status == ParsingFollowUpJobStatus.FAILED }.forEach {
+        jobs.filter { it.status == ParsingFollowUpJobStatus.FAILED && command.jobType == null }.forEach {
             it.status = ParsingFollowUpJobStatus.PENDING
             it.retryAttemptCount = 0
             it.nextAttemptAt = clock.instant()
@@ -86,7 +95,7 @@ class AdminPostRecoveryAdapter(
                 targetType = "POST",
                 targetId = command.postId.toString(),
                 reason = command.reason,
-                beforeValue = before.jobs.filter { it.status == "FAILED" }
+                beforeValue = selected.filter { it.status == "FAILED" }
                     .joinToString(
                         prefix = "[",
                         postfix = "]",

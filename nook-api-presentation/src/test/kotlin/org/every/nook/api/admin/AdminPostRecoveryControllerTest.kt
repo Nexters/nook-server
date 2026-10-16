@@ -42,6 +42,18 @@ class AdminPostRecoveryControllerTest {
         assertEquals(RetryPostParsingCommand(616, actor, "원인 조치"), port.command)
     }
 
+    @Test
+    fun `selected content or place stage is forwarded without enabling arbitrary job types`() {
+        val actor = AdminActor("operator", "ops@example.com")
+        controller.retry(616, AdminPostRecoveryController.RetryRequest("장소만 복구", "PLACE_PARSING"), actor)
+        assertEquals("PLACE_PARSING", port.command?.jobType)
+        controller.retry(616, AdminPostRecoveryController.RetryRequest("본문만 복구", "POST_CONTENT"), actor)
+        assertEquals("POST_CONTENT", port.command?.jobType)
+        assertFailsWith<IllegalArgumentException> {
+            controller.retry(616, AdminPostRecoveryController.RetryRequest("잘못된 종류", "UNKNOWN"), actor)
+        }
+    }
+
     private class FakePort : AdminPostRecoveryPort {
         var query: List<Any?> = emptyList()
         var command: RetryPostParsingCommand? = null
