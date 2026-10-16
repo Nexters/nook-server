@@ -18,7 +18,7 @@ export function PostRecoveryDetails({ post, onRetryJob }: { post: RecoveryPost; 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}>
         <Typography variant="subtitle2">{recoveryTypeNames[job.type] ?? job.type} <Typography component="span" variant="caption" color="text.secondary">작업 #{job.id} · {job.attempts}회 실행</Typography></Typography>
         <Stack direction="row" spacing={1}><Chip size="small" label={recoveryLabel(job)} color={job.status === "FAILED" ? "error" : job.status === "COMPLETED" ? "success" : "default"} />
-          {onRetryJob && job.status === "FAILED" && !["POST_CONTENT", "PLACE_PARSING"].includes(job.type) && <Button size="small" onClick={() => onRetryJob(job)}>이 작업 재시도</Button>}
+          {onRetryJob && job.status === "FAILED" && <Button size="small" onClick={() => onRetryJob(job)}>이 단계 재시도</Button>}
         </Stack>
       </Stack>
       {(job.lastFailedAt || job.failureReason || job.status === "FAILED") && <Typography variant="caption" color="text.secondary">마지막 실패: {job.lastFailedAt ? dateText(job.lastFailedAt) : "기록 없음 (과거 작업)"}{job.failureStage ? ` · ${recoveryStageNames[job.failureStage] ?? job.failureStage}` : ""}</Typography>}

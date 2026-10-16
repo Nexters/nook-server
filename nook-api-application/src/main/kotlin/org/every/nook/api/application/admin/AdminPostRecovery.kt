@@ -10,7 +10,12 @@ data class AdminPostRecovery(
     val savedUsers: List<AdminSavedUser> = emptyList(),
 )
 data class AdminPostRecoveryPage(val posts: List<AdminPostRecovery>, val hasNext: Boolean)
-data class RetryPostParsingCommand(val postId: Long, val actor: AdminActor, val reason: String)
+data class RetryPostParsingCommand(
+    val postId: Long,
+    val actor: AdminActor,
+    val reason: String,
+    val jobType: String? = null,
+)
 
 interface AdminPostRecoveryPort {
     fun list(postId: Long?, status: String?, beforePostId: Long?, limit: Int): AdminPostRecoveryPage
@@ -39,6 +44,7 @@ class GetAdminPostRecoveryUseCase(private val port: AdminPostRecoveryPort) {
 class RetryAdminPostRecoveryUseCase(private val port: AdminPostRecoveryPort) {
     operator fun invoke(command: RetryPostParsingCommand): AdminPostRecovery {
         require(command.postId > 0)
+        require(command.jobType == null || command.jobType in setOf("POST_CONTENT", "PLACE_PARSING"))
         require(command.reason.isNotBlank() && command.reason.length <= MAX_REASON_LENGTH)
         return port.retry(command.copy(reason = command.reason.trim()))
     }

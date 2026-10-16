@@ -17,3 +17,20 @@ Content-Type: application/json
 # 응답의 jobs[].outcome은 장소 파싱의 COMPLETED/PARTIAL 결과이며 작업 status와 별도입니다.
 
 # 목록 posts[].savedUsers와 상세 savedUsers는 현재 저장 회원 ID·닉네임입니다.
+
+### 본문 수집 실패만 재시도 (장소·이미지·태그 유지)
+POST {{baseUrl}}/api/admin/v1/parsing-posts/616/retry
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+Content-Type: application/json
+
+{"reason":"수집 provider 복구 후 본문만 재시도", "jobType":"POST_CONTENT"}
+
+### 장소 인식 실패만 재시도 (본문 수집 완료가 선행되어야 함)
+POST {{baseUrl}}/api/admin/v1/parsing-posts/616/retry
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+Content-Type: application/json
+
+{"reason":"장소 인식 오류 조치 후 재시도", "jobType":"PLACE_PARSING"}
+
+# 장소 이미지/게시물 미디어/태그는 AdminParsingRecoveryController.http의 개별 jobId 재시도를 사용합니다.
+# 이미지가 없지만 작업은 완료된 경우, 장소 상세의 사진·태그 재처리를 사용합니다.

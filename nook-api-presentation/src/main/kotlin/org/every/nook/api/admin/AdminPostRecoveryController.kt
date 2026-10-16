@@ -40,7 +40,7 @@ class AdminPostRecoveryController(
     @PostMapping("/{postId}/retry")
     @Operation(summary = "게시물에서 실패한 본문·장소·후속 작업을 함께 재시도합니다")
     fun retry(@PathVariable postId: Long, @RequestBody request: RetryRequest, actor: AdminActor) =
-        ApiResponse.success(retryPost(RetryPostParsingCommand(postId, actor, request.reason)))
+        ApiResponse.success(retryPost(RetryPostParsingCommand(postId, actor, request.reason, request.jobType)))
 
-    data class RetryRequest(val reason: String)
+    data class RetryRequest(val reason: String, val jobType: String? = null)
 }
