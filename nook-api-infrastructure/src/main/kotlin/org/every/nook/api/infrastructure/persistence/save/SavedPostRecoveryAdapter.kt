@@ -4,6 +4,7 @@ import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.post.SavedPostRecovery
 import org.every.nook.api.application.post.SavedPostRecoveryPort
 import org.every.nook.api.application.post.error.PostNotFoundException
+import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.model.PostProcessingView
 import org.every.nook.api.domain.post.PostContentParsingStatus
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
@@ -27,6 +28,12 @@ class SavedPostRecoveryAdapter(
     @Transactional(readOnly = true)
     override fun find(userId: Long, savedPostId: Long): SavedPostRecovery {
         val saved = ownedPost(userId, savedPostId)
+        if (saved.placeLinksFrozen) {
+            return SavedPostRecovery(
+                savedPostId,
+                PostProcessingView(PostProcessingStatusView.COMPLETED, null),
+            )
+        }
         val job = contentJobs.findByPostId(saved.postId) ?: throw PostNotFoundException()
         return result(savedPostId, job)
     }
@@ -34,6 +41,12 @@ class SavedPostRecoveryAdapter(
     @Transactional
     override fun request(userId: Long, savedPostId: Long): SavedPostRecovery {
         val saved = ownedPost(userId, savedPostId)
+        if (saved.placeLinksFrozen) {
+            return SavedPostRecovery(
+                savedPostId,
+                PostProcessingView(PostProcessingStatusView.COMPLETED, null),
+            )
+        }
         // The shared content job lock serializes recovery requests from all users of this source post.
         val job = contentJobs.findByPostIdForUpdate(saved.postId) ?: throw PostNotFoundException()
         if (job.status != PostContentParsingStatus.FAILED) return result(savedPostId, job)

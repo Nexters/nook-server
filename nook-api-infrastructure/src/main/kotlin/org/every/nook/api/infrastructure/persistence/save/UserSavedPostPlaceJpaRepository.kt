@@ -58,6 +58,10 @@ interface UserSavedPostPlaceJpaRepository : JpaRepository<UserSavedPostPlaceEnti
         userSavedPostIds: Collection<Long>,
     ): List<UserSavedPostPlaceEntity>
 
+    @Modifying
+    @Query("DELETE FROM UserSavedPostPlaceEntity place WHERE place.userSavedPostId = :savedPostId")
+    fun deleteAllByUserSavedPostId(@Param("savedPostId") savedPostId: Long): Int
+
     fun deleteByUserSavedPostIdAndPlaceId(userSavedPostId: Long, placeId: Long): Long
 
     @Modifying

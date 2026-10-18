@@ -1,0 +1,17 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{"provider":"KAKAO", "accessToken":"replace-with-kakao-access-token"}
+
+@postId = 1
+@token = replace-with-issued-post-share-token
+
+### 내 저장 게시물의 현재 상태로 독립 공유 링크 발급
+POST {{baseUrl}}/api/v1/posts/{{postId}}/share-links
+
+### 공유 스냅샷을 내 아카이브로 저장 (로그인 필수)
+POST {{baseUrl}}/api/v1/post-shares/{{token}}/save
+Content-Type: application/json
+
+{"groupIds": [1]}

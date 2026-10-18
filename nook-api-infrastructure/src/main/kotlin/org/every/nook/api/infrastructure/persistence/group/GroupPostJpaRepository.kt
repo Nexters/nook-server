@@ -1,6 +1,8 @@
 package org.every.nook.api.infrastructure.persistence.group
 
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -24,6 +26,10 @@ interface GroupPostJpaRepository : JpaRepository<GroupPostEntity, Long> {
     fun countByGroupId(@Param("groupId") groupId: Long): Long
 
     fun findAllByUserSavedPostId(userSavedPostId: Long): List<GroupPostEntity>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT groupPost FROM GroupPostEntity groupPost WHERE groupPost.userSavedPostId = :savedPostId")
+    fun findAllByUserSavedPostIdForUpdate(@Param("savedPostId") savedPostId: Long): List<GroupPostEntity>
 
     fun findAllByUserSavedPostIdIn(userSavedPostIds: Collection<Long>): List<GroupPostEntity>
 
