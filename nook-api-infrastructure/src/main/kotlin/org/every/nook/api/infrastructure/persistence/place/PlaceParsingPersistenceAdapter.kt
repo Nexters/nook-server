@@ -181,7 +181,9 @@ class PlaceParsingPersistenceAdapter(
             )
         }
         postPlaceRepository.saveAll(postPlaces)
-        userSavedPostLockRepository.findAllByPostIdForUpdate(postId).forEach { savedPost ->
+        val mutableSavedPosts = userSavedPostLockRepository.findAllByPostIdForUpdate(postId)
+            .filterNot { it.placeLinksFrozen }
+        mutableSavedPosts.forEach { savedPost ->
             val savedPostId = requireNotNull(savedPost.id)
             userSavedPostPlaceRepository.insertAllFromPost(savedPostId, postId)
             userSavedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId).forEach { place ->

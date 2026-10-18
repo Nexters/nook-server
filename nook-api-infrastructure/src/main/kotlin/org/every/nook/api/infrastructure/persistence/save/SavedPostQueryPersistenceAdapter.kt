@@ -145,8 +145,8 @@ class SavedPostQueryPersistenceAdapter(
                 val contentJob = contentJobByPostId[savedPost.postId]
                 val placeJob = placeJobByPostId[savedPost.postId]
                 val processing = PostProcessingView.from(
-                    contentStatus = contentJob?.status ?: PostContentParsingStatus.COMPLETED,
-                    placeStatus = placeJob?.status.effectiveFor(savedPostIdsWithPlaces.contains(savedPost.id)),
+                    contentStatus = savedPost.ownContentStatus(contentJob),
+                    placeStatus = savedPost.ownPlaceStatus(placeJob?.status, savedPost.id in savedPostIdsWithPlaces),
                     contentStartedAt = contentJob?.processingStartedAt(),
                     placeStartedAt = placeJob?.processingStartedAt(),
                     now = clock.instant(),
@@ -191,9 +191,10 @@ class SavedPostQueryPersistenceAdapter(
         val memoByPlaceId = bookmarks.mapNotNull { bookmark -> bookmark.memo?.let { bookmark.placeId to it } }.toMap()
         val parsingJob = parsingJobRepository.findByPostId(savedPost.postId)
         val contentParsingJob = contentParsingJobRepository.findByPostId(savedPost.postId)
+        val placeStatus = savedPost.ownPlaceStatus(parsingJob?.status, savedPostPlaces.isNotEmpty())
         val processing = PostProcessingView.from(
-            contentStatus = contentParsingJob?.status ?: PostContentParsingStatus.COMPLETED,
-            placeStatus = parsingJob?.status.effectiveFor(savedPostPlaces.isNotEmpty()),
+            contentStatus = savedPost.ownContentStatus(contentParsingJob),
+            placeStatus = placeStatus,
             contentStartedAt = contentParsingJob?.processingStartedAt(),
             placeStartedAt = parsingJob?.processingStartedAt(),
             now = clock.instant(),
@@ -214,11 +215,9 @@ class SavedPostQueryPersistenceAdapter(
             memo = savedPost.memo,
             savedAt = savedPost.createdAt,
             groups = groups,
-            placeParsingStatus = PlaceParsingStatusView.from(
-                parsingJob?.status.effectiveFor(savedPostPlaces.isNotEmpty()) ?: PlaceParsingStatus.PENDING,
-            ),
+            placeParsingStatus = PlaceParsingStatusView.from(placeStatus ?: PlaceParsingStatus.PENDING),
             placeParsingFailureReason = PlaceParsingFailureReasonView.from(
-                parsingJob?.status.effectiveFor(savedPostPlaces.isNotEmpty()) ?: PlaceParsingStatus.PENDING,
+                placeStatus ?: PlaceParsingStatus.PENDING,
             ),
             places = savedPostPlaces.toSavedPostPlaces(
                 placesById,
@@ -366,3 +365,9 @@ private fun PlaceParsingJobEntity.processingStartedAt() =
 
 private fun PlaceParsingStatus?.effectiveFor(hasPlaces: Boolean): PlaceParsingStatus? =
     if (hasPlaces) PlaceParsingStatus.COMPLETED else this
+
+private fun UserSavedPostEntity.ownContentStatus(job: PostContentParsingJobEntity?) =
+    if (placeLinksFrozen) PostContentParsingStatus.COMPLETED else job?.status ?: PostContentParsingStatus.COMPLETED
+
+private fun UserSavedPostEntity.ownPlaceStatus(status: PlaceParsingStatus?, hasPlaces: Boolean) =
+    status.effectiveFor(placeLinksFrozen || hasPlaces)

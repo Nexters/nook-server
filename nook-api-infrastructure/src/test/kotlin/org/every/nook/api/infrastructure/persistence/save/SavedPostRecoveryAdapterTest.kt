@@ -135,6 +135,17 @@ class SavedPostRecoveryAdapterTest {
     }
 
     @Test
+    fun `shared copy is already saved and never restarts a failed common source`() {
+        val copy = UserSavedPostEntity(7, 101).apply { placeLinksFrozen = true }
+        `when`(saved.findByIdAndUserId(11, 7)).thenReturn(copy)
+        val result = adapter.request(7, 11)
+        assertFalse(result.requested)
+        assertEquals(PostProcessingStatusView.COMPLETED, result.processing.status)
+        assertEquals(PostProcessingStatusView.COMPLETED, adapter.find(7, 11).processing.status)
+        verifyNoInteractions(content, places, groups, disposition)
+    }
+
+    @Test
     fun `status lookup does not enqueue jobs`() {
         assertEquals(PostProcessingStatusView.FAILED, adapter.find(7, 11).processing.status)
         verify(content, never()).findByPostIdForUpdate(101)

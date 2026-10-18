@@ -66,6 +66,19 @@ class ConnectPostPlacePersistenceAdapterTest {
     }
 
     @Test
+    fun `shared copy can edit its own places while original parsing is in progress`() {
+        val savedPost = savedPost()
+        `when`(savedPost.placeLinksFrozen).thenReturn(true)
+        val place = mock(PlaceEntity::class.java)
+        `when`(place.id).thenReturn(17)
+        `when`(savedPostRepository.findByIdAndUserIdForUpdate(11, 7)).thenReturn(savedPost)
+        `when`(parsingJobRepository.findByPostId(101)).thenReturn(parsingJob(PlaceParsingStatus.PROCESSING))
+        `when`(placeIdentityResolver.resolve(candidate())).thenReturn(place)
+        assertEquals(ConnectPostPlacePort.Result.Connected(17), adapter.connect(7, 11, candidate()))
+        verify(bookmarkRepository).insertOrTouchWithMemo(7, 17, "게시물 메모")
+    }
+
+    @Test
     fun `creates a missing user place link and bookmark without changing the shared failed job`() {
         val savedPost = savedPost()
         val job = parsingJob(PlaceParsingStatus.FAILED)

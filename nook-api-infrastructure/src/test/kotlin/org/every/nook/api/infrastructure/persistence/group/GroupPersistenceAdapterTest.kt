@@ -121,7 +121,7 @@ class GroupPersistenceAdapterTest {
     fun `deleting an owned group soft deletes posts without another active group`() {
         val group = mock(GroupEntity::class.java)
         val orphanedSavedPost = mock(UserSavedPostEntity::class.java)
-        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
+        `when`(groupRepository.findByIdAndUserIdForUpdate(17, 7)).thenReturn(group)
         `when`(groupPostRepository.findActiveSavedPostIdsByGroupId(17)).thenReturn(listOf(11, 12))
         `when`(groupPostRepository.findActiveSavedPostIdsWithActiveGroup(setOf(11, 12))).thenReturn(listOf(12))
         `when`(savedPostRepository.findAllByUserIdAndIdIn(7, setOf(11))).thenReturn(listOf(orphanedSavedPost))
@@ -142,7 +142,7 @@ class GroupPersistenceAdapterTest {
     @Test
     fun `deleting an empty group does not query saved posts`() {
         val group = mock(GroupEntity::class.java)
-        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(group)
+        `when`(groupRepository.findByIdAndUserIdForUpdate(17, 7)).thenReturn(group)
         `when`(groupPostRepository.findActiveSavedPostIdsByGroupId(17)).thenReturn(emptyList())
 
         assertTrue(adapter.delete(7, 17))
@@ -155,7 +155,7 @@ class GroupPersistenceAdapterTest {
 
     @Test
     fun `deleting another users group changes nothing`() {
-        `when`(groupRepository.findByIdAndUserId(17, 7)).thenReturn(null)
+        `when`(groupRepository.findByIdAndUserIdForUpdate(17, 7)).thenReturn(null)
 
         assertFalse(adapter.delete(7, 17))
         verify(groupPostRepository, never()).findActiveSavedPostIdsByGroupId(17)
