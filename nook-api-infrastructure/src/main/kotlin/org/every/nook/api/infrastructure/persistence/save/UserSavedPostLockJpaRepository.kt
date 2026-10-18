@@ -10,6 +10,22 @@ interface UserSavedPostLockJpaRepository : Repository<UserSavedPostEntity, Long>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
+            SELECT savedPost FROM UserSavedPostEntity savedPost
+            WHERE savedPost.userId = :userId AND savedPost.postId = :postId
+        """,
+    )
+    fun findByUserIdAndPostIdForUpdate(
+        @Param("userId") userId: Long,
+        @Param("postId") postId: Long,
+    ): UserSavedPostEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT savedPost FROM UserSavedPostEntity savedPost WHERE savedPost.id = :id")
+    fun findByIdForUpdate(@Param("id") id: Long): UserSavedPostEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
             SELECT savedPost
             FROM UserSavedPostEntity savedPost
             WHERE savedPost.id = :id AND savedPost.userId = :userId

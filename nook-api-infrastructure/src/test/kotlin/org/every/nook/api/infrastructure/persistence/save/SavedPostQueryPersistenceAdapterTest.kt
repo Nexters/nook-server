@@ -74,6 +74,27 @@ class SavedPostQueryPersistenceAdapterTest {
     )
 
     @Test
+    fun `empty shared copy stays completed while common source is retried`() {
+        val savedPost = mock(UserSavedPostEntity::class.java)
+        `when`(savedPost.id).thenReturn(11)
+        `when`(savedPost.postId).thenReturn(101)
+        `when`(savedPost.placeLinksFrozen).thenReturn(true)
+        `when`(savedPost.createdAt).thenReturn(Instant.EPOCH)
+        `when`(savedPostRepository.findByIdAndUserId(11, 7)).thenReturn(savedPost)
+        `when`(postRepository.findById(101)).thenReturn(
+            Optional.of(PostEntity("INSTAGRAM", "ABC", "https://instagram.test/p/ABC/")),
+        )
+        `when`(contentParsingJobRepository.findByPostId(101))
+            .thenReturn(PostContentParsingJobEntity(101, PostContentParsingStatus.FAILED))
+        `when`(parsingJobRepository.findByPostId(101))
+            .thenReturn(PlaceParsingJobEntity(101, PlaceParsingStatus.PENDING))
+        val detail = requireNotNull(adapter.findDetail(7, 11))
+        assertEquals(PostProcessingStatusView.COMPLETED, detail.processingStatus)
+        assertEquals(PlaceParsingStatusView.COMPLETED, detail.placeParsingStatus)
+        assertEquals(emptyList(), detail.places)
+    }
+
+    @Test
     fun `detail preserves media hashtag and place order with bookmark state`() {
         val savedPost = mock(UserSavedPostEntity::class.java)
         `when`(savedPost.postId).thenReturn(101)

@@ -29,7 +29,7 @@ class ConnectPostPlacePersistenceAdapter(
         val savedPost = findSavedPostForConnection(savedPostId, userId)
             ?: return ConnectPostPlacePort.Result.PostNotFound
         val parsingJob = parsingJobRepository.findByPostId(savedPost.postId)
-        if (parsingJob == null || parsingJob.status in IN_PROGRESS_STATUSES) {
+        if (!savedPost.placeLinksFrozen && (parsingJob == null || parsingJob.status in IN_PROGRESS_STATUSES)) {
             return ConnectPostPlacePort.Result.ParsingInProgress
         }
 

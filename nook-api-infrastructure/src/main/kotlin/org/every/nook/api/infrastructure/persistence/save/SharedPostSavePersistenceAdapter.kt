@@ -1,6 +1,8 @@
 package org.every.nook.api.infrastructure.persistence.save
 
+import org.every.nook.api.application.post.model.PostProcessingStatusView
 import org.every.nook.api.application.post.port.SaveSharedPostPort
+import org.every.nook.api.application.post.port.SavedPostQueryPort
 import org.every.nook.api.infrastructure.persistence.group.GroupPostEntity
 import org.every.nook.api.infrastructure.persistence.group.GroupPostJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.UserPlaceBookmarkJpaRepository
@@ -13,6 +15,7 @@ class SharedPostSavePersistenceAdapter(
     private val savedPostPlaceRepository: UserSavedPostPlaceJpaRepository,
     private val groupPostRepository: GroupPostJpaRepository,
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val queryPort: SavedPostQueryPort,
 ) : SaveSharedPostPort {
     @Transactional
     override fun save(userId: Long, sharedPostId: Long, groupIds: Set<Long>): Long {
@@ -24,14 +27,20 @@ class SharedPostSavePersistenceAdapter(
         )
         val savedPostId = requireNotNull(savedPost.id)
         if (existing == null) {
-            initializePlaces(userId, savedPostId, sharedPost.postId)
+            // Legacy archive sharing can save an unfinished source; keep its initial worker population.
+            savedPost.placeLinksFrozen = queryPort.findDetail(sharedPost.userId, sharedPostId)
+                ?.processingStatus == PostProcessingStatusView.COMPLETED
+            initializePlaces(userId, savedPostId, sharedPostId)
         }
         addToGroups(savedPostId, groupIds)
         return savedPostId
     }
 
-    private fun initializePlaces(userId: Long, savedPostId: Long, sourcePostId: Long) {
-        savedPostPlaceRepository.insertAllFromPost(savedPostId, sourcePostId)
+    private fun initializePlaces(userId: Long, savedPostId: Long, sourceSavedPostId: Long) {
+        val sourcePlaces = savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(sourceSavedPostId)
+        savedPostPlaceRepository.saveAll(
+            sourcePlaces.map { UserSavedPostPlaceEntity(savedPostId, it.placeId, it.sequence, it.thumbnailUrl) },
+        )
         savedPostPlaceRepository.findAllByUserSavedPostIdOrderBySequenceAsc(savedPostId).forEach { place ->
             bookmarkRepository.insertOrTouchWithMemo(userId, place.placeId, memo = null)
         }
