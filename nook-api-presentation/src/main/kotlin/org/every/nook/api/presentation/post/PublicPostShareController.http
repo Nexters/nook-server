@@ -1,0 +1,14 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{"provider":"KAKAO", "accessToken":"replace-with-kakao-access-token"}
+
+@token = replace-with-issued-post-share-token
+
+### 비로그인 공개 조회 (공유자 메모/아카이브/북마크 노출 없음)
+GET {{baseUrl}}/api/public/v1/post-shares/{{token}}
+
+### 로그인 토큰을 첨부하면 viewerSavedPostId로 기존 내 저장 여부 확인
+GET {{baseUrl}}/api/public/v1/post-shares/{{token}}
+Authorization: Bearer replace-with-access-token

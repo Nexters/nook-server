@@ -172,7 +172,7 @@ class PostPersistenceAdapter(
         val memoByPlaceId = bookmarks.mapNotNull { bookmark -> bookmark.memo?.let { bookmark.placeId to it } }.toMap()
         val placesById = placeJpaRepository.findAllById(savedPostPlaces.map { it.placeId })
             .associateBy { requireNotNull(it.id) }
-        val effectiveParsingStatus = if (savedPostPlaces.isNotEmpty()) {
+        val effectiveParsingStatus = if (userPost.placeLinksFrozen || savedPostPlaces.isNotEmpty()) {
             PlaceParsingStatus.COMPLETED
         } else {
             parsingJob?.status ?: PlaceParsingStatus.PENDING

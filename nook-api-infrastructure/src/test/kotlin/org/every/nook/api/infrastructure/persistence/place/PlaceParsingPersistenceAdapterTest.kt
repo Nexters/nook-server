@@ -31,6 +31,7 @@ import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
@@ -44,6 +45,7 @@ import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PlaceParsingPersistenceAdapterTest {
     private val jobRepository = mock(PlaceParsingJobJpaRepository::class.java)
@@ -469,6 +471,20 @@ class PlaceParsingPersistenceAdapterTest {
             """[{"displayName":"호뎅 | 건대 술집 ㅣ 이자카야","username":"ho.den_g"}]"""
         val NOW: Instant = Instant.parse("2026-07-28T00:00:00Z")
     }
+
+    @Test
+    fun `later common parsing never appends places to a frozen shared copy`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+        val original = savedPostWithMemo(7, null)
+        val copy = savedPostWithMemo(8, null)
+        `when`(copy.placeLinksFrozen).thenReturn(true)
+        `when`(userSavedPostLockRepository.findAllByPostIdForUpdate(11)).thenReturn(listOf(original, copy))
+        assertTrue(adapter.complete(11, 0, "title", emptyList(), diagnostics()))
+        verify(userSavedPostPlaceRepository).insertAllFromPost(21, 11)
+        verify(userSavedPostPlaceRepository, never()).insertAllFromPost(22, 11)
+    }
+
     private fun savedPostWithMemo(userId: Long, memo: String?): UserSavedPostEntity {
         val savedPost = mock(UserSavedPostEntity::class.java)
         `when`(savedPost.id).thenReturn(if (userId == 7L) 21 else 22)

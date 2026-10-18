@@ -67,7 +67,7 @@ class GroupPersistenceAdapter(
 
     @Transactional
     override fun delete(userId: Long, groupId: Long): Boolean {
-        val group = groupRepository.findByIdAndUserId(groupId, userId) ?: return false
+        val group = groupRepository.findByIdAndUserIdForUpdate(groupId, userId) ?: return false
         val now = clock.instant()
         val affectedSavedPostIds = groupPostRepository.findActiveSavedPostIdsByGroupId(groupId).toSet()
         groupPostRepository.softDeleteAllByGroupId(groupId, now)
