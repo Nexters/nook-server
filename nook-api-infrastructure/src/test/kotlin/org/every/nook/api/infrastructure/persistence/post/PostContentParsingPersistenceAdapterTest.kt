@@ -162,6 +162,31 @@ class PostContentParsingPersistenceAdapterTest {
         assertFollowUpEvents()
     }
 
+    @Test
+    fun `recollection replaces stale clues and OCR and preserves place execution fencing`() {
+        val job = PostContentParsingJobEntity(101, PostContentParsingStatus.PROCESSING, attemptCount = 9)
+        val placeJob = PlaceParsingJobEntity(
+            101,
+            PlaceParsingStatus.COMPLETED,
+            textPlaceClues = "old",
+            imageTranscripts = "old OCR",
+            sourceProfileHints = "old profile",
+            attemptCount = 7,
+        )
+        `when`(jobRepository.findByPostIdForUpdate(101)).thenReturn(job)
+        `when`(placeJobRepository.findByPostIdForUpdate(101)).thenReturn(placeJob)
+        `when`(postRepository.findById(101)).thenReturn(Optional.of(mock(PostEntity::class.java)))
+        val post = Post(PostSource("INSTAGRAM", "ABC123"), "https://www.instagram.com/p/ABC123/", body = "new")
+        adapter.complete(101, 9, post, listOf(PlaceClue("new", region = null, queries = listOf("new"))))
+        assertEquals(PlaceParsingStatus.PENDING, placeJob.status)
+        assertEquals(7, placeJob.attemptCount)
+        assertEquals(0, placeJob.retryAttemptCount)
+        assertEquals(null, placeJob.imageTranscripts)
+        assertEquals(null, placeJob.sourceProfileHints)
+        kotlin.test.assertContains(placeJob.textPlaceClues.orEmpty(), "new")
+        verify(eventPublisher).publishEvent(any(PlaceParsingJobRequestedEvent::class.java))
+    }
+
     private fun assertFollowUpEvents() {
         val placeEventCaptor = ArgumentCaptor.forClass(Any::class.java)
         verify(eventPublisher).publishEvent(placeEventCaptor.capture())

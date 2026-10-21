@@ -1,12 +1,15 @@
 package org.every.nook.api.admin
 
 import org.every.nook.api.application.admin.AdminActor
+import org.every.nook.api.application.admin.AdminPostContentRefetchPort
 import org.every.nook.api.application.admin.AdminPostRecovery
 import org.every.nook.api.application.admin.AdminPostRecoveryPage
 import org.every.nook.api.application.admin.AdminPostRecoveryPort
 import org.every.nook.api.application.admin.GetAdminPostRecoveryUseCase
 import org.every.nook.api.application.admin.ListAdminPostRecoveryUseCase
 import org.every.nook.api.application.admin.ParsingRecoveryException
+import org.every.nook.api.application.admin.RefetchAdminPostContentUseCase
+import org.every.nook.api.application.admin.RefetchPostContentCommand
 import org.every.nook.api.application.admin.RetryAdminPostRecoveryUseCase
 import org.every.nook.api.application.admin.RetryPostParsingCommand
 import kotlin.test.Test
@@ -15,10 +18,17 @@ import kotlin.test.assertFailsWith
 
 class AdminPostRecoveryControllerTest {
     private val port = FakePort()
+    private var refetch: RefetchPostContentCommand? = null
     private val controller = AdminPostRecoveryController(
         ListAdminPostRecoveryUseCase(port),
         GetAdminPostRecoveryUseCase(port),
         RetryAdminPostRecoveryUseCase(port),
+        RefetchAdminPostContentUseCase(
+            AdminPostContentRefetchPort { command ->
+                refetch = command
+                AdminPostRecovery(command.postId, emptyList())
+            },
+        ),
     )
 
     @Test
@@ -51,6 +61,21 @@ class AdminPostRecoveryControllerTest {
         assertEquals("POST_CONTENT", port.command?.jobType)
         assertFailsWith<IllegalArgumentException> {
             controller.retry(616, AdminPostRecoveryController.RetryRequest("잘못된 종류", "UNKNOWN"), actor)
+        }
+    }
+
+    @Test
+    fun `refetch validates reason and id and preserves actor`() {
+        val actor = AdminActor("operator", "ops@example.com")
+        controller.refetch(616, AdminPostRecoveryController.RefetchRequest("  새 수집  "), actor)
+        assertEquals(RefetchPostContentCommand(616, actor, "새 수집"), refetch)
+        for (reason in listOf(" ", "x".repeat(501))) {
+            assertFailsWith<IllegalArgumentException> {
+                controller.refetch(616, AdminPostRecoveryController.RefetchRequest(reason), actor)
+            }
+        }
+        assertFailsWith<IllegalArgumentException> {
+            controller.refetch(0, AdminPostRecoveryController.RefetchRequest("수집"), actor)
         }
     }
 
