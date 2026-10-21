@@ -377,6 +377,30 @@ class PlaceParsingPersistenceAdapterTest {
     }
 
     @Test
+    fun `reprocessing preserves existing place links and appends new places without duplicate keys`() {
+        val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
+        val oldPlace = mock(PlaceEntity::class.java)
+        val newPlace = mock(PlaceEntity::class.java)
+        val first = candidate("existing")
+        val second = candidate("new")
+        val stored = mutableListOf<PostPlaceEntity>()
+        `when`(oldPlace.id).thenReturn(17)
+        `when`(newPlace.id).thenReturn(18)
+        `when`(jobRepository.findByPostId(11)).thenReturn(job)
+        `when`(placeIdentityResolver.resolve(first)).thenReturn(oldPlace)
+        `when`(placeIdentityResolver.resolve(second)).thenReturn(newPlace)
+        `when`(postPlaceRepository.findAllByPostIdOrderBySequenceAsc(11))
+            .thenReturn(listOf(PostPlaceEntity(11, 17, 2), PostPlaceEntity(11, 19, 5)))
+        `when`(postPlaceRepository.saveAll(anyList<PostPlaceEntity>())).thenAnswer { invocation ->
+            invocation.getArgument<List<PostPlaceEntity>>(0).also(stored::addAll)
+        }
+        adapter.complete(11, 0, "새 수집", listOf(first, second), diagnostics())
+        assertEquals(listOf(18L), stored.map { it.placeId })
+        assertEquals(6, stored.single().sequence)
+        assertEquals(PlaceParsingStatus.COMPLETED, job.status)
+    }
+
+    @Test
     fun `passes an extracted city to the place identity resolver`() {
         val job = PlaceParsingJobEntity(postId = 11, status = PlaceParsingStatus.PROCESSING)
         val savedPlace = mock(PlaceEntity::class.java)
