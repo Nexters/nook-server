@@ -269,6 +269,63 @@ class PlaceControllerTest {
             }
     }
 
+    @Test
+    fun `recent archive selection distinguishes omitted empty and multiple ids`() {
+        listOf(null, emptyList(), listOf(1L, 2L)).forEach { groupIds ->
+            val query = GetRecentPlacesUseCase.Query(TEST_USER_ID, null, 20, groupIds)
+            `when`(getRecentPlacesUseCase(query)).thenReturn(
+                RecentPlaceSliceView(emptyList(), null, false),
+            )
+            val suffix = groupIds?.joinToString(",")?.let { "?groupIds=$it" }.orEmpty()
+
+            mockMvc.get("/api/v1/places/recent$suffix").andExpect {
+                status { isOk() }
+                jsonPath("$.success.items") { isEmpty() }
+                jsonPath("$.success.hasNext") { value(false) }
+            }
+            verify(getRecentPlacesUseCase)(query)
+        }
+    }
+
+    @Test
+    fun `map archive selection distinguishes omitted empty and multiple ids`() {
+        listOf(null, emptyList(), listOf(1L, 2L)).forEach { groupIds ->
+            val query = GetMapPlacesUseCase.Query(
+                TEST_USER_ID,
+                BigDecimal("37.6"),
+                BigDecimal("126.8"),
+                BigDecimal("37.4"),
+                BigDecimal("127.2"),
+                groupIds,
+            )
+            `when`(getMapPlacesUseCase(query)).thenReturn(emptyList())
+            val suffix = groupIds?.joinToString(",")?.let { "&groupIds=$it" }.orEmpty()
+
+            mockMvc.get(
+                "/api/v1/places/map?northLatitude=37.6&westLongitude=126.8" +
+                    "&southLatitude=37.4&eastLongitude=127.2$suffix",
+            ).andExpect {
+                status { isOk() }
+                jsonPath("$.success") { isEmpty() }
+            }
+            verify(getMapPlacesUseCase)(query)
+        }
+    }
+
+    @Test
+    fun `rejects malformed and nonpositive archive ids`() {
+        listOf("abc", "0", "-1", "1,-2", "1,,2", "1,").forEach { ids ->
+            mockMvc.get("/api/v1/places/recent?groupIds=$ids").andExpect {
+                status { isBadRequest() }
+                jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
+            }
+            mockMvc.get(
+                "/api/v1/places/map?northLatitude=37.6&westLongitude=126.8" +
+                    "&southLatitude=37.4&eastLongitude=127.2&groupIds=$ids",
+            ).andExpect { status { isBadRequest() } }
+        }
+    }
+
     private fun recentPlaceView(accessType: PlaceAccessType, shareToken: String?) = RecentPlaceView(
         bookmarkId = 31,
         bookmarkedAt = Instant.parse("2026-07-27T00:00:00Z"),

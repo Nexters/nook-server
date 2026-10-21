@@ -9,6 +9,7 @@ class GetRecentPlacesUseCase(private val queryPort: PlaceMapQueryPort) {
             userId = query.userId,
             cursor = query.cursor,
             limit = query.size + 1,
+            groupIds = query.groupIds,
         )
         val hasNext = rows.size > query.size
         val items = rows.take(query.size)
@@ -20,7 +21,7 @@ class GetRecentPlacesUseCase(private val queryPort: PlaceMapQueryPort) {
         return RecentPlaceSliceView(items = items, nextCursor = nextCursor, hasNext = hasNext)
     }
 
-    data class Query(val userId: Long, val cursor: RecentPlaceCursor?, val size: Int)
+    data class Query(val userId: Long, val cursor: RecentPlaceCursor?, val size: Int, val groupIds: List<Long>? = null)
 
     companion object {
         const val MAX_PAGE_SIZE = 100

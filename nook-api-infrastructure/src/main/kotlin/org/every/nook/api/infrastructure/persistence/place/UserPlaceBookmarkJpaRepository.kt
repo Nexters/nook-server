@@ -124,6 +124,19 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
                     AND uspp.place_id = p.id
+                    AND (
+                        :filterByGroups = false OR EXISTS (
+                            SELECT 1
+                            FROM group_posts selected_group_post
+                            INNER JOIN user_groups selected_group
+                                ON selected_group.id = selected_group_post.group_id
+                               AND selected_group.user_id = usp.user_id
+                            WHERE selected_group_post.user_saved_post_id = usp.id
+                              AND selected_group.id IN (:groupIds)
+                              AND selected_group.deleted_at IS NULL
+                              AND selected_group_post.deleted_at IS NULL
+                        )
+                    )
                 )
                 OR EXISTS (
                     SELECT 1
@@ -143,6 +156,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                       AND (share_link.expires_at IS NULL OR share_link.expires_at > CURRENT_TIMESTAMP(6))
                       AND shared_group_post.deleted_at IS NULL
                       AND shared_group.deleted_at IS NULL
+                      AND (:filterByGroups = false OR shared_group.id IN (:groupIds))
                       AND shared_saved_post.deleted_at IS NULL
                 )
               )
@@ -155,6 +169,8 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
         @Param("westLongitude") westLongitude: BigDecimal,
         @Param("southLatitude") southLatitude: BigDecimal,
         @Param("eastLongitude") eastLongitude: BigDecimal,
+        @Param("filterByGroups") filterByGroups: Boolean = false,
+        @Param("groupIds") groupIds: List<Long> = listOf(0L),
     ): List<MapPlaceProjection>
 
     @Query(
@@ -200,6 +216,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                           AND (share_link.expires_at IS NULL OR share_link.expires_at > CURRENT_TIMESTAMP(6))
                           AND shared_group_post.deleted_at IS NULL
                           AND shared_group.deleted_at IS NULL
+                          AND (:filterByGroups = false OR shared_group.id IN (:groupIds))
                           AND shared_saved_post.deleted_at IS NULL
                         ORDER BY subscription.created_at DESC, subscription.id DESC
                         LIMIT 1
@@ -216,6 +233,19 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   WHERE usp.user_id = upb.user_id
                     AND usp.deleted_at IS NULL
                     AND uspp.place_id = p.id
+                    AND (
+                        :filterByGroups = false OR EXISTS (
+                            SELECT 1
+                            FROM group_posts selected_group_post
+                            INNER JOIN user_groups selected_group
+                                ON selected_group.id = selected_group_post.group_id
+                               AND selected_group.user_id = usp.user_id
+                            WHERE selected_group_post.user_saved_post_id = usp.id
+                              AND selected_group.id IN (:groupIds)
+                              AND selected_group.deleted_at IS NULL
+                              AND selected_group_post.deleted_at IS NULL
+                        )
+                    )
                 )
                 OR EXISTS (
                     SELECT 1
@@ -235,6 +265,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                       AND (share_link.expires_at IS NULL OR share_link.expires_at > CURRENT_TIMESTAMP(6))
                       AND shared_group_post.deleted_at IS NULL
                       AND shared_group.deleted_at IS NULL
+                      AND (:filterByGroups = false OR shared_group.id IN (:groupIds))
                       AND shared_saved_post.deleted_at IS NULL
                 )
               )
@@ -253,6 +284,8 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
         @Param("cursorBookmarkedAt") cursorBookmarkedAt: Instant?,
         @Param("cursorBookmarkId") cursorBookmarkId: Long?,
         @Param("limit") limit: Int,
+        @Param("filterByGroups") filterByGroups: Boolean = false,
+        @Param("groupIds") groupIds: List<Long> = listOf(0L),
     ): List<RecentPlaceProjection>
 
     @Query(

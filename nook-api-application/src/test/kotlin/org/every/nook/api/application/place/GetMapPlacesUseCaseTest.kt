@@ -30,14 +30,19 @@ class GetMapPlacesUseCaseTest {
         )
         val useCase = GetMapPlacesUseCase(
             object : PlaceMapQueryPort {
-                override fun findInBounds(userId: Long, bounds: GeoBounds): List<MapPlaceView> {
+                override fun findInBounds(userId: Long, bounds: GeoBounds, groupIds: List<Long>?): List<MapPlaceView> {
                     assertEquals(7, userId)
+                    assertEquals(listOf(1L, 2L), groupIds)
                     capturedBounds = bounds
                     return expected
                 }
 
-                override fun findRecent(userId: Long, cursor: RecentPlaceCursor?, limit: Int): List<RecentPlaceView> =
-                    emptyList()
+                override fun findRecent(
+                    userId: Long,
+                    cursor: RecentPlaceCursor?,
+                    limit: Int,
+                    groupIds: List<Long>?,
+                ): List<RecentPlaceView> = emptyList()
             },
             UserAnalyticsEventRecorder { record -> events += record.eventName },
         )
@@ -49,6 +54,7 @@ class GetMapPlacesUseCaseTest {
                 westLongitude = BigDecimal("126.8"),
                 southLatitude = BigDecimal("37.4"),
                 eastLongitude = BigDecimal("127.2"),
+                groupIds = listOf(1L, 2L),
             ),
         )
 
@@ -63,16 +69,25 @@ class GetMapPlacesUseCaseTest {
         val second = recentPlace(30, Instant.parse("2026-07-27T00:00:00Z"))
         val useCase = GetRecentPlacesUseCase(
             object : PlaceMapQueryPort {
-                override fun findInBounds(userId: Long, bounds: GeoBounds): List<MapPlaceView> = emptyList()
+                override fun findInBounds(userId: Long, bounds: GeoBounds, groupIds: List<Long>?): List<MapPlaceView> =
+                    emptyList()
 
-                override fun findRecent(userId: Long, cursor: RecentPlaceCursor?, limit: Int): List<RecentPlaceView> {
+                override fun findRecent(
+                    userId: Long,
+                    cursor: RecentPlaceCursor?,
+                    limit: Int,
+                    groupIds: List<Long>?,
+                ): List<RecentPlaceView> {
                     assertEquals(3, limit)
+                    assertEquals(listOf(1L, 2L), groupIds)
                     return listOf(first, second, recentPlace(29, Instant.parse("2026-07-26T23:59:59Z")))
                 }
             },
         )
 
-        val result = useCase(GetRecentPlacesUseCase.Query(userId = 7, cursor = null, size = 2))
+        val result = useCase(
+            GetRecentPlacesUseCase.Query(userId = 7, cursor = null, size = 2, groupIds = listOf(1L, 2L)),
+        )
 
         assertEquals(listOf(first, second), result.items)
         assertEquals(RecentPlaceCursor(second.bookmarkedAt, second.bookmarkId), result.nextCursor)
@@ -83,10 +98,15 @@ class GetMapPlacesUseCaseTest {
     fun `recent places omit a cursor on the last slice`() {
         val useCase = GetRecentPlacesUseCase(
             object : PlaceMapQueryPort {
-                override fun findInBounds(userId: Long, bounds: GeoBounds): List<MapPlaceView> = emptyList()
+                override fun findInBounds(userId: Long, bounds: GeoBounds, groupIds: List<Long>?): List<MapPlaceView> =
+                    emptyList()
 
-                override fun findRecent(userId: Long, cursor: RecentPlaceCursor?, limit: Int): List<RecentPlaceView> =
-                    listOf(recentPlace(31, Instant.parse("2026-07-27T00:00:00Z")))
+                override fun findRecent(
+                    userId: Long,
+                    cursor: RecentPlaceCursor?,
+                    limit: Int,
+                    groupIds: List<Long>?,
+                ): List<RecentPlaceView> = listOf(recentPlace(31, Instant.parse("2026-07-27T00:00:00Z")))
             },
         )
 
