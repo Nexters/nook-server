@@ -27,9 +27,11 @@ class ApifyInstagramPostContentExtractor(
     override fun extract(url: String): ExtractedPostContent {
         val startedAt = System.nanoTime()
         val instagramUrl = InstagramContentUrl.parse(url)
-        responseCache.find(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode)?.let { cached ->
+        responseCache.findUsableInstagramContent(PROVIDER, instagramUrl.shortcode) { cached ->
+            mapResponse(instagramUrl, parseResponse(cached))
+        }?.let { extracted ->
             logger.logCacheHit(PROVIDER, startedAt)
-            return mapResponse(instagramUrl, parseResponse(cached))
+            return extracted
         }
         if (properties.apiToken.isBlank()) {
             providerFailure()
@@ -90,7 +92,7 @@ class ApifyInstagramPostContentExtractor(
             if (record.isContentUnavailable()) contentNotFound()
             providerFailure()
         }
-        return mapper.map(url, record)
+        return mapper.map(url, record).requireUsableContent()
     }
 
     private fun ApifyInstagramRecord.isContentUnavailable(): Boolean {

@@ -7,6 +7,10 @@ class ScrapingProviderResponseCache(private val repository: ScrapingProviderResp
     fun find(provider: String, sourceType: String, externalPostId: String): String? =
         repository.findByProviderAndSourceTypeAndExternalPostId(provider, sourceType, externalPostId)?.responseBody
 
+    fun evict(provider: String, sourceType: String, externalPostId: String, responseBody: String) {
+        repository.deleteMatchingResponse(provider, sourceType, externalPostId, responseBody)
+    }
+
     fun save(provider: String, sourceType: String, externalPostId: String, responseBody: String) {
         runCatching {
             repository.saveAndFlush(

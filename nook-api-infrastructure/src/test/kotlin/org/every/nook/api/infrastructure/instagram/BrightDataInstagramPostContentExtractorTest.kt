@@ -26,7 +26,7 @@ class BrightDataInstagramPostContentExtractorTest {
     fun `cached response skips Bright Data request`() {
         val responseCache = mock(ScrapingProviderResponseCache::class.java)
         `when`(responseCache.find("BRIGHT_DATA", "INSTAGRAM", "Post123")).thenReturn(
-            """[{"url":"https://www.instagram.com/p/Post123/","content_type":"Image"}]""",
+            """[{"url":"https://www.instagram.com/p/Post123/","content_type":"Image","description":"caption"}]""",
         )
         val builder = RestClient.builder().baseUrl("https://api.brightdata.test")
         val server = MockRestServiceServer.bindTo(builder).build()
