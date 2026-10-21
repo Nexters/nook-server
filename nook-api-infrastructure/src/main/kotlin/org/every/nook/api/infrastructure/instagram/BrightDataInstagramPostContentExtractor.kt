@@ -27,9 +27,11 @@ class BrightDataInstagramPostContentExtractor(
     override fun extract(url: String): ExtractedPostContent {
         val startedAt = System.nanoTime()
         val instagramUrl = InstagramContentUrl.parse(url)
-        responseCache.find(PROVIDER, SOURCE_TYPE, instagramUrl.shortcode)?.let { cached ->
+        responseCache.findUsableInstagramContent(PROVIDER, instagramUrl.shortcode) { cached ->
+            mapResponse(instagramUrl, parseResponse(cached))
+        }?.let { extracted ->
             logger.logCacheHit(PROVIDER, startedAt)
-            return mapResponse(instagramUrl, parseResponse(cached))
+            return extracted
         }
         if (properties.apiToken.isBlank()) {
             providerFailure()
@@ -85,7 +87,7 @@ class BrightDataInstagramPostContentExtractor(
         }.getOrElse {
             logger.warn("Failed to map Bright Data Instagram response", it)
             providerFailure(it)
-        }
+        }.requireUsableContent()
     }
 
     private fun datasetId(url: InstagramContentUrl): String = when (url.kind) {

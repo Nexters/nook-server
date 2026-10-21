@@ -145,6 +145,29 @@ class ProcessPostContentParsingJobUseCaseTest {
     }
 
     @Test
+    fun `provider failure after retry budget never completes or infers empty content`() {
+        val port = RecordingPort()
+        val extractor = object : PostContentExtractor {
+            override fun supports(url: String): Boolean = true
+
+            override fun extract(url: String): ExtractedPostContent =
+                throw org.every.nook.api.application.content.PostContentProviderException()
+        }
+        val useCase = ProcessPostContentParsingJobUseCase(
+            jobPort = port,
+            extractPostContent = ExtractPostContentUseCase(listOf(extractor)),
+            contentInference = PostContentInference { error("content must not be inferred") },
+            retryBackoffs = emptyList(),
+            processingTimeout = Duration.ofMinutes(2),
+            clock = CLOCK,
+        )
+        assertEquals(ProcessPostContentParsingJobUseCase.Result.Failed, useCase(101))
+        assertEquals(null, port.completedPost)
+        assertEquals(null, port.retryAt)
+        assertEquals("게시물 콘텐츠를 가져오지 못했습니다.", port.failureReason)
+    }
+
+    @Test
     fun `records each content processing stage`() {
         val measurements = mutableListOf<ProcessingMetrics.Measurement>()
         val port = RecordingPort()
