@@ -12,6 +12,8 @@ data class GroupView(
     val accessType: GroupAccessType = GroupAccessType.OWNED,
     val owner: GroupOwnerView? = null,
     val shareToken: String? = null,
+    val subscriberCount: Long = 0,
+    val subscriberPreview: List<GroupSubscriberView> = emptyList(),
 )
 
 enum class GroupAccessType { OWNED, SHARED }

@@ -6,6 +6,7 @@ import org.every.nook.api.application.group.GroupPlacePage
 import org.every.nook.api.application.group.GroupPlaceSummary
 import org.every.nook.api.application.group.GroupPostPage
 import org.every.nook.api.application.group.GroupPostSummary
+import org.every.nook.api.application.group.GroupSubscriberView
 import org.every.nook.api.application.group.GroupView
 import org.every.nook.api.application.group.ListGroupPlacesUseCase
 import org.every.nook.api.application.group.ListGroupPostsUseCase
@@ -87,6 +88,13 @@ class GroupControllerTest {
                         name = "카페",
                         color = "YELLOW",
                         postCount = 3,
+                        subscriberCount = 1,
+                        subscriberPreview = listOf(
+                            org.every.nook.api.application.group.GroupSubscriberView(
+                                "reader",
+                                "https://cdn.test/reader.jpg",
+                            ),
+                        ),
                         lastSavedAt = Instant.parse("2026-09-16T13:00:00Z"),
                         thumbnailUrls = listOf(
                             "https://example.com/latest.jpg",
@@ -100,6 +108,8 @@ class GroupControllerTest {
             status { isOk() }
             jsonPath("$.success[0].id") { value(17) }
             jsonPath("$.success[0].postCount") { value(3) }
+            jsonPath("$.success[0].subscriberCount") { value(1) }
+            jsonPath("$.success[0].subscriberPreview[0].nickname") { value("reader") }
             jsonPath("$.success[0].lastSavedAt") { value("2026-09-16T13:00:00Z") }
             jsonPath("$.success[0].thumbnailUrls[0]") { value("https://example.com/latest.jpg") }
             jsonPath("$.success[0].thumbnailUrls[1]") { value("https://example.com/second.jpg") }

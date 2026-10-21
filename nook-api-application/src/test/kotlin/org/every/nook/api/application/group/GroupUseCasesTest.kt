@@ -55,7 +55,7 @@ class GroupUseCasesTest {
         )
 
         assertFailsWith<GroupNotFoundException> {
-            UpdateGroupUseCase(port)(
+            UpdateGroupUseCase(port, RecordingGroupSubscribersPort())(
                 UpdateGroupUseCase.Command(userId = 7, groupId = 17, name = "카페", color = "GREEN"),
             )
         }
