@@ -13,13 +13,13 @@ import org.every.nook.api.application.place.ProcessPlaceParsingJobUseCase
 import org.every.nook.api.application.place.SearchPlaceCandidatesUseCase
 import org.every.nook.api.application.place.StorePlaceTagsUseCase
 import org.every.nook.api.application.place.StorePlaceThumbnailUseCase
+import org.every.nook.api.application.push.PostProcessingPushTarget
 import org.every.nook.api.application.push.PushMessage
 import org.every.nook.api.application.push.PushNotificationSender
 import org.every.nook.api.application.push.PushPlatform
 import org.every.nook.api.application.push.PushPreference
 import org.every.nook.api.application.push.PushPreferencePort
 import org.every.nook.api.application.push.PushSendResult
-import org.every.nook.api.application.push.PushToken
 import org.every.nook.api.application.push.PushTokenPort
 import org.every.nook.api.application.push.SendPostProcessingPushUseCase
 import org.mockito.ArgumentCaptor
@@ -138,6 +138,7 @@ class PlaceParsingEventListenerTest {
         failedJobListener.process(PlaceParsingJobRequestedEvent(postId = 11))
 
         assertEquals("11", pushSender.message?.data?.get("postId"))
+        assertEquals("77", pushSender.message?.data?.get("savedPostId"))
         assertEquals("COMPLETED", pushSender.message?.data?.get("outcome"))
     }
 
@@ -146,8 +147,8 @@ class PlaceParsingEventListenerTest {
 
         override fun delete(userId: Long, token: String) = Unit
 
-        override fun findEnabledTokensByPostId(postId: Long): List<PushToken> =
-            listOf(PushToken(1, "token-1", PushPlatform.IOS))
+        override fun findPostProcessingTargets(postId: Long): List<PostProcessingPushTarget> =
+            listOf(PostProcessingPushTarget(1, 77, "token-1"))
 
         override fun disable(tokens: Collection<String>, reason: String) = Unit
     }

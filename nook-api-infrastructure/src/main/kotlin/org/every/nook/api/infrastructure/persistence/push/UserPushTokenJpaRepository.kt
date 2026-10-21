@@ -11,17 +11,26 @@ interface UserPushTokenJpaRepository : JpaRepository<UserPushTokenEntity, Long> 
 
     @Query(
         """
-            SELECT pushToken
+            SELECT pushToken.userId AS userId, pushToken.token AS token, savedPost.id AS savedPostId
             FROM UserPushTokenEntity pushToken
+            JOIN UserSavedPostEntity savedPost ON savedPost.userId = pushToken.userId
             WHERE pushToken.enabled = true
-              AND pushToken.userId IN (
-                  SELECT DISTINCT savedPost.userId
-                  FROM UserSavedPostEntity savedPost
-                  WHERE savedPost.postId = :postId
+              AND savedPost.postId = :postId
+              AND EXISTS (
+                  SELECT groupPost.id FROM GroupPostEntity groupPost
+                  JOIN GroupEntity userGroup ON userGroup.id = groupPost.groupId
+                  WHERE groupPost.userSavedPostId = savedPost.id
+                    AND userGroup.userId = savedPost.userId
               )
         """,
     )
-    fun findAllEnabledByPostId(@Param("postId") postId: Long): List<UserPushTokenEntity>
+    fun findPostProcessingTargets(@Param("postId") postId: Long): List<PostProcessingTarget>
+
+    interface PostProcessingTarget {
+        val userId: Long
+        val savedPostId: Long
+        val token: String
+    }
 
     fun findAllByTokenIn(tokens: Collection<String>): List<UserPushTokenEntity>
 }
