@@ -32,6 +32,10 @@ data class GroupResponse(
     val owner: GroupOwnerResponse?,
     @field:Schema(description = "공유 그룹 접근 토큰. 내 그룹이면 null", nullable = true)
     val shareToken: String?,
+    @field:Schema(description = "현재 아카이브를 참조형으로 추가한 사람 수. 소유자는 제외합니다.")
+    val subscriberCount: Long,
+    @field:Schema(description = "추가한 사람 미리보기. 최근 추가순으로 최대 3명이며 0명이면 빈 배열입니다.")
+    val subscriberPreview: List<GroupSubscriberResponse>,
 ) {
     companion object {
         fun from(view: GroupView): GroupResponse = GroupResponse(
@@ -44,6 +48,8 @@ data class GroupResponse(
             accessType = view.accessType,
             owner = view.owner?.let(GroupOwnerResponse::from),
             shareToken = view.shareToken,
+            subscriberCount = view.subscriberCount,
+            subscriberPreview = view.subscriberPreview.map(GroupSubscriberResponse::from),
         )
     }
 }
