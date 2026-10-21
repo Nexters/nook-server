@@ -17,6 +17,19 @@ GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&south
 # 장소별 tags(최대 4개)가 포함됩니다.
 GET {{baseUrl}}/api/v1/places/recent?size=20
 
+### 선택한 내·공유 아카이브의 지도 장소 (OR 조건)
+GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&southLatitude=37.40&eastLongitude=127.20&groupIds=1,2
+
+### 선택한 아카이브의 최근 저장 공간
+# 다음 페이지는 같은 groupIds와 반환된 cursor를 전달합니다. 선택 변경 시 cursor를 초기화합니다.
+GET {{baseUrl}}/api/v1/places/recent?size=20&groupIds=1,2
+
+### 아카이브 전체 해제: 지도 빈 목록
+GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&southLatitude=37.40&eastLongitude=127.20&groupIds=
+
+### 아카이브 전체 해제: 최근 저장 공간 빈 페이지
+GET {{baseUrl}}/api/v1/places/recent?size=20&groupIds=
+
 ### 내 저장 장소 검색
 # 장소명, 주소, 카테고리, 내 장소 메모 및 활성 장소 태그명을 부분 일치로 검색합니다.
 GET {{baseUrl}}/api/v1/places/saved/search?query=카페&page=0&size=20
