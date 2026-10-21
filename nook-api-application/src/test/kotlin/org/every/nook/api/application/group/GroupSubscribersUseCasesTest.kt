@@ -50,8 +50,9 @@ class GroupSubscribersUseCasesTest {
     private fun groupPort(groups: List<GroupView>) = object : GroupPort {
         override fun findAll(userId: Long) = groups
         override fun findOwned(userId: Long) = groups.take(1)
-        override fun create(userId: Long, name: String, color: GroupColor): GroupView = error("unused")
-        override fun update(userId: Long, groupId: Long, name: String, color: GroupColor) =
+        override fun create(userId: Long, name: String, color: GroupColor, description: String?): GroupView =
+            error("unused")
+        override fun update(userId: Long, groupId: Long, name: String, color: GroupColor, description: String?) =
             GroupPort.UpdateResult.Updated(groups.last())
         override fun delete(userId: Long, groupId: Long) = false
     }

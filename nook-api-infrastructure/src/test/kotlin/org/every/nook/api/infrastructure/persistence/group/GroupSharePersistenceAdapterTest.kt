@@ -1,6 +1,8 @@
 package org.every.nook.api.infrastructure.persistence.group
 
 import org.every.nook.api.application.group.SharedGroupAccess
+import org.every.nook.api.domain.group.GroupColor
+import org.every.nook.api.infrastructure.persistence.member.MemberEntity
 import org.every.nook.api.infrastructure.persistence.member.MemberJpaRepository
 import org.every.nook.api.infrastructure.persistence.place.SharedPlaceBookmarkSyncJpaRepository
 import org.every.nook.api.infrastructure.persistence.save.SharedGroupContentJpaRepository
@@ -8,7 +10,9 @@ import org.every.nook.api.infrastructure.persistence.save.UserSavedPostJpaReposi
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import java.util.Optional
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -55,6 +59,21 @@ class GroupSharePersistenceAdapterTest {
 
         assertFalse(adapter.containsPlace(ACCESS, placeId = 27))
         verify(sharedContentRepository).existsPlaceInGroup(7, 17, 27)
+    }
+
+    @Test
+    fun `shared group reads the current original description`() {
+        val group = GroupEntity(7, "카페", GroupColor.YELLOW, "첫 소개")
+        val member = mock(MemberEntity::class.java)
+        `when`(member.nickname).thenReturn("소유자")
+        `when`(groupRepository.findById(17)).thenReturn(Optional.of(group))
+        `when`(memberRepository.findById(7)).thenReturn(Optional.of(member))
+
+        assertEquals("첫 소개", adapter.findGroup(ACCESS)?.group?.description)
+        group.description = "수정된 소개\n👨‍👩‍👧‍👦"
+        assertEquals(group.description, adapter.findGroup(ACCESS)?.group?.description)
+        group.description = null
+        assertEquals(null, adapter.findGroup(ACCESS)?.group?.description)
     }
 
     private companion object {

@@ -87,6 +87,7 @@ class GroupSharePersistenceAdapter(
             group = GroupView(
                 id = access.groupId,
                 name = group.name,
+                description = group.description,
                 color = group.color.name,
                 postCount = groupPostRepository.countByGroupId(access.groupId),
                 thumbnailUrls = thumbnails,

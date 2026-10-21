@@ -131,12 +131,13 @@ class GroupController(
                     userId = userContext.userId,
                     name = request.name,
                     color = request.color,
+                    description = request.description,
                 ),
             ),
         ),
     )
 
-    @Operation(summary = "그룹명과 색상 수정")
+    @Operation(summary = "그룹명, 색상과 소개글 수정")
     @PatchMapping("/{groupId}")
     fun update(
         @Parameter(hidden = true) userContext: UserContext,
@@ -153,6 +154,7 @@ class GroupController(
                     groupId = groupId,
                     name = request.name,
                     color = request.color,
+                    description = request.description,
                 ),
             ),
         ),

@@ -25,6 +25,8 @@ class GroupEntity(
     @Enumerated(EnumType.STRING)
     @Column(name = "color", nullable = false, length = COLOR_COLUMN_LENGTH)
     var color: GroupColor,
+    @Column(name = "description", nullable = true, columnDefinition = "TEXT COMMENT '아카이브 소개글'")
+    var description: String? = null,
 ) : BaseEntity() {
     @Column(name = "deleted_at", nullable = true)
     var deletedAt: Instant? = null

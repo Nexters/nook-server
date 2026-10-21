@@ -36,11 +36,14 @@ data class GroupResponse(
     val subscriberCount: Long,
     @field:Schema(description = "추가한 사람 미리보기. 최근 추가순으로 최대 3명이며 0명이면 빈 배열입니다.")
     val subscriberPreview: List<GroupSubscriberResponse>,
+    @field:Schema(description = "아카이브 소개글. 미입력 시 null이며 줄바꿈을 포함한 전체 원문을 반환합니다", nullable = true)
+    val description: String? = null,
 ) {
     companion object {
         fun from(view: GroupView): GroupResponse = GroupResponse(
             id = view.id,
             name = view.name,
+            description = view.description,
             color = view.color,
             postCount = view.postCount,
             lastSavedAt = view.lastSavedAt,
