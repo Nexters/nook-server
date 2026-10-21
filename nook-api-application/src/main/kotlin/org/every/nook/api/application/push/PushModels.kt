@@ -7,6 +7,8 @@ enum class PushPlatform {
 
 data class PushToken(val userId: Long, val token: String, val platform: PushPlatform)
 
+data class PostProcessingPushTarget(val userId: Long, val savedPostId: Long, val token: String)
+
 data class PushPreference(val postProcessingEnabled: Boolean)
 
 data class PushMessage(val title: String, val body: String, val data: Map<String, String> = emptyMap())
