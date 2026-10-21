@@ -143,7 +143,8 @@ class PostContentParsingPersistenceAdapter(
         job.failureReason = null
         job.progressPercent = CONTENT_COMPLETED_PERCENT
 
-        if (placeParsingJobRepository.findByPostId(postId) == null) {
+        val placeJob = placeParsingJobRepository.findByPostIdForUpdate(postId)
+        if (placeJob == null) {
             placeParsingJobRepository.save(
                 PlaceParsingJobEntity(
                     postId = postId,
@@ -154,6 +155,24 @@ class PostContentParsingPersistenceAdapter(
                     nextAttemptAt = clock.instant(),
                 ),
             )
+            eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId, clock.instant()))
+        }
+        if (placeJob != null && placeJob.status in setOf(PlaceParsingStatus.COMPLETED, PlaceParsingStatus.FAILED)) {
+            placeJob.textPlaceClues = objectMapper.writeValueAsString(textPlaceClues)
+            placeJob.imageTranscripts = imageTranscripts.toJsonOrNull()
+            placeJob.sourceProfileHints = sourceProfileHints.toJsonOrNull()
+            placeJob.status = PlaceParsingStatus.PENDING
+            placeJob.retryAttemptCount = 0
+            placeJob.nextAttemptAt = clock.instant()
+            placeJob.progressStage = null
+            placeJob.progressStageStartedAt = null
+            placeJob.progressPercent = PLACE_PENDING_PERCENT
+            placeJob.executionStage = null
+            placeJob.parsingOutcome = null
+            placeJob.expectedPlaceCount = null
+            placeJob.extractedPlaceCount = null
+            placeJob.resolvedPlaceCount = null
+            placeJob.unresolvedPlaceClues = null
             eventPublisher.publishEvent(PlaceParsingJobRequestedEvent(postId, clock.instant()))
         }
         if (!entity.contentManuallyOverridden) {
@@ -221,5 +240,6 @@ class PostContentParsingPersistenceAdapter(
             PostContentParsingStatus.PROCESSING,
         )
         const val CONTENT_COMPLETED_PERCENT = 45
+        const val PLACE_PENDING_PERCENT = 50
     }
 }

@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import org.every.nook.api.application.admin.AdminActor
 import org.every.nook.api.application.admin.GetAdminPostRecoveryUseCase
 import org.every.nook.api.application.admin.ListAdminPostRecoveryUseCase
+import org.every.nook.api.application.admin.RefetchAdminPostContentUseCase
+import org.every.nook.api.application.admin.RefetchPostContentCommand
 import org.every.nook.api.application.admin.RetryAdminPostRecoveryUseCase
 import org.every.nook.api.application.admin.RetryPostParsingCommand
 import org.every.nook.api.presentation.response.ApiResponse
@@ -23,6 +25,7 @@ class AdminPostRecoveryController(
     private val listPosts: ListAdminPostRecoveryUseCase,
     private val getPost: GetAdminPostRecoveryUseCase,
     private val retryPost: RetryAdminPostRecoveryUseCase,
+    private val refetchContent: RefetchAdminPostContentUseCase,
 ) {
     @GetMapping
     @Operation(summary = "게시물 단위로 파싱 작업을 묶어 조회합니다; 상태 필터는 게시물 선정에만 적용합니다")
@@ -41,6 +44,13 @@ class AdminPostRecoveryController(
     @Operation(summary = "게시물에서 실패한 본문·장소·후속 작업을 함께 재시도합니다")
     fun retry(@PathVariable postId: Long, @RequestBody request: RetryRequest, actor: AdminActor) =
         ApiResponse.success(retryPost(RetryPostParsingCommand(postId, actor, request.reason, request.jobType)))
+
+    @PostMapping("/{postId}/refetch-content")
+    @Operation(summary = "수집 캐시를 초기화하고 본문·장소 인식을 새로 실행합니다; 진행 중·수동 수정 게시물은 제외")
+    fun refetch(@PathVariable postId: Long, @RequestBody request: RefetchRequest, actor: AdminActor) =
+        ApiResponse.success(refetchContent(RefetchPostContentCommand(postId, actor, request.reason)))
+
+    data class RefetchRequest(val reason: String)
 
     data class RetryRequest(val reason: String, val jobType: String? = null)
 }

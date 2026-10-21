@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.config
 
 import org.every.nook.api.application.admin.AdminParsingRecoveryPort
+import org.every.nook.api.application.admin.AdminPostContentRefetchPort
 import org.every.nook.api.application.admin.AdminPostProcessingPort
 import org.every.nook.api.application.admin.AdminPostRecoveryPort
 import org.every.nook.api.application.admin.ChangePostDispositionUseCase
@@ -9,6 +10,7 @@ import org.every.nook.api.application.admin.GetAdminPostRecoveryUseCase
 import org.every.nook.api.application.admin.ListAdminFollowUpJobsUseCase
 import org.every.nook.api.application.admin.ListAdminPostRecoveryUseCase
 import org.every.nook.api.application.admin.ListPostProcessingUseCase
+import org.every.nook.api.application.admin.RefetchAdminPostContentUseCase
 import org.every.nook.api.application.admin.RetryAdminFollowUpJobUseCase
 import org.every.nook.api.application.admin.RetryAdminPostRecoveryUseCase
 import org.springframework.context.annotation.Bean
@@ -16,6 +18,9 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class ParsingRecoveryConfig {
+    @Bean
+    fun refetchAdminPostContent(port: AdminPostContentRefetchPort) = RefetchAdminPostContentUseCase(port)
+
     @Bean
     fun listPostProcessing(port: AdminPostProcessingPort) = ListPostProcessingUseCase(port)
 

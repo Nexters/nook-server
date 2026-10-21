@@ -66,7 +66,11 @@ class AdminPostRecoveryAdapter(
         val selected = before.jobs.filter { command.jobType == null || it.type == command.jobType }
         val upstreamIncomplete = command.jobType == "PLACE_PARSING" &&
             contentJob?.status != PostContentParsingStatus.COMPLETED
-        if (selected.none { it.status == "FAILED" } || upstreamIncomplete) {
+        val contentActive = contentJob?.status in setOf(
+            PostContentParsingStatus.PENDING,
+            PostContentParsingStatus.PROCESSING,
+        )
+        if (selected.none { it.status == "FAILED" } || upstreamIncomplete || contentActive) {
             throw ParsingRecoveryException(ParsingRecoveryError.CONFLICT)
         }
         contentJob?.takeIf {
