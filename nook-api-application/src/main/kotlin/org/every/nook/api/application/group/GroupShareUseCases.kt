@@ -6,6 +6,7 @@ import org.every.nook.api.application.group.error.ShareLinkNotFoundException
 import org.every.nook.api.application.group.error.ShareLinkRevokedException
 import org.every.nook.api.application.group.error.SharedGroupUnavailableException
 import org.every.nook.api.application.group.port.GroupSharePort
+import org.every.nook.api.application.group.port.GroupSubscribersPort
 import java.time.Instant
 
 class IssueGroupShareLinkUseCase(private val port: GroupSharePort) {
@@ -21,10 +22,12 @@ class RevokeGroupShareLinkUseCase(private val port: GroupSharePort) {
     }
 }
 
-class GetSharedGroupUseCase(private val port: GroupSharePort) {
+class GetSharedGroupUseCase(private val port: GroupSharePort, private val subscribersPort: GroupSubscribersPort) {
     operator fun invoke(token: String): SharedGroupView {
         val access = port.resolveActive(token)
-        return port.findGroup(access) ?: throw SharedGroupUnavailableException()
+        val shared = port.findGroup(access) ?: throw SharedGroupUnavailableException()
+        val summary = subscribersPort.findSummaries(setOf(access.groupId))[access.groupId]
+        return shared.copy(group = shared.group.withSubscribers(summary))
     }
 }
 

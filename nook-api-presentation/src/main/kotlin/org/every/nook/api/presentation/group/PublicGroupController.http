@@ -8,6 +8,7 @@ Content-Type: application/json
 }
 
 ### 공유 그룹 정보 조회
+# subscriberCount와 subscriberPreview(최대 3명)가 포함됩니다.
 GET {{baseUrl}}/api/public/v1/groups/{{shareToken}}
 
 ### 공유 그룹 게시물 목록 조회
