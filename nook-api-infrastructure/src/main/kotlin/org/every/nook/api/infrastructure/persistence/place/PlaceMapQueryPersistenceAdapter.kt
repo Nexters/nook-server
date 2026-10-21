@@ -25,7 +25,8 @@ class PlaceMapQueryPersistenceAdapter(
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) : PlaceMapQueryPort {
     @Transactional(readOnly = true)
-    override fun findInBounds(userId: Long, bounds: GeoBounds): List<MapPlaceView> {
+    override fun findInBounds(userId: Long, bounds: GeoBounds, groupIds: List<Long>?): List<MapPlaceView> {
+        if (groupIds != null && groupIds.isEmpty()) return emptyList()
         val tagCatalog = tagCatalogPort.snapshot()
         return bookmarkRepository.findMapPlaces(
             userId = userId,
@@ -33,6 +34,8 @@ class PlaceMapQueryPersistenceAdapter(
             westLongitude = bounds.westLongitude,
             southLatitude = bounds.southLatitude,
             eastLongitude = bounds.eastLongitude,
+            filterByGroups = groupIds != null,
+            groupIds = groupIds ?: listOf(0L),
         ).map { row ->
             MapPlaceView(
                 id = row.id,
@@ -56,13 +59,21 @@ class PlaceMapQueryPersistenceAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findRecent(userId: Long, cursor: RecentPlaceCursor?, limit: Int): List<RecentPlaceView> {
+    override fun findRecent(
+        userId: Long,
+        cursor: RecentPlaceCursor?,
+        limit: Int,
+        groupIds: List<Long>?,
+    ): List<RecentPlaceView> {
+        if (groupIds != null && groupIds.isEmpty()) return emptyList()
         val tagCatalog = tagCatalogPort.snapshot()
         return bookmarkRepository.findRecentPlaces(
             userId = userId,
             cursorBookmarkedAt = cursor?.bookmarkedAt,
             cursorBookmarkId = cursor?.bookmarkId,
             limit = limit,
+            filterByGroups = groupIds != null,
+            groupIds = groupIds ?: listOf(0L),
         ).map { row ->
             RecentPlaceView(
                 bookmarkId = row.bookmarkId,

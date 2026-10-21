@@ -14,6 +14,7 @@ class GetMapPlacesUseCase(
     operator fun invoke(query: Query): List<MapPlaceView> {
         val result = queryPort.findInBounds(
             userId = query.userId,
+            groupIds = query.groupIds,
             bounds = GeoBounds(
                 northLatitude = query.northLatitude,
                 westLongitude = query.westLongitude,
@@ -33,5 +34,6 @@ class GetMapPlacesUseCase(
         val westLongitude: BigDecimal,
         val southLatitude: BigDecimal,
         val eastLongitude: BigDecimal,
+        val groupIds: List<Long>? = null,
     )
 }

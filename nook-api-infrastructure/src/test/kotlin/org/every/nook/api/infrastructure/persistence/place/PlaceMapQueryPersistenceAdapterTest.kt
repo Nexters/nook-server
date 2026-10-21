@@ -6,6 +6,7 @@ import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.domain.place.GeoBounds
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import java.math.BigDecimal
 import java.time.Instant
@@ -16,6 +17,35 @@ import kotlin.test.assertNull
 class PlaceMapQueryPersistenceAdapterTest {
     private val repository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val adapter = PlaceMapQueryPersistenceAdapter(repository)
+
+    @Test
+    fun `passes selected archives to both database queries`() {
+        val bounds = GeoBounds(BigDecimal("38"), BigDecimal("126"), BigDecimal("37"), BigDecimal("127"))
+        val groupIds = listOf(1L, 2L)
+
+        adapter.findInBounds(7, bounds, groupIds)
+        adapter.findRecent(7, null, 20, groupIds)
+
+        verify(repository).findMapPlaces(
+            7,
+            bounds.northLatitude,
+            bounds.westLongitude,
+            bounds.southLatitude,
+            bounds.eastLongitude,
+            true,
+            groupIds,
+        )
+        verify(repository).findRecentPlaces(7, null, null, 20, true, groupIds)
+    }
+
+    @Test
+    fun `empty selection returns no map or recent places without querying`() {
+        val bounds = GeoBounds(BigDecimal("38"), BigDecimal("126"), BigDecimal("37"), BigDecimal("127"))
+
+        assertEquals(emptyList(), adapter.findInBounds(7, bounds, emptyList()))
+        assertEquals(emptyList(), adapter.findRecent(7, null, 20, emptyList()))
+        verifyNoInteractions(repository)
+    }
 
     @Test
     fun `maps lightweight places inside the requested bounds`() {
