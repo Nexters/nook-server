@@ -9,15 +9,16 @@ class CreateGroupUseCase(private val groupPort: GroupPort) {
     operator fun invoke(command: Command): GroupView {
         val name = command.name.trim()
         val color = parseColor(command.color)
-        validateGroup(command.userId, name, color)
-        return groupPort.create(command.userId, name, color)
+        val description = command.description?.trim()
+        validateGroup(command.userId, name, color, description)
+        return groupPort.create(command.userId, name, color, description?.takeIf(String::isNotEmpty))
     }
 
-    data class Command(val userId: Long, val name: String, val color: String)
+    data class Command(val userId: Long, val name: String, val color: String, val description: String? = null)
 
-    private fun validateGroup(userId: Long, name: String, color: GroupColor) {
+    private fun validateGroup(userId: Long, name: String, color: GroupColor, description: String?) {
         try {
-            Group(userId = userId, name = name, color = color)
+            Group(userId = userId, name = name, color = color, description = description)
         } catch (exception: IllegalArgumentException) {
             throw InvalidGroupException(exception)
         }

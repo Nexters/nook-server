@@ -4,10 +4,8 @@ import jakarta.persistence.LockModeType
 import org.every.nook.api.domain.group.GroupColor
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
-import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
@@ -17,6 +15,7 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 user_group.id AS id,
                 user_group.name AS name,
                 user_group.color AS color,
+                user_group.description AS description,
                 COUNT(saved_post.id) AS postCount,
                 MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) AS lastSavedAt
             FROM user_groups user_group
@@ -26,7 +25,7 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
                 AND saved_post.deleted_at IS NULL
             WHERE user_group.user_id = :userId
               AND user_group.deleted_at IS NULL
-            GROUP BY user_group.id, user_group.name, user_group.color
+            GROUP BY user_group.id, user_group.name, user_group.color, user_group.description
             ORDER BY
                 MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) IS NULL ASC,
                 MAX(CASE WHEN saved_post.id IS NOT NULL THEN group_post.updated_at END) DESC,
@@ -116,17 +115,6 @@ interface GroupJpaRepository : JpaRepository<GroupEntity, Long> {
 
     fun existsByIdAndUserId(id: Long, userId: Long): Boolean
 
-    @Modifying
-    @Transactional
-    @Query(
-        """
-            UPDATE GroupEntity userGroup
-            SET userGroup.name = :name, userGroup.color = :color
-            WHERE userGroup.id = :id AND userGroup.userId = :userId
-        """,
-    )
-    fun updateByIdAndUserId(id: Long, userId: Long, name: String, color: GroupColor): Int
-
     fun deleteByIdAndUserId(id: Long, userId: Long): Long
 }
 
@@ -136,6 +124,7 @@ interface GroupSummaryProjection {
     val color: GroupColor
     val postCount: Long
     val lastSavedAt: Instant?
+    val description: String?
 }
 
 interface GroupThumbnailProjection {

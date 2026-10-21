@@ -11,8 +11,9 @@ class UpdateGroupUseCase(private val groupPort: GroupPort, private val subscribe
     operator fun invoke(command: Command): GroupView {
         val name = command.name.trim()
         val color = parseColor(command.color)
-        validateGroup(command.userId, command.groupId, name, color)
-        return when (val result = groupPort.update(command.userId, command.groupId, name, color)) {
+        val description = command.description?.trim()
+        validateGroup(command.userId, command.groupId, name, color, description)
+        return when (val result = groupPort.update(command.userId, command.groupId, name, color, description)) {
             is GroupPort.UpdateResult.Updated -> result.group.withSubscribers(
                 subscribersPort.findSummaries(setOf(command.groupId))[command.groupId],
             )
@@ -21,11 +22,17 @@ class UpdateGroupUseCase(private val groupPort: GroupPort, private val subscribe
         }
     }
 
-    data class Command(val userId: Long, val groupId: Long, val name: String, val color: String)
+    data class Command(
+        val userId: Long,
+        val groupId: Long,
+        val name: String,
+        val color: String,
+        val description: String? = null,
+    )
 
-    private fun validateGroup(userId: Long, groupId: Long, name: String, color: GroupColor) {
+    private fun validateGroup(userId: Long, groupId: Long, name: String, color: GroupColor, description: String?) {
         try {
-            Group(userId = userId, name = name, color = color, id = groupId)
+            Group(userId = userId, name = name, color = color, id = groupId, description = description)
         } catch (exception: IllegalArgumentException) {
             throw InvalidGroupException(exception)
         }

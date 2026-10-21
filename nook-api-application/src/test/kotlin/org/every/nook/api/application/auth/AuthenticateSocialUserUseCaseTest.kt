@@ -119,13 +119,18 @@ private class AuthFakeGroupPort : GroupPort {
 
     override fun findOwned(userId: Long): List<GroupView> = error("Not used")
 
-    override fun create(userId: Long, name: String, color: GroupColor): GroupView {
+    override fun create(userId: Long, name: String, color: GroupColor, description: String?): GroupView {
         groups += AuthFakeGroup(userId, name, color)
         return GroupView(id = groups.size.toLong(), name = name, color = color.name, postCount = 0)
     }
 
-    override fun update(userId: Long, groupId: Long, name: String, color: GroupColor): GroupPort.UpdateResult =
-        error("Not used")
+    override fun update(
+        userId: Long,
+        groupId: Long,
+        name: String,
+        color: GroupColor,
+        description: String?,
+    ): GroupPort.UpdateResult = error("Not used")
 
     override fun delete(userId: Long, groupId: Long): Boolean = error("Not used")
 }

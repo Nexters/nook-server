@@ -9,7 +9,7 @@ Content-Type: application/json
 
 ### 내 그룹 목록 조회
 # subscriberCount와 subscriberPreview(최대 3명)가 포함됩니다.
-# 응답에 lastSavedAt(최근 저장 시각)이 포함됩니다.
+# 응답에 lastSavedAt(최근 저장 시각)과 description(선택 소개글)이 포함됩니다.
 GET {{baseUrl}}/api/v1/groups
 Authorization: Bearer replace-with-nook-access-token
 
@@ -34,17 +34,31 @@ Content-Type: application/json
 
 {
   "name": "초록뷰 카페",
-  "color": "YELLOW"
+  "color": "YELLOW",
+  "description": "초록뷰가 있는 카페\n커피와 함께 쉬어 가요 ☕"
 }
 
-### 그룹명과 색상 수정
+### 그룹명, 색상과 소개글 수정
+# description 생략 또는 null: 기존 값 유지. 빈 문자열/공백만 입력: 삭제.
 PATCH {{baseUrl}}/api/v1/groups/1
 Authorization: Bearer replace-with-nook-access-token
 Content-Type: application/json
 
 {
   "name": "서울 카페",
-  "color": "GREEN"
+  "color": "GREEN",
+  "description": "주말에 가고 싶은 서울 카페"
+}
+
+### 소개글 삭제 (그룹은 유지)
+PATCH {{baseUrl}}/api/v1/groups/1
+Authorization: Bearer replace-with-nook-access-token
+Content-Type: application/json
+
+{
+  "name": "서울 카페",
+  "color": "GREEN",
+  "description": ""
 }
 
 ### 그룹 삭제

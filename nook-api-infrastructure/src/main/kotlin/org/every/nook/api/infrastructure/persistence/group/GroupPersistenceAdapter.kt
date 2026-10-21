@@ -41,28 +41,41 @@ class GroupPersistenceAdapter(
         }
     }
 
-    override fun create(userId: Long, name: String, color: GroupColor): GroupView {
-        val saved = groupRepository.saveAndFlush(GroupEntity(userId = userId, name = name, color = color))
-        return GroupView(id = requireNotNull(saved.id), name = saved.name, color = saved.color.name, postCount = 0)
+    override fun create(userId: Long, name: String, color: GroupColor, description: String?): GroupView {
+        val saved = groupRepository.saveAndFlush(
+            GroupEntity(userId = userId, name = name, color = color, description = description),
+        )
+        return GroupView(
+            id = requireNotNull(saved.id),
+            name = saved.name,
+            color = saved.color.name,
+            postCount = 0,
+            description = saved.description,
+        )
     }
 
-    override fun update(userId: Long, groupId: Long, name: String, color: GroupColor): GroupPort.UpdateResult {
-        if (!groupRepository.existsByIdAndUserId(groupId, userId)) {
-            return GroupPort.UpdateResult.NotFound
-        }
-        val updated = groupRepository.updateByIdAndUserId(groupId, userId, name, color)
-        return if (updated == 0) {
-            GroupPort.UpdateResult.NotFound
-        } else {
-            GroupPort.UpdateResult.Updated(
-                GroupView(
-                    id = groupId,
-                    name = name,
-                    color = color.name,
-                    postCount = groupPostRepository.countByGroupId(groupId),
-                ),
-            )
-        }
+    @Transactional
+    override fun update(
+        userId: Long,
+        groupId: Long,
+        name: String,
+        color: GroupColor,
+        description: String?,
+    ): GroupPort.UpdateResult {
+        val group = groupRepository.findByIdAndUserIdForUpdate(groupId, userId)
+            ?: return GroupPort.UpdateResult.NotFound
+        group.name = name
+        group.color = color
+        if (description != null) group.description = description.takeIf(String::isNotEmpty)
+        return GroupPort.UpdateResult.Updated(
+            GroupView(
+                id = groupId,
+                name = group.name,
+                color = group.color.name,
+                postCount = groupPostRepository.countByGroupId(groupId),
+                description = group.description,
+            ),
+        )
     }
 
     @Transactional
@@ -92,6 +105,7 @@ class GroupPersistenceAdapter(
         color = color.name,
         postCount = postCount,
         lastSavedAt = lastSavedAt,
+        description = description,
         thumbnailUrls = thumbnailUrls,
     )
 

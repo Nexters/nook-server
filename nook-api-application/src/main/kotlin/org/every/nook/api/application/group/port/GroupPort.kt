@@ -8,9 +8,10 @@ interface GroupPort {
 
     fun findOwned(userId: Long): List<GroupView>
 
-    fun create(userId: Long, name: String, color: GroupColor): GroupView
+    fun create(userId: Long, name: String, color: GroupColor, description: String? = null): GroupView
 
-    fun update(userId: Long, groupId: Long, name: String, color: GroupColor): UpdateResult
+    /** A null description preserves the existing value; an empty string clears it. */
+    fun update(userId: Long, groupId: Long, name: String, color: GroupColor, description: String? = null): UpdateResult
 
     fun delete(userId: Long, groupId: Long): Boolean
 
