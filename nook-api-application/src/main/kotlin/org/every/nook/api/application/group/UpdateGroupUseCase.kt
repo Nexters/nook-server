@@ -3,16 +3,20 @@ package org.every.nook.api.application.group
 import org.every.nook.api.application.group.error.GroupNotFoundException
 import org.every.nook.api.application.group.error.InvalidGroupException
 import org.every.nook.api.application.group.port.GroupPort
+import org.every.nook.api.application.group.port.GroupSubscribersPort
 import org.every.nook.api.domain.group.Group
 import org.every.nook.api.domain.group.GroupColor
 
-class UpdateGroupUseCase(private val groupPort: GroupPort) {
+class UpdateGroupUseCase(private val groupPort: GroupPort, private val subscribersPort: GroupSubscribersPort) {
     operator fun invoke(command: Command): GroupView {
         val name = command.name.trim()
         val color = parseColor(command.color)
         validateGroup(command.userId, command.groupId, name, color)
         return when (val result = groupPort.update(command.userId, command.groupId, name, color)) {
-            is GroupPort.UpdateResult.Updated -> result.group
+            is GroupPort.UpdateResult.Updated -> result.group.withSubscribers(
+                subscribersPort.findSummaries(setOf(command.groupId))[command.groupId],
+            )
+
             GroupPort.UpdateResult.NotFound -> throw GroupNotFoundException()
         }
     }

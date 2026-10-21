@@ -24,16 +24,40 @@ class GroupShareUseCasesTest {
         )
         val port = FakeGroupSharePort(resolveResult = GroupSharePort.ResolveResult.Active(access), group = expected)
 
-        assertEquals(expected, GetSharedGroupUseCase(port)("token"))
+        assertEquals(expected, GetSharedGroupUseCase(port, RecordingGroupSubscribersPort())("token"))
     }
 
     @Test
     fun `revoked and expired links keep distinct errors`() {
         assertFailsWith<ShareLinkRevokedException> {
-            GetSharedGroupUseCase(FakeGroupSharePort(GroupSharePort.ResolveResult.Revoked))("token")
+            GetSharedGroupUseCase(
+                FakeGroupSharePort(GroupSharePort.ResolveResult.Revoked),
+                RecordingGroupSubscribersPort(),
+            )("token")
         }
         assertFailsWith<ShareLinkExpiredException> {
-            GetSharedGroupUseCase(FakeGroupSharePort(GroupSharePort.ResolveResult.Expired))("token")
+            GetSharedGroupUseCase(
+                FakeGroupSharePort(GroupSharePort.ResolveResult.Expired),
+                RecordingGroupSubscribersPort(),
+            )("token")
+        }
+    }
+
+    @Test
+    fun `public detail and subscriber page require a valid link and expose the same summary`() {
+        val access = SharedGroupAccess(1, 2, 3, "token")
+        val group = SharedGroupView(GroupView(2, "카페", "YELLOW", 1), GroupOwnerView("owner", null))
+        val share = FakeGroupSharePort(GroupSharePort.ResolveResult.Active(access), group)
+        val subscribers = RecordingGroupSubscribersPort()
+        val expected = GroupSubscriberSummary(1, subscribers.page.items)
+        subscribers.summaries = mapOf(2L to expected)
+        assertEquals(1, GetSharedGroupUseCase(share, subscribers)("token").group.subscriberCount)
+        assertEquals(subscribers.page, ListSharedGroupSubscribersUseCase(share, subscribers)("token", 0, 20))
+        assertFailsWith<ShareLinkRevokedException> {
+            ListSharedGroupSubscribersUseCase(
+                FakeGroupSharePort(GroupSharePort.ResolveResult.Revoked),
+                subscribers,
+            )("token", 0, 20)
         }
     }
 

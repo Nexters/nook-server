@@ -6,6 +6,7 @@ import org.every.nook.api.application.group.GetSharedPostDetailUseCase
 import org.every.nook.api.application.group.IssueGroupShareLinkUseCase
 import org.every.nook.api.application.group.ListSharedGroupPlacesUseCase
 import org.every.nook.api.application.group.ListSharedGroupPostsUseCase
+import org.every.nook.api.application.group.ListSharedGroupSubscribersUseCase
 import org.every.nook.api.application.group.RevokeGroupShareLinkUseCase
 import org.every.nook.api.application.group.SubscribeSharedGroupUseCase
 import org.every.nook.api.application.group.UnsubscribeSharedGroupUseCase
@@ -13,6 +14,7 @@ import org.every.nook.api.application.group.port.GroupOwnershipPort
 import org.every.nook.api.application.group.port.GroupPlaceQueryPort
 import org.every.nook.api.application.group.port.GroupPostQueryPort
 import org.every.nook.api.application.group.port.GroupSharePort
+import org.every.nook.api.application.group.port.GroupSubscribersPort
 import org.every.nook.api.application.group.port.SharedPostViewerQueryPort
 import org.every.nook.api.application.place.port.SharedPlaceDetailQueryPort
 import org.every.nook.api.application.post.SaveSharedPostUseCase
@@ -30,7 +32,12 @@ class GroupShareUseCaseConfig {
     fun revokeGroupShareLinkUseCase(port: GroupSharePort) = RevokeGroupShareLinkUseCase(port)
 
     @Bean
-    fun getSharedGroupUseCase(port: GroupSharePort) = GetSharedGroupUseCase(port)
+    fun getSharedGroupUseCase(port: GroupSharePort, subscribersPort: GroupSubscribersPort) =
+        GetSharedGroupUseCase(port, subscribersPort)
+
+    @Bean
+    fun listSharedGroupSubscribersUseCase(port: GroupSharePort, subscribersPort: GroupSubscribersPort) =
+        ListSharedGroupSubscribersUseCase(port, subscribersPort)
 
     @Bean
     fun subscribeSharedGroupUseCase(port: GroupSharePort) = SubscribeSharedGroupUseCase(port)
