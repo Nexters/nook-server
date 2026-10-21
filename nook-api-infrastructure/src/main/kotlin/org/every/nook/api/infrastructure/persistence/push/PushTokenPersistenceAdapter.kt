@@ -1,7 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.push
 
+import org.every.nook.api.application.push.PostProcessingPushTarget
 import org.every.nook.api.application.push.PushPlatform
-import org.every.nook.api.application.push.PushToken
 import org.every.nook.api.application.push.PushTokenPort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -37,9 +37,9 @@ class PushTokenPersistenceAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findEnabledTokensByPostId(postId: Long): List<PushToken> = repository
-        .findAllEnabledByPostId(postId)
-        .map { PushToken(it.userId, it.token, it.platform) }
+    override fun findPostProcessingTargets(postId: Long): List<PostProcessingPushTarget> = repository
+        .findPostProcessingTargets(postId)
+        .map { PostProcessingPushTarget(it.userId, it.savedPostId, it.token) }
 
     @Transactional
     override fun disable(tokens: Collection<String>, reason: String) {

@@ -37,52 +37,48 @@ class SendPostProcessingPushUseCase(
     private val sender: PushNotificationSender,
 ) {
     operator fun invoke(command: Command): Result {
-        val enabledTokens = pushTokenPort.findEnabledTokensByPostId(command.postId)
+        val targets = pushTokenPort.findPostProcessingTargets(command.postId)
         val disabledUserIds = pushPreferencePort.findPostProcessingDisabledUserIds(
-            enabledTokens.map(PushToken::userId).distinct(),
+            targets.map(PostProcessingPushTarget::userId).distinct(),
         )
-        val tokens = enabledTokens.filterNot { it.userId in disabledUserIds }
-        if (tokens.isEmpty()) {
-            return Result(0, 0, 0)
+        val enabledTargets = targets.filterNot { it.userId in disabledUserIds }
+        val results = enabledTargets.groupBy { it.userId to it.savedPostId }.map { (_, userTargets) ->
+            val tokens = userTargets.map(PostProcessingPushTarget::token).distinct()
+            sender.send(tokens, command.message(userTargets.first().savedPostId))
         }
-
-        val message = when (command.outcome) {
-            Outcome.COMPLETED -> PushMessage(
-                title = "게시물 저장이 완료됐어요!",
-                body = "지금 앱에서 확인해보세요.",
-                data = mapOf(
-                    TYPE_KEY to TYPE_POST_PROCESSING,
-                    OUTCOME_KEY to OUTCOME_COMPLETED,
-                    POST_ID_KEY to command.postId.toString(),
-                ),
-            )
-
-            Outcome.FAILED -> PushMessage(
-                title = "앗, 저장에 실패했어요",
-                body = "다시 시도하러 가볼까요?",
-                data = mapOf(
-                    TYPE_KEY to TYPE_POST_PROCESSING,
-                    OUTCOME_KEY to OUTCOME_FAILED,
-                    POST_ID_KEY to command.postId.toString(),
-                ),
-            )
+        val invalidTokens = results.flatMap(PushSendResult::invalidTokens).distinct()
+        if (invalidTokens.isNotEmpty()) {
+            pushTokenPort.disable(invalidTokens, INVALID_TOKEN_REASON)
         }
-
-        val sendResult = sender.send(tokens.map(PushToken::token).distinct(), message)
-        if (sendResult.invalidTokens.isNotEmpty()) {
-            pushTokenPort.disable(sendResult.invalidTokens, INVALID_TOKEN_REASON)
-        }
+        val result = Result(
+            targetCount = enabledTargets.map(PostProcessingPushTarget::token).distinct().size,
+            successCount = results.sumOf(PushSendResult::successCount),
+            failureCount = results.sumOf(PushSendResult::failureCount),
+        )
         logger.info {
             "Post processing push sent: postId=${command.postId}, outcome=${command.outcome}, " +
-                "successCount=${sendResult.successCount}, failureCount=${sendResult.failureCount}, " +
-                "invalidTokenCount=${sendResult.invalidTokens.size}"
+                "successCount=${result.successCount}, failureCount=${result.failureCount}, " +
+                "invalidTokenCount=${invalidTokens.size}"
         }
-        return Result(
-            targetCount = tokens.size,
-            successCount = sendResult.successCount,
-            failureCount = sendResult.failureCount,
-        )
+        return result
     }
+
+    private fun Command.message(savedPostId: Long): PushMessage = PushMessage(
+        title = when (outcome) {
+            Outcome.COMPLETED -> "게시물 저장이 완료됐어요!"
+            Outcome.FAILED -> "앗, 저장에 실패했어요"
+        },
+        body = when (outcome) {
+            Outcome.COMPLETED -> "지금 앱에서 확인해보세요."
+            Outcome.FAILED -> "다시 시도하러 가볼까요?"
+        },
+        data = mapOf(
+            TYPE_KEY to TYPE_POST_PROCESSING,
+            OUTCOME_KEY to outcome.name,
+            POST_ID_KEY to postId.toString(),
+            SAVED_POST_ID_KEY to savedPostId.toString(),
+        ),
+    )
 
     data class Command(val postId: Long, val outcome: Outcome)
 
@@ -98,9 +94,8 @@ class SendPostProcessingPushUseCase(
         const val TYPE_KEY = "type"
         const val TYPE_POST_PROCESSING = "POST_PROCESSING"
         const val OUTCOME_KEY = "outcome"
-        const val OUTCOME_COMPLETED = "COMPLETED"
-        const val OUTCOME_FAILED = "FAILED"
         const val POST_ID_KEY = "postId"
+        const val SAVED_POST_ID_KEY = "savedPostId"
         const val INVALID_TOKEN_REASON = "FCM token is invalid or unregistered"
     }
 }

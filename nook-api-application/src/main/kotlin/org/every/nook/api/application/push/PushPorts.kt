@@ -5,7 +5,7 @@ interface PushTokenPort {
 
     fun delete(userId: Long, token: String)
 
-    fun findEnabledTokensByPostId(postId: Long): List<PushToken>
+    fun findPostProcessingTargets(postId: Long): List<PostProcessingPushTarget>
 
     fun disable(tokens: Collection<String>, reason: String)
 }

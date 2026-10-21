@@ -45,8 +45,8 @@ class PushUseCasesTest {
     fun `sends completed push and disables invalid tokens`() {
         val port = RecordingPushTokenPort(
             tokens = listOf(
-                PushToken(7, "token-1", PushPlatform.IOS),
-                PushToken(7, "token-2", PushPlatform.IOS),
+                PostProcessingPushTarget(7, 71, "token-1"),
+                PostProcessingPushTarget(7, 71, "token-2"),
             ),
         )
         val preferencePort = RecordingPushPreferencePort()
@@ -64,13 +64,14 @@ class PushUseCasesTest {
         assertEquals("지금 앱에서 확인해보세요.", sender.message?.body)
         assertEquals("COMPLETED", sender.message?.data?.get("outcome"))
         assertEquals("11", sender.message?.data?.get("postId"))
+        assertEquals("71", sender.message?.data?.get("savedPostId"))
         assertEquals(listOf("token-2"), port.disabledTokens)
         assertEquals(SendPostProcessingPushUseCase.Result(2, 1, 1), result)
     }
 
     @Test
     fun `sends failed push`() {
-        val port = RecordingPushTokenPort(tokens = listOf(PushToken(7, "token-1", PushPlatform.IOS)))
+        val port = RecordingPushTokenPort(tokens = listOf(PostProcessingPushTarget(7, 71, "token-1")))
         val sender = RecordingPushNotificationSender()
 
         SendPostProcessingPushUseCase(port, RecordingPushPreferencePort(), sender)(
@@ -83,14 +84,15 @@ class PushUseCasesTest {
         assertEquals("앗, 저장에 실패했어요", sender.message?.title)
         assertEquals("다시 시도하러 가볼까요?", sender.message?.body)
         assertEquals("FAILED", sender.message?.data?.get("outcome"))
+        assertEquals("71", sender.message?.data?.get("savedPostId"))
     }
 
     @Test
     fun `does not send to users who disabled post processing push`() {
         val port = RecordingPushTokenPort(
             tokens = listOf(
-                PushToken(7, "token-disabled", PushPlatform.IOS),
-                PushToken(8, "token-enabled", PushPlatform.ANDROID),
+                PostProcessingPushTarget(7, 71, "token-disabled"),
+                PostProcessingPushTarget(8, 81, "token-enabled"),
             ),
         )
         val preferencePort = RecordingPushPreferencePort(mutableMapOf(7L to false))
@@ -104,9 +106,52 @@ class PushUseCasesTest {
         assertEquals(SendPostProcessingPushUseCase.Result(1, 1, 0), result)
     }
 
+    @Test
+    fun `sends each user their saved post id across multiple devices for both outcomes`() {
+        for (outcome in SendPostProcessingPushUseCase.Outcome.entries) {
+            val port = RecordingPushTokenPort(
+                listOf(
+                    PostProcessingPushTarget(7, 71, "user-7-phone"),
+                    PostProcessingPushTarget(8, 81, "user-8-phone"),
+                    PostProcessingPushTarget(7, 71, "user-7-tablet"),
+                ),
+            )
+            val sender = RecordingPushNotificationSender(listOf("user-7-tablet"))
+            val result = SendPostProcessingPushUseCase(port, RecordingPushPreferencePort(), sender)(
+                SendPostProcessingPushUseCase.Command(11, outcome),
+            )
+            assertEquals(2, sender.calls.size)
+            val bySavedId = sender.calls.associate { (tokens, message) -> message.data["savedPostId"] to tokens }
+            assertEquals(listOf("user-7-phone", "user-7-tablet"), bySavedId["71"])
+            assertEquals(listOf("user-8-phone"), bySavedId["81"])
+            sender.calls.forEach { (_, message) ->
+                assertEquals("11", message.data["postId"])
+                assertEquals(outcome.name, message.data["outcome"])
+                assertEquals("POST_PROCESSING", message.data["type"])
+            }
+            assertEquals(SendPostProcessingPushUseCase.Result(3, 2, 1), result)
+            assertEquals(listOf("user-7-tablet"), port.disabledTokens)
+        }
+    }
+
+    @Test
+    fun `does not send without an eligible saved post or when all preferences are disabled`() {
+        for (targets in listOf(emptyList(), listOf(PostProcessingPushTarget(7, 71, "token")))) {
+            val sender = RecordingPushNotificationSender()
+            val result = SendPostProcessingPushUseCase(
+                RecordingPushTokenPort(targets),
+                RecordingPushPreferencePort(mutableMapOf(7L to false)),
+                sender,
+            )(SendPostProcessingPushUseCase.Command(11, SendPostProcessingPushUseCase.Outcome.COMPLETED))
+            assertEquals(SendPostProcessingPushUseCase.Result(0, 0, 0), result)
+            assertTrue(sender.calls.isEmpty())
+        }
+    }
+
     private data class RegisterCall(val userId: Long, val token: String, val platform: PushPlatform)
 
-    private class RecordingPushTokenPort(private val tokens: List<PushToken> = emptyList()) : PushTokenPort {
+    private class RecordingPushTokenPort(private val tokens: List<PostProcessingPushTarget> = emptyList()) :
+        PushTokenPort {
         val registerCalls = mutableListOf<RegisterCall>()
         val deleteCalls = mutableListOf<Pair<Long, String>>()
         val disabledTokens = mutableListOf<String>()
@@ -119,7 +164,7 @@ class PushUseCasesTest {
             deleteCalls += userId to token
         }
 
-        override fun findEnabledTokensByPostId(postId: Long): List<PushToken> = tokens
+        override fun findPostProcessingTargets(postId: Long): List<PostProcessingPushTarget> = tokens
 
         override fun disable(tokens: Collection<String>, reason: String) {
             disabledTokens += tokens
@@ -128,6 +173,7 @@ class PushUseCasesTest {
 
     private class RecordingPushNotificationSender(private val invalidTokens: List<String> = emptyList()) :
         PushNotificationSender {
+        val calls = mutableListOf<Pair<List<String>, PushMessage>>()
         var tokens: List<String> = emptyList()
             private set
         var message: PushMessage? = null
@@ -136,10 +182,12 @@ class PushUseCasesTest {
         override fun send(tokens: List<String>, message: PushMessage): PushSendResult {
             this.tokens = tokens
             this.message = message
+            calls += tokens to message
+            val invalidForCall = invalidTokens.filter { it in tokens }
             return PushSendResult(
-                successCount = tokens.size - invalidTokens.size,
-                failureCount = invalidTokens.size,
-                invalidTokens = invalidTokens,
+                successCount = tokens.size - invalidForCall.size,
+                failureCount = invalidForCall.size,
+                invalidTokens = invalidForCall,
             )
         }
     }
