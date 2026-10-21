@@ -81,7 +81,13 @@ class PlaceController(
         @DecimalMin("-180")
         @DecimalMax("180")
         eastLongitude: BigDecimal,
+        @Parameter(description = "선택한 내·공유 아카이브 ID. 미지정 시 전체, 빈 값이면 전체 해제")
+        @RequestParam(required = false)
+        groupIds: List<Long>?,
     ): ApiResponse<List<MapPlaceResponse>> {
+        require(groupIds == null || groupIds.all { id: Long? -> id != null && id > 0 }) {
+            "Group IDs must be positive"
+        }
         val places = getMapPlacesUseCase(
             GetMapPlacesUseCase.Query(
                 userId = userContext.userId,
@@ -89,6 +95,7 @@ class PlaceController(
                 westLongitude = westLongitude,
                 southLatitude = southLatitude,
                 eastLongitude = eastLongitude,
+                groupIds = groupIds,
             ),
         )
         return ApiResponse.success(places.map(MapPlaceResponse::from))
@@ -106,11 +113,18 @@ class PlaceController(
         @Min(1)
         @Max(MAX_RECENT_PLACE_PAGE_SIZE)
         size: Int,
+        @Parameter(description = "선택한 내·공유 아카이브 ID. 미지정 시 전체, 빈 값이면 전체 해제")
+        @RequestParam(required = false)
+        groupIds: List<Long>?,
     ): ApiResponse<RecentPlaceSliceResponse> {
+        require(groupIds == null || groupIds.all { id: Long? -> id != null && id > 0 }) {
+            "Group IDs must be positive"
+        }
         val places = getRecentPlacesUseCase(
             GetRecentPlacesUseCase.Query(
                 userId = userContext.userId,
                 cursor = RecentPlaceCursorCodec.decode(cursor),
+                groupIds = groupIds,
                 size = size,
             ),
         )
