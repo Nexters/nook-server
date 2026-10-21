@@ -95,6 +95,7 @@ class GroupControllerTest {
                                 "https://cdn.test/reader.jpg",
                             ),
                         ),
+                        description = "초록뷰\n카페",
                         lastSavedAt = Instant.parse("2026-09-16T13:00:00Z"),
                         thumbnailUrls = listOf(
                             "https://example.com/latest.jpg",
@@ -110,6 +111,7 @@ class GroupControllerTest {
             jsonPath("$.success[0].postCount") { value(3) }
             jsonPath("$.success[0].subscriberCount") { value(1) }
             jsonPath("$.success[0].subscriberPreview[0].nickname") { value("reader") }
+            jsonPath("$.success[0].description") { value("초록뷰\n카페") }
             jsonPath("$.success[0].lastSavedAt") { value("2026-09-16T13:00:00Z") }
             jsonPath("$.success[0].thumbnailUrls[0]") { value("https://example.com/latest.jpg") }
             jsonPath("$.success[0].thumbnailUrls[1]") { value("https://example.com/second.jpg") }
@@ -126,6 +128,7 @@ class GroupControllerTest {
                         name = "내 카페",
                         color = "YELLOW",
                         postCount = 3,
+                        description = "초록뷰\n카페",
                     ),
                 ),
             )
@@ -286,6 +289,62 @@ class GroupControllerTest {
             DeleteGroupUseCase.Command(userId = TEST_USER_ID, groupId = 17),
         )
     }
+
+    @Test
+    fun `creates and returns a multiline description`() {
+        val command = CreateGroupUseCase.Command(TEST_USER_ID, "카페", "YELLOW", "초록뷰\n카페")
+        `when`(createGroupUseCase(command)).thenReturn(GroupView(17, "카페", "YELLOW", 0, description = "초록뷰\n카페"))
+        mockMvc.post("/api/v1/groups") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"카페","color":"YELLOW","description":"초록뷰\n카페"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.success.description") { value("초록뷰\n카페") }
+        }
+        verify(createGroupUseCase)(command)
+    }
+
+    @Test
+    fun `description supports 150 combined emoji instead of 150 UTF16 units`() {
+        val description = "👨‍👩‍👧‍👦".repeat(150)
+        val command = CreateGroupUseCase.Command(TEST_USER_ID, "카페", "YELLOW", description)
+        `when`(createGroupUseCase(command)).thenReturn(GroupView(17, "카페", "YELLOW", 0, description = description))
+        mockMvc.post("/api/v1/groups") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"카페","color":"YELLOW","description":"$description"}"""
+        }.andExpect { status { isCreated() } }
+    }
+
+    @Test
+    fun `rejects 151 visible characters for both create and update`() {
+        val payload = """{"name":"카페","color":"YELLOW","description":"${"👨‍👩‍👧‍👦".repeat(151)}"}"""
+        mockMvc.post("/api/v1/groups") {
+            contentType = MediaType.APPLICATION_JSON
+            content = payload
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error.errorCode") { value("INVALID_REQUEST") }
+        }
+        mockMvc.patch("/api/v1/groups/17") {
+            contentType = MediaType.APPLICATION_JSON
+            content = payload
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `update forwards null to retain and empty string to delete description`() {
+        for (description in listOf(null, "")) {
+            val command = UpdateGroupUseCase.Command(TEST_USER_ID, 17, "카페", "GREEN", description)
+            `when`(updateGroupUseCase(command)).thenReturn(GroupView(17, "카페", "GREEN", 0))
+            val jsonDescription = description?.let { "\"$it\"" } ?: "null"
+            mockMvc.patch("/api/v1/groups/17") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"카페","color":"GREEN","description":$jsonDescription}"""
+            }.andExpect { status { isOk() } }
+            verify(updateGroupUseCase)(command)
+        }
+    }
+
     private companion object {
         const val TEST_USER_ID = 1L
     }

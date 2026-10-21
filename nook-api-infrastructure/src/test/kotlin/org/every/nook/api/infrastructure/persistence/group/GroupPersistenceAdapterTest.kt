@@ -39,6 +39,7 @@ class GroupPersistenceAdapterTest {
         val secondThumbnail = mock(GroupThumbnailProjection::class.java)
         `when`(groupSummary.id).thenReturn(17)
         `when`(groupSummary.name).thenReturn("카페")
+        `when`(groupSummary.description).thenReturn("초록뷰\n카페")
         `when`(groupSummary.color).thenReturn(GroupColor.YELLOW)
         `when`(groupSummary.postCount).thenReturn(4)
         `when`(groupSummary.lastSavedAt).thenReturn(FIXED_NOW)
@@ -58,6 +59,7 @@ class GroupPersistenceAdapterTest {
             result.single().thumbnailUrls,
         )
         assertEquals(FIXED_NOW, result.single().lastSavedAt)
+        assertEquals("초록뷰\n카페", result.single().description)
         verify(groupRepository).findRecentThumbnailUrls(7)
     }
 
@@ -110,7 +112,7 @@ class GroupPersistenceAdapterTest {
 
     @Test
     fun `another users group cannot be updated`() {
-        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(false)
+        `when`(groupRepository.findByIdAndUserIdForUpdate(17, 7)).thenReturn(null)
 
         val result = adapter.update(7, 17, "카페", GroupColor.GREEN)
 
@@ -163,6 +165,27 @@ class GroupPersistenceAdapterTest {
         verifyNoInteractions(savedPostRepository)
     }
 
+    @Test
+    fun `updates then clears description and preserves value for old clients`() {
+        val group = GroupEntity(7, "카페", GroupColor.YELLOW, "기존 소개")
+        `when`(groupRepository.findByIdAndUserIdForUpdate(17, 7)).thenReturn(group)
+        fun update(description: String?): String? = assertIs<GroupPort.UpdateResult.Updated>(
+            adapter.update(7, 17, "카페", GroupColor.GREEN, description),
+        ).group.description
+
+        assertEquals("새 소개\n👨‍👩‍👧‍👦", update("새 소개\n👨‍👩‍👧‍👦"))
+        assertEquals("새 소개\n👨‍👩‍👧‍👦", update(null))
+        assertEquals(null, update(""))
+        assertEquals(null, group.description)
+    }
+
+    @Test
+    fun `another user cannot modify the description`() {
+        `when`(groupRepository.findByIdAndUserIdForUpdate(17, 8)).thenReturn(null)
+        assertIs<GroupPort.UpdateResult.NotFound>(adapter.update(8, 17, "카페", GroupColor.GREEN, "덮어쓰기"))
+        verifyNoInteractions(groupPostRepository)
+    }
+
     private companion object {
         val FIXED_NOW: Instant = Instant.parse("2026-08-01T00:00:00Z")
         val FIXED_CLOCK: Clock = Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
@@ -170,8 +193,8 @@ class GroupPersistenceAdapterTest {
 
     @Test
     fun `updates to a duplicate group name and includes current post count`() {
-        `when`(groupRepository.existsByIdAndUserId(17, 7)).thenReturn(true)
-        `when`(groupRepository.updateByIdAndUserId(17, 7, "서울 카페", GroupColor.GREEN)).thenReturn(1)
+        val group = GroupEntity(7, "카페", GroupColor.YELLOW, "기존 소개")
+        `when`(groupRepository.findByIdAndUserIdForUpdate(17, 7)).thenReturn(group)
         `when`(groupPostRepository.countByGroupId(17)).thenReturn(3)
 
         val result = adapter.update(7, 17, "서울 카페", GroupColor.GREEN)
@@ -179,6 +202,7 @@ class GroupPersistenceAdapterTest {
         val updated = assertIs<GroupPort.UpdateResult.Updated>(result)
         assertEquals(3, updated.group.postCount)
         assertEquals("GREEN", updated.group.color)
+        assertEquals("기존 소개", updated.group.description)
     }
 
     @Test
