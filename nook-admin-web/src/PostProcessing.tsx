@@ -3,6 +3,7 @@ import { Link as RouterLink, useLocation, useParams, useSearchParams } from "rea
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Pagination, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { api } from "./api";
+import { ContentRefetch } from "./ContentRefetch";
 import { SavedUsersInline, SavedUsersSection } from "./SavedUsers";
 import { type RecoveryPost, failedJobs } from "./ParsingPostRecovery";
 import { recoveryLabel, recoveryStageNames, recoveryTypeNames, type RecoveryJob } from "./ParsingRecoveryTracking";
@@ -127,6 +128,7 @@ function ProcessingDetail({ postId }: { postId: string }) {
         {post.dispositionChangedAt && <Typography variant="caption">운영 상태 변경: {date(post.dispositionChangedAt)} · {post.dispositionReason}</Typography>}
         <Typography variant="caption" color="text.secondary">{checked && `마지막 확인 ${checked.toLocaleTimeString("ko-KR")}`} {active(post) ? "· 처리 중에는 5초마다 자동 갱신합니다." : "· 현재 실행이 종료되었습니다."}</Typography>
         <ProcessingActions post={post} onUpdated={r => { setPost(r); setRevision(v => v + 1); }} />
+        <ContentRefetch post={post} onScheduled={() => setRevision(v => v + 1)} />
         <Button sx={{ alignSelf: "flex-start" }} onClick={() => setRevision(v => v + 1)}>상태 새로고침</Button>
       </Stack></CardContent></Card>
       <Stack direction={{ xs: "column", md: "row" }} spacing={1}>

@@ -172,15 +172,9 @@ class PlaceParsingPersistenceAdapter(
             val place = placeIdentityResolver.resolve(candidate)
             candidate.copy(googlePlaceId = place.googlePlaceId) to place
         }.distinctBy { (_, place) -> requireNotNull(place.id) }
-        val postPlaces = resolvedPlaces.mapIndexed { sequence, (candidate, place) ->
-            PostPlaceEntity(
-                postId = postId,
-                placeId = requireNotNull(place.id),
-                sequence = sequence,
-                sourceMediaSequence = candidate.sourceMediaSequence,
-            )
-        }
-        postPlaceRepository.saveAll(postPlaces)
+        val existing = postPlaceRepository.findAllByPostIdOrderBySequenceAsc(postId).associateBy { it.placeId }
+        val postPlaces = resolvedPlaces.toPostPlaces(postId, existing)
+        postPlaceRepository.saveAll(postPlaces.filter { it.placeId !in existing })
         val mutableSavedPosts = userSavedPostLockRepository.findAllByPostIdForUpdate(postId)
             .filterNot { it.placeLinksFrozen }
         mutableSavedPosts.forEach { savedPost ->
@@ -330,4 +324,19 @@ private fun PlaceParsingJobEntity.updateDiagnostics(diagnostics: PlaceParsingDia
     extractedPlaceCount = diagnostics.extractedPlaceCount
     resolvedPlaceCount = diagnostics.resolvedPlaceCount
     unresolvedPlaceClues = objectMapper.writeValueAsString(diagnostics.unresolvedClues)
+}
+
+private fun List<Pair<PlaceCandidate, PlaceEntity>>.toPostPlaces(
+    postId: Long,
+    existing: Map<Long, PostPlaceEntity>,
+): List<PostPlaceEntity> {
+    var nextSequence = (existing.values.maxOfOrNull { it.sequence } ?: -1) + 1
+    return map { (candidate, place) ->
+        existing[requireNotNull(place.id)] ?: PostPlaceEntity(
+            postId = postId,
+            placeId = requireNotNull(place.id),
+            sequence = nextSequence++,
+            sourceMediaSequence = candidate.sourceMediaSequence,
+        )
+    }
 }

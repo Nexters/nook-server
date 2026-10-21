@@ -34,3 +34,10 @@ Content-Type: application/json
 
 # 장소 이미지/게시물 미디어/태그는 AdminParsingRecoveryController.http의 개별 jobId 재시도를 사용합니다.
 # 이미지가 없지만 작업은 완료된 경우, 장소 상세의 사진·태그 재처리를 사용합니다.
+
+### 캐시 초기화 후 콘텐츠 재수집 (진행 중·수동 수정·처리 불가 게시물은 409)
+POST {{baseUrl}}/api/admin/v1/parsing-posts/616/refetch-content
+Cf-Access-Jwt-Assertion: replace-with-admin-access-token
+Content-Type: application/json
+
+{"reason":"캐시된 콘텐츠가 불완전하여 원문 재수집"}
