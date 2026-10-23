@@ -118,6 +118,8 @@ class PostContentParsingPersistenceAdapter(
             entity.updateContent(post)
             mediaRepository.deleteAllByPostId(postId)
             hashtagRepository.deleteAllByPostId(postId)
+            // Flush both queued deletes before IDENTITY inserts reuse their unique keys.
+            mediaRepository.flush()
             mediaRepository.saveAll(
                 post.media.map { media ->
                     PostMediaEntity(
