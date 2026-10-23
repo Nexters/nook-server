@@ -12,7 +12,6 @@ from typing import Callable, Iterator, TextIO
 
 CONTAINER_NAME = os.getenv("ERROR_LOG_CONTAINER_NAME", "nook-dev-api")
 DISCORD_WEBHOOK_URL = os.getenv("ERROR_LOG_DISCORD_WEBHOOK_URL", "")
-PARSING_DISCORD_WEBHOOK_URL = os.getenv("PARSING_ALERT_DISCORD_WEBHOOK_URL", "")
 ENVIRONMENT = os.getenv("ERROR_LOG_ENV", "dev")
 GRAFANA_BASE_URL = os.getenv("ERROR_LOG_GRAFANA_BASE_URL", "")
 LOG_LEVEL_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}.*\s(?P<level>TRACE|DEBUG|INFO|WARN|ERROR)\s+")
@@ -86,72 +85,15 @@ def discord_payload(lines: list[str], context: dict[str, str | None]) -> dict:
     return {"embeds": [embed], "allowed_mentions": {"parse": []}}
 
 
-STAGE_NAMES = {
-    "POST_CONTENT": "본문 파싱", "PLACE_PARSING": "장소 파싱", "POST_MEDIA": "미디어 저장",
-    "PLACE_THUMBNAILS": "썸네일 저장", "PLACE_TAGS": "장소 태그 저장",
-    "CONTENT_FETCH": "원문 가져오기", "CONTENT_COVER_TITLE": "커버·제목 추출",
-    "CONTENT_INFERENCE": "본문 분석", "CONTENT_SAVE": "본문 저장",
-    "PLACE_TEXT_CLUES": "장소 단서 추출", "PLACE_TEXT_RESOLUTION": "장소 검색",
-    "PLACE_IMAGE_OCR": "이미지 OCR", "PLACE_IMAGE_CLUES": "이미지 장소 추출",
-    "PLACE_IMAGE_RESOLUTION": "이미지 장소 검색", "TITLE_FINALIZATION": "제목 생성",
-    "PLACE_SAVE": "장소 저장", "POST_SAVE": "게시물 저장 요청",
-}
-
-
-SUMMARY_EVENTS = ("post.parsing.summary_failed", "post.parsing.summary_warning")
-
-def parsing_payload(context: dict) -> dict:
-    post_id = context.get("post_id") or "미생성"
-    stage = context.get("failure_stage") or "UNKNOWN"
-    stage_name = STAGE_NAMES.get(stage, stage)
-    fields = [{"name": name, "value": str(value or "-")[:200], "inline": True} for name, value in (
-        ("게시물", post_id), ("실패 단계", stage_name), ("작업", context.get("job_id")),
-        ("실행 횟수", context.get("attempt")), ("실패 시각", context.get("failed_at")),
-    )]
-    embed = {
-        "title": f"[{ENVIRONMENT}] 게시물 #{post_id} · {stage_name} 실패"[:256],
-        "description": "자동 재시도가 종료되어 확인이 필요합니다. 관리자 화면에서 실패 원인을 확인하고 재시도할 수 있습니다.",
-        "color": 15158332, "fields": fields,
-    }
-    if context.get("event_type") in SUMMARY_EVENTS:
-        embed["title"] = f"[{ENVIRONMENT}] 게시물 #{post_id} · 처리 완료 — 일부 실패"[:256]
-        failures = json.loads(context.get("failure_summary") or "[]")
-        lines = []
-        for item in failures:
-            lines.append(f"• {STAGE_NAMES.get(item['stage'], item['stage'])}: {item['reason']} ({item['count']}건)")
-            if item.get("code"):
-                lines.append(f"  오류 코드: {item['code']}")
-            if item.get("detail") and item["detail"] != item["reason"]:
-                lines.append(f"  상세: {item['detail'][:400]}")
-            if item.get("attempts"):
-                origin = "관리자 재시도 후 실패" if item.get("retried") else "자동 재시도 종료"
-                lines.append(f"  {origin} · 최대 {item['attempts']}회 실행")
-        embed["description"] = ("모든 작업이 종료되었습니다.\n" + "\n".join(lines))[:4000]
-        embed["fields"] = [{"name": name, "value": str(context.get(key) or "0"), "inline": True}
-                           for name, key in (("전체 작업", "total_count"), ("성공", "completed_count"),
-                                             ("실패", "failed_count"))]
-        if context.get("failed_at"):
-            embed["fields"].append({"name": "마지막 실패 시각", "value": context["failed_at"]})
-        if context.get("event_type") == "post.parsing.summary_warning":
-            embed["title"] = f"[{ENVIRONMENT}] 게시물 #{post_id} · 장소 없이 저장됨"[:256]
-            embed["color"] = 16753920
-            embed["description"] = "게시물이 정상 저장되고 모든 처리 작업이 완료됐습니다."
-        if context.get("warning_code") == "NO_PLACES":
-            embed["fields"].append({"name": "확인 필요 · 장소 없이 저장됨",
-                                    "value": "연결된 장소가 0개입니다. 원문을 확인해 필요한 장소를 연결해 주세요."})
-    if context.get("event_type") == "post.save.failed":
-        embed["description"] = "게시물 저장 요청이 실패했습니다. Request ID로 서버 오류를 확인해 주세요."
-        embed["fields"].append({"name": "Request ID", "value": str(context.get("request_id") or "-")[:200]})
-    if str(post_id).isdigit() and ENVIRONMENT in ("dev", "live"):
-        host = "dev-admin.everynook.co.kr" if ENVIRONMENT == "dev" else "admin.everynook.co.kr"
-        embed["url"] = f"https://{host}/#/posts/{post_id}/processing"
-    return {"embeds": [embed], "allowed_mentions": {"parse": []}}
+SUPPRESSED_EVENTS = (
+    "post.parsing.summary_failed",
+    "post.parsing.summary_warning",
+    "post.save.failed",
+)
 
 
 def should_forward(level: str | None, context: dict) -> bool:
-    if level == "WARN" and context.get("event_type") == "post.parsing.summary_warning":
-        return True
-    return level == "ERROR" and (not PARSING_ONLY or context.get("event_type") == "post.parsing.summary_failed")
+    return level == "ERROR" and not PARSING_ONLY and context.get("event_type") not in SUPPRESSED_EVENTS
 
 
 def post_payload(url: str, payload: dict) -> None:
@@ -184,15 +126,16 @@ def post_payload(url: str, payload: dict) -> None:
 
 
 def post_error_log(lines: list[str], context: dict[str, str | None]) -> None:
-    parsing = context.get("event_type") in (*SUMMARY_EVENTS, "post.save.failed")
-    webhook = (PARSING_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL) if parsing else DISCORD_WEBHOOK_URL
-    if webhook and "".join(lines).strip():
+    # Also guard direct delivery so removed alerts cannot fall back to the ERROR channel.
+    if PARSING_ONLY or context.get("event_type") in SUPPRESSED_EVENTS:
+        return
+    if DISCORD_WEBHOOK_URL and "".join(lines).strip():
         # wait=true makes Discord report message creation failures synchronously.
-        url = urllib.parse.urlsplit(webhook)
+        url = urllib.parse.urlsplit(DISCORD_WEBHOOK_URL)
         query = dict(urllib.parse.parse_qsl(url.query))
         query["wait"] = "true"
         target = urllib.parse.urlunsplit(url._replace(query=urllib.parse.urlencode(query)))
-        post_payload(target, parsing_payload(context) if context.get("event_type") in (*SUMMARY_EVENTS, "post.save.failed") else discord_payload(lines, context))
+        post_payload(target, discord_payload(lines, context))
 
 
 def read_json_log_line(raw_line: str) -> str:
@@ -225,15 +168,13 @@ def parse_log_entry(line: str) -> tuple[str | None, str, dict[str, str | None]]:
         "url_path": " ".join(value for value in (method, path) if value) or None,
     }
 
-    if entry.get("event_type") in SUMMARY_EVENTS:
-        context.update({key: context_value(entry, key) for key in
-                        ("event_type", "post_id", "failure_summary", "completed_count", "failed_count", "total_count", "failed_at", "warning_code")})
+    if entry.get("event_type") in SUPPRESSED_EVENTS:
+        context["event_type"] = context_value(entry, "event_type")
 
     if level == "ERROR" and method == "POST" and (
         path == "/api/v1/posts" or (path and path.startswith("/api/v1/shared-posts/") and path.endswith("/save"))
     ):
-        context.update({"event_type": "post.save.failed", "failure_stage": "POST_SAVE",
-                        "failed_at": context_value(entry, "@timestamp")})
+        context["event_type"] = "post.save.failed"
 
     header_parts = [
         str(value)
