@@ -58,12 +58,15 @@ data class RecentPlaceSliceResponse(
     val nextCursor: String?,
     @field:Schema(description = "다음 목록 존재 여부")
     val hasNext: Boolean,
+    @field:Schema(description = "선택한 아카이브 조건의 전체 장소 수. 중복 장소는 한 번 집계하며 cursor·size와 무관")
+    val totalCount: Long,
 ) {
     companion object {
         fun from(view: RecentPlaceSliceView): RecentPlaceSliceResponse = RecentPlaceSliceResponse(
             items = view.items.map(RecentPlaceResponse::from),
             nextCursor = view.nextCursor?.let(RecentPlaceCursorCodec::encode),
             hasNext = view.hasNext,
+            totalCount = view.totalCount,
         )
     }
 }
