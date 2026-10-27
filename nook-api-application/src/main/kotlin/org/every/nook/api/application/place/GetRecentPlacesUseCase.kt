@@ -18,7 +18,12 @@ class GetRecentPlacesUseCase(private val queryPort: PlaceMapQueryPort) {
         } else {
             null
         }
-        return RecentPlaceSliceView(items = items, nextCursor = nextCursor, hasNext = hasNext)
+        return RecentPlaceSliceView(
+            items = items,
+            nextCursor = nextCursor,
+            hasNext = hasNext,
+            totalCount = queryPort.countRecent(query.userId, query.groupIds),
+        )
     }
 
     data class Query(val userId: Long, val cursor: RecentPlaceCursor?, val size: Int, val groupIds: List<Long>? = null)

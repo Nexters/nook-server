@@ -45,6 +45,7 @@ data class RecentPlaceSliceView(
     val items: List<RecentPlaceView>,
     val nextCursor: RecentPlaceCursor?,
     val hasNext: Boolean,
+    val totalCount: Long,
 )
 
 data class RecentPlaceCursor(val bookmarkedAt: Instant, val bookmarkId: Long)

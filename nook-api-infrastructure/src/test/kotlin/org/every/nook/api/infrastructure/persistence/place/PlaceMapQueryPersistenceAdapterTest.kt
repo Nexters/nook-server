@@ -16,7 +16,8 @@ import kotlin.test.assertNull
 
 class PlaceMapQueryPersistenceAdapterTest {
     private val repository = mock(UserPlaceBookmarkJpaRepository::class.java)
-    private val adapter = PlaceMapQueryPersistenceAdapter(repository)
+    private val countRepository = mock(RecentPlaceCountJpaRepository::class.java)
+    private val adapter = PlaceMapQueryPersistenceAdapter(repository, countRepository)
 
     @Test
     fun `passes selected archives to both database queries`() {
@@ -25,6 +26,7 @@ class PlaceMapQueryPersistenceAdapterTest {
 
         adapter.findInBounds(7, bounds, groupIds)
         adapter.findRecent(7, null, 20, groupIds)
+        adapter.countRecent(7, groupIds)
 
         verify(repository).findMapPlaces(
             7,
@@ -36,6 +38,7 @@ class PlaceMapQueryPersistenceAdapterTest {
             groupIds,
         )
         verify(repository).findRecentPlaces(7, null, null, 20, true, groupIds)
+        verify(countRepository).countRecentPlaces(7, true, groupIds)
     }
 
     @Test
@@ -44,7 +47,16 @@ class PlaceMapQueryPersistenceAdapterTest {
 
         assertEquals(emptyList(), adapter.findInBounds(7, bounds, emptyList()))
         assertEquals(emptyList(), adapter.findRecent(7, null, 20, emptyList()))
-        verifyNoInteractions(repository)
+        assertEquals(0L, adapter.countRecent(7, emptyList()))
+        verifyNoInteractions(repository, countRepository)
+    }
+
+    @Test
+    fun `unfiltered count uses all accessible bookmarks including ungrouped places`() {
+        `when`(countRepository.countRecentPlaces(7, false, listOf(0L))).thenReturn(42L)
+
+        assertEquals(42L, adapter.countRecent(7))
+        verify(countRepository).countRecentPlaces(7, false, listOf(0L))
     }
 
     @Test

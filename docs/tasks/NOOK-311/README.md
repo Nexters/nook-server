@@ -47,3 +47,33 @@ Linear 댓글의 '최근 조회한 공간'은 기존 `GET /api/v1/places/recent`
 - 실제 MySQL 및 브라우저 검증은 수행하지 않았다. 개발 서버에서 내·공유 아카이브 필터 요청을
   실행해 합집합·전체 해제·공유 해제 후 제외 동작을 확인하는 절차는 `client-handoff.md`에 기록했다.
 - `git diff --check` 통과.
+
+## 전체 장소 수 후속 요청 (2026-10-27)
+
+Linear의 프런트 코멘트 요청에 따라 `GET /api/v1/places/recent` 응답에 `totalCount: Long`을 추가한다.
+기존 items·hasNext·nextCursor와 입력·권한 정책은 유지하며 모든 페이지에 전체 수를 제공한다.
+
+- 같은 groupIds 조건과 권한으로 접근 가능한 장소를 한 번씩 집계한다.
+- 필터 생략 시 미분류 저장 장소도 포함한다. 빈 선택·조회 가능한 장소가 없으면 0이다.
+- 커서·size·지도 bbox에 영향받지 않는다. 목록과 집계의 접근 조건 SQL을 공유한다.
+- 기존 H2 SQL 회귀에서 선택 조합, 중복, 비공개·삭제·공유 해제·만료·구독 해제 제외와 집계를 함께 검증한다.
+- 커서 다음 페이지와 지도 영역 밖 장소의 전체 수, 북마크·저장 접근 제거를 검증한다.
+- 유스케이스와 MockMvc에서 전체 수 전달 및 기존 커서·페이지 계약 유지를 확인한다.
+
+DDL·프런트 UI·실제 DB 변경은 없다. 단위·H2와 정적 검사로 검증하며 MySQL 컨테이너·브라우저는 실행하지 않는다.
+배포 후 API 클라이언트를 갱신하고 실제 내·공유 아카이브로 totalCount와 페이지 간 값을 확인해야 한다.
+
+### 후속 요청 검증 결과
+
+- 단위·H2 테스트 951개 통과, 실패·오류·skip 0. 기존 회귀에 집계 검증을 추가하고 테스트 2개를 추가했다.
+- Detekt, 모듈 의존 방향 검사, `git diff --check` 통과.
+- 공유 조건을 추출한 최근 목록 SQL은 기존 쿼리와 공백 외 내용이 동일함을 확인했다.
+- 위 7개 MySQL 컨테이너 클래스는 임시 init script로 제외했다. 실제 MySQL·브라우저·배포는 미검증이다.
+
+```bash
+./gradlew check --continue --init-script /tmp/nook-311-count-check.gradle --no-daemon \
+  --max-workers=2 -Dorg.gradle.jvmargs='-Xmx2g -XX:MaxMetaspaceSize=768m'
+```
+
+초기 검증에서 테스트 fixture의 생성자 필드 위치와 저장소 함수 개수 제한을 수정했다.
+기존 CRUD 저장소에 기능을 더 쌓는 대신 집계 전용 읽기 저장소를 두었으며 baseline이나 검사 규칙은 변경하지 않았다.
