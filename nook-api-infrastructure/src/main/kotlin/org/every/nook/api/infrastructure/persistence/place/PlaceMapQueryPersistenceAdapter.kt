@@ -21,6 +21,7 @@ import tools.jackson.module.kotlin.jacksonObjectMapper
 @Component
 class PlaceMapQueryPersistenceAdapter(
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
+    private val recentCountRepository: RecentPlaceCountJpaRepository,
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) : PlaceMapQueryPort {
@@ -56,6 +57,12 @@ class PlaceMapQueryPersistenceAdapter(
                 tags = row.representativeTags.toDisplayTags(tagCatalog),
             )
         }
+    }
+
+    @Transactional(readOnly = true)
+    override fun countRecent(userId: Long, groupIds: List<Long>?): Long {
+        if (groupIds != null && groupIds.isEmpty()) return 0L
+        return recentCountRepository.countRecentPlaces(userId, groupIds != null, groupIds ?: listOf(0L))
     }
 
     @Transactional(readOnly = true)

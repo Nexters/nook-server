@@ -224,6 +224,7 @@ class PlaceControllerTest {
                 ),
                 nextCursor = RecentPlaceCursor(bookmarkedAt, 31),
                 hasNext = true,
+                totalCount = 42,
             ),
         )
 
@@ -239,6 +240,7 @@ class PlaceControllerTest {
                 jsonPath("$.success.items[0].shareToken") { value(null) }
                 jsonPath("$.success.nextCursor") { isNotEmpty() }
                 jsonPath("$.success.hasNext") { value(true) }
+                jsonPath("$.success.totalCount") { value(42) }
             }
     }
 
@@ -256,6 +258,7 @@ class PlaceControllerTest {
                 ),
                 nextCursor = null,
                 hasNext = false,
+                totalCount = 2,
             ),
         )
 
@@ -274,7 +277,7 @@ class PlaceControllerTest {
         listOf(null, emptyList(), listOf(1L, 2L)).forEach { groupIds ->
             val query = GetRecentPlacesUseCase.Query(TEST_USER_ID, null, 20, groupIds)
             `when`(getRecentPlacesUseCase(query)).thenReturn(
-                RecentPlaceSliceView(emptyList(), null, false),
+                RecentPlaceSliceView(emptyList(), null, false, totalCount = 0),
             )
             val suffix = groupIds?.joinToString(",")?.let { "?groupIds=$it" }.orEmpty()
 
@@ -282,6 +285,7 @@ class PlaceControllerTest {
                 status { isOk() }
                 jsonPath("$.success.items") { isEmpty() }
                 jsonPath("$.success.hasNext") { value(false) }
+                jsonPath("$.success.totalCount") { value(0) }
             }
             verify(getRecentPlacesUseCase)(query)
         }

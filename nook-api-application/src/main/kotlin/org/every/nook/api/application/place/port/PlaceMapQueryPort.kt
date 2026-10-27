@@ -8,6 +8,8 @@ import org.every.nook.api.domain.place.GeoBounds
 interface PlaceMapQueryPort {
     fun findInBounds(userId: Long, bounds: GeoBounds, groupIds: List<Long>? = null): List<MapPlaceView>
 
+    fun countRecent(userId: Long, groupIds: List<Long>? = null): Long
+
     fun findRecent(
         userId: Long,
         cursor: RecentPlaceCursor?,
