@@ -222,53 +222,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                         LIMIT 1
                     )
                 END AS shareToken
-            FROM user_place_bookmarks upb
-            INNER JOIN places p ON p.id = upb.place_id
-            WHERE upb.user_id = :userId
-              AND (
-                EXISTS (
-                  SELECT 1
-                  FROM user_saved_posts usp
-                  INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
-                  WHERE usp.user_id = upb.user_id
-                    AND usp.deleted_at IS NULL
-                    AND uspp.place_id = p.id
-                    AND (
-                        :filterByGroups = false OR EXISTS (
-                            SELECT 1
-                            FROM group_posts selected_group_post
-                            INNER JOIN user_groups selected_group
-                                ON selected_group.id = selected_group_post.group_id
-                               AND selected_group.user_id = usp.user_id
-                            WHERE selected_group_post.user_saved_post_id = usp.id
-                              AND selected_group.id IN (:groupIds)
-                              AND selected_group.deleted_at IS NULL
-                              AND selected_group_post.deleted_at IS NULL
-                        )
-                    )
-                )
-                OR EXISTS (
-                    SELECT 1
-                    FROM shared_group_subscriptions subscription
-                    INNER JOIN group_share_links share_link
-                        ON share_link.id = subscription.share_link_id
-                    INNER JOIN group_posts shared_group_post
-                        ON shared_group_post.group_id = share_link.group_id
-                    INNER JOIN user_groups shared_group ON shared_group.id = shared_group_post.group_id
-                    INNER JOIN user_saved_posts shared_saved_post
-                        ON shared_saved_post.id = shared_group_post.user_saved_post_id
-                    INNER JOIN user_saved_post_places shared_saved_post_place
-                        ON shared_saved_post_place.user_saved_post_id = shared_saved_post.id
-                    WHERE subscription.member_id = upb.user_id
-                      AND shared_saved_post_place.place_id = p.id
-                      AND share_link.revoked_at IS NULL
-                      AND (share_link.expires_at IS NULL OR share_link.expires_at > CURRENT_TIMESTAMP(6))
-                      AND shared_group_post.deleted_at IS NULL
-                      AND shared_group.deleted_at IS NULL
-                      AND (:filterByGroups = false OR shared_group.id IN (:groupIds))
-                      AND shared_saved_post.deleted_at IS NULL
-                )
-              )
+            $RECENT_PLACE_ACCESS_SQL
               AND (
                   :cursorBookmarkedAt IS NULL
                   OR upb.last_saved_at < :cursorBookmarkedAt
@@ -572,3 +526,54 @@ interface SavedPlaceSearchGroupProjection {
     val color: String
     val matchedPlaceCount: Long
 }
+
+// Share access and archive predicates so the total always follows the recent-list visibility policy.
+internal const val RECENT_PLACE_ACCESS_SQL = """
+            FROM user_place_bookmarks upb
+            INNER JOIN places p ON p.id = upb.place_id
+            WHERE upb.user_id = :userId
+              AND (
+                EXISTS (
+                  SELECT 1
+                  FROM user_saved_posts usp
+                  INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
+                  WHERE usp.user_id = upb.user_id
+                    AND usp.deleted_at IS NULL
+                    AND uspp.place_id = p.id
+                    AND (
+                        :filterByGroups = false OR EXISTS (
+                            SELECT 1
+                            FROM group_posts selected_group_post
+                            INNER JOIN user_groups selected_group
+                                ON selected_group.id = selected_group_post.group_id
+                               AND selected_group.user_id = usp.user_id
+                            WHERE selected_group_post.user_saved_post_id = usp.id
+                              AND selected_group.id IN (:groupIds)
+                              AND selected_group.deleted_at IS NULL
+                              AND selected_group_post.deleted_at IS NULL
+                        )
+                    )
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM shared_group_subscriptions subscription
+                    INNER JOIN group_share_links share_link
+                        ON share_link.id = subscription.share_link_id
+                    INNER JOIN group_posts shared_group_post
+                        ON shared_group_post.group_id = share_link.group_id
+                    INNER JOIN user_groups shared_group ON shared_group.id = shared_group_post.group_id
+                    INNER JOIN user_saved_posts shared_saved_post
+                        ON shared_saved_post.id = shared_group_post.user_saved_post_id
+                    INNER JOIN user_saved_post_places shared_saved_post_place
+                        ON shared_saved_post_place.user_saved_post_id = shared_saved_post.id
+                    WHERE subscription.member_id = upb.user_id
+                      AND shared_saved_post_place.place_id = p.id
+                      AND share_link.revoked_at IS NULL
+                      AND (share_link.expires_at IS NULL OR share_link.expires_at > CURRENT_TIMESTAMP(6))
+                      AND shared_group_post.deleted_at IS NULL
+                      AND shared_group.deleted_at IS NULL
+                      AND (:filterByGroups = false OR shared_group.id IN (:groupIds))
+                      AND shared_saved_post.deleted_at IS NULL
+                )
+              )
+"""

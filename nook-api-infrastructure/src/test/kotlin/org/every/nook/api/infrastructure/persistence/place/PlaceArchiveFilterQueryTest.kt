@@ -78,10 +78,12 @@ class PlaceArchiveFilterQueryTest {
         val first = rows("findRecentPlaces", listOf(2L), limit = 1)
         assertEquals(listOf(3L), first.map { (it.getValue("placeId") as Number).toLong() })
         assertEquals("selected-token", first.single()["shareToken"])
+        assertEquals(2L, count(listOf(2L)))
         val next = rows("findRecentPlaces", listOf(2L), cursorId = 3, limit = 1)
         assertEquals(listOf(2L), next.map { (it.getValue("placeId") as Number).toLong() })
         assertEquals(null, next.single()["shareToken"])
         assertEquals(emptyList(), rows("findRecentPlaces", listOf(2L), cursorId = 2, limit = 1))
+        assertEquals(2L, count(listOf(2L)))
     }
 
     @Test
@@ -89,9 +91,22 @@ class PlaceArchiveFilterQueryTest {
         jdbc.execute("UPDATE places SET latitude = 40 WHERE id = 3")
         val ids = rows("findMapPlaces", listOf(2L)).map { (it.getValue("id") as Number).toLong() }
         assertEquals(listOf(2L), ids)
+        assertEquals(2L, count(listOf(2L)))
     }
 
+    @Test
+    fun `count excludes places whose bookmarks or saved post access have been removed`() {
+        jdbc.execute("DELETE FROM user_place_bookmarks WHERE place_id = 1")
+        assertPlaces(null, listOf(2L, 3L, 4L))
+        jdbc.execute("UPDATE user_saved_posts SET deleted_at = CURRENT_TIMESTAMP WHERE id = 4")
+        assertPlaces(null, listOf(2L, 3L))
+    }
+
+    private fun count(groupIds: List<Long>?): Long =
+        (rows("countRecentPlaces", groupIds).single().values.single() as Number).toLong()
+
     private fun assertPlaces(groupIds: List<Long>?, expected: List<Long>) {
+        assertEquals(expected.size.toLong(), count(groupIds), "count with $groupIds")
         listOf("findMapPlaces" to "id", "findRecentPlaces" to "placeId").forEach { (method, column) ->
             val ids = rows(method, groupIds).map { (it.getValue(column) as Number).toLong() }
             assertEquals(expected.sorted(), ids.sorted(), "$method with $groupIds")
@@ -105,7 +120,12 @@ class PlaceArchiveFilterQueryTest {
         cursorId: Long? = null,
         limit: Int = 20,
     ): List<Map<String, Any?>> {
-        val query = UserPlaceBookmarkJpaRepository::class.memberFunctions.single { it.name == method }
+        val repository = if (method == "countRecentPlaces") {
+            RecentPlaceCountJpaRepository::class
+        } else {
+            UserPlaceBookmarkJpaRepository::class
+        }
+        val query = repository.memberFunctions.single { it.name == method }
             .findAnnotation<Query>()!!.value
         return namedJdbc.queryForList(
             query,

@@ -2,7 +2,7 @@
 
 ## 요청
 
-기존 두 endpoint에 같은 `groupIds`를 전달한다. 응답 형식은 유지된다.
+기존 두 endpoint에 같은 `groupIds`를 전달한다. 최근 공간 응답에 `totalCount`가 추가된다.
 
 | 선택 | 쿼리 | 의미 |
 | --- | --- | --- |
@@ -19,6 +19,35 @@ GET /api/v1/places/recent?size=20&groupIds=
 ID는 양의 정수다. 중복 ID는 결과를 중복시키지 않는다. 잘못된 형식과 0·음수 ID는
 `400 / INVALID_REQUEST`다. 접근할 수 없거나 삭제된 ID는 무시하며 유효한 선택 결과는 반환한다.
 미지정과 빈 값은 다르므로 전체 해제를 보낼 때 query serializer가 빈 파라미터를 생략하지 않도록 한다.
+생성 클라이언트가 빈 배열을 생략한다면, 전체 해제 시 요청하지 않고 화면에서 0곳·빈 목록으로 처리한다.
+
+## 전체 장소 수 (2026-10-27 추가)
+
+`GET /api/v1/places/recent`의 `success.totalCount`를 바텀시트의 N곳 표시에 사용한다.
+
+- `totalCount`는 정수(Long)이며 모든 페이지에 제공한다. `size`, `cursor`, 지도 영역과 무관하다.
+- `groupIds`가 있으면 같은 내·공유 아카이브 OR 조건으로 집계한다. 중복 장소는 한 번만 센다.
+- `groupIds` 생략 시 미분류를 포함한 접근 가능한 전체 북마크 장소 수다.
+- `groupIds=` 또는 접근 가능한 장소가 없는 선택은 `totalCount: 0`이다.
+- 다음 페이지가 비어 있어도 조건에 맞는 전체 수를 반환한다. `items.length`와 다를 수 있다.
+- 삭제·공유 해제·만료·구독 해제 여부를 매 요청 확인한다. 조회 사이 데이터가 변경되면 수가 달라질 수 있다.
+
+예시 응답(필터에 해당하는 장소 42개, 마지막 커서 이후 요청):
+
+```json
+{
+  "resultType": "SUCCESS",
+  "success": {
+    "items": [],
+    "nextCursor": null,
+    "hasNext": false,
+    "totalCount": 42
+  }
+}
+```
+
+위 예시는 마지막 커서 이후 빈 페이지이며, 앞선 페이지에서도 같은 `totalCount`를 제공한다.
+필터 변경 시 목록·cursor를 초기화하고 새 응답의 `totalCount`로 교체한다.
 
 ## 화면 연결
 
