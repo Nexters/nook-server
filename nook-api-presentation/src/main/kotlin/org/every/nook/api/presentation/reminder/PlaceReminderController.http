@@ -1,0 +1,24 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+### 리마인드 설정·미연결 게시물 수·배너 표시 대상 조회
+# 최초 enabled=true. 앱 진입/복귀 및 장소 연결/삭제 후 다시 조회합니다.
+GET {{baseUrl}}/api/v1/me/place-connection-reminder
+
+### 리마인드 끄기 (저장 완료 푸시 설정은 유지)
+PATCH {{baseUrl}}/api/v1/me/place-connection-reminder
+Content-Type: application/json
+
+{"enabled": false}
+
+### 리마인드 켜기
+PATCH {{baseUrl}}/api/v1/me/place-connection-reminder
+Content-Type: application/json
+
+{"enabled": true}
