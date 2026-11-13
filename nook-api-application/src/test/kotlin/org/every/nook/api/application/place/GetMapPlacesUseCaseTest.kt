@@ -8,6 +8,7 @@ import java.math.BigDecimal
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -45,6 +46,7 @@ class GetMapPlacesUseCaseTest {
                     cursor: RecentPlaceCursor?,
                     limit: Int,
                     groupIds: List<Long>?,
+                    ordering: PlaceOrdering,
                 ): List<RecentPlaceView> = emptyList()
             },
             UserAnalyticsEventRecorder { record -> events += record.eventName },
@@ -86,6 +88,7 @@ class GetMapPlacesUseCaseTest {
                     cursor: RecentPlaceCursor?,
                     limit: Int,
                     groupIds: List<Long>?,
+                    ordering: PlaceOrdering,
                 ): List<RecentPlaceView> {
                     assertEquals(3, limit)
                     assertEquals(listOf(1L, 2L), groupIds)
@@ -122,6 +125,7 @@ class GetMapPlacesUseCaseTest {
                     cursor: RecentPlaceCursor?,
                     limit: Int,
                     groupIds: List<Long>?,
+                    ordering: PlaceOrdering,
                 ): List<RecentPlaceView> = if (cursor?.bookmarkId == 1L) {
                     emptyList()
                 } else {
@@ -144,6 +148,42 @@ class GetMapPlacesUseCaseTest {
         assertEquals(50L, exhausted.totalCount)
         assertFalse(exhausted.hasNext)
         assertEquals(null, exhausted.nextCursor)
+    }
+
+    @Test
+    fun `nearest cursor preserves GPS distance and ordering and rejects a changed origin`() {
+        val ordering = PlaceOrdering(PlaceSort.NEAREST, BigDecimal("37.5"), BigDecimal("127"))
+        val place = recentPlace(31, Instant.EPOCH).copy(distanceScore = 0.001)
+        val port = object : PlaceMapQueryPort {
+            override fun countRecent(userId: Long, groupIds: List<Long>?): Long = 2
+
+            override fun findInBounds(userId: Long, bounds: GeoBounds, groupIds: List<Long>?): List<MapPlaceView> =
+                error("must not query pins")
+
+            override fun findRecent(
+                userId: Long,
+                cursor: RecentPlaceCursor?,
+                limit: Int,
+                groupIds: List<Long>?,
+                ordering: PlaceOrdering,
+            ): List<RecentPlaceView> = listOf(place, place.copy(bookmarkId = 32))
+        }
+        val useCase = GetRecentPlacesUseCase(port)
+        val query = GetRecentPlacesUseCase.Query(7, null, 1, ordering = ordering)
+        val cursor = useCase(query).nextCursor
+        assertEquals(
+            RecentPlaceCursor(Instant.EPOCH, 31, PlaceSort.NEAREST, ordering.latitude, ordering.longitude, 0.001),
+            cursor,
+        )
+        assertFailsWith<InvalidPlaceSearchRequestException> {
+            useCase(query.copy(cursor = cursor, ordering = ordering.copy(latitude = BigDecimal("37.6"))))
+        }
+        assertFailsWith<InvalidPlaceSearchRequestException> {
+            useCase(query.copy(cursor = cursor, ordering = PlaceOrdering(PlaceSort.OLDEST)))
+        }
+        assertFailsWith<InvalidPlaceSearchRequestException> {
+            useCase(query.copy(ordering = PlaceOrdering(PlaceSort.NEAREST)))
+        }
     }
 
     private fun recentPlace(bookmarkId: Long, bookmarkedAt: Instant): RecentPlaceView = RecentPlaceView(

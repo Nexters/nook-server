@@ -3,6 +3,8 @@ package org.every.nook.api.infrastructure.persistence.place
 import org.every.nook.api.application.place.MapPlaceView
 import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceCategoryGroup
+import org.every.nook.api.application.place.PlaceOrdering
+import org.every.nook.api.application.place.PlaceSort
 import org.every.nook.api.application.place.PlaceTagCatalogQueryPort
 import org.every.nook.api.application.place.PlaceTagCatalogSnapshot
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
@@ -22,6 +24,7 @@ import tools.jackson.module.kotlin.jacksonObjectMapper
 class PlaceMapQueryPersistenceAdapter(
     private val bookmarkRepository: UserPlaceBookmarkJpaRepository,
     private val recentCountRepository: RecentPlaceCountJpaRepository,
+    private val recentSortRepository: RecentPlaceSortJpaRepository,
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) : PlaceMapQueryPort {
@@ -71,17 +74,11 @@ class PlaceMapQueryPersistenceAdapter(
         cursor: RecentPlaceCursor?,
         limit: Int,
         groupIds: List<Long>?,
+        ordering: PlaceOrdering,
     ): List<RecentPlaceView> {
         if (groupIds != null && groupIds.isEmpty()) return emptyList()
         val tagCatalog = tagCatalogPort.snapshot()
-        return bookmarkRepository.findRecentPlaces(
-            userId = userId,
-            cursorBookmarkedAt = cursor?.bookmarkedAt,
-            cursorBookmarkId = cursor?.bookmarkId,
-            limit = limit,
-            filterByGroups = groupIds != null,
-            groupIds = groupIds ?: listOf(0L),
-        ).map { row ->
+        return recentRows(userId, cursor, limit, groupIds, ordering).map { row ->
             RecentPlaceView(
                 bookmarkId = row.bookmarkId,
                 bookmarkedAt = row.bookmarkedAt,
@@ -103,8 +100,39 @@ class PlaceMapQueryPersistenceAdapter(
                 tags = row.representativeTags.toDisplayTags(tagCatalog),
                 accessType = if (row.shareToken == null) PlaceAccessType.OWNED else PlaceAccessType.SHARED,
                 shareToken = row.shareToken,
+                distanceScore = if (ordering.sort == PlaceSort.NEAREST) row.distanceScore else null,
             )
         }
+    }
+
+    private fun recentRows(
+        userId: Long,
+        cursor: RecentPlaceCursor?,
+        limit: Int,
+        groupIds: List<Long>?,
+        ordering: PlaceOrdering,
+    ): List<RecentPlaceProjection> = if (ordering.sort == PlaceSort.LATEST) {
+        bookmarkRepository.findRecentPlaces(
+            userId = userId,
+            cursorBookmarkedAt = cursor?.bookmarkedAt,
+            cursorBookmarkId = cursor?.bookmarkId,
+            limit = limit,
+            filterByGroups = groupIds != null,
+            groupIds = groupIds ?: listOf(0L),
+        )
+    } else {
+        recentSortRepository.findSortedRecentPlaces(
+            userId = userId,
+            sort = ordering.sort.name,
+            limit = limit,
+            filterByGroups = groupIds != null,
+            groupIds = groupIds ?: listOf(0L),
+            latitude = ordering.latitude,
+            longitude = ordering.longitude,
+            cursorBookmarkedAt = cursor?.bookmarkedAt,
+            cursorBookmarkId = cursor?.bookmarkId,
+            cursorDistanceScore = cursor?.distanceScore,
+        )
     }
 
     private fun String?.toDisplayTags(tagCatalog: PlaceTagCatalogSnapshot): List<String> = if (this.isNullOrBlank()) {
