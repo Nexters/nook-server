@@ -17,6 +17,14 @@ GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&south
 # totalCount는 미분류 포함 전체 접근 가능 장소 수입니다. 장소별 tags(최대 4개)가 포함됩니다.
 GET {{baseUrl}}/api/v1/places/recent?size=20
 
+### 가까운 순: 사용자 GPS 기준, 전체 목록 정렬 후 페이지네이션
+# 다음 페이지에는 반환된 cursor와 같은 sort/latitude/longitude/groupIds를 전달합니다.
+# 정렬·GPS·아카이브 선택 변경 시 cursor를 초기화합니다. 스크롤 중 GPS를 갱신하지 않습니다.
+GET {{baseUrl}}/api/v1/places/recent?sort=NEAREST&latitude=37.5665&longitude=126.9780&size=20
+
+### 오래된 순: 마지막 저장 연결 시각 기준
+GET {{baseUrl}}/api/v1/places/recent?sort=OLDEST&groupIds=1,2&size=20
+
 ### 선택한 내·공유 아카이브의 지도 장소 (OR 조건)
 GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&southLatitude=37.40&eastLongitude=127.20&groupIds=1,2
 
@@ -43,6 +51,15 @@ GET {{baseUrl}}/api/v1/places/saved/search?query=라자냐&page=0&size=20
 
 ### 장소 태그명 검색
 GET {{baseUrl}}/api/v1/places/saved/search?query=조용&page=0&size=20
+
+### 저장 장소 검색: 최신 저장순 (정렬 미지정 시 기존 관련도순 유지)
+GET {{baseUrl}}/api/v1/places/saved/search?query=카페&sort=LATEST&groupId=1&page=0&size=20
+
+### 저장 장소 검색: 오래된 저장순
+GET {{baseUrl}}/api/v1/places/saved/search?query=카페&sort=OLDEST&page=0&size=20
+
+### 저장 장소 검색: GPS 가까운 순
+GET {{baseUrl}}/api/v1/places/saved/search?query=카페&sort=NEAREST&latitude=37.5665&longitude=126.9780&page=0&size=20
 
 ### 직접 연결할 장소 검색
 # 기존 장소와 일치하면 existingPlaceId가 포함됩니다.

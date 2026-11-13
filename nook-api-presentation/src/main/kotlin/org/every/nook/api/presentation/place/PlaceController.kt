@@ -14,6 +14,8 @@ import jakarta.validation.constraints.Size
 import org.every.nook.api.application.place.GetMapPlacesUseCase
 import org.every.nook.api.application.place.GetPlaceDetailUseCase
 import org.every.nook.api.application.place.GetRecentPlacesUseCase
+import org.every.nook.api.application.place.PlaceOrdering
+import org.every.nook.api.application.place.PlaceSort
 import org.every.nook.api.application.place.SearchPlacesUseCase
 import org.every.nook.api.application.place.SearchSavedPlacesUseCase
 import org.every.nook.api.application.place.UpdatePlaceBookmarkUseCase
@@ -116,6 +118,15 @@ class PlaceController(
         @Parameter(description = "선택한 내·공유 아카이브 ID. 미지정 시 전체, 빈 값이면 전체 해제")
         @RequestParam(required = false)
         groupIds: List<Long>?,
+        @Parameter(description = "정렬: LATEST(기본), OLDEST, NEAREST. 변경 시 cursor 초기화")
+        @RequestParam(defaultValue = "LATEST")
+        sort: PlaceSort = PlaceSort.LATEST,
+        @Parameter(description = "NEAREST 필수: 사용자 GPS 위도. 페이지 조회 동안 고정")
+        @RequestParam(required = false)
+        latitude: BigDecimal? = null,
+        @Parameter(description = "NEAREST 필수: 사용자 GPS 경도. 페이지 조회 동안 고정")
+        @RequestParam(required = false)
+        longitude: BigDecimal? = null,
     ): ApiResponse<RecentPlaceSliceResponse> {
         require(groupIds == null || groupIds.all { id: Long? -> id != null && id > 0 }) {
             "Group IDs must be positive"
@@ -125,6 +136,7 @@ class PlaceController(
                 userId = userContext.userId,
                 cursor = RecentPlaceCursorCodec.decode(cursor),
                 groupIds = groupIds,
+                ordering = PlaceOrdering(sort, latitude, longitude),
                 size = size,
             ),
         )
@@ -153,6 +165,15 @@ class PlaceController(
         @Min(1)
         @Max(MAX_SAVED_PLACE_SEARCH_PAGE_SIZE)
         size: Int,
+        @Parameter(description = "정렬: 미지정 시 기존 관련도순. LATEST, OLDEST, NEAREST")
+        @RequestParam(required = false)
+        sort: PlaceSort? = null,
+        @Parameter(description = "NEAREST 필수: 사용자 GPS 위도")
+        @RequestParam(required = false)
+        latitude: BigDecimal? = null,
+        @Parameter(description = "NEAREST 필수: 사용자 GPS 경도")
+        @RequestParam(required = false)
+        longitude: BigDecimal? = null,
     ): ApiResponse<SavedPlaceSearchPageResponse> {
         val result = searchSavedPlacesUseCase(
             SearchSavedPlacesUseCase.Query(
@@ -161,6 +182,7 @@ class PlaceController(
                 page = page,
                 size = size,
                 groupId = groupId,
+                ordering = sort?.let { PlaceOrdering(it, latitude, longitude) },
             ),
         )
         return ApiResponse.success(SavedPlaceSearchPageResponse.from(result))

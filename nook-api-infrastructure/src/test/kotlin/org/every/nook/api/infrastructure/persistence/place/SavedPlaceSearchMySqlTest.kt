@@ -71,8 +71,9 @@ class SavedPlaceSearchMySqlTest {
     private fun createSchema(jdbc: JdbcTemplate) {
         val tables = listOf(
             """places (id BIGINT PRIMARY KEY, name VARCHAR(50), address VARCHAR(50), category VARCHAR(50),
-                provider_category VARCHAR(50), thumbnail_url VARCHAR(255), representative_tags JSON)""",
-            "user_place_bookmarks (user_id BIGINT, place_id BIGINT, memo TEXT)",
+                provider_category VARCHAR(50), thumbnail_url VARCHAR(255), representative_tags JSON,
+                latitude DECIMAL(10,6), longitude DECIMAL(10,6))""",
+            "user_place_bookmarks (user_id BIGINT, place_id BIGINT, memo TEXT, id BIGINT, last_saved_at TIMESTAMP)",
             """user_saved_posts (id BIGINT PRIMARY KEY, user_id BIGINT, post_id BIGINT,
                 created_at TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6), deleted_at TIMESTAMP(6) NULL)""",
             "user_saved_post_places (user_saved_post_id BIGINT, place_id BIGINT)",
@@ -114,7 +115,7 @@ class SavedPlaceSearchMySqlTest {
         )
         jdbc.update(
             """
-            INSERT INTO user_place_bookmarks VALUES
+            INSERT INTO user_place_bookmarks (user_id, place_id, memo) VALUES
                 (1, 1, '100%_!'), (1, 2, '조용하고 정렬하기 좋은 곳'), (1, 3, NULL), (1, 4, NULL),
                 (2, 1, '타인메모'), (1, 5, '내공유메모'), (2, 5, '공유자메모'), (1, 6, '조용')
             """.trimIndent(),
@@ -160,6 +161,9 @@ private class SearchQueries(private val jdbc: NamedParameterJdbcTemplate) {
     private fun parameters(keyword: String, groupId: Long?): Map<String, Any?> = mapOf(
         "userId" to 1L,
         "groupId" to groupId,
+        "sort" to null,
+        "latitude" to null,
+        "longitude" to null,
         "pattern" to "%${keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_")}%",
     )
 

@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.sql.Connection
 import java.sql.Timestamp
 import java.util.UUID
@@ -102,6 +103,55 @@ class PlaceArchiveFilterQueryTest {
         assertPlaces(null, listOf(2L, 3L))
     }
 
+    @Test
+    fun `oldest sorting paginates the entire filtered result with deterministic ties`() {
+        jdbc.execute("UPDATE user_place_bookmarks SET last_saved_at = TIMESTAMP '2026-01-03' WHERE place_id = 1")
+        jdbc.execute("UPDATE user_place_bookmarks SET last_saved_at = TIMESTAMP '2026-01-02' WHERE place_id = 3")
+        val first = rows("findSortedRecentPlaces", null, limit = 2, sort = "OLDEST")
+        assertEquals(listOf(4L, 2L), first.placeIds())
+        val next = rows("findSortedRecentPlaces", null, sort = "OLDEST", after = first.last())
+        assertEquals(listOf(3L, 1L), next.placeIds())
+        assertEquals(listOf(2L, 3L), rows("findSortedRecentPlaces", listOf(2L), sort = "OLDEST").placeIds())
+        assertEquals(4L, count(null))
+    }
+
+    @Test
+    fun `nearest sorting applies before limit and continues without duplicates`() {
+        jdbc.execute("UPDATE places SET latitude = 37.5 + id * 0.01")
+        val first = rows("findSortedRecentPlaces", null, limit = 2, sort = "NEAREST")
+        assertEquals(listOf(1L, 2L), first.placeIds())
+        val next = rows("findSortedRecentPlaces", null, limit = 2, sort = "NEAREST", after = first.last())
+        assertEquals(listOf(3L, 4L), next.placeIds())
+        assertEquals(emptyList(), rows("findSortedRecentPlaces", null, sort = "NEAREST", after = next.last()))
+        assertEquals(listOf(2L, 3L), rows("findSortedRecentPlaces", listOf(2L), sort = "NEAREST").placeIds())
+    }
+
+    @Test
+    fun `equal distances use latest saved time then bookmark id across pages`() {
+        jdbc.execute("UPDATE user_place_bookmarks SET last_saved_at = TIMESTAMP '2026-01-02' WHERE place_id = 1")
+        val first = rows("findSortedRecentPlaces", null, limit = 2, sort = "NEAREST")
+        assertEquals(listOf(1L, 4L), first.placeIds())
+        assertEquals(
+            listOf(3L, 2L),
+            rows("findSortedRecentPlaces", null, sort = "NEAREST", after = first.last()).placeIds(),
+        )
+    }
+
+    @Test
+    fun `search sorts all matches before limiting and preserves archive filter`() {
+        jdbc.execute("UPDATE places SET name = 'foo', latitude = 37.5 + id * 0.01")
+        jdbc.execute("UPDATE user_place_bookmarks SET last_saved_at = TIMESTAMP '2026-01-02' WHERE place_id = 1")
+        fun ids(sort: String?, groups: List<Long>? = null, limit: Int = 20): List<Long> =
+            rows("searchSavedPlaces", groups, sort = sort, limit = limit).map { (it.getValue("id") as Number).toLong() }
+        assertEquals(listOf(1L, 4L, 3L, 2L), ids("LATEST"))
+        assertEquals(listOf(4L, 3L, 2L, 1L), ids("OLDEST"))
+        assertEquals(listOf(1L, 2L), ids("NEAREST", limit = 2))
+        assertEquals(listOf(1L, 2L), ids("LATEST", listOf(1L)))
+        assertEquals(listOf(1L, 2L, 3L, 4L), ids(null))
+    }
+
+    private fun List<Map<String, Any?>>.placeIds(): List<Long> = map { (it.getValue("placeId") as Number).toLong() }
+
     private fun count(groupIds: List<Long>?): Long =
         (rows("countRecentPlaces", groupIds).single().values.single() as Number).toLong()
 
@@ -119,16 +169,18 @@ class PlaceArchiveFilterQueryTest {
         groupIds: List<Long>?,
         cursorId: Long? = null,
         limit: Int = 20,
+        sort: String? = null,
+        after: Map<String, Any?>? = null,
     ): List<Map<String, Any?>> {
-        val repository = if (method == "countRecentPlaces") {
-            RecentPlaceCountJpaRepository::class
-        } else {
-            UserPlaceBookmarkJpaRepository::class
+        val repository = when (method) {
+            "countRecentPlaces" -> RecentPlaceCountJpaRepository::class
+            "findSortedRecentPlaces" -> RecentPlaceSortJpaRepository::class
+            else -> UserPlaceBookmarkJpaRepository::class
         }
         val query = repository.memberFunctions.single { it.name == method }
             .findAnnotation<Query>()!!.value
         return namedJdbc.queryForList(
-            query,
+            if (method == "searchSavedPlaces") query + " LIMIT :limit OFFSET 0" else query,
             mapOf(
                 "userId" to 7L,
                 "filterByGroups" to (groupIds != null),
@@ -137,15 +189,41 @@ class PlaceArchiveFilterQueryTest {
                 "southLatitude" to 37,
                 "westLongitude" to 126,
                 "eastLongitude" to 128,
-                "cursorBookmarkedAt" to cursorId?.let { Timestamp.valueOf("2026-01-01 00:00:00") },
-                "cursorBookmarkId" to cursorId,
+                "cursorBookmarkedAt" to (
+                    after?.get("bookmarkedAt") ?: cursorId?.let { Timestamp.valueOf("2026-01-01 00:00:00") }
+                    ),
+                "cursorBookmarkId" to (after?.get("bookmarkId") ?: cursorId),
+                "cursorDistanceScore" to after?.get("distanceScore"),
+                "sort" to sort,
+                "latitude" to 37.51,
+                "longitude" to 127,
+                "groupId" to groupIds?.singleOrNull(),
+                "pattern" to "%o%",
                 "limit" to limit,
             ),
         )
     }
 
-    private companion object {
-        val schema = listOf(
+    companion object {
+        @JvmStatic
+        fun jsonContains(document: String?, candidate: String?): Boolean {
+            if (document == null || candidate == null) return false
+            val mapper = jacksonObjectMapper()
+            return mapper.readValue(document, Array<String>::class.java)
+                .contains(mapper.readValue(candidate, String::class.java))
+        }
+
+        @JvmStatic
+        fun jsonQuote(value: String): String = jacksonObjectMapper().writeValueAsString(value)
+
+        private val schema = listOf(
+            """CREATE ALIAS JSON_CONTAINS FOR
+                "org.every.nook.api.infrastructure.persistence.place.PlaceArchiveFilterQueryTest.jsonContains" """,
+            """CREATE ALIAS JSON_QUOTE FOR
+                "org.every.nook.api.infrastructure.persistence.place.PlaceArchiveFilterQueryTest.jsonQuote" """,
+            """CREATE TABLE post_media (post_id BIGINT, media_url VARCHAR(100), media_type VARCHAR(20),
+                display_order INT)""",
+            "CREATE TABLE place_tag_catalogs (enabled BOOLEAN, display_name VARCHAR(100), tag_code VARCHAR(30))",
             """
             CREATE TABLE places (
                 id BIGINT, name VARCHAR(100), city VARCHAR(100), address VARCHAR(100), category VARCHAR(100),
@@ -155,10 +233,11 @@ class PlaceArchiveFilterQueryTest {
             """,
             """
             CREATE TABLE user_place_bookmarks (
-                id BIGINT, user_id BIGINT, place_id BIGINT, last_saved_at TIMESTAMP
+                id BIGINT, user_id BIGINT, place_id BIGINT, last_saved_at TIMESTAMP, memo VARCHAR(100)
             )
             """,
-            "CREATE TABLE user_saved_posts (id BIGINT, user_id BIGINT, created_at TIMESTAMP, deleted_at TIMESTAMP)",
+            """CREATE TABLE user_saved_posts (id BIGINT, user_id BIGINT, created_at TIMESTAMP,
+                deleted_at TIMESTAMP, post_id BIGINT)""",
             "CREATE TABLE user_saved_post_places (user_saved_post_id BIGINT, place_id BIGINT)",
             "CREATE TABLE user_groups (id BIGINT, user_id BIGINT, color VARCHAR(30), deleted_at TIMESTAMP)",
             """
@@ -177,19 +256,19 @@ class PlaceArchiveFilterQueryTest {
             )
             """,
         )
-        val fixtures = listOf(
+        private val fixtures = listOf(
             """
             INSERT INTO places (id, name, latitude, longitude) VALUES
                 (1, 'own', 37.5, 127), (2, 'overlap', 37.5, 127),
                 (3, 'shared', 37.5, 127), (4, 'ungrouped', 37.5, 127), (5, 'private', 37.5, 127)
             """,
             """
-            INSERT INTO user_place_bookmarks VALUES
+            INSERT INTO user_place_bookmarks (id, user_id, place_id, last_saved_at) VALUES
                 (1, 7, 1, '2026-01-01'), (2, 7, 2, '2026-01-01'), (3, 7, 3, '2026-01-01'),
                 (4, 7, 4, '2026-01-01'), (5, 7, 5, '2026-01-01'), (6, 8, 5, '2026-01-01')
             """,
             """
-            INSERT INTO user_saved_posts VALUES
+            INSERT INTO user_saved_posts (id, user_id, created_at, deleted_at) VALUES
                 (1, 7, '2026-01-01', NULL), (2, 7, '2026-01-01', NULL),
                 (3, 8, '2026-01-01', NULL), (4, 7, '2026-01-01', NULL), (5, 9, '2026-01-01', NULL)
             """,

@@ -32,7 +32,7 @@ class SavedPlaceSearchPersistenceAdapterTest {
         )
         `when`(repository.findSavedPlaceSearchGroups(7, "%100!%!_!!%")).thenReturn(listOf(group))
 
-        val result = adapter.search(userId = 7, keyword = "100%_!", groupId = 9, page = 1, size = 2)
+        val result = adapter.search(userId = 7, keyword = "100%_!", groupId = 9, page = 1, size = 2, ordering = null)
 
         assertEquals(17, result.items.single().id)
         assertEquals("카페 100%_!", result.items.single().name)

@@ -17,7 +17,8 @@ import kotlin.test.assertNull
 class PlaceMapQueryPersistenceAdapterTest {
     private val repository = mock(UserPlaceBookmarkJpaRepository::class.java)
     private val countRepository = mock(RecentPlaceCountJpaRepository::class.java)
-    private val adapter = PlaceMapQueryPersistenceAdapter(repository, countRepository)
+    private val sortRepository = mock(RecentPlaceSortJpaRepository::class.java)
+    private val adapter = PlaceMapQueryPersistenceAdapter(repository, countRepository, sortRepository)
 
     @Test
     fun `passes selected archives to both database queries`() {

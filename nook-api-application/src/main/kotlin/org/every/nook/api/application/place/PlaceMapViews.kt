@@ -33,6 +33,7 @@ data class RecentPlaceView(
     val tags: List<String> = emptyList(),
     val accessType: PlaceAccessType = PlaceAccessType.OWNED,
     val shareToken: String? = null,
+    val distanceScore: Double? = null,
 )
 
 /**
@@ -48,4 +49,11 @@ data class RecentPlaceSliceView(
     val totalCount: Long,
 )
 
-data class RecentPlaceCursor(val bookmarkedAt: Instant, val bookmarkId: Long)
+data class RecentPlaceCursor(
+    val bookmarkedAt: Instant,
+    val bookmarkId: Long,
+    val sort: PlaceSort = PlaceSort.LATEST,
+    val latitude: BigDecimal? = null,
+    val longitude: BigDecimal? = null,
+    val distanceScore: Double? = null,
+)
