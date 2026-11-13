@@ -9,6 +9,7 @@ class SearchSavedPlacesUseCase(
     private val groupOwnershipPort: GroupOwnershipPort,
 ) {
     operator fun invoke(query: Query): SavedPlaceSearchPageView {
+        query.ordering?.validate()
         if (query.hasInvalidKeyword() || query.hasInvalidPagination()) {
             throw InvalidPlaceSearchRequestException()
         }
@@ -21,10 +22,18 @@ class SearchSavedPlacesUseCase(
             groupId = query.groupId,
             page = query.page,
             size = query.size,
+            ordering = query.ordering,
         )
     }
 
-    data class Query(val userId: Long, val keyword: String, val page: Int, val size: Int, val groupId: Long? = null)
+    data class Query(
+        val userId: Long,
+        val keyword: String,
+        val page: Int,
+        val size: Int,
+        val groupId: Long? = null,
+        val ordering: PlaceOrdering? = null,
+    )
 
     private fun Query.hasInvalidKeyword(): Boolean = keyword.isBlank() || keyword.length > MAX_QUERY_LENGTH
 

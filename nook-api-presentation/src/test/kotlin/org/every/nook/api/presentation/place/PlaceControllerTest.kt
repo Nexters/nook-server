@@ -7,6 +7,7 @@ import org.every.nook.api.application.place.MapPlaceView
 import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceCandidate
 import org.every.nook.api.application.place.PlaceDetailView
+import org.every.nook.api.application.place.PlaceOrdering
 import org.every.nook.api.application.place.PlacePostGroupView
 import org.every.nook.api.application.place.PlacePostMediaTypeView
 import org.every.nook.api.application.place.PlacePostMediaView
@@ -14,6 +15,7 @@ import org.every.nook.api.application.place.PlacePostPageView
 import org.every.nook.api.application.place.PlacePostView
 import org.every.nook.api.application.place.PlaceSearchResultView
 import org.every.nook.api.application.place.PlaceSearchSliceView
+import org.every.nook.api.application.place.PlaceSort
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceSliceView
@@ -242,6 +244,28 @@ class PlaceControllerTest {
                 jsonPath("$.success.hasNext") { value(true) }
                 jsonPath("$.success.totalCount") { value(42) }
             }
+    }
+
+    @Test
+    fun `binds GPS ordering for recent and searched places`() {
+        val ordering = PlaceOrdering(PlaceSort.NEAREST, BigDecimal("37.5"), BigDecimal("127"))
+        val recent = GetRecentPlacesUseCase.Query(TEST_USER_ID, null, 20, ordering = ordering)
+        val search = SearchSavedPlacesUseCase.Query(TEST_USER_ID, "카페", 0, 20, ordering = ordering)
+        `when`(getRecentPlacesUseCase(recent)).thenReturn(RecentPlaceSliceView(emptyList(), null, false, 0))
+        `when`(searchSavedPlacesUseCase(search)).thenReturn(
+            SavedPlaceSearchPageView(emptyList(), emptyList(), 0, 20, 0, 0, false),
+        )
+        val parameters = "sort=NEAREST&latitude=37.5&longitude=127"
+        mockMvc.get("/api/v1/places/recent?$parameters").andExpect { status { isOk() } }
+        mockMvc.get("/api/v1/places/saved/search?query=카페&$parameters").andExpect { status { isOk() } }
+        verify(getRecentPlacesUseCase).invoke(recent)
+        verify(searchSavedPlacesUseCase).invoke(search)
+    }
+
+    @Test
+    fun `rejects unknown sorting before querying`() {
+        mockMvc.get("/api/v1/places/recent?sort=UNKNOWN").andExpect { status { isBadRequest() } }
+        mockMvc.get("/api/v1/places/saved/search?query=카페&sort=UNKNOWN").andExpect { status { isBadRequest() } }
     }
 
     @Test

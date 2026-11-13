@@ -175,54 +175,7 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
 
     @Query(
         value = """
-            SELECT
-                upb.id AS bookmarkId,
-                upb.last_saved_at AS bookmarkedAt,
-                p.id AS placeId,
-                p.name AS name,
-                p.city AS city,
-                p.address AS address,
-                p.category AS category,
-                p.provider_category AS providerCategory,
-                p.latitude AS latitude,
-                p.longitude AS longitude,
-                CAST(p.representative_tags AS CHAR) AS representativeTags,
-                p.thumbnail_url AS thumbnailUrl,
-                p.thumbnail_parsing_status AS thumbnailParsingStatus,
-                CASE
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM user_saved_posts usp
-                        INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
-                        WHERE usp.user_id = upb.user_id
-                          AND usp.deleted_at IS NULL
-                          AND uspp.place_id = p.id
-                    ) THEN NULL
-                    ELSE (
-                        SELECT share_link.token_value
-                        FROM shared_group_subscriptions subscription
-                        INNER JOIN group_share_links share_link
-                            ON share_link.id = subscription.share_link_id
-                        INNER JOIN group_posts shared_group_post
-                            ON shared_group_post.group_id = share_link.group_id
-                        INNER JOIN user_groups shared_group ON shared_group.id = shared_group_post.group_id
-                        INNER JOIN user_saved_posts shared_saved_post
-                            ON shared_saved_post.id = shared_group_post.user_saved_post_id
-                        INNER JOIN user_saved_post_places shared_saved_post_place
-                            ON shared_saved_post_place.user_saved_post_id = shared_saved_post.id
-                        WHERE subscription.member_id = upb.user_id
-                          AND shared_saved_post_place.place_id = p.id
-                          AND share_link.revoked_at IS NULL
-                          AND (share_link.expires_at IS NULL OR share_link.expires_at > CURRENT_TIMESTAMP(6))
-                          AND shared_group_post.deleted_at IS NULL
-                          AND shared_group.deleted_at IS NULL
-                          AND (:filterByGroups = false OR shared_group.id IN (:groupIds))
-                          AND shared_saved_post.deleted_at IS NULL
-                        ORDER BY subscription.created_at DESC, subscription.id DESC
-                        LIMIT 1
-                    )
-                END AS shareToken
-            $RECENT_PLACE_ACCESS_SQL
+            $RECENT_PLACE_SELECT_SQL
               AND (
                   :cursorBookmarkedAt IS NULL
                   OR upb.last_saved_at < :cursorBookmarkedAt
@@ -348,10 +301,16 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
                   )
               )
             ORDER BY
-                CASE
-                    WHEN p.name LIKE :pattern ESCAPE '!' THEN 0
-                    WHEN p.address LIKE :pattern ESCAPE '!' THEN 1
-                    ELSE 2
+                CASE WHEN :sort = 'NEAREST' THEN $PLACE_DISTANCE_SCORE_SQL END ASC,
+                CASE WHEN :sort = 'OLDEST' THEN upb.last_saved_at END ASC,
+                CASE WHEN :sort IN ('LATEST', 'NEAREST') THEN upb.last_saved_at END DESC,
+                CASE WHEN :sort IS NOT NULL THEN upb.id END DESC,
+                CASE WHEN :sort IS NULL THEN
+                    CASE
+                        WHEN p.name LIKE :pattern ESCAPE '!' THEN 0
+                        WHEN p.address LIKE :pattern ESCAPE '!' THEN 1
+                        ELSE 2
+                    END
                 END,
                 p.name ASC,
                 p.id ASC
@@ -429,6 +388,9 @@ interface UserPlaceBookmarkJpaRepository : JpaRepository<UserPlaceBookmarkEntity
         @Param("pattern") pattern: String,
         @Param("groupId") groupId: Long?,
         pageable: Pageable,
+        @Param("sort") sort: String? = null,
+        @Param("latitude") latitude: BigDecimal? = null,
+        @Param("longitude") longitude: BigDecimal? = null,
     ): Page<SavedPlaceSearchProjection>
 
     @Query(
@@ -493,6 +455,7 @@ interface MapPlaceProjection {
 }
 
 interface RecentPlaceProjection {
+    val distanceScore: Double?
     val bookmarkId: Long
     val bookmarkedAt: Instant
     val placeId: Long
@@ -576,4 +539,61 @@ internal const val RECENT_PLACE_ACCESS_SQL = """
                       AND shared_saved_post.deleted_at IS NULL
                 )
               )
+"""
+
+internal const val RECENT_PLACE_SELECT_SQL = """
+            SELECT
+                upb.id AS bookmarkId,
+                upb.last_saved_at AS bookmarkedAt,
+                p.id AS placeId,
+                p.name AS name,
+                p.city AS city,
+                p.address AS address,
+                p.category AS category,
+                p.provider_category AS providerCategory,
+                p.latitude AS latitude,
+                p.longitude AS longitude,
+                CAST(p.representative_tags AS CHAR) AS representativeTags,
+                p.thumbnail_url AS thumbnailUrl,
+                p.thumbnail_parsing_status AS thumbnailParsingStatus,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM user_saved_posts usp
+                        INNER JOIN user_saved_post_places uspp ON uspp.user_saved_post_id = usp.id
+                        WHERE usp.user_id = upb.user_id
+                          AND usp.deleted_at IS NULL
+                          AND uspp.place_id = p.id
+                    ) THEN NULL
+                    ELSE (
+                        SELECT share_link.token_value
+                        FROM shared_group_subscriptions subscription
+                        INNER JOIN group_share_links share_link
+                            ON share_link.id = subscription.share_link_id
+                        INNER JOIN group_posts shared_group_post
+                            ON shared_group_post.group_id = share_link.group_id
+                        INNER JOIN user_groups shared_group ON shared_group.id = shared_group_post.group_id
+                        INNER JOIN user_saved_posts shared_saved_post
+                            ON shared_saved_post.id = shared_group_post.user_saved_post_id
+                        INNER JOIN user_saved_post_places shared_saved_post_place
+                            ON shared_saved_post_place.user_saved_post_id = shared_saved_post.id
+                        WHERE subscription.member_id = upb.user_id
+                          AND shared_saved_post_place.place_id = p.id
+                          AND share_link.revoked_at IS NULL
+                          AND (share_link.expires_at IS NULL OR share_link.expires_at > CURRENT_TIMESTAMP(6))
+                          AND shared_group_post.deleted_at IS NULL
+                          AND shared_group.deleted_at IS NULL
+                          AND (:filterByGroups = false OR shared_group.id IN (:groupIds))
+                          AND shared_saved_post.deleted_at IS NULL
+                        ORDER BY subscription.created_at DESC, subscription.id DESC
+                        LIMIT 1
+                    )
+                END AS shareToken
+            $RECENT_PLACE_ACCESS_SQL
+"""
+
+internal const val PLACE_DISTANCE_SCORE_SQL = """
+    (POWER(SIN(RADIANS(p.latitude - :latitude) / 2), 2)
+     + COS(RADIANS(:latitude)) * COS(RADIANS(p.latitude))
+       * POWER(SIN(RADIANS(p.longitude - :longitude) / 2), 2))
 """

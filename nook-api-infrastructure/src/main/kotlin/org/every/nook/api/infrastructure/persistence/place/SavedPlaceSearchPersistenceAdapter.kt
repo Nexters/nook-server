@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.persistence.place
 
 import org.every.nook.api.application.place.PlaceCategoryGroup
+import org.every.nook.api.application.place.PlaceOrdering
 import org.every.nook.api.application.place.SavedPlaceSearchGroupView
 import org.every.nook.api.application.place.SavedPlaceSearchItemView
 import org.every.nook.api.application.place.SavedPlaceSearchPageView
@@ -13,13 +14,23 @@ import org.springframework.transaction.annotation.Transactional
 class SavedPlaceSearchPersistenceAdapter(private val bookmarkRepository: UserPlaceBookmarkJpaRepository) :
     SavedPlaceSearchPort {
     @Transactional(readOnly = true)
-    override fun search(userId: Long, keyword: String, groupId: Long?, page: Int, size: Int): SavedPlaceSearchPageView {
+    override fun search(
+        userId: Long,
+        keyword: String,
+        groupId: Long?,
+        page: Int,
+        size: Int,
+        ordering: PlaceOrdering?,
+    ): SavedPlaceSearchPageView {
         val pattern = keyword.toLikePattern()
         val result = bookmarkRepository.searchSavedPlaces(
             userId = userId,
             pattern = pattern,
             groupId = groupId,
             pageable = PageRequest.of(page, size),
+            sort = ordering?.sort?.name,
+            latitude = ordering?.latitude,
+            longitude = ordering?.longitude,
         )
         return SavedPlaceSearchPageView(
             items = result.content.map { row ->
