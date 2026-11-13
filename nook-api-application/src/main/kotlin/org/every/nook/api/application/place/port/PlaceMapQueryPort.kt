@@ -1,6 +1,7 @@
 package org.every.nook.api.application.place.port
 
 import org.every.nook.api.application.place.MapPlaceView
+import org.every.nook.api.application.place.PlaceOrdering
 import org.every.nook.api.application.place.RecentPlaceCursor
 import org.every.nook.api.application.place.RecentPlaceView
 import org.every.nook.api.domain.place.GeoBounds
@@ -15,5 +16,6 @@ interface PlaceMapQueryPort {
         cursor: RecentPlaceCursor?,
         limit: Int,
         groupIds: List<Long>? = null,
+        ordering: PlaceOrdering = PlaceOrdering(),
     ): List<RecentPlaceView>
 }

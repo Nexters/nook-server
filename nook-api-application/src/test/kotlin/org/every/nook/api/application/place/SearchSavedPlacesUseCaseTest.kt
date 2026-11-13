@@ -28,7 +28,7 @@ class SearchSavedPlacesUseCaseTest {
             hasNext = false,
         )
         val useCase = SearchSavedPlacesUseCase(
-            SavedPlaceSearchPort { userId, keyword, groupId, page, size ->
+            SavedPlaceSearchPort { userId, keyword, groupId, page, size, _ ->
                 assertEquals(7, userId)
                 assertEquals("카페", keyword)
                 assertEquals(3, groupId)
@@ -47,7 +47,7 @@ class SearchSavedPlacesUseCaseTest {
     @Test
     fun `rejects blank keyword and invalid pagination`() {
         val useCase = SearchSavedPlacesUseCase(
-            SavedPlaceSearchPort { _, _, _, _, _ -> error("must not search") },
+            SavedPlaceSearchPort { _, _, _, _, _, _ -> error("must not search") },
             GroupOwnershipPort { _, _ -> true },
         )
 
@@ -65,7 +65,7 @@ class SearchSavedPlacesUseCaseTest {
     @Test
     fun `rejects a group that the current user does not own`() {
         val useCase = SearchSavedPlacesUseCase(
-            SavedPlaceSearchPort { _, _, _, _, _ -> error("must not search") },
+            SavedPlaceSearchPort { _, _, _, _, _, _ -> error("must not search") },
             GroupOwnershipPort { _, _ -> false },
         )
 
