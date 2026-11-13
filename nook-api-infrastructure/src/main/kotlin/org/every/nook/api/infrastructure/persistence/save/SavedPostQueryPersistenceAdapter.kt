@@ -18,6 +18,7 @@ import org.every.nook.api.application.post.model.SavedPostPage
 import org.every.nook.api.application.post.model.SavedPostPlace
 import org.every.nook.api.application.post.model.SavedPostSummary
 import org.every.nook.api.application.post.port.SavedPostQueryPort
+import org.every.nook.api.application.post.port.UnlinkedSavedPostQueryPort
 import org.every.nook.api.domain.place.PlaceParsingStatus
 import org.every.nook.api.domain.place.PlaceTag
 import org.every.nook.api.domain.post.PostContentParsingStatus
@@ -47,6 +48,7 @@ import java.time.Clock
 @Component
 class SavedPostQueryPersistenceAdapter(
     private val savedPostRepository: UserSavedPostJpaRepository,
+    private val unlinkedPostRepository: UnlinkedSavedPostJpaRepository,
     private val postRepository: PostJpaRepository,
     private val mediaRepository: PostMediaJpaRepository,
     private val hashtagRepository: PostHashtagJpaRepository,
@@ -61,7 +63,15 @@ class SavedPostQueryPersistenceAdapter(
     private val tagCatalogPort: PlaceTagCatalogQueryPort = PlaceTagCatalogQueryPort { PlaceTag.defaultDefinitions },
     private val clock: Clock = Clock.systemUTC(),
 ) : SavedPostQueryPort,
+    UnlinkedSavedPostQueryPort,
     GroupPostQueryPort {
+    @Transactional(readOnly = true)
+    override fun countUnlinked(userId: Long): Long = unlinkedPostRepository.countUnlinked(userId)
+
+    @Transactional(readOnly = true)
+    override fun findUnlinked(userId: Long, page: Int, size: Int): SavedPostPage =
+        unlinkedPostRepository.findUnlinked(userId, PageRequest.of(page, size)).toPage(usePlaceThumbnail = false)
+
     @Transactional(readOnly = true)
     override fun findAll(userId: Long, page: Int, size: Int): SavedPostPage {
         val pageable = PageRequest.of(
@@ -119,7 +129,7 @@ class SavedPostQueryPersistenceAdapter(
             postRepository.findAllById(sourcePostIds).associateBy { requireNotNull(it.id) }
         }
         val firstMediaByPostId = findFirstMediaByPostId(sourcePostIds)
-        val savedPostPlaces = findSavedPostPlaces(savedPostIds)
+        val savedPostPlaces = savedPostPlaceRepository.findSavedPostPlaces(savedPostIds)
         val savedPostIdsWithPlaces = savedPostPlaces.mapTo(mutableSetOf()) { it.userSavedPostId }
         val firstPlaceThumbnailBySavedPostId = if (usePlaceThumbnail) {
             findFirstPlaceThumbnailBySavedPostId(savedPostPlaces)
@@ -305,13 +315,6 @@ class SavedPostQueryPersistenceAdapter(
         }
     }
 
-    private fun PostMediaEntity.toView(): SavedPostMedia = SavedPostMedia(
-        type = SavedPostMediaType.valueOf(mediaType.name),
-        url = mediaUrl,
-        sequence = sequence,
-        thumbnailUrl = thumbnailUrl,
-    )
-
     private fun findFirstMediaByPostId(sourcePostIds: List<Long>): Map<Long, SavedPostMedia> =
         if (sourcePostIds.isEmpty()) {
             emptyMap()
@@ -345,13 +348,6 @@ class SavedPostQueryPersistenceAdapter(
             .toMap()
     }
 
-    private fun findSavedPostPlaces(savedPostIds: List<Long>): List<UserSavedPostPlaceEntity> =
-        if (savedPostIds.isEmpty()) {
-            emptyList()
-        } else {
-            savedPostPlaceRepository.findAllByUserSavedPostIdInOrderByUserSavedPostIdAscSequenceAsc(savedPostIds)
-        }
-
     private companion object {
         const val THUMBNAIL_SEQUENCE = 0
     }
@@ -371,3 +367,18 @@ private fun UserSavedPostEntity.ownContentStatus(job: PostContentParsingJobEntit
 
 private fun UserSavedPostEntity.ownPlaceStatus(status: PlaceParsingStatus?, hasPlaces: Boolean) =
     status.effectiveFor(placeLinksFrozen || hasPlaces)
+
+private fun PostMediaEntity.toView(): SavedPostMedia = SavedPostMedia(
+    type = SavedPostMediaType.valueOf(mediaType.name),
+    url = mediaUrl,
+    sequence = sequence,
+    thumbnailUrl = thumbnailUrl,
+)
+
+private fun UserSavedPostPlaceJpaRepository.findSavedPostPlaces(
+    savedPostIds: List<Long>,
+): List<UserSavedPostPlaceEntity> = if (savedPostIds.isEmpty()) {
+    emptyList()
+} else {
+    findAllByUserSavedPostIdInOrderByUserSavedPostIdAscSequenceAsc(savedPostIds)
+}
