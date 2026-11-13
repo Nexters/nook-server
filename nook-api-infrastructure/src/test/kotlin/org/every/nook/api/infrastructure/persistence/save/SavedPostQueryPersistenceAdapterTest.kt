@@ -47,6 +47,7 @@ import kotlin.test.assertNull
 
 class SavedPostQueryPersistenceAdapterTest {
     private val savedPostRepository = mock(UserSavedPostJpaRepository::class.java)
+    private val unlinkedPostRepository = mock(UnlinkedSavedPostJpaRepository::class.java)
     private val postRepository = mock(PostJpaRepository::class.java)
     private val mediaRepository = mock(PostMediaJpaRepository::class.java)
     private val hashtagRepository = mock(PostHashtagJpaRepository::class.java)
@@ -60,6 +61,7 @@ class SavedPostQueryPersistenceAdapterTest {
     private val memberRepository = mock(MemberJpaRepository::class.java)
     private val adapter = SavedPostQueryPersistenceAdapter(
         savedPostRepository,
+        unlinkedPostRepository,
         postRepository,
         mediaRepository,
         hashtagRepository,
@@ -72,6 +74,20 @@ class SavedPostQueryPersistenceAdapterTest {
         groupPostRepository,
         memberRepository,
     )
+
+    @Test
+    fun `unlinked list uses the filtered repository without fetching all posts`() {
+        val pageable = PageRequest.of(1, 20)
+        `when`(unlinkedPostRepository.findUnlinked(7, pageable)).thenReturn(PageImpl(emptyList(), pageable, 20))
+        `when`(unlinkedPostRepository.countUnlinked(7)).thenReturn(20)
+        val page = adapter.findUnlinked(7, 1, 20)
+        assertEquals(emptyList(), page.items)
+        assertEquals(20L, page.totalElements)
+        assertEquals(1, page.page)
+        assertEquals(20L, adapter.countUnlinked(7))
+        verify(unlinkedPostRepository).findUnlinked(7, pageable)
+        verifyNoInteractions(savedPostRepository)
+    }
 
     @Test
     fun `empty shared copy stays completed while common source is retried`() {
