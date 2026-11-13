@@ -1,0 +1,19 @@
+Applied at 2026-11-13T20:00:24+09:00 by Codex (백도현 승인)
+Target: dev 1.201.120.75:3806/nook, MySQL 8.4.11
+Table	Create Table
+user_place_reminder_preferences	CREATE TABLE `user_place_reminder_preferences` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '장소 연결 리마인드 설정 식별자',
+  `user_id` bigint NOT NULL COMMENT '설정 소유 사용자 식별자',
+  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '장소 연결 리마인드 사용 여부',
+  `created_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '설정 생성 시각',
+  `updated_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '설정 최종 변경 시각',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_u_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='사용자별 장소 미연결 게시물 안내 설정'
+preference_rows
+0
+physical_foreign_keys
+0
+INDEX_NAME	NON_UNIQUE	COLUMN_NAME
+idx_u_user_id	0	user_id
+PRIMARY	0	id

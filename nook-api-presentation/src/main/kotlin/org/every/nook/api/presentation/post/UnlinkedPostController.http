@@ -1,0 +1,13 @@
+### 카카오 로그인
+POST {{baseUrl}}/api/v1/auth/social
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "accessToken": "replace-with-kakao-access-token"
+}
+
+### 장소 미연결 게시물 목록 (저장 최신순)
+# 응답 postId는 기존 /posts/{postId}/places 장소 연결에 사용하는 저장 게시물 ID입니다.
+# totalElements는 현재 내 아카이브의 고유 대상 수이며 설정 ON/OFF에 영향받지 않습니다.
+GET {{baseUrl}}/api/v1/posts/unlinked-places?page=0&size=20
