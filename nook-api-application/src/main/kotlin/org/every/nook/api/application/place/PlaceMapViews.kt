@@ -15,6 +15,8 @@ data class MapPlaceView(
     val thumbnailUrl: String?,
     val thumbnailParsingStatus: PlaceThumbnailParsingStatusView = PlaceThumbnailParsingStatusView.PENDING,
     val tags: List<String> = emptyList(),
+    val accessType: PlaceAccessType = PlaceAccessType.OWNED,
+    val shareToken: String? = null,
 )
 
 data class RecentPlaceView(

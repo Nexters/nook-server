@@ -89,6 +89,8 @@ class PlaceMapQueryPersistenceAdapterTest {
 
         val result = adapter.findInBounds(7, bounds)
 
+        assertEquals(PlaceAccessType.OWNED, result.single().accessType)
+        assertNull(result.single().shareToken)
         assertEquals(17, result.single().id)
         assertEquals("퍼머넌트해비탯", result.single().name)
         assertEquals("서울", result.single().city)
@@ -112,6 +114,7 @@ class PlaceMapQueryPersistenceAdapterTest {
         `when`(row.latitude).thenReturn(BigDecimal("37.5"))
         `when`(row.longitude).thenReturn(BigDecimal("127.0"))
         `when`(row.color).thenReturn("YELLOW")
+        `when`(row.shareToken).thenReturn("share-token-value")
         `when`(
             repository.findMapPlaces(
                 userId = 7,
@@ -124,6 +127,8 @@ class PlaceMapQueryPersistenceAdapterTest {
 
         val result = adapter.findInBounds(7, bounds)
 
+        assertEquals(PlaceAccessType.SHARED, result.single().accessType)
+        assertEquals("share-token-value", result.single().shareToken)
         assertEquals("YELLOW", result.single().color)
         assertEquals(PlaceThumbnailParsingStatusView.PENDING, result.single().thumbnailParsingStatus)
     }

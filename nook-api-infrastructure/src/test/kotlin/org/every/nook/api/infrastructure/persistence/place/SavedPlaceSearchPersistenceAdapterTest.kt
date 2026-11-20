@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceAccessType
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
@@ -34,6 +35,8 @@ class SavedPlaceSearchPersistenceAdapterTest {
 
         val result = adapter.search(userId = 7, keyword = "100%_!", groupId = 9, page = 1, size = 2, ordering = null)
 
+        assertEquals(PlaceAccessType.OWNED, result.items.single().accessType)
+        assertEquals(null, result.items.single().shareToken)
         assertEquals(17, result.items.single().id)
         assertEquals("카페 100%_!", result.items.single().name)
         assertEquals("서울 성동구", result.items.single().address)
@@ -48,5 +51,21 @@ class SavedPlaceSearchPersistenceAdapterTest {
         assertFalse(result.hasNext)
         verify(repository).searchSavedPlaces(7, "%100!%!_!!%", 9, pageable)
         verify(repository).findSavedPlaceSearchGroups(7, "%100!%!_!!%")
+    }
+
+    @Test
+    fun `shared search results carry the public detail token`() {
+        val row = mock(SavedPlaceSearchProjection::class.java)
+        `when`(row.name).thenReturn("공유 카페")
+        `when`(row.address).thenReturn("서울")
+        `when`(row.shareToken).thenReturn("share-token-value")
+        `when`(repository.searchSavedPlaces(7, "%카페%", null, PageRequest.of(0, 20))).thenReturn(
+            PageImpl(listOf(row)),
+        )
+
+        val result = adapter.search(7, "카페", null, 0, 20, null)
+
+        assertEquals(PlaceAccessType.SHARED, result.items.single().accessType)
+        assertEquals("share-token-value", result.items.single().shareToken)
     }
 }
