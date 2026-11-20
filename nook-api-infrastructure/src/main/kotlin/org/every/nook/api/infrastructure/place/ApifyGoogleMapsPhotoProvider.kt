@@ -1,6 +1,7 @@
 package org.every.nook.api.infrastructure.place
 
 import org.every.nook.api.application.place.PlaceCandidate
+import org.every.nook.api.application.place.PlaceOpeningHours
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.application.place.PlaceThumbnailProvider
 import org.every.nook.api.application.post.port.PostMediaStoragePort
@@ -80,6 +81,7 @@ class ApifyGoogleMapsPhotoProvider(
                 category = node.text("categoryName") ?: node.stringList("categories").firstOrNull(),
                 latitude = node.path("location").decimal("lat") ?: node.decimal("latitude"),
                 longitude = node.path("location").decimal("lng") ?: node.decimal("longitude"),
+                openingHours = ApifyOpeningHoursParser.parse(node),
                 imageUrls = node.stringList("imageUrls").ifEmpty {
                     listOfNotNull(node.text("imageUrl"))
                 },
@@ -131,7 +133,7 @@ class ApifyGoogleMapsPhotoProvider(
         matches.zip(storedPhotoTasks).map { (match, tasks) ->
             match?.let {
                 PlaceSupplement(
-                    openingHours = null,
+                    openingHours = match.openingHours,
                     photoUrls = tasks.mapNotNull { task -> task.get() },
                     googlePlaceId = match.placeId,
                 )
@@ -161,6 +163,7 @@ class ApifyGoogleMapsPhotoProvider(
         val latitude: BigDecimal?,
         val longitude: BigDecimal?,
         val imageUrls: List<String>,
+        val openingHours: PlaceOpeningHours?,
     )
 
     private companion object {
