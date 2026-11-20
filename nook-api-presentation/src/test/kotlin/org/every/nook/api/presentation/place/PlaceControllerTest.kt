@@ -188,12 +188,73 @@ class PlaceControllerTest {
             jsonPath("$.success[0].category") { value("음식점") }
             jsonPath("$.success[0].latitude") { value(37.5) }
             jsonPath("$.success[0].longitude") { value(127.0) }
+            jsonPath("$.success[0].accessType") { value("OWNED") }
+            jsonPath("$.success[0].shareToken") { value(null) }
             jsonPath("$.success[0].color") { value("BLUE") }
             jsonPath("$.success[0].thumbnailUrl") { value("https://example.com/map-place.jpg") }
             jsonPath("$.success[0].thumbnailParsingStatus") { value("COMPLETED") }
         }
 
         verify(getMapPlacesUseCase)(query)
+    }
+
+    @Test
+    fun `map and search expose shared access metadata for public place detail navigation`() {
+        val mapQuery = GetMapPlacesUseCase.Query(
+            TEST_USER_ID,
+            BigDecimal("37.6"),
+            BigDecimal("126.8"),
+            BigDecimal("37.4"),
+            BigDecimal("127.2"),
+        )
+        val shared = MapPlaceView(
+            id = 17,
+            name = "공유 카페",
+            city = "서울",
+            category = "카페",
+            latitude = BigDecimal("37.5"),
+            longitude = BigDecimal("127.0"),
+            color = "BLUE",
+            thumbnailUrl = null,
+            accessType = PlaceAccessType.SHARED,
+            shareToken = "share-token-value",
+        )
+        `when`(getMapPlacesUseCase(mapQuery)).thenReturn(listOf(shared))
+        val searchQuery = SearchSavedPlacesUseCase.Query(TEST_USER_ID, "카페", 0, 20)
+        `when`(searchSavedPlacesUseCase(searchQuery)).thenReturn(
+            SavedPlaceSearchPageView(
+                items = listOf(
+                    SavedPlaceSearchItemView(
+                        id = 17,
+                        name = "공유 카페",
+                        address = "서울",
+                        category = "카페",
+                        thumbnailUrl = null,
+                        accessType = PlaceAccessType.SHARED,
+                        shareToken = "share-token-value",
+                    ),
+                ),
+                groups = emptyList(),
+                page = 0,
+                size = 20,
+                totalElements = 1,
+                totalPages = 1,
+                hasNext = false,
+            ),
+        )
+
+        mockMvc.get(
+            "/api/v1/places/map?northLatitude=37.6&westLongitude=126.8&southLatitude=37.4&eastLongitude=127.2",
+        ).andExpect {
+            status { isOk() }
+            jsonPath("$.success[0].accessType") { value("SHARED") }
+            jsonPath("$.success[0].shareToken") { value("share-token-value") }
+        }
+        mockMvc.get("/api/v1/places/saved/search?query=카페").andExpect {
+            status { isOk() }
+            jsonPath("$.success.items[0].accessType") { value("SHARED") }
+            jsonPath("$.success.items[0].shareToken") { value("share-token-value") }
+        }
     }
 
     @Test
@@ -518,6 +579,8 @@ class PlaceControllerTest {
                 jsonPath("$.success.items[0].category") { value("카페") }
                 jsonPath("$.success.items[0].thumbnailUrl") { value("https://cdn.example.com/place.jpg") }
                 jsonPath("$.success.items[0].id") { value(17) }
+                jsonPath("$.success.items[0].accessType") { value("OWNED") }
+                jsonPath("$.success.items[0].shareToken") { value(null) }
                 jsonPath("$.success.groups[0].id") { value(3) }
                 jsonPath("$.success.groups[0].name") { value("서울 카페") }
                 jsonPath("$.success.groups[0].color") { value("YELLOW") }

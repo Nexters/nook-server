@@ -58,6 +58,8 @@ class PlaceMapQueryPersistenceAdapter(
                     ),
                 ),
                 tags = row.representativeTags.toDisplayTags(tagCatalog),
+                accessType = if (row.shareToken == null) PlaceAccessType.OWNED else PlaceAccessType.SHARED,
+                shareToken = row.shareToken,
             )
         }
     }

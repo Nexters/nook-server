@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.PlaceOrdering
 import org.every.nook.api.application.place.SavedPlaceSearchGroupView
@@ -41,6 +42,8 @@ class SavedPlaceSearchPersistenceAdapter(private val bookmarkRepository: UserPla
                     category = row.category,
                     categoryGroup = PlaceCategoryGroup.from(row.providerCategory),
                     thumbnailUrl = row.thumbnailUrl,
+                    accessType = if (row.shareToken == null) PlaceAccessType.OWNED else PlaceAccessType.SHARED,
+                    shareToken = row.shareToken,
                 )
             },
             groups = bookmarkRepository.findSavedPlaceSearchGroups(userId, pattern).map { row ->
