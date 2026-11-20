@@ -1,5 +1,6 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceOpeningHours
 import org.every.nook.api.application.place.PlaceSupplement
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
 import java.math.BigDecimal
@@ -74,6 +75,21 @@ class PlaceSupplementUpdateTest {
 
         assertEquals("google-123", place.googlePlaceId)
         assertEquals(PlaceThumbnailParsingStatus.FAILED, place.thumbnailParsingStatus)
+    }
+
+    @Test
+    fun `persists hours without photos and keeps them when a later provider has none`() {
+        val place = place()
+        val hours = PlaceOpeningHours("Asia/Seoul")
+
+        place.updateThumbnailParsing(
+            PlaceThumbnailParsingStatus.FAILED,
+            PlaceSupplement(openingHours = hours, photoUrls = emptyList()),
+        )
+        assertEquals(hours, place.openingHours)
+
+        place.updateSupplement(PlaceSupplement(openingHours = null, photoUrls = listOf(POST_IMAGE_URL)))
+        assertEquals(hours, place.openingHours)
     }
 
     private fun place(thumbnailUrl: String? = null) = PlaceEntity(

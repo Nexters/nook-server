@@ -18,12 +18,16 @@ import org.springframework.test.web.client.response.MockRestResponseCreators.wit
 import org.springframework.web.client.RestClient
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ApifyGoogleMapsPhotoProviderTest {
     @Test
@@ -202,6 +206,48 @@ class ApifyGoogleMapsPhotoProviderTest {
         )
 
         assertEquals(listOf("apify-actor", "image-store"), metrics.measurements.map { it.stage })
+    }
+
+    @Test
+    fun `keeps weekly hours without photos and calculates current opening state`() {
+        val fixture = fixture()
+        val days = listOf("일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일")
+        val hours = days.map { day -> mapOf("day" to day, "hours" to "오전 10:00~오후 9:00") }
+        val response = jacksonObjectMapper().writeValueAsString(
+            listOf(
+                mapOf(
+                    "placeId" to "google-1",
+                    "title" to "누크 카페",
+                    "countryCode" to "KR",
+                    "openingHours" to hours,
+                ),
+            ),
+        )
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(response, MediaType.APPLICATION_JSON))
+
+        val result = assertNotNull(fixture.provider.fetch(request("google-1")))
+        val openingHours = assertNotNull(result.openingHours)
+
+        assertEquals(emptyList(), result.photoUrls)
+        assertEquals("Asia/Seoul", openingHours.timeZone)
+        assertEquals(7, openingHours.weekdayDescriptions.size)
+        assertTrue(openingHours.isOpenAt(Instant.parse("2026-11-20T03:00:00Z")))
+        assertFalse(openingHours.isOpenAt(Instant.parse("2026-11-20T13:00:00Z")))
+        fixture.server.verify()
+    }
+
+    @Test
+    fun `absent hours preserve photo results and do not invent opening state`() {
+        val fixture = fixture()
+        fixture.server.expect(requestTo(containsString("/run-sync-get-dataset-items")))
+            .andRespond(withSuccess(RESPONSE, MediaType.APPLICATION_JSON))
+
+        val result = assertNotNull(fixture.provider.fetch(request("google-1")))
+
+        assertNull(result.openingHours)
+        assertEquals(6, result.photoUrls.size)
+        fixture.server.verify()
     }
 
     private fun fixture(
