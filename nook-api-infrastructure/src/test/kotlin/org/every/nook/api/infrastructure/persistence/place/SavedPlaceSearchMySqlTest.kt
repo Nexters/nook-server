@@ -81,8 +81,9 @@ class SavedPlaceSearchMySqlTest {
                 deleted_at TIMESTAMP(6) NULL)""",
             "group_posts (group_id BIGINT, user_saved_post_id BIGINT, deleted_at TIMESTAMP(6) NULL)",
             "post_media (post_id BIGINT, media_url VARCHAR(255), media_type VARCHAR(20), display_order INT)",
-            "shared_group_subscriptions (member_id BIGINT, share_link_id BIGINT)",
-            """group_share_links (id BIGINT PRIMARY KEY, group_id BIGINT,
+            """shared_group_subscriptions (id BIGINT, member_id BIGINT, share_link_id BIGINT,
+                created_at TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6))""",
+            """group_share_links (id BIGINT PRIMARY KEY, group_id BIGINT, token_value VARCHAR(100),
                 revoked_at TIMESTAMP(6) NULL, expires_at TIMESTAMP(6) NULL)""",
             """place_tag_catalogs (tag_code VARCHAR(50), display_name VARCHAR(50), enabled BOOLEAN,
                 matching_keywords JSON)""",
@@ -135,8 +136,8 @@ class SavedPlaceSearchMySqlTest {
         jdbc.update(
             "INSERT INTO group_posts VALUES (1, 1, NULL), (1, 2, NULL), (1, 3, NULL), (2, 2, NULL), (3, 6, NULL)",
         )
-        jdbc.update("INSERT INTO group_share_links VALUES (1, 3, NULL, NULL)")
-        jdbc.update("INSERT INTO shared_group_subscriptions VALUES (1, 1)")
+        jdbc.update("INSERT INTO group_share_links VALUES (1, 3, 'shared-token', NULL, NULL)")
+        jdbc.update("INSERT INTO shared_group_subscriptions (id, member_id, share_link_id) VALUES (1, 1, 1)")
     }
 }
 

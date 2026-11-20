@@ -1,6 +1,7 @@
 package org.every.nook.api.presentation.place.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.every.nook.api.application.place.PlaceAccessType
 import org.every.nook.api.application.place.PlaceCategoryGroup
 import org.every.nook.api.application.place.SavedPlaceSearchGroupView
 import org.every.nook.api.application.place.SavedPlaceSearchItemView
@@ -68,6 +69,13 @@ data class SavedPlaceSearchItemResponse(
     val thumbnailUrl: String?,
     @field:Schema(description = "장소 식별자")
     val id: Long,
+    @field:Schema(description = "장소 접근 유형. 공유 그룹 구독으로만 접근하는 장소는 SHARED입니다.")
+    val accessType: PlaceAccessType,
+    @field:Schema(
+        description = "공유 그룹 접근 토큰. accessType이 SHARED일 때만 내려가고 내 장소면 null입니다.",
+        nullable = true,
+    )
+    val shareToken: String?,
 ) {
     companion object {
         fun from(view: SavedPlaceSearchItemView): SavedPlaceSearchItemResponse = SavedPlaceSearchItemResponse(
@@ -77,6 +85,8 @@ data class SavedPlaceSearchItemResponse(
             categoryGroup = view.categoryGroup,
             thumbnailUrl = view.thumbnailUrl,
             id = view.id,
+            accessType = view.accessType,
+            shareToken = view.shareToken,
         )
     }
 }

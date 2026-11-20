@@ -150,6 +150,28 @@ class PlaceArchiveFilterQueryTest {
         assertEquals(listOf(1L, 2L, 3L, 4L), ids(null))
     }
 
+    @Test
+    fun `map and search return owned access without tokens and deterministic active shared tokens`() {
+        jdbc.execute("UPDATE places SET name = 'foo'")
+        listOf("findMapPlaces", "searchSavedPlaces").forEach { method ->
+            val tokens = rows(method, null).associate { (it.getValue("id") as Number).toLong() to it["shareToken"] }
+            assertEquals(mapOf(1L to null, 2L to null, 3L to "other-token", 4L to null), tokens)
+        }
+        val selected = rows("findMapPlaces", listOf(2L)).associate {
+            (it.getValue("id") as Number).toLong() to it["shareToken"]
+        }
+        assertEquals(mapOf(2L to null, 3L to "selected-token"), selected)
+        jdbc.execute("UPDATE group_share_links SET revoked_at = CURRENT_TIMESTAMP WHERE id = 2")
+        listOf("findMapPlaces", "searchSavedPlaces").forEach { method ->
+            assertEquals("selected-token", rows(method, null).single { it["shareToken"] != null }["shareToken"])
+        }
+        jdbc.execute("UPDATE group_share_links SET expires_at = TIMESTAMP '2000-01-01 00:00:00' WHERE id = 1")
+        listOf("findMapPlaces", "searchSavedPlaces").forEach { method ->
+            val ids = rows(method, null).map { (it.getValue("id") as Number).toLong() }
+            assertEquals(listOf(1L, 2L, 4L), ids.sorted())
+        }
+    }
+
     private fun List<Map<String, Any?>>.placeIds(): List<Long> = map { (it.getValue("placeId") as Number).toLong() }
 
     private fun count(groupIds: List<Long>?): Long =
