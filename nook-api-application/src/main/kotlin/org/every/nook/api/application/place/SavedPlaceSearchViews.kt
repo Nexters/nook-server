@@ -7,6 +7,8 @@ data class SavedPlaceSearchItemView(
     val category: String?,
     val categoryGroup: PlaceCategoryGroup = PlaceCategoryGroup.ETC,
     val thumbnailUrl: String?,
+    val accessType: PlaceAccessType = PlaceAccessType.OWNED,
+    val shareToken: String? = null,
 )
 
 data class SavedPlaceSearchGroupView(val id: Long, val name: String, val color: String, val matchedPlaceCount: Long)
