@@ -1,5 +1,8 @@
 package org.every.nook.api.infrastructure.persistence.place
 
+import org.every.nook.api.application.place.PlaceOpeningHours
+import org.every.nook.api.application.place.PlaceOpeningPeriod
+import org.every.nook.api.application.place.PlaceOpeningPoint
 import org.every.nook.api.application.place.PlaceThumbnailParsingStatusView
 import org.every.nook.api.domain.group.GroupColor
 import org.every.nook.api.domain.place.PlaceThumbnailParsingStatus
@@ -22,7 +25,9 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,6 +53,41 @@ class PlaceDetailQueryPersistenceAdapterTest {
         groupRepository,
         groupPostRepository,
     )
+
+    @Test
+    fun `detail returns saved hours and evaluates openNow with the clock`() {
+        val pageable = expectedPageable(page = 0, size = 20)
+        val place = place()
+        val hours = PlaceOpeningHours(
+            timeZone = "Asia/Seoul",
+            periods = listOf(PlaceOpeningPeriod(PlaceOpeningPoint(5, 10), PlaceOpeningPoint(5, 21))),
+            weekdayDescriptions = listOf("금요일: 10:00–21:00"),
+        )
+        `when`(place.openingHours).thenReturn(hours)
+        `when`(placeRepository.findById(17)).thenReturn(Optional.of(place))
+        `when`(savedPostRepository.findAllByUserIdAndPlaceId(7, 17, pageable))
+            .thenReturn(PageImpl(emptyList(), pageable, 0))
+        `when`(bookmarkRepository.findByUserIdAndPlaceId(7, 17)).thenReturn(bookmark(memo = null))
+        val adapter = PlaceDetailQueryPersistenceAdapter(
+            placeRepository,
+            bookmarkRepository,
+            savedPostRepository,
+            postRepository,
+            mediaRepository,
+            groupRepository,
+            groupPostRepository,
+            clock = Clock.fixed(Instant.parse("2026-11-20T03:00:00Z"), ZoneOffset.UTC),
+        )
+
+        val detail = assertNotNull(adapter.find(7, 17, 0, 20))
+        assertEquals(hours, detail.openingHours)
+        assertEquals(true, detail.openNow)
+
+        `when`(place.openingHours).thenReturn(null)
+        val missing = assertNotNull(adapter.find(7, 17, 0, 20))
+        assertNull(missing.openingHours)
+        assertNull(missing.openNow)
+    }
 
     @Test
     fun `bookmarked place is returned with an empty post page`() {
