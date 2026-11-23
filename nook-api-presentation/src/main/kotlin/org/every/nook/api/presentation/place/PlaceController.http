@@ -15,6 +15,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/places/map?northLatitude=37.60&westLongitude=126.80&southLatitude=37.40&eastLongitude=127.20
 
 ### 최근 저장 공간 조회
+# 서울 지역의 city는 서울로 반환됩니다.
 # totalCount는 미분류 포함 전체 접근 가능 장소 수입니다. 장소별 tags(최대 4개)가 포함됩니다.
 GET {{baseUrl}}/api/v1/places/recent?size=20
 

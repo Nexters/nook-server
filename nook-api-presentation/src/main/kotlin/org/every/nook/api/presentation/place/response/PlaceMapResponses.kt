@@ -115,7 +115,7 @@ data class RecentPlaceResponse(
         fun from(view: RecentPlaceView): RecentPlaceResponse = RecentPlaceResponse(
             id = view.id,
             name = view.name,
-            city = view.city,
+            city = if (view.city == "서울특별시") "서울" else view.city,
             address = view.address,
             category = view.category,
             categoryGroup = view.categoryGroup,
