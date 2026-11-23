@@ -415,6 +415,30 @@ class PlaceControllerTest {
         }
     }
 
+    @Test
+    fun `normalizes only Seoul city names in recent places`() {
+        val query = GetRecentPlacesUseCase.Query(userId = TEST_USER_ID, cursor = null, size = 20)
+        val place = recentPlaceView(accessType = PlaceAccessType.OWNED, shareToken = null)
+        val cities = listOf("서울특별시", "서울", "용인", null)
+        `when`(getRecentPlacesUseCase(query)).thenReturn(
+            RecentPlaceSliceView(
+                items = cities.map { place.copy(city = it, address = "서울특별시 성동구") },
+                nextCursor = null,
+                hasNext = false,
+                totalCount = cities.size.toLong(),
+            ),
+        )
+
+        mockMvc.get("/api/v1/places/recent").andExpect {
+            status { isOk() }
+            jsonPath("$.success.items[0].city") { value("서울") }
+            jsonPath("$.success.items[0].address") { value("서울특별시 성동구") }
+            jsonPath("$.success.items[1].city") { value("서울") }
+            jsonPath("$.success.items[2].city") { value("용인") }
+            jsonPath("$.success.items[3].city") { value(null) }
+        }
+    }
+
     private fun recentPlaceView(accessType: PlaceAccessType, shareToken: String?) = RecentPlaceView(
         bookmarkId = 31,
         bookmarkedAt = Instant.parse("2026-07-27T00:00:00Z"),
